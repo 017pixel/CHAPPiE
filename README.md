@@ -1,10 +1,14 @@
-# 🤖 CHAPPiE - Chappie Proto
+# 🤖 CHAPiE - AI Chat Assistant
 
-> Ein KI-Agent mit episodischem Gedächtnis - "Lernen wie ein Kind"
+> Ein KI-Agent mit episodischem Gedächtnis und Emotions-Engine - "Lernen wie ein Kind"
+
+## 🔗 Repository
+
+[![GitHub](https://img.shields.io/badge/GitHub-017pixel%2FCHAPPiE-blue?logo=github)](https://github.com/017pixel/CHAPPiE)
 
 ## 📋 Überblick
 
-CHAPPiE ist ein experimenteller KI-Agent, der sich an vergangene Interaktionen erinnert und sein Verhalten basierend auf Feedback anpasst. Das Kernkonzept ist ein **episodisches Gedächtnis** mit ChromaDB als Vektordatenbank.
+CHAPiE ist ein experimenteller KI-Agent, der sich an vergangene Interaktionen erinnert, sein Verhalten basierend auf Feedback anpasst und über eine Emotions-Engine verfügt. Das Kernkonzept ist ein **episodisches Gedächtnis** mit ChromaDB als Vektordatenbank, kombiniert mit einem dynamischen Emotionssystem.
 
 ## 🏗️ Architektur
 
@@ -28,20 +32,28 @@ CHAPPiE ist ein experimenteller KI-Agent, der sich an vergangene Interaktionen e
 ## 📁 Projektstruktur
 
 ```
-CHAPPiE/
+CHAPiE/
 ├── config/
 │   ├── config.py          # Zentrale Konfiguration
+│   ├── prompts.py         # System-Prompts & Templates
 │   └── secrets.py         # API-Keys & Modell-Einstellungen ⚠️
 ├── memory/
-│   └── memory_engine.py   # ChromaDB Wrapper
+│   ├── memory_engine.py   # ChromaDB Wrapper (Vektordatenbank)
+│   ├── emotions_engine.py # Emotions-Engine (6 Emotionen)
+│   └── chat_manager.py    # Chat-Session Management
 ├── brain/
 │   ├── base_brain.py      # Abstrakte LLM-Klasse
-│   ├── ollama_brain.py    # Ollama Implementation
-│   └── groq_brain.py      # Groq Cloud Implementation
+│   ├── ollama_brain.py    # Ollama Implementation (lokal)
+│   ├── groq_brain.py      # Groq Cloud Implementation
+│   └── response_parser.py # Antwort-Parsing & Markdown
 ├── data/
-│   └── chroma_db/         # Persistente Vektordatenbank
-├── main.py                # Haupt-Loop
-└── requirements.txt       # Dependencies
+│   ├── chat_sessions/     # Persistierte Chat-Sessions
+│   └── chroma_db/         # Vektordatenbank (automatisch erstellt)
+├── app.py                 # GUI-Anwendung (optional)
+├── main.py                # CLI Haupt-Loop
+├── requirements.txt       # Dependencies
+├── .gitignore             # Git-Ignore Regeln
+└── README.md              # Diese Datei
 ```
 
 ## 🚀 Installation
@@ -49,7 +61,8 @@ CHAPPiE/
 ### 1. Repository klonen & Virtual Environment
 
 ```bash
-cd CHAPpIE
+git clone https://github.com/017pixel/CHAPPiE.git
+cd CHAPPiE
 python -m venv venv
 .\venv\Scripts\activate  # Windows
 # source venv/bin/activate  # Linux/Mac
@@ -93,20 +106,59 @@ Alle Einstellungen befinden sich in `config/secrets.py`:
 | `GROQ_MODEL` | Groq Modell | `llama-3.1-8b-instant` |
 | `MEMORY_TOP_K` | Anzahl Erinnerungen | `5` |
 | `TEMPERATURE` | Kreativität (0.0-1.0) | `0.7` |
+| `USE_CHAIN_OF_THOUGHT` | Chain-of-Thought aktivieren | `True` |
+
+**⚠️ Wichtig:** `config/secrets.py` ist in `.gitignore` enthalten und wird **nicht** auf GitHub hochgeladen.
 
 ## 🎮 Verwendung
+
+### CLI Modus (Terminal)
 
 ```bash
 python main.py
 ```
 
+### GUI Modus (optional)
+
+```bash
+python app.py
+```
+
+### Verfügbare Commands
+
+- `/help` - Zeigt alle verfügbaren Commands
+- `/text` - Deaktiviert Sprachmodus
+- `/voice` - Aktiviert Sprachmodus
+- `/stop` - Beendet die aktuelle Sitzung
+- `/dream` - Startet Traum-Zusammenfassungs-Modus
+- `/emotion` - Zeigt aktuellen Emotions-Status
+
 ## 🧠 Features
 
-- **Episodisches Gedächtnis**: Speichert alle Konversationen als Vektoren
-- **RAG (Retrieval Augmented Generation)**: Findet relevante Erinnerungen
+### Kernfunktionen
+- **Episodisches Gedächtnis**: Speichert alle Konversationen als Vektoren in ChromaDB
+- **RAG (Retrieval Augmented Generation)**: Findet relevante Erinnerungen basierend auf Kontext
 - **Modulares Backend**: Wechsel zwischen Ollama (lokal) und Groq (Cloud)
 - **Token-Streaming**: Flüssige Textausgabe im Terminal
 - **Persistenz**: Erinnerungen bleiben nach Neustart erhalten
+
+### Emotions-Engine
+- **6 Emotionen**: Happiness, Trust, Energy, Curiosity, Frustration, Motivation
+- **Dynamisches System**: Emotionen ändern sich basierend auf Konversationen
+- **Kontext-Integration**: Emotions-Status wird in jeden Prompt eingebunden
+
+### Advanced Features
+- **Chain-of-Thought (CoT)**: Strukturiertes Denken für komplexere Antworten
+- **Sentiment-Analyse**: Analysiert Stimmung der Eingaben
+- **Query-Extraction**: Extrahiert Kerninformationen aus Nachrichten
+- **Traum-Zusammenfassung**: Konsolidiert Erinnerungen im Schlafmodus
+- **Markdown-Formatierung**: Saubere Darstellung von Code, Listen und Text
+
+### Voice Engine V2
+- **Edge-TTS**: Kostengünstige Text-to-Speech mit exzellenter Qualität
+- **Faster-Whisper**: 4x schneller als OpenAI Whisper
+- **Threading**: Non-blocking Audio-Verarbeitung
+- **Intelligente Leertasten-Erkennung**: Kein PTT-Trigger während Texteingabe
 
 ## 📊 Hardware-Anforderungen
 
@@ -125,20 +177,46 @@ python main.py
 
 **🎉 PROJEKT ABGESCHLOSSEN!**
 
-## 🆕 Letzte Updates (10. Januar 2026)
+## 🆕 Letzte Updates (11. Januar 2026)
 
-### Bug Fixes
+### GitHub Integration
+- ✅ Projekt auf GitHub veröffentlicht: https://github.com/017pixel/CHAPPiE
+- ✅ Git-Repository initialisiert und konfiguriert
+- ✅ `.gitignore` optimiert (schützt sensible Daten und Build-Artefakte)
+
+### Dokumentation
+- ✅ README aktualisiert mit neuen Informationen
+- ✅ Projektstruktur dokumentiert
+- ✅ Installationsanleitung vervollständigt
+
+### Vorherige Updates (10. Januar 2026)
+
+#### Bug Fixes
 - ✅ Commands funktionieren jetzt im Schlafmodus
 - ✅ Sprachmodus kann mit `/text` oder `/stop` deaktiviert werden
 - ✅ Intelligente Leertasten-Erkennung (kein PTT-Trigger während Texteingabe)
 - ✅ Verbesserte Markdown-Formatierung (Apostrophe, Bindestriche, Quotes)
 
-### Neue Features
+#### Neue Features
 - 🎙️ **Voice Engine V2** mit besseren Modellen:
-  - Edge-TTS (kostenlos, exzellente Qualität) 🆕
-  - Faster-Whisper (4x schneller als OpenAI Whisper) 🆕
+  - Edge-TTS (kostenlos, exzellente Qualität)
+  - Faster-Whisper (4x schneller als OpenAI Whisper)
   - Threading für non-blocking Audio
 - 📚 Siehe `BUGFIX_CHANGELOG.md` für Details
+
+---
+
+## 📄 Lizenz
+
+Dies ist ein experimentelles Projekt. Verwendung auf eigene Gefahr.
+
+## 🤝 Beitrag
+
+Fork das Repository und erstelle einen Pull Request für Verbesserungen!
+
+## 📞 Kontakt
+
+Bei Fragen oder Problemen öffne ein Issue auf GitHub.
 
 ---
 
