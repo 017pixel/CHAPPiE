@@ -103,12 +103,12 @@ Alle Einstellungen befinden sich in `config/secrets.py`:
 | `LLM_PROVIDER` | Backend: `ollama` oder `groq` | `ollama` |
 | `OLLAMA_MODEL` | Lokales Modell | `llama3:8b` |
 | `GROQ_API_KEY` | Groq Cloud API Key | (leer) |
-| `GROQ_MODEL` | Groq Modell | `llama-3.1-8b-instant` |
+| `GROQ_MODEL` | Groq Modell | `kimi k2` |
 | `MEMORY_TOP_K` | Anzahl Erinnerungen | `5` |
 | `TEMPERATURE` | Kreativität (0.0-1.0) | `0.7` |
 | `USE_CHAIN_OF_THOUGHT` | Chain-of-Thought aktivieren | `True` |
 
-**⚠️ Wichtig:** `config/secrets.py` ist in `.gitignore` enthalten und wird **nicht** auf GitHub hochgeladen.
+**⚠️ Wichtig:** `config/secrets.py` muss mit einem Groq gefüllt werden!
 
 ## 🎮 Verwendung
 
@@ -158,11 +158,8 @@ http://localhost:8501
 ### Verfügbare Commands
 
 - `/help` - Zeigt alle verfügbaren Commands
-- `/text` - Deaktiviert Sprachmodus
-- `/voice` - Aktiviert Sprachmodus
-- `/stop` - Beendet die aktuelle Sitzung
-- `/dream` - Startet Traum-Zusammenfassungs-Modus
-- `/emotion` - Zeigt aktuellen Emotions-Status
+- `/sleep` - Startet Traum-Zusammenfassungs-Modus
+- /config und noch viele mehr
 
 ## 🧠 Features
 
@@ -185,11 +182,6 @@ http://localhost:8501
 - **Traum-Zusammenfassung**: Konsolidiert Erinnerungen im Schlafmodus
 - **Markdown-Formatierung**: Saubere Darstellung von Code, Listen und Text
 
-### Voice Engine V2
-- **Edge-TTS**: Kostengünstige Text-to-Speech mit exzellenter Qualität
-- **Faster-Whisper**: 4x schneller als OpenAI Whisper
-- **Threading**: Non-blocking Audio-Verarbeitung
-- **Intelligente Leertasten-Erkennung**: Kein PTT-Trigger während Texteingabe
 
 ## 📊 Hardware-Anforderungen
 
@@ -205,8 +197,6 @@ http://localhost:8501
 - [x] Phase 3: Brain Engine (Ollama/Groq) ✅
 - [x] Phase 4: Main Loop & Integration ✅
 - [x] Phase 5: Bug Fixes & Voice Engine V2 ✅
-
-**🎉 PROJEKT ABGESCHLOSSEN!**
 
 ## 🆕 Letzte Updates (11. Januar 2026)
 
@@ -227,13 +217,6 @@ http://localhost:8501
 - ✅ Sprachmodus kann mit `/text` oder `/stop` deaktiviert werden
 - ✅ Intelligente Leertasten-Erkennung (kein PTT-Trigger während Texteingabe)
 - ✅ Verbesserte Markdown-Formatierung (Apostrophe, Bindestriche, Quotes)
-
-#### Neue Features
-- 🎙️ **Voice Engine V2** mit besseren Modellen:
-  - Edge-TTS (kostenlos, exzellente Qualität)
-  - Faster-Whisper (4x schneller als OpenAI Whisper)
-  - Threading für non-blocking Audio
-- 📚 Siehe `BUGFIX_CHANGELOG.md` für Details
 
 ---
 
