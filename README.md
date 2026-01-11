@@ -118,11 +118,42 @@ Alle Einstellungen befinden sich in `config/secrets.py`:
 python main.py
 ```
 
-### GUI Modus (optional)
+### GUI Modus (Streamlit Web-App)
+
+CHAPiE verfügt über eine moderne Web-GUI basierend auf **Streamlit**, die im Browser läuft.
+
+#### Installation der GUI-Abhängigkeit
 
 ```bash
-python app.py
+pip install streamlit
 ```
+
+#### Starten der GUI
+
+```bash
+streamlit run app.py
+```
+
+Die App öffnet sich automatisch in deinem Standard-Browser unter:
+```
+http://localhost:8501
+```
+
+#### GUI Features
+
+- **Chat-Interface**: Modernes Messaging-Interface mit Chat-Verlauf
+- **Emotions-Dashboard**: Echtzeit-Anzeige der 6 Emotionen (Happiness, Trust, Energy, Curiosity, Frustration, Motivation)
+- **Settings Panel**: Konfiguration von LLM-Provider, Temperatur, Memory-Top-K
+- **Session Management**: Mehrere Chat-Sessions speichern und laden
+- **Markdown-Support**: Formatierung für Code, Listen und Text
+- **Responsive Design**: Funktioniert auf Desktop und Tablet
+
+#### Streamlit Vorteile
+
+- **Keine Frontend-Entwicklung nötig**: Python-Code reicht aus
+- **Automatische UI**: Streamlit erstellt die Benutzeroberfläche automatisch
+- **Hot Reload**: Änderungen im Code werden sofort im Browser aktualisiert
+- **Interaktive Widgets**: Buttons, Slider, Textfelder mit wenigen Zeilen Code
 
 ### Verfügbare Commands
 
