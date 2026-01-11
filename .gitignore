@@ -1,0 +1,42 @@
+# CHAPiE .gitignore
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Projekt-spezifisch ===
+# Sensitive Daten (API Keys)
+config/secrets.py
+
+# Datenbank & Persistenz
+data/chroma_db/
+
+# Logs
+*.log
+logs/
+
+# === Build & Distribution ===
+build/
+dist/
+*.spec
+
+# === Chat Sessions (persönliche Daten) ===
+data/chat_sessions/
+data/status.json
+
+# === OS ===
+.DS_Store
+Thumbs.db
