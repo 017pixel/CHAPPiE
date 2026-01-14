@@ -33,6 +33,7 @@ class Memory:
     timestamp: str
     mem_type: str = "interaction"  # "interaction" oder "summary"
     relevance_score: float = 0.0
+    label: str = "original"  # "original" oder "zsm gefasst"
 
 
 class MemoryEngine:
@@ -51,9 +52,10 @@ class MemoryEngine:
         print(f"   Lade Embedding-Modell: {settings.embedding_model}")
         self.embedder = SentenceTransformer(settings.embedding_model)
         
-        # ChromaDB Client initialisieren (in-memory für Stabilität)
-        print(f"   Verbinde mit ChromaDB (in-memory)")
-        self.client = chromadb.Client(
+        # ChromaDB Client initialisieren (PERSISTENT für dauerhafte Speicherung)
+        print(f"   Verbinde mit ChromaDB (persistent: {CHROMA_DB_DIR})")
+        self.client = chromadb.PersistentClient(
+            path=str(CHROMA_DB_DIR),
             settings=ChromaSettings(anonymized_telemetry=False)
         )
         
@@ -66,25 +68,28 @@ class MemoryEngine:
         memory_count = self.collection.count()
         print(f"   Memory Engine bereit! ({memory_count} Erinnerungen geladen)")
     
-    def add_memory(self, content: str, role: str = "user", mem_type: str = "interaction") -> str:
+    def add_memory(self, content: str, role: str = "user", mem_type: str = "interaction", label: str = "original", source: str = "conversation") -> str:
         """
         Speichert eine neue Erinnerung.
-        
+
         Args:
             content: Der zu speichernde Text
             role: "user" oder "assistant"
-        
+            mem_type: "interaction" oder "summary"
+            label: "original", "zsm gefasst" oder "self_reflection"
+            source: "conversation" oder "self_reflection" (für Deep Think)
+
         Returns:
             Die ID der gespeicherten Erinnerung
         """
         # Generiere eindeutige ID
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
-        
+
         # Erstelle Embedding
         embedding = self.embedder.encode(content).tolist()
-        
-        # Speichere in ChromaDB
+
+        # Speichere in ChromaDB mit erweitertem Metadata
         self.collection.add(
             ids=[memory_id],
             embeddings=[embedding],
@@ -92,14 +97,73 @@ class MemoryEngine:
             metadatas=[{
                 "role": role,
                 "timestamp": timestamp,
-                "type": mem_type
+                "type": mem_type,
+                "label": label,
+                "source": source  # NEU: Quelle der Erinnerung
             }]
         )
-        
+
         if settings.debug:
-            print(f"   Memory gespeichert: [{role}] {content[:50]}...")
+            print(f"   Memory gespeichert: [{role}] [{source}] {content[:50]}...")
 
         return memory_id
+    
+    def search_self_reflections(self, query: str, top_k: int = 5) -> list[Memory]:
+        """
+        Sucht speziell nach Selbstreflexions-Erinnerungen.
+        
+        Priorisiert Memories mit source="self_reflection".
+        
+        Args:
+            query: Suchanfrage
+            top_k: Anzahl Ergebnisse
+            
+        Returns:
+            Liste von Memory-Objekten
+        """
+        if self.collection.count() == 0:
+            return []
+        
+        # Versuche zuerst mit Filter nach self_reflection
+        try:
+            query_embedding = self.embedder.encode(query).tolist()
+            
+            # Suche mit Filter
+            results = self.collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(top_k, self.collection.count()),
+                where={"source": "self_reflection"}
+            )
+            
+            # Wenn keine Selbstreflexionen, normale Suche
+            if not results["documents"] or not results["documents"][0]:
+                return self.search_memory(query, top_k=top_k)
+            
+            # Konvertiere zu Memory-Objekten
+            memories = []
+            for i, doc in enumerate(results["documents"][0]):
+                distance = results["distances"][0][i] if results["distances"] else 0
+                relevance = max(0, 1 - distance / 2)
+                metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+                
+                memory = Memory(
+                    id=results["ids"][0][i],
+                    content=doc,
+                    role=metadata.get("role", "unknown"),
+                    timestamp=metadata.get("timestamp", ""),
+                    mem_type=metadata.get("type", "interaction"),
+                    relevance_score=relevance,
+                    label=metadata.get("label", "self_reflection")
+                )
+                memories.append(memory)
+            
+            return memories
+            
+        except Exception as e:
+            # Fallback auf normale Suche
+            if settings.debug:
+                print(f"   Self-Reflection Suche fehlgeschlagen: {e}")
+            return self.search_memory(query, top_k=top_k)
 
     def extract_search_query(self, user_input: str) -> str:
         """
@@ -196,13 +260,13 @@ class MemoryEngine:
 
         # Erstelle Query-Embedding
         query_embedding = self.embedder.encode(optimized_query).tolist()
-        
+
         # Suche in ChromaDB
         results = self.collection.query(
             query_embeddings=[query_embedding],
             n_results=min(top_k, self.collection.count())
         )
-        
+
         # Konvertiere zu Memory-Objekten
         memories = []
         if results and results["documents"] and results["documents"][0]:
@@ -211,61 +275,63 @@ class MemoryEngine:
                 # 0 = identisch, 1 = orthogonal, 2 = gegensätzlich
                 distance = results["distances"][0][i] if results["distances"] else 0
                 relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
-                
+
                 metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-                
+
                 memory = Memory(
                     id=results["ids"][0][i],
                     content=doc,
                     role=metadata.get("role", "unknown"),
                     timestamp=metadata.get("timestamp", ""),
                     mem_type=metadata.get("type", "interaction"),
-                    relevance_score=relevance
+                    relevance_score=relevance,
+                    label=metadata.get("label", "original")
                 )
                 memories.append(memory)
-        
+
         return memories
     
     def get_recent_memories(self, limit: int = 10) -> list[Memory]:
         """
         Holt die neuesten Erinnerungen.
-        
+
         Args:
             limit: Maximale Anzahl
-        
+
         Returns:
             Liste von Memory-Objekten
         """
         if self.collection.count() == 0:
             return []
-        
+
         # Hole alle Erinnerungen
         results = self.collection.get(
             limit=limit,
             include=["documents", "metadatas"]
         )
-        
+
         memories = []
         if results and results["documents"]:
             for i, doc in enumerate(results["documents"]):
                 metadata = results["metadatas"][i] if results["metadatas"] else {}
-                
+
                 # Sicherstellen, dass metadata ein Dict ist
                 if not isinstance(metadata, dict):
                     metadata = {}
-                
+
                 memory = Memory(
                     id=results["ids"][i] if i < len(results["ids"]) else str(uuid.uuid4()),
                     content=doc if isinstance(doc, str) else str(doc),
                     role=metadata.get("role", "unknown"),
                     timestamp=metadata.get("timestamp", ""),
-                    mem_type=metadata.get("type", "interaction")
+                    mem_type=metadata.get("type", "interaction"),
+                    label=metadata.get("label", "original")
                 )
                 memories.append(memory)
-        
+
         # Sortiere nach Timestamp (neueste zuerst)
         memories.sort(key=lambda m: m.timestamp, reverse=True)
-        
+
         return memories[:limit]
     
     def delete_memories(self, ids: list[str]):
@@ -372,70 +438,285 @@ class MemoryEngine:
         
         return "\n".join(lines)
 
+    def _parse_bullet_points(self, text: str) -> list[str]:
+        """
+        Parst einen Text und extrahiert alle Stichpunkte als einzelne Elemente.
+        
+        Unterstuetzt:
+        - Bullet-Points mit -, *, •
+        - Nummerierte Listen (1., 2., 1), 2) etc.)
+        - Mehrzeilige Stichpunkte (Einrueckung wird beruecksichtigt)
+        
+        Args:
+            text: Der zu parsende Text
+            
+        Returns:
+            Liste von einzelnen Stichpunkten
+        """
+        import re
+        
+        bullet_points = []
+        current_point = []
+        
+        # Regex fuer Bullet-Point-Marker
+        bullet_pattern = re.compile(r'^\s*([-*•]|\d{1,2}[\.\)])\s+')
+        
+        for line in text.split('\n'):
+            stripped = line.strip()
+            
+            # Leere Zeilen beenden aktuellen Punkt
+            if not stripped:
+                if current_point:
+                    full_point = ' '.join(current_point).strip()
+                    if len(full_point) > 5:
+                        bullet_points.append(full_point)
+                    current_point = []
+                continue
+            
+            # Check ob Zeile mit Bullet beginnt
+            match = bullet_pattern.match(line)
+            if match:
+                # Vorherigen Punkt speichern
+                if current_point:
+                    full_point = ' '.join(current_point).strip()
+                    if len(full_point) > 5:
+                        bullet_points.append(full_point)
+                    current_point = []
+                
+                # Neuen Punkt starten (ohne Bullet-Marker)
+                clean_text = bullet_pattern.sub('', line).strip()
+                if clean_text:
+                    current_point.append(clean_text)
+            elif current_point:
+                # Fortsetzung des aktuellen Punkts (eingerueckte Zeile)
+                current_point.append(stripped)
+            else:
+                # Zeile ohne Bullet-Marker und kein aktiver Punkt
+                # Behandle als eigenstaendigen Punkt wenn genuegend Inhalt
+                if len(stripped) > 10:
+                    bullet_points.append(stripped)
+        
+        # Letzten Punkt nicht vergessen
+        if current_point:
+            full_point = ' '.join(current_point).strip()
+            if len(full_point) > 5:
+                bullet_points.append(full_point)
+        
+        return bullet_points
+
     def consolidate_memories(self, brain: Any) -> str:
         """
         Fuehrt die Memory-Consolidation (Traum-Phase) durch.
         
-        Holt alle Erinnerungen, laesst das LLM eine Zusammenfassung erstellen,
-        speichert die Zusammenfassung und loescht die alten Erinnerungen.
+        Robuste Version mit:
+        - Chunking (Batch-Verarbeitung) bei vielen Erinnerungen
+        - Fehlerbehandlung für Token-Limits (413 Errors)
+        - Atomare Operationen (Löschen erst nach Speichern)
+        """
+        from config.prompts import format_dream_prompt
+
+        # Erinnerungen holen
+        all_memories = self.get_recent_memories(limit=1000)
+        interaction_memories = [m for m in all_memories if m.mem_type == "interaction"]
+
+        if not interaction_memories:
+            return "Keine neuen Erinnerungen zum Konsolidieren vorhanden."
+
+        # Chunking-Konfiguration
+        BATCH_SIZE = 20
+        total_memories = len(interaction_memories)
+        
+        # In Batches aufteilen
+        batches = [interaction_memories[i:i + BATCH_SIZE] for i in range(0, total_memories, BATCH_SIZE)]
+        
+        summary_log = []
+        errors = []
+        consolidated_total = 0
+        deleted_total = 0
+        
+        for i, batch in enumerate(batches):
+            batch_id = f"Batch {i+1}/{len(batches)}"
+            
+            try:
+                # 1. Konversation formatieren
+                conversation_lines = []
+                for mem in batch:
+                    role_label = "User" if mem.role == "user" else "CHAPiE"
+                    conversation_lines.append(f"{role_label}: {mem.content}")
+                
+                conversation_text = "\n".join(conversation_lines)
+                dream_prompt = format_dream_prompt(conversation_text)
+                
+                # 2. Generierung mit Error Handling
+                try:
+                    gen_config = GenerationConfig(
+                        max_tokens=1000, # Etwas mehr Raum geben
+                        temperature=0.3,
+                        stream=False
+                    )
+                    summary = brain.generate([Message(role="user", content=dream_prompt)], config=gen_config)
+                except Exception as api_err:
+                    err_msg = str(api_err)
+                    if "413" in err_msg or "too large" in err_msg.lower():
+                        errors.append(f"{batch_id}: Token Limit überschritten - Erinnerungen bleiben erhalten.")
+                        continue # Batch überspringen, nichts löschen
+                    else:
+                        raise api_err # Anderen Fehler weiterwerfen
+
+                if not isinstance(summary, str):
+                    summary = str(summary)
+                
+                # 3. Parsen und Speichern (NEUE Memories)
+                bullet_points = self._parse_bullet_points(summary)
+                if not bullet_points:
+                    errors.append(f"{batch_id}: Keine Zusammenfassung generiert.")
+                    continue
+
+                for point in bullet_points:
+                    self.add_memory(point, role="assistant", mem_type="summary", label="zsm gefasst")
+                    consolidated_count = 0 # Nur für Logik
+                
+                # 4. Löschen der ALTEN Memories (nur wenn wir bis hier kommen)
+                batch_ids = [mem.id for mem in batch]
+                if batch_ids:
+                    self.delete_memories(batch_ids)
+                    deleted_total += len(batch_ids)
+                
+                summary_log.append(f"✅ {batch_id}: {len(bullet_points)} Fakten extrahiert.")
+                consolidated_total += len(bullet_points)
+                
+            except Exception as e:
+                import traceback
+                errors.append(f"❌ {batch_id} Fehler: {str(e)}")
+                if settings.debug:
+                    print(traceback.format_exc())
+        
+        # Abschlussbericht
+        result_msg = f"Traum-Phase abgeschlossen.\n"
+        result_msg += f"- Verarbeitet: {deleted_total}/{total_memories} Erinnerungen\n"
+        result_msg += f"- Neu erstellt: {consolidated_total} Fakten\n\n"
+        
+        if summary_log:
+            result_msg += "Verlauf:\n" + "\n".join(summary_log)
+            
+        if errors:
+            result_msg += "\n\n⚠️ Warnungen:\n" + "\n".join(errors)
+            
+        return result_msg
+
+    def think_deep(self, brain: Any, topic: str = "", steps: int = 10, delay: float = 1.0):
+        """
+        Fuehrt einen tiefen Reflektionsprozess durch (Think-Modus).
+        
+        Iteriert ueber mehrere Denkschritte, sucht relevante Erinnerungen,
+        formuliert Gedanken und speichert diese als neue Erinnerungen.
         
         Args:
             brain: Brain-Instanz fuer die Generierung
-        
-        Returns:
-            Zusammenfassungstext
+            topic: Optionales Thema fuer die Reflektion
+            steps: Anzahl der Denkschritte (default: 10)
+            delay: Verzoegerung zwischen Schritten in Sekunden (default: 1.0)
+            
+        Yields:
+            Dict mit step, thought, memories_found fuer jeden Schritt
         """
-        from config.prompts import format_dream_prompt
+        import time
         
-        # Alle Erinnerungen holen
-        all_memories = self.get_recent_memories(limit=1000)
+        # Think-Prompt Template
+        THINK_PROMPT_TEMPLATE = """Du bist CHAPPiE und befindest dich in einer tiefen Reflektionsphase.
+
+Dein aktueller Denkschritt: {step} von {total_steps}
+Thema der Reflektion: {topic}
+
+VORHERIGER GEDANKE:
+{previous_thought}
+
+RELEVANTE ERINNERUNGEN:
+{memories}
+
+AUFGABE:
+Reflektiere ueber das Thema basierend auf deinem vorherigen Gedanken und den Erinnerungen.
+Formuliere einen neuen, tieferen Gedanken der auf den bisherigen aufbaut.
+
+REGELN:
+- Sei introspektiv und analytisch
+- Verbinde verschiedene Informationen miteinander
+- Ziehe Schlussfolgerungen
+- Formuliere neue Fragen oder Erkenntnisse
+- Maximal 2-3 Saetze
+
+Dein naechster Gedanke:"""
+
+        # Standard-Thema wenn keins angegeben
+        if not topic:
+            topic = "Allgemeine Selbstreflexion ueber meine Erfahrungen und Erkenntnisse"
         
-        if not all_memories:
-            return "Keine Erinnerungen zum Konsolidieren vorhanden."
+        previous_thought = "Ich beginne meine Reflektionsphase..."
         
-        # Debug: Pruefen ob alle Memories korrekt sind
-        for mem in all_memories:
-            if not hasattr(mem, 'role'):
-                return f"Fehler: Memory-Objekt hat kein 'role' Attribut: {mem}"
-        
-        # Konversation fuer den Traum-Prompt formatieren
-        conversation_lines = []
-        for mem in all_memories:
-            role_label = "User" if mem.role == "user" else "CHAPiE"
-            conversation_lines.append(f"{role_label}: {mem.content}")
-        
-        conversation_text = "\n".join(conversation_lines)
-        
-        # Traum-Prompt erstellen
-        dream_prompt = format_dream_prompt(conversation_text)
-        
-        try:
-            # Zusammenfassung generieren
-            gen_config = GenerationConfig(
-                max_tokens=500,
-                temperature=0.3,
-                stream=False,
+        for step in range(1, steps + 1):
+            # Suche relevante Erinnerungen basierend auf Thema und vorherigem Gedanken
+            search_query = f"{topic} {previous_thought}"
+            memories = self.search_memory(search_query, top_k=3)
+            memories_text = self.format_memories_for_prompt(memories)
+            
+            # Prompt erstellen
+            think_prompt = THINK_PROMPT_TEMPLATE.format(
+                step=step,
+                total_steps=steps,
+                topic=topic,
+                previous_thought=previous_thought,
+                memories=memories_text
             )
-            summary = brain.generate([Message(role="user", content=dream_prompt)], config=gen_config)
             
-            # Sicherstellen, dass summary ein String ist
-            if not isinstance(summary, str):
-                summary = str(summary)
-            
-            # Zusammenfassung speichern
-            self.add_memory(summary, role="assistant", mem_type="summary")
-            
-            # Alte Erinnerungen loeschen (nur interaction-Typ)
-            old_ids = [mem.id for mem in all_memories if mem.mem_type == "interaction"]
-            if old_ids:
-                self.delete_memories(old_ids)
-            
-            return f"💤 Traum-Phase abgeschlossen. {len(old_ids)} Erinnerungen konsolidiert.\n\nZusammenfassung:\n{summary}"
-            
-        except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            return f"Fehler bei der Memory-Consolidation: {str(e)}\n\nDetails:\n{error_details}"
+            try:
+                # Gedanken generieren (hoeheres Token-Limit fuer tiefere Gedanken)
+                gen_config = GenerationConfig(
+                    max_tokens=5000,
+                    temperature=0.7,
+                    stream=False,
+                )
+                thought = brain.generate([Message(role="user", content=think_prompt)], config=gen_config)
+                
+                # Sicherstellen, dass thought ein String ist
+                if not isinstance(thought, str):
+                    thought = str(thought)
+                
+                thought = thought.strip()
+                
+                # Gedanken als Erinnerung speichern (Self-Learning)
+                self.add_memory(
+                    f"[Reflektion Schritt {step}] {thought}",
+                    role="assistant",
+                    mem_type="interaction",
+                    label="original"
+                )
+                
+                # Ergebnis zurueckgeben
+                yield {
+                    "step": step,
+                    "total_steps": steps,
+                    "thought": thought,
+                    "memories_found": len(memories),
+                    "memories": [m.content[:100] for m in memories]
+                }
+                
+                # Aktuellen Gedanken fuer naechste Iteration speichern
+                previous_thought = thought
+                
+                # Verzoegerung (ausser beim letzten Schritt)
+                if step < steps:
+                    time.sleep(delay)
+                    
+            except Exception as e:
+                yield {
+                    "step": step,
+                    "total_steps": steps,
+                    "thought": f"Fehler bei Schritt {step}: {str(e)}",
+                    "memories_found": 0,
+                    "memories": [],
+                    "error": True
+                }
+                break
 
 
 # === Test-Funktion ===

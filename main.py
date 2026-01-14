@@ -279,7 +279,8 @@ class CHAPPiE:
         "/status": "Zeigt den aktuellen emotionalen Status",
         "/clear": "Loescht den Chat-Verlauf",
         "/config": "Zeigt die aktuelle Konfiguration",
-        "/sleep": "CHAPiE geht schlafen (spart Energie)",
+        "/sleep": "CHAPiE geht schlafen (konsolidiert Erinnerungen)",
+        "/think": "Startet tiefen Reflektionsmodus (10 Schritte)",
         "/help": "Zeigt alle verfuegbaren Befehle",
         "/exit": "Beendet CHAPPiE",
         "/quit": "Alias fuer /exit",
@@ -539,11 +540,44 @@ class CHAPPiE:
                 self.chat_history.add("system", "CHAPPiE ist aufgewacht!")
                 self.log_debug("Aus Schlafmodus aufgewacht")
             else:
-                # Einschlafen
-                self.is_sleeping = True
+                # Konsolidierung starten
+                self.chat_history.add("system", "CHAPPiE startet die Traum-Phase...")
+                self.log_debug("Memory-Konsolidierung gestartet")
+                result = self.memory.consolidate_memories(self.brain)
+                self.chat_history.add("system", result)
                 self.emotions.restore_energy(30)
-                self.chat_history.add("system", "CHAPPiE geht schlafen... (Energie wird wiederhergestellt)")
-                self.log_debug("Schlafmodus aktiviert")
+                self.log_debug("Traum-Phase abgeschlossen")
+            return True
+        
+        # Think Mode
+        if cmd.startswith("/think"):
+            # Extrahiere optionales Thema
+            parts = command.split(" ", 1)
+            topic = parts[1] if len(parts) > 1 else ""
+            
+            self.chat_history.add("system", f"CHAPPiE startet tiefen Reflektionsmodus...")
+            self.log_debug(f"Think-Modus gestartet (Thema: {topic if topic else 'Allgemein'})")
+            
+            # Iteriere ueber alle Denkschritte
+            for step_result in self.memory.think_deep(self.brain, topic=topic, steps=10, delay=1.0):
+                step = step_result["step"]
+                total = step_result["total_steps"]
+                thought = step_result["thought"]
+                mem_count = step_result["memories_found"]
+                
+                # Gedanken zum Thought-History hinzufuegen
+                self.thought_history.add("system", f"[{step}/{total}] {thought}")
+                self.current_thought = f"Schritt {step}/{total}: {thought[:50]}..."
+                self.log_debug(f"Think Schritt {step}: {mem_count} Erinnerungen gefunden")
+                
+                # Bei Fehler abbrechen
+                if step_result.get("error"):
+                    self.chat_history.add("system", f"Fehler bei Schritt {step}: {thought}")
+                    break
+            
+            self.current_thought = ""
+            self.chat_history.add("system", f"Reflektionsmodus abgeschlossen. 10 Gedanken generiert und gespeichert.")
+            self.log_debug("Think-Modus beendet")
             return True
         
         # Help

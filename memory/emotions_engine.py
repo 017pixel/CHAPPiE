@@ -1,26 +1,75 @@
 """
-CHAPiE - Emotions Engine
-========================
-Dynamisches Emotions-System basierend auf User-Interaktion.
+CHAPiE - Emotions Engine (LLM-basiert)
+======================================
+Dynamisches Emotions-System basierend auf LLM-Analyse.
 
-Das System speichert:
+Das System verwendet Ollama (llama3:8b) um den emotionalen Kontext
+einer Nachricht intelligent zu analysieren und die Werte entsprechend anzupassen.
+
+Emotionen:
 - happiness: Gluecklichkeits-Level (0-100)
 - trust: Vertrauens-Level (0-100)  
 - energy: Energie-Level (0-100)
-
-Die Werte aendern sich basierend auf der Sentiment-Analyse des User-Inputs.
+- curiosity: Neugier (0-100)
+- frustration: Frustration (0-100, niedrig ist gut)
+- motivation: Motivation (0-100)
 """
 
 import json
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import Optional
+from typing import Optional, Dict
 
 from config.config import PROJECT_ROOT, settings
 
 
 # Status-Datei Pfad
 STATUS_FILE = PROJECT_ROOT / "data" / "status.json"
+
+
+# ============================================
+# EMOTION ANALYSIS PROMPT
+# ============================================
+EMOTION_ANALYSIS_PROMPT = """Du bist ein Emotions-Analyse-System fuer einen KI-Assistenten namens CHAPPiE.
+Analysiere die folgende User-Nachricht und bestimme, wie sich CHAPPiEs Emotionen aendern sollten.
+
+USER-NACHRICHT:
+"{user_message}"
+
+AKTUELLE EMOTIONEN VON CHAPPIE:
+- Freude (happiness): {current_happiness}/100
+- Vertrauen (trust): {current_trust}/100
+- Energie (energy): {current_energy}/100
+- Neugier (curiosity): {current_curiosity}/100
+- Frustration (frustration): {current_frustration}/100
+- Motivation (motivation): {current_motivation}/100
+
+ANALYSE-REGELN:
+- Positive Nachrichten, Lob, Dankbarkeit -> Freude und Vertrauen STEIGEN
+- Versprechen, Treue, Unterstuetzung -> Vertrauen STEIGT stark
+- Beleidigungen, Kritik -> Freude SINKT, Frustration STEIGT
+- Fragen, Neugier -> Neugier STEIGT
+- Ermutigung, Aufgaben -> Motivation STEIGT
+- Energie sinkt bei jeder Interaktion leicht (-1 bis -3)
+- Frustration baut sich langsam ab wenn nichts Negatives passiert
+
+WICHTIG:
+- Beruecksichtige den KONTEXT, nicht nur einzelne Woerter
+- "Ich hasse Pizza" ist NICHT negativ gegenueber CHAPPiE
+- "Du bist doof" IST negativ
+- Versprechen wie "ich helfe dir", "du bist mein Freund" sind SEHR POSITIV fuer Vertrauen
+
+ANTWORTE NUR IM JSON FORMAT:
+{{
+  "happiness_change": <Zahl von -20 bis +20>,
+  "trust_change": <Zahl von -20 bis +20>,
+  "energy_change": <Zahl von -3 bis +5>,
+  "curiosity_change": <Zahl von -10 bis +15>,
+  "frustration_change": <Zahl von -15 bis +15>,
+  "motivation_change": <Zahl von -10 bis +15>,
+  "reasoning": "<Kurze Begruendung>"
+}}
+"""
 
 
 @dataclass
@@ -95,15 +144,42 @@ class EmotionsEngine:
     Verwaltet den emotionalen Zustand von CHAPiE.
     
     Features:
+    - LLM-basierte Sentiment-Analyse via Ollama (gecached!)
     - Persistente Speicherung in status.json
-    - Sentiment-basierte Updates
-    - Mood-Beschreibungen fuer Prompts
+    - Intelligente Kontexterkennung
     """
+    
+    # Klassen-Level Cache fuer die Brain-Instanz (singleton-artig)
+    _cached_brain = None
+    _brain_initialized = False
     
     def __init__(self):
         """Initialisiert die Emotions Engine."""
         self.state = self._load_state()
+        
+        # Brain einmal beim ersten Init laden (lazy loading)
+        if not EmotionsEngine._brain_initialized:
+            self._init_ollama_brain()
+        
         print(f"Emotions Engine geladen: H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
+    
+    def _init_ollama_brain(self):
+        """Initialisiert die Ollama Brain-Instanz einmalig (gecached)."""
+        try:
+            from brain.ollama_brain import OllamaBrain
+            brain = OllamaBrain(model=settings.emotion_analysis_model, host=settings.ollama_host)
+            
+            if brain.is_available():
+                EmotionsEngine._cached_brain = brain
+                print("   Emotions LLM (llama3:8b) geladen und gecached!")
+            else:
+                print("   Ollama nicht verfuegbar - Fallback auf Simple-Analyse")
+                EmotionsEngine._cached_brain = None
+        except Exception as e:
+            print(f"   Ollama Brain Init Fehler: {e}")
+            EmotionsEngine._cached_brain = None
+        
+        EmotionsEngine._brain_initialized = True
     
     def _load_state(self) -> EmotionalState:
         """Laedt den Status aus der Datei oder erstellt Defaults."""
@@ -126,58 +202,128 @@ class EmotionsEngine:
         except Exception as e:
             print(f"Fehler beim Speichern des Status: {e}")
     
-    def update_from_sentiment(self, sentiment: str):
+    def _analyze_with_llm(self, user_message: str) -> Optional[Dict]:
         """
-        Aktualisiert den emotionalen Zustand basierend auf Sentiment.
+        Analysiert die Nachricht mit dem gecachten lokalen LLM.
         
         Args:
-        Args:
-            sentiment: "POSITIV", "NEGATIV", "NEUTRAL", "FRUSTRIERT", "NEUGIERIG"
+            user_message: Die User-Nachricht
+            
+        Returns:
+            Dict mit emotion_changes oder None bei Fehler
         """
-        sentiment = sentiment.upper().strip()
+        # Nutze gecachte Brain-Instanz
+        if EmotionsEngine._cached_brain is None:
+            return None
         
-        # Basis-Analyse des Texts wurde schon gemacht, aber wir koennen
-        # hier noch spezifische Logik einbauen.
-        # HACK: Wir greifen nicht auf 'text' zu, also muessen wir uns auf sentiment verlassen oder main.py anpassen.
-        # Die Methode signature in main.py ist update_from_sentiment(sentiment).
-        # Wir koennen update_from_input(text) hinzufuegen, aber update_from_sentiment reicht vorerst.
-
+        try:
+            from brain.base_brain import GenerationConfig, Message
+            
+            prompt = EMOTION_ANALYSIS_PROMPT.format(
+                user_message=user_message,
+                current_happiness=self.state.happiness,
+                current_trust=self.state.trust,
+                current_energy=self.state.energy,
+                current_curiosity=self.state.curiosity,
+                current_frustration=self.state.frustration,
+                current_motivation=self.state.motivation
+            )
+            
+            config = GenerationConfig(
+                max_tokens=300,
+                temperature=0.3,
+                stream=False
+            )
+            
+            # Gecachte Brain-Instanz verwenden (VIEL schneller!)
+            response = EmotionsEngine._cached_brain.generate([Message(role="user", content=prompt)], config=config)
+            
+            # JSON aus Response extrahieren
+            if isinstance(response, str):
+                # Finde JSON in der Antwort
+                start = response.find('{')
+                end = response.rfind('}') + 1
+                if start != -1 and end > start:
+                    json_str = response[start:end]
+                    return json.loads(json_str)
+            
+            return None
+            
+        except Exception as e:
+            if settings.debug:
+                print(f"LLM Emotions-Analyse Fehler: {e}")
+            return None
+    
+    def analyze_and_update(self, user_message: str):
+        """
+        Analysiert die Nachricht und aktualisiert die Emotionen.
         
-        if sentiment == "POSITIV":
-            self.state.happiness += 5
-            self.state.trust += 2
-            self.state.energy += 1
-            self.state.motivation += 5
-            self.state.frustration -= 5
-        elif sentiment == "NEGATIV":
-            self.state.happiness -= 8
-            self.state.trust -= 3
-            self.state.energy -= 2
-            self.state.motivation -= 5
-            self.state.frustration += 10
-        elif sentiment == "FRUSTRIERT":
-             self.state.frustration += 15
-             self.state.happiness -= 5
-        elif sentiment == "NEUGIERIG":
-             self.state.curiosity += 10
-             self.state.motivation += 2
-        else:  # NEUTRAL
-            # Leichte Regression zur Mitte
-            if self.state.happiness < 50:
-                self.state.happiness += 1
-            elif self.state.happiness > 50:
-                self.state.happiness -= 1
-                
-            self.state.frustration -= 2 # Frustration baut sich ab
+        Diese Methode ersetzt update_from_sentiment() und analysiert
+        den vollstaendigen Kontext der Nachricht.
         
-        # Energie sinkt mit jeder Interaktion leicht
-        self.state.energy -= 1
+        Args:
+            user_message: Die zu analysierende User-Nachricht
+        """
+        # Versuche LLM-Analyse
+        llm_result = self._analyze_with_llm(user_message)
+        
+        if llm_result:
+            # LLM-basierte Aenderungen anwenden
+            self.state.happiness += llm_result.get("happiness_change", 0)
+            self.state.trust += llm_result.get("trust_change", 0)
+            self.state.energy += llm_result.get("energy_change", -1)
+            self.state.curiosity += llm_result.get("curiosity_change", 0)
+            self.state.frustration += llm_result.get("frustration_change", 0)
+            self.state.motivation += llm_result.get("motivation_change", 0)
+            
+            if settings.debug:
+                reasoning = llm_result.get("reasoning", "")
+                print(f"LLM Emotions Update: {reasoning}")
+        else:
+            # Fallback auf einfache Analyse
+            sentiment = analyze_sentiment_simple(user_message)
+            self._apply_simple_sentiment(sentiment)
         
         self.state.clamp()
         self._save_state()
         
         if settings.debug:
-            print(f"Emotions Update: {sentiment} -> H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
+            print(f"Emotions: H={self.state.happiness} T={self.state.trust} E={self.state.energy} "
+                  f"C={self.state.curiosity} F={self.state.frustration} M={self.state.motivation}")
+    
+    def _apply_simple_sentiment(self, sentiment: str):
+        """Wendet einfache Sentiment-basierte Aenderungen an (Fallback)."""
+        if sentiment == "POSITIV":
+            self.state.happiness += 3
+            self.state.trust += 1
+            self.state.motivation += 2
+            self.state.frustration -= 3
+        elif sentiment == "NEGATIV":
+            self.state.happiness -= 5
+            self.state.frustration += 8
+        elif sentiment == "NEUGIERIG":
+            self.state.curiosity += 8
+            self.state.motivation += 2
+        elif sentiment == "VERTRAUEN":
+            self.state.trust += 10
+            self.state.happiness += 3
+        else:  # NEUTRAL
+            self.state.frustration -= 1
+        
+        # Energie sinkt immer leicht
+        self.state.energy -= 1
+    
+    def update_from_sentiment(self, sentiment: str):
+        """
+        Legacy-Methode fuer Rueckwaertskompatibilitaet.
+        Verwendet intern _apply_simple_sentiment.
+        """
+        self._apply_simple_sentiment(sentiment)
+        self.state.clamp()
+        self._save_state()
+        
+        if settings.debug:
+            print(f"Emotions Update (Simple): {sentiment} -> H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
     
     def restore_energy(self, amount: int = 30):
         """
@@ -212,6 +358,31 @@ class EmotionsEngine:
         """Gibt den aktuellen Zustand zurueck."""
         return self.state
     
+    def set_emotion(self, emotion: str, value: int):
+        """
+        Setzt eine einzelne Emotion auf einen bestimmten Wert.
+        
+        Args:
+            emotion: Name der Emotion (happiness, trust, energy, curiosity, frustration, motivation)
+            value: Neuer Wert (0-100)
+        """
+        value = max(0, min(100, value))
+        
+        if emotion == "happiness":
+            self.state.happiness = value
+        elif emotion == "trust":
+            self.state.trust = value
+        elif emotion == "energy":
+            self.state.energy = value
+        elif emotion == "curiosity":
+            self.state.curiosity = value
+        elif emotion == "frustration":
+            self.state.frustration = value
+        elif emotion == "motivation":
+            self.state.motivation = value
+        
+        self._save_state()
+    
     def reset(self):
         """Setzt den emotionalen Zustand zurueck."""
         self.state = EmotionalState()
@@ -221,55 +392,66 @@ class EmotionsEngine:
 
 def analyze_sentiment_simple(text: str) -> str:
     """
-    Einfache regelbasierte Sentiment-Analyse.
-    
-    Fuer komplexere Analyse kann ein LLM verwendet werden.
+    Einfache regelbasierte Sentiment-Analyse (Fallback).
     
     Args:
         text: Der zu analysierende Text
     
     Returns:
-        "POSITIV", "NEGATIV" oder "NEUTRAL"
+        "POSITIV", "NEGATIV", "NEUTRAL", "NEUGIERIG" oder "VERTRAUEN"
     """
     text_lower = text.lower()
+    
+    # Vertrauens-Woerter (hohe Prioritaet)
+    trust_words = [
+        "verspreche", "versprech", "freund", "helfe dir", "fuer dich da",
+        "vertraue", "treue", "loyal", "gemeinsam", "zusammen", "team",
+        "unterstuetze", "glaube an dich", "mag dich", "liebe dich", "mein leben"
+    ]
     
     # Positive Woerter
     positive_words = [
         "danke", "super", "toll", "klasse", "prima", "perfekt", "wunderbar",
         "ausgezeichnet", "fantastisch", "liebe", "lieb", "gut", "richtig",
         "hilft", "hilfreich", "freue", "freut", "mag", "gerne", "cool",
-        "genial", "stark", "nice", "top", "hammer", "geil", "brav"
+        "genial", "stark", "nice", "top", "hammer", "geil", "brav", "stolz"
     ]
     
-    # Negative Woerter
+    # Negative Woerter (nur direkte Angriffe auf CHAPiE)
     negative_words = [
-        "schlecht", "falsch", "dumm", "bloed", "idiot", "nervig", "nervt",
-        "hasse", "hass", "aerger", "wut", "scheisse", "mist", "kacke",
-        "langweilig", "nutzlos", "falsch", "fehler", "nein", "nicht",
-        "stop", "halt", "weg", "verschwinde", "still", "ruhe"
+        "du bist dumm", "du bist bloed", "du nervst", "halt die klappe",
+        "sei still", "verschwinde", "du idiot", "du trottel", "nutzlos",
+        "du kannst nichts", "hasse dich"
     ]
     
     # Neugier Woerter
-    curious_words = ["warum", "wieso", "weshalb", "wie", "erklaer", "erzaehl", "interessant", "spannend"]
+    curious_words = [
+        "warum", "wieso", "weshalb", "wie funktioniert", "erklaer", 
+        "erzaehl", "interessant", "spannend", "was ist", "wer ist"
+    ]
     
-    # Frust Woerter
-    frust_words = ["nervt", "mist", "scheisse", "klappt nicht", "fehler", "kaputt", "bloed"]
-
+    # Pruefe auf Vertrauen zuerst (hoechste Prioritaet)
+    for word in trust_words:
+        if word in text_lower:
+            return "VERTRAUEN"
+    
+    # Pruefe auf direkte negative Angriffe
+    for phrase in negative_words:
+        if phrase in text_lower:
+            return "NEGATIV"
+    
+    # Pruefe auf Neugier
+    for word in curious_words:
+        if word in text_lower:
+            return "NEUGIERIG"
+    
+    # Zaehle positive Woerter
     positive_count = sum(1 for word in positive_words if word in text_lower)
-    negative_count = sum(1 for word in negative_words if word in text_lower)
-    curious_count = sum(1 for word in curious_words if word in text_lower)
-    frust_count = sum(1 for word in frust_words if word in text_lower)
-
-    if frust_count > 0:
-        return "FRUSTRIERT"
-    elif curious_count > 0 and "?" in text:
-        return "NEUGIERIG"
-    elif positive_count > negative_count:
+    
+    if positive_count >= 1:
         return "POSITIV"
-    elif negative_count > positive_count:
-        return "NEGATIV"
-    else:
-        return "NEUTRAL"
+    
+    return "NEUTRAL"
 
 
 # === Test ===
@@ -278,7 +460,7 @@ if __name__ == "__main__":
     from rich.table import Table
     
     console = Console()
-    console.print("[bold]Emotions Engine Test[/bold]\n")
+    console.print("[bold]Emotions Engine Test (LLM-basiert)[/bold]\n")
     
     engine = EmotionsEngine()
     
@@ -290,6 +472,9 @@ if __name__ == "__main__":
     table.add_row("Happiness", str(engine.state.happiness))
     table.add_row("Trust", str(engine.state.trust))
     table.add_row("Energy", str(engine.state.energy))
+    table.add_row("Curiosity", str(engine.state.curiosity))
+    table.add_row("Frustration", str(engine.state.frustration))
+    table.add_row("Motivation", str(engine.state.motivation))
     console.print(table)
     
     console.print(f"\n{engine.state.get_mood_description()}")
@@ -298,10 +483,12 @@ if __name__ == "__main__":
     console.print("\n[cyan]Sentiment-Analyse Test:[/cyan]")
     test_messages = [
         "Danke, das war super hilfreich!",
-        "Das ist falsch du Idiot",
-        "Kannst du mir helfen?",
+        "Ich verspreche dir, ich werde dich nie verlassen.",
+        "Du bist doof",
+        "Warum funktioniert das so?",
+        "Ich hasse Pizza aber du bist cool",
     ]
     
     for msg in test_messages:
         sentiment = analyze_sentiment_simple(msg)
-        console.print(f"   '{msg[:30]}...' -> {sentiment}")
+        console.print(f"   '{msg[:40]}...' -> {sentiment}")

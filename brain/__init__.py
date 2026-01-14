@@ -6,6 +6,7 @@ Nutze get_brain() für automatische Backend-Auswahl basierend auf secrets.py.
 from .base_brain import BaseBrain, Message, GenerationConfig
 from .ollama_brain import OllamaBrain
 from .groq_brain import GroqBrain
+from .deep_think import DeepThinkEngine, DeepThinkStep
 
 from config.config import settings, LLMProvider
 

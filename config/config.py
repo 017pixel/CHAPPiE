@@ -39,6 +39,7 @@ class Settings:
     # === Ollama ===
     ollama_host: str = secrets.OLLAMA_HOST
     ollama_model: str = secrets.OLLAMA_MODEL
+    emotion_analysis_model: str = getattr(secrets, 'EMOTION_ANALYSIS_MODEL', 'llama3:8b')
     
     # === Groq ===
     groq_api_key: str = secrets.GROQ_API_KEY

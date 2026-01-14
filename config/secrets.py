@@ -11,7 +11,7 @@ Hier trägst du deine API-Schlüssel und Modellnamen ein.
 
 # Groq Cloud API Key
 # Hole dir einen kostenlosen Key von: https://console.groq.com/keys
-GROQ_API_KEY = ""
+GROQ_API_KEY = "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"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -26,8 +26,10 @@ LLM_PROVIDER = "groq"
 # --- Ollama (Lokal) ---
 # Stelle sicher, dass Ollama läuft und das Modell installiert ist!
 # Installation: ollama pull llama3:8b
+# Für Emotions-Analyse (schnell): ollama pull qwen2.5:1.5b
 OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_MODEL = "llama3:8b"
+EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b"
 
 
 # --- Groq (Cloud) ---
