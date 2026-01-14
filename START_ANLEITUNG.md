@@ -27,6 +27,8 @@ python main.py
 
 ---
 
+streamlit run app.py
+
 ## 💡 Ein-Zeilen-Befehl (Schnellstart)
 Wenn du dich bereits im Ordner befindest, kannst du auch einfach das hier eingeben:
 ```powershell
