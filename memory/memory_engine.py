@@ -145,6 +145,10 @@ class MemoryEngine:
                 distance = results["distances"][0][i] if results["distances"] else 0
                 relevance = max(0, 1 - distance / 2)
                 metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+
+                # Normalize metadata to a dict to avoid None attribute errors
+                if not isinstance(metadata, dict):
+                    metadata = {}
                 
                 memory = Memory(
                     id=results["ids"][0][i],
@@ -276,7 +280,12 @@ class MemoryEngine:
                 distance = results["distances"][0][i] if results["distances"] else 0
                 relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
 
-                metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+                metadata = results.get("metadatas") or []
+                metadata = metadata[0][i] if metadata and metadata[0] else {}
+
+                # Ensure metadata is a dict to prevent NoneType errors
+                if not isinstance(metadata, dict):
+                    metadata = metadata or {}
 
                 memory = Memory(
                     id=results["ids"][0][i],
