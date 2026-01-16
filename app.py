@@ -31,7 +31,7 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = None # Aktuelle Chat-ID
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "current_emotions" not in st.session_state:
+if st.session_state.get("current_emotions") is None:
     st.session_state.current_emotions = {
         "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
         "frustration": 0, "motivation": 80  # Neue Emotionen
@@ -816,8 +816,11 @@ def main():
         with tab2:
             st.subheader("Emotionen bearbeiten")
             st.info("Hier kannst du CHAPPiEs emotionalen Zustand manuell anpassen.")
-            
-            emo = st.session_state.current_emotions
+
+            emo = st.session_state.get("current_emotions") or {
+                "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
+                "frustration": 0, "motivation": 80
+            }
             
             new_joy = st.slider("Freude", 0, 100, int(emo.get("joy", 50)), 
                                help="Gluecklichkeits-Level")
@@ -835,7 +838,7 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("Emotionen speichern", use_container_width=True, type="primary"):
-                    st.session_state.current_emotions = {
+                    new_emotions = {
                         "joy": new_joy,
                         "trust": new_trust,
                         "energy": new_energy,
@@ -843,6 +846,8 @@ def main():
                         "frustration": new_frustration,
                         "motivation": new_motivation
                     }
+                    if new_emotions and isinstance(new_emotions, dict):
+                        st.session_state.current_emotions = new_emotions
                     # Auch im Backend aktualisieren
                     backend.emotions.state.happiness = new_joy
                     backend.emotions.state.trust = new_trust
@@ -856,10 +861,12 @@ def main():
                     st.rerun()
             with col2:
                 if st.button("Zuruecksetzen", use_container_width=True):
-                    st.session_state.current_emotions = {
+                    default_emotions = {
                         "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
                         "frustration": 0, "motivation": 80
                     }
+                    if default_emotions and isinstance(default_emotions, dict):
+                        st.session_state.current_emotions = default_emotions
                     backend.emotions.reset()
                     st.success("Emotionen zurueckgesetzt!")
                     time.sleep(0.5)
@@ -1045,7 +1052,8 @@ def main():
                         "frustration": step_result.emotions_after.get("frustration", 0),
                         "motivation": step_result.emotions_after.get("motivation", 80)
                     }
-                    st.session_state.current_emotions = new_emotions
+                    if new_emotions and isinstance(new_emotions, dict):
+                        st.session_state.current_emotions = new_emotions
                     
                     # Zeige Live-Vitalzeichen im Status-Container
                     st.markdown("---")
@@ -1274,7 +1282,8 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
                 with st.spinner("CHAPPiE denkt nach..."):
                     result = backend.process(user_input, st.session_state.messages[:-1])
                     st.markdown(result["response_text"])
-                    st.session_state.current_emotions = result["emotions"]
+                    if result.get("emotions") and isinstance(result["emotions"], dict):
+                        st.session_state.current_emotions = result["emotions"]
             
             # Helper to serialize memories for JSON storage (Memory objects are not JSON serializable by default)
             formatted_memories = []
