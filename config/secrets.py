@@ -11,7 +11,7 @@ Hier trägst du deine API-Schlüssel und Modellnamen ein.
 
 # Groq Cloud API Key
 # Hole dir einen kostenlosen Key von: https://console.groq.com/keys
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 
 
 # ═══════════════════════════════════════════════════════════════════
