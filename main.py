@@ -8,6 +8,7 @@ import sys
 import time
 import msvcrt
 import re
+import threading
 from datetime import datetime
 from typing import Optional, List
 
@@ -678,9 +679,19 @@ class CHAPPiE:
                 self.chat_history.add("assistant", display_response)
                 self.log_debug(f"Antwort generiert ({len(display_response)} Zeichen)")
             
-            # Speichere
-            self.memory.add_memory(user_text, role="user")
-            self.memory.add_memory(display_response, role="assistant")
+            # Speichere ASYNCHRON im Hintergrund
+            def save_background(u_text, a_text):
+                try:
+                    self.memory.add_memory(u_text, role="user")
+                    self.memory.add_memory(a_text, role="assistant")
+                    # Nur fuer Debugging im Main Thread sichtbar machen via Log
+                    if settings.debug:
+                        # self.log_debug("Erinnerungen im Hintergrund gespeichert")
+                        pass
+                except Exception as ex:
+                    pass
+
+            threading.Thread(target=save_background, args=(user_text, display_response), daemon=True).start()
 
 
 

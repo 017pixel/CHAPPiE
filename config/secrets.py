@@ -2,7 +2,6 @@
 CHAPiE - API Keys & Modell-Konfiguration
 =========================================
 Hier trägst du deine API-Schlüssel und Modellnamen ein.
-
 """
 
 # ═══════════════════════════════════════════════════════════════════
@@ -20,32 +19,27 @@ GROQ_API_KEY = "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"
 
 # Welches Backend soll verwendet werden?
 # Optionen: "ollama" (lokal) oder "groq" (cloud)
-LLM_PROVIDER = "groq"
+LLM_PROVIDER = "ollama"
 
 
 # --- Ollama (Lokal) ---
-# Stelle sicher, dass Ollama läuft und das Modell installiert ist!
-# Installation: ollama pull llama3:8b
-# Für Emotions-Analyse (schnell): ollama pull qwen2.5:1.5b
+# Hauptmodell für Unterhaltungen (Fallback auf DeepSeek da GPT-OSS Update braucht)
 OLLAMA_HOST = "http://localhost:11434"
-OLLAMA_MODEL = "llama3:8b"
+OLLAMA_MODEL = "gpt-oss:20b"
+
+# Modell für Gehirnzusammenfassungen / Sleep Modus
 EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b"
 
 
 # --- Groq (Cloud) ---
-# Schnelle Cloud-API, benötigt GROQ_API_KEY oben
-# Verfügbare Modelle: https://console.groq.com/docs/models
 GROQ_MODEL = "moonshotai/kimi-k2-instruct-0905"
 
-#moonshotai/kimi-k2-instruct-0905
-#openai/gpt-oss-120b
 
 # ═══════════════════════════════════════════════════════════════════
 # 🧠 MEMORY EINSTELLUNGEN
 # ═══════════════════════════════════════════════════════════════════
 
 # Embedding-Modell für die Vektordatenbank
-# Läuft lokal, braucht ca. 500MB VRAM
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # Wie viele Erinnerungen sollen bei jeder Anfrage abgerufen werden?
@@ -60,42 +54,28 @@ CHROMA_COLLECTION = "chapie_memory"
 # ═══════════════════════════════════════════════════════════════════
 
 # Maximale Anzahl Tokens pro Antwort
-MAX_TOKENS = 1024
+MAX_TOKENS = 2048
 
 # Kreativität (0.0 = deterministic, 1.0 = sehr kreativ)
-TEMPERATURE = 0.7
+# Für DeepSeek R1 ist etwas niedriger oft besser
+TEMPERATURE = 0.6
 
-# Token-Streaming aktivieren (Text fließt Wort für Wort)
+# Token-Streaming aktivieren
 STREAM = True
 
 
 # ═══════════════════════════════════════════════════════════════════
-# � SMART QUERY EXTRACTION (RAG OPTIMIERUNG)
+# 🔍 SMART QUERY EXTRACTION
 # ═══════════════════════════════════════════════════════════════════
 
-# Smart Query Extraction aktivieren?
-# True = User-Input wird vor der Vektor-Suche durch LLM optimiert
-# False = User-Input wird direkt vektorisiert (alte Methode)
 ENABLE_QUERY_EXTRACTION = False
-
-# --- Groq (Cloud) für Query Extraction ---
-# Schnelles Modell für Keyword-Extraktion
 QUERY_EXTRACTION_GROQ_MODEL = "llama-3.1-8b-instant"
-
-# --- Ollama (Local Fallback) ---
-# Kleines Modell für Offline-Fallback
-QUERY_EXTRACTION_OLLAMA_MODEL = "llama3.2:1b"
+QUERY_EXTRACTION_OLLAMA_MODEL = "qwen2.5:1.5b"
 
 
 # ═══════════════════════════════════════════════════════════════════
-# �� DEBUG
+# 🐛 DEBUG
 # ═══════════════════════════════════════════════════════════════════
 
-# Debug-Modus für zusätzliche Ausgaben
 DEBUG = True
-
-# Innerer Monolog (Chain of Thought) aktivieren?
-# True = Erst denken, dann antworten (besser, aber langsamer)
-# False = Sofort antworten (schneller)
 CHAIN_OF_THOUGHT = True
-

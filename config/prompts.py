@@ -2,7 +2,7 @@
 CHAPPiE - Zentrale Prompt-Verwaltung
 ===================================
 Alle System-Prompts und Anweisungen an einem Ort.
-Hier kannst du die Persoenlichkeit und das Verhalten von CHAPPiE anpassen.
+Hier kannst du die Persoenlichkeit und das Verhalten von CHAPPiE anpassen. 
 """
 
 # =============================================================================

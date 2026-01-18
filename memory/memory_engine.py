@@ -173,10 +173,11 @@ class MemoryEngine:
         """
         Extrahiert optimierte Suchbegriffe aus dem User-Input.
 
-        Nutzt Dual-Strategy:
-        1. Priority: Groq API (llama-3.1-8b-instant)
-        2. Fallback: Ollama (llama3.2:1b)
-        3. Silent Fallback: Originaler User-Input bei komplettem Fehler
+        Nutzt Tri-Strategy:
+        1. Priority: Manual (Kurze Inputs < 6 Wörter)
+        2. Priority: Groq API (llama-3.1-8b-instant)
+        3. Fallback: Ollama (qwen2.5:1.5b)
+        4. Silent Fallback: Originaler User-Input bei komplettem Fehler
 
         Args:
             user_input: Der originale User-Input
@@ -190,7 +191,35 @@ class MemoryEngine:
         if not user_input or not user_input.strip():
             return user_input
 
+        # === 1. Manual Optimization (für kurze Inputs) ===
+        words = user_input.split()
+        if len(words) < 6:
+            # Deutsche Stoppwörter (Füllwörter), die ignoriert werden sollen
+            stop_words = {
+                "ich", "du", "er", "sie", "es", "wir", "ihr", "sie",
+                "der", "die", "das", "ein", "eine", "einen", "einem", "einer",
+                "und", "oder", "aber", "doch", "als", "wie",
+                "bin", "bist", "ist", "sind", "war", "wäre", "haben", "hat",
+                "mir", "dir", "ihm", "ihr", "uns", "euch", "ihnen",
+                "mich", "dich", "sich",
+                "hallo", "hi", "hey", "moin", "servus", "guten", "tag", "morgen", "abend",
+                "bitte", "danke", "mal", "halt", "eben", "so", "doch", "ja", "nein"
+            }
+            
+            # Filtere Stoppwörter raus (case-insensitive)
+            keywords = [w for w in words if w.lower().strip(".,!?") not in stop_words]
+            
+            if keywords:
+                extracted = " ".join(keywords)
+                if settings.debug:
+                    print(f"   Query Extraction (Manual): '{user_input}' -> '{extracted}'")
+                return extracted
+            else:
+                # Wenn nur Stoppwörter übrig bleiben (z.B. "Hallo, wie geht es?"), nimm Original
+                return user_input
+
         prompt = format_query_extraction_prompt(user_input)
+
         gen_config = GenerationConfig(
             max_tokens=100,
             temperature=0.3,
@@ -532,7 +561,7 @@ class MemoryEngine:
             return "Keine neuen Erinnerungen zum Konsolidieren vorhanden."
 
         # Chunking-Konfiguration
-        BATCH_SIZE = 20
+        BATCH_SIZE = 50
         total_memories = len(interaction_memories)
         
         # In Batches aufteilen

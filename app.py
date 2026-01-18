@@ -6,7 +6,7 @@ import os
 from typing import Dict, Any, List, Optional
 
 # CHAPiE imports
-from config.config import settings, get_active_model, PROJECT_ROOT
+from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.prompts import SYSTEM_PROMPT, get_system_prompt_with_emotions
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine
@@ -663,6 +663,14 @@ def main():
     _inject_modern_css()
     backend = init_chappie()
 
+    # --- API CHECK ---
+    # Automatisch Einstellungen oeffnen wenn Key fehlt (nur einmalig)
+    if "api_check_done" not in st.session_state:
+        if settings.llm_provider == LLMProvider.GROQ and not settings.groq_api_key:
+            st.session_state.show_settings = True
+            st.warning("⚠️ Bitte konfiguriere deinen API Key in den Einstellungen.")
+        st.session_state.api_check_done = True
+
     # --- SESSION MANAGEMENT ---
     if not st.session_state.session_id:
         st.session_state.session_id = backend.chat_manager.create_session()
@@ -783,8 +791,82 @@ def main():
         st.markdown("## Einstellungen")
         
         # Tabs fuer verschiedene Einstellungsbereiche
-        tab1, tab2, tab3 = st.tabs(["Generierung", "Emotionen", "Datenbank"])
+        tab_api, tab1, tab2, tab3 = st.tabs(["API & Modelle", "Generierung", "Emotionen", "Datenbank"])
         
+        with tab_api:
+            st.subheader("API & Modell Konfiguration")
+            
+            # 1. Provider Auswahl
+            current_provider_index = 0 if settings.llm_provider == LLMProvider.GROQ else 1
+            selected_provider = st.selectbox(
+                "KI-Anbieter (Backend)", 
+                ["Groq Cloud (Schnell & Stark)", "Ollama Lokal (Privat & Offline)"],
+                index=current_provider_index
+            )
+            
+            is_groq = "Groq" in selected_provider
+            
+            st.divider()
+            
+            if is_groq:
+                st.markdown("### ☁️ Groq Cloud Konfiguration")
+                st.caption("Benötigt einen API Key. Kostenlos verfügbar unter [console.groq.com](https://console.groq.com)")
+                
+                # API Key Input
+                new_api_key = st.text_input(
+                    "Groq API Key", 
+                    value=settings.groq_api_key if settings.groq_api_key else "",
+                    type="password",
+                    help="Der Key wird nur für die aktuelle Sitzung temporär gespeichert, wenn addSecrets.py leer ist."
+                )
+                
+                # Model Input
+                new_model = st.text_input(
+                    "Modell Name",
+                    value=settings.groq_model,
+                    help="z.B. moonshotai/kimi-k2-instruct-0905 oder llama-3.1-70b-versatile"
+                )
+                
+                if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True):
+                    settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
+                    st.success("✅ Einstellungen für Groq gespeichert!")
+                    time.sleep(0.5)
+                    st.rerun()
+                    
+            else:
+                st.markdown("### 🏠 Ollama Lokal Konfiguration")
+                st.caption("Benötigt eine laufende Ollama-Instanz auf deinem PC.")
+                
+                # Simple Mode Toggle
+                simple_mode = st.toggle("Ich weiß nicht, welche Modelle ich nutzen soll", value=False)
+                
+                if simple_mode:
+                    st.info("💡 Keine Sorge! Wir setzen die bewährten Standards für dich.")
+                    st.markdown("""
+                    **Empfohlene Standards:**
+                    - Chat Modell: `llama3:8b` (Ausgewogen)
+                    - Host: `http://localhost:11434`
+                    """)
+                    
+                    if st.button("Standard-Werte setzen & Speichern", type="primary", use_container_width=True):
+                        settings.update_from_ui(provider="ollama", model="llama3:8b")
+                        # Wir setzen hier direkt die config attribute für host da update_from_ui das (noch) nicht kann
+                        settings.ollama_host = "http://localhost:11434" 
+                        settings.emotion_analysis_model = "qwen2.5:1.5b"
+                        st.success("✅ Standard-Werte gesetzt! Bitte stelle sicher, dass du `ollama run llama3:8b` im Terminal ausgeführt hast.")
+                        time.sleep(1.5)
+                        st.rerun()
+                else:
+                    new_host = st.text_input("Ollama URL", value=settings.ollama_host)
+                    new_ollama_model = st.text_input("Chat Modell", value=settings.ollama_model)
+                    
+                    if st.button("Ollama Einstellungen Speichern", type="primary", use_container_width=True):
+                        settings.update_from_ui(provider="ollama", model=new_ollama_model)
+                        settings.ollama_host = new_host
+                        st.success("✅ Einstellungen für Ollama gespeichert!")
+                        time.sleep(0.5)
+                        st.rerun()
+
         with tab1:
             st.subheader("Generierungs-Einstellungen")
             new_temp = st.slider("Temperatur", 0.0, 1.0, float(settings.temperature), 0.1,

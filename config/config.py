@@ -23,49 +23,97 @@ class LLMProvider(str, Enum):
     GROQ = "groq"
 
 
-# === Lade Einstellungen aus secrets.py ===
-from config import secrets
+# === Lade Einstellungen ===
+# 1. Lade Defaults aus secrets.py
+try:
+    from config import secrets
+except ImportError:
+    # Fallback falls secrets.py komplett fehlt
+    import types
+    secrets = types.ModuleType("secrets")
 
+# 2. Versuche addSecrets.py zu laden (User Overrides)
+try:
+    from config import addSecrets
+except ImportError:
+    addSecrets = None
 
 class Settings:
     """
     Hauptkonfiguration fuer CHAPiE.
-    Laedt Werte aus secrets.py.
+    Hierarchie: UI > addSecrets.py > secrets.py
     """
     
-    # === LLM Backend ===
-    llm_provider: LLMProvider = LLMProvider(secrets.LLM_PROVIDER.lower())
-    
-    # === Ollama ===
-    ollama_host: str = secrets.OLLAMA_HOST
-    ollama_model: str = secrets.OLLAMA_MODEL
-    emotion_analysis_model: str = getattr(secrets, 'EMOTION_ANALYSIS_MODEL', 'llama3:8b')
-    
-    # === Groq ===
-    groq_api_key: str = secrets.GROQ_API_KEY
-    groq_model: str = secrets.GROQ_MODEL
-    
-    # === Memory / Embedding ===
-    embedding_model: str = secrets.EMBEDDING_MODEL
-    memory_top_k: int = secrets.MEMORY_TOP_K
-    chroma_collection_name: str = secrets.CHROMA_COLLECTION
+    def __init__(self):
+        self._load_from_files()
 
-    # === Query Extraction (RAG Optimization) ===
-    enable_query_extraction: bool = getattr(secrets, 'ENABLE_QUERY_EXTRACTION', True)
-    query_extraction_groq_model: str = getattr(secrets, 'QUERY_EXTRACTION_GROQ_MODEL', 'llama-3.1-8b-instant')
-    query_extraction_ollama_model: str = getattr(secrets, 'QUERY_EXTRACTION_OLLAMA_MODEL', 'llama3.2:1b')
+    def _get_val(self, name, default=None):
+        """Hilfsfunktion: Holt Wert aus addSecrets, dann secrets, dann default."""
+        # 1. Check addSecrets
+        if addSecrets and hasattr(addSecrets, name):
+            val = getattr(addSecrets, name)
+            if val: return val # Nur wenn nicht leer
+            
+        # 2. Check secrets
+        if hasattr(secrets, name):
+            return getattr(secrets, name)
+            
+        # 3. Default
+        return default
 
-    # === Generation ===
-    max_tokens: int = secrets.MAX_TOKENS
-    temperature: float = secrets.TEMPERATURE
-    stream: bool = secrets.STREAM
-    
-    # === Chain of Thought ===
-    # Aktiviert den inneren Monolog - CHAPiE denkt erst nach, dann antwortet
-    chain_of_thought: bool = getattr(secrets, 'CHAIN_OF_THOUGHT', True)
-    
-    # === System ===
-    debug: bool = secrets.DEBUG
+    def _load_from_files(self):
+        # === LLM Backend ===
+        provider_str = self._get_val("LLM_PROVIDER", "groq")
+        try:
+            self.llm_provider = LLMProvider(provider_str.lower())
+        except ValueError:
+            self.llm_provider = LLMProvider.GROQ
+
+        # === Ollama ===
+        self.ollama_host = self._get_val("OLLAMA_HOST", "http://localhost:11434")
+        self.ollama_model = self._get_val("OLLAMA_MODEL", "llama3:8b")
+        self.emotion_analysis_model = self._get_val("EMOTION_ANALYSIS_MODEL", "qwen2.5:1.5b")
+        
+        # === Groq ===
+        self.groq_api_key = self._get_val("GROQ_API_KEY", "")
+        self.groq_model = self._get_val("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
+        
+        # === Memory / Embedding ===
+        self.embedding_model = self._get_val("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+        self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 5))
+        self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
+
+        # === Query Extraction ===
+        self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
+        self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
+        self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
+
+        # === Generation ===
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 1024))
+        self.temperature = float(self._get_val("TEMPERATURE", 0.7))
+        self.stream = bool(self._get_val("STREAM", True))
+        
+        # === Chain of Thought ===
+        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))
+        
+        # === System ===
+        self.debug = bool(self._get_val("DEBUG", True))
+
+    def update_from_ui(self, provider=None, api_key=None, model=None):
+        """Erlaubt Updates zur Laufzeit durch die UI."""
+        if provider:
+            try:
+                self.llm_provider = LLMProvider(provider.lower())
+            except: pass
+            
+        if api_key is not None: # Leerer String ist erlaubt (Loeschen)
+            self.groq_api_key = api_key
+            
+        if model:
+            if self.llm_provider == LLMProvider.GROQ:
+                self.groq_model = model
+            else:
+                self.ollama_model = model
 
 
 # === Globale Settings-Instanzen ===
