@@ -70,14 +70,18 @@ Das ist eines der coolsten Features. Im `/sleep` Modus passiert folgendes:
 | **Sprache** | Python 3.11+ |
 | **Datenbank** | ChromaDB (Local Vector Store) |
 | **Embeddings** | all-MiniLM-L6-v2 (Lokal & schnell) |
-| **LLM APIs** | Groq (LPU) / Ollama |
-| **UI** | Rich (Terminal-Layout mit Farben & Panels) |
+| **Haupt-Brain** | GPT-OSS 20B (Chat & Deep Think) |
+| **Background Brain** | Qwen 2.5 1.5B (Träume, Analyse, Extraktion) |
+| **LLM APIs** | Groq (LPU) / Ollama (Lokal) |
+| **UI** | Modularisiertes Streamlit Interface (`web_infrastructure/`) |
 
 ---
 
 ## 📁 Ordnerstruktur erklärt
 
-- `main.py`: Das Herzstück. Hier startet alles.
+- `main.py`: CLI-Einstiegspunkt.
+- `app.py`: Web-UI Einstiegspunkt (Orchestrator).
+- `web_infrastructure/`: Modulare UI-Komponenten (Styles, Chat, Settings).
 - `brain/`: Logik für die Kommunikation mit der KI.
 - `memory/`: Logik für ChromaDB und die Gefühle.
 - `config/`: Hier liegen die Passwörter (`secrets.py`) and die Persönlichkeit (`prompts.py`).

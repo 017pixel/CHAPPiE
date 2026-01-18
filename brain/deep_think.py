@@ -155,8 +155,12 @@ Dein nächster Gedanke:"""
         Args:
             thought: Der generierte Gedanke
         """
-        # Nutze die LLM-basierte Analyse für den Gedanken
-        self.emotions.analyze_and_update(thought)
+        # Performance: Nutze Regex-Analyse statt LLM, um Model-Swapping im Loop zu verhindern!
+        # Sonst: Gedanke (GPT) -> Wechsel -> Emotion (Qwen) -> Wechsel -> Gedanke (GPT)...
+        from memory.emotions_engine import analyze_sentiment_simple
+        
+        sentiment = analyze_sentiment_simple(thought)
+        self.emotions.update_from_sentiment(sentiment)
     
     def think_cycle(
         self, 

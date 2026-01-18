@@ -1,0 +1,196 @@
+import streamlit as st
+import time
+from config.config import settings, LLMProvider
+
+def render_settings_overlay(backend):
+    """Rendert das Einstellungs-Overlay."""
+    if not st.session_state.show_settings:
+        return
+
+    st.markdown("## Einstellungen")
+    
+    # Tabs fuer verschiedene Einstellungsbereiche
+    tab_api, tab1, tab2, tab3 = st.tabs(["API & Modelle", "Generierung", "Emotionen", "Datenbank"])
+    
+    with tab_api:
+        st.subheader("API & Modell Konfiguration")
+        
+        # 1. Provider Auswahl
+        current_provider_index = 0 if settings.llm_provider == LLMProvider.GROQ else 1
+        selected_provider = st.selectbox(
+            "KI-Anbieter (Backend)", 
+            ["Groq Cloud (Schnell & Stark)", "Ollama Lokal (Privat & Offline)"],
+            index=current_provider_index
+        )
+        
+        is_groq = "Groq" in selected_provider
+        
+        st.divider()
+        
+        if is_groq:
+            st.markdown("### ☁️ Groq Cloud Konfiguration")
+            st.caption("Benötigt einen API Key. Kostenlos verfügbar unter [console.groq.com](https://console.groq.com)")
+            
+            # API Key Input
+            new_api_key = st.text_input(
+                "Groq API Key", 
+                value=settings.groq_api_key if settings.groq_api_key else "",
+                type="password",
+                help="Der Key wird nur für die aktuelle Sitzung temporär gespeichert, wenn addSecrets.py leer ist."
+            )
+            
+            # Model Input
+            new_model = st.text_input(
+                "Modell Name",
+                value=settings.groq_model,
+                help="z.B. moonshotai/kimi-k2-instruct-0905 oder llama-3.1-70b-versatile"
+            )
+            
+            if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True):
+                settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
+                st.success("✅ Einstellungen für Groq gespeichert!")
+                time.sleep(0.5)
+                st.rerun()
+                
+        else:
+            st.markdown("### 🏠 Ollama Lokal Konfiguration")
+            st.caption("Benötigt eine laufende Ollama-Instanz auf deinem PC.")
+            
+            # Simple Mode Toggle
+            simple_mode = st.toggle("Ich weiß nicht, welche Modelle ich nutzen soll", value=False)
+            
+            if simple_mode:
+                st.info("💡 Keine Sorge! Wir setzen die bewährten Standards für dich.")
+                st.markdown("""
+                **Empfohlene Standards:**
+                - Chat Modell: `llama3:8b` (Ausgewogen)
+                - Host: `http://localhost:11434`
+                """)
+                
+                if st.button("Standard-Werte setzen & Speichern", type="primary", use_container_width=True):
+                    settings.update_from_ui(provider="ollama", model="llama3:8b")
+                    # Wir setzen hier direkt die config attribute für host da update_from_ui das (noch) nicht kann
+                    settings.ollama_host = "http://localhost:11434" 
+                    settings.emotion_analysis_model = "qwen2.5:1.5b"
+                    st.success("✅ Standard-Werte gesetzt! Bitte stelle sicher, dass du `ollama run llama3:8b` im Terminal ausgeführt hast.")
+                    time.sleep(1.5)
+                    st.rerun()
+            else:
+                new_host = st.text_input("Ollama URL", value=settings.ollama_host)
+                new_ollama_model = st.text_input("Chat Modell", value=settings.ollama_model)
+                
+                if st.button("Ollama Einstellungen Speichern", type="primary", use_container_width=True):
+                    settings.update_from_ui(provider="ollama", model=new_ollama_model)
+                    settings.ollama_host = new_host
+                    st.success("✅ Einstellungen für Ollama gespeichert!")
+                    time.sleep(0.5)
+                    st.rerun()
+
+    with tab1:
+        st.subheader("Generierungs-Einstellungen")
+        new_temp = st.slider("Temperatur", 0.0, 1.0, float(settings.temperature), 0.1,
+                            help="Hoehere Werte = kreativere Antworten")
+        new_tokens = st.number_input("Max Tokens", 100, 8000, int(settings.max_tokens), 100,
+                                    help="Maximale Laenge der Antworten")
+        new_cot = st.toggle("Chain of Thought (Gedankenprozess)", bool(settings.chain_of_thought),
+                           help="Zeigt CHAPPiEs Denkprozess")
+        
+        st.subheader("Gedaechtnis")
+        new_k = st.slider("Memory Top-K", 1, 10, int(settings.memory_top_k),
+                         help="Anzahl der Erinnerungen die abgerufen werden")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Speichern", use_container_width=True, type="primary"):
+                settings.temperature = new_temp
+                settings.max_tokens = new_tokens
+                settings.chain_of_thought = new_cot
+                settings.memory_top_k = new_k
+                st.success("Einstellungen gespeichert!")
+                time.sleep(0.5)
+                st.rerun()
+        with col2:
+            if st.button("Schliessen", use_container_width=True):
+                st.session_state.show_settings = False
+                st.rerun()
+    
+    with tab2:
+        st.subheader("Emotionen bearbeiten")
+        st.info("Hier kannst du CHAPPiEs emotionalen Zustand manuell anpassen.")
+
+        emo = st.session_state.get("current_emotions") or {
+            "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
+            "frustration": 0, "motivation": 80
+        }
+        
+        new_joy = st.slider("Freude", 0, 100, int(emo.get("joy", 50)), 
+                           help="Gluecklichkeits-Level")
+        new_trust = st.slider("Vertrauen", 0, 100, int(emo.get("trust", 50)),
+                             help="Vertrauens-Level zum User")
+        new_energy = st.slider("Energie", 0, 100, int(emo.get("energy", 80)),
+                              help="Energie-Level (sinkt bei viel Arbeit)")
+        new_curiosity = st.slider("Neugier", 0, 100, int(emo.get("curiosity", 60)),
+                                 help="Wie neugierig CHAPPiE ist")
+        new_motivation = st.slider("Motivation", 0, 100, int(emo.get("motivation", 80)),
+                                  help="Motivations-Level")
+        new_frustration = st.slider("Frustration", 0, 100, int(emo.get("frustration", 0)),
+                                   help="Frustrations-Level (niedrig ist besser)")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Emotionen speichern", use_container_width=True, type="primary"):
+                new_emotions = {
+                    "joy": new_joy,
+                    "trust": new_trust,
+                    "energy": new_energy,
+                    "curiosity": new_curiosity,
+                    "frustration": new_frustration,
+                    "motivation": new_motivation
+                }
+                if new_emotions and isinstance(new_emotions, dict):
+                    st.session_state.current_emotions = new_emotions
+                # Auch im Backend aktualisieren
+                backend.emotions.state.happiness = new_joy
+                backend.emotions.state.trust = new_trust
+                backend.emotions.state.energy = new_energy
+                backend.emotions.state.curiosity = new_curiosity
+                backend.emotions.state.frustration = new_frustration
+                backend.emotions.state.motivation = new_motivation
+                backend.emotions._save_state()  # Persistieren
+                st.success("Emotionen aktualisiert!")
+                time.sleep(0.5)
+                st.rerun()
+        with col2:
+            if st.button("Zuruecksetzen", use_container_width=True):
+                default_emotions = {
+                    "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
+                    "frustration": 0, "motivation": 80
+                }
+                if default_emotions and isinstance(default_emotions, dict):
+                    st.session_state.current_emotions = default_emotions
+                backend.emotions.reset()
+                st.success("Emotionen zurueckgesetzt!")
+                time.sleep(0.5)
+                st.rerun()
+    
+    with tab3:
+        st.subheader("Datenbank-Verwaltung")
+        
+        memory_count = backend.memory.get_memory_count()
+        st.metric("Gespeicherte Erinnerungen", memory_count)
+        
+        st.warning("Achtung: Das Loeschen der ChromaDB ist nicht rueckgaengig zu machen!")
+        
+        # Sicherheits-Checkbox
+        confirm_delete = st.checkbox("Ich verstehe, dass alle Erinnerungen unwiderruflich geloescht werden")
+        
+        if st.button("ChromaDB loeschen", use_container_width=True, 
+                    type="primary" if confirm_delete else "secondary",
+                    disabled=not confirm_delete):
+            if confirm_delete:
+                deleted_count = backend.memory.clear_memory()
+                st.success(f"{deleted_count} Erinnerungen geloescht!")
+                time.sleep(1)
+                st.rerun()
+    
+    st.markdown("---")

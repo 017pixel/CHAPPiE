@@ -37,6 +37,10 @@ CHAPiE/
 │   ├── config.py          # Zentrale Konfiguration
 │   ├── prompts.py         # System-Prompts & Templates
 │   └── secrets.py         # API-Keys & Modell-Einstellungen ⚠️
+├── web_infrastructure/    # 🆕 Modulare Web-UI
+│   ├── components.py      # Wiederverwendbare UI-Elemente
+│   ├── chat_ui.py         # Chat-Interface
+│   └── ...
 ├── memory/
 │   ├── memory_engine.py   # ChromaDB Wrapper (Vektordatenbank)
 │   ├── emotions_engine.py # Emotions-Engine (6 Emotionen)
@@ -45,11 +49,12 @@ CHAPiE/
 │   ├── base_brain.py      # Abstrakte LLM-Klasse
 │   ├── ollama_brain.py    # Ollama Implementation (lokal)
 │   ├── groq_brain.py      # Groq Cloud Implementation
+│   ├── deep_think.py      # Deep Think Engine
 │   └── response_parser.py # Antwort-Parsing & Markdown
 ├── data/
 │   ├── chat_sessions/     # Persistierte Chat-Sessions
 │   └── chroma_db/         # Vektordatenbank (automatisch erstellt)
-├── app.py                 # GUI-Anwendung (optional)
+├── app.py                 # GUI-Anwendung (Startpunkt)
 ├── main.py                # CLI Haupt-Loop
 ├── requirements.txt       # Dependencies
 ├── .gitignore             # Git-Ignore Regeln
@@ -82,17 +87,26 @@ pip install -r requirements.txt
 # LLM Provider wählen: "ollama" (lokal) oder "groq" (cloud)
 LLM_PROVIDER = "ollama"
 
-# Falls Groq: API-Key eintragen
-GROQ_API_KEY = "dein_key_hier"
+# Modelle (Empfohlen für lokale Nutzung)
+OLLAMA_MODEL = "gpt-oss:20b"           # Haupt-Chat
+EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b" # Hintergrund-Prozesse (Schnell!)
 ```
 
 ### 4. Ollama einrichten (für lokale Modelle)
 
 ```bash
 # Ollama installieren: https://ollama.ai
-# Modell herunterladen:
-ollama pull llama3:8b
+# Modelle herunterladen:
+ollama pull gpt-oss:20b
+ollama pull qwen2.5:1.5b
 ```
+
+## 🆕 Performance Update (Januar 2026)
+
+Das System wurde massiv für lokale Nutzung optimiert:
+*   **Dual-Brain Architektur:** Nutzt das leistungsstarke `gpt-oss:20b` für den Chat, aber das pfeilschnelle `qwen2.5:1.5b` für Hintergrundaufgaben (Träume, Analyse).
+*   **Smart Query Extraction:** Einfache Fragen ("Wie geht es dir?") umgehen das LLM komplett -> Sofortige Antwort ohne Wartezeit.
+*   **Modulare Web-UI:** Die Benutzeroberfläche wurde komplett refactored und ist nun extrem reaktionsschnell dank asynchronem Speichern.
 
 ## ⚙️ Konfiguration
 
