@@ -70,9 +70,29 @@
 - `'single'` -> dim italic quotes
 - `--` -> — (em dash)
 
+#### 5. ✅ Automatisierter Trainingsmodus & Fehlerbehandlung
+**Problem**: Manuelles Training von CHAPiE war mühsam und fehleranfällig bei API-Limits oder langen Kontexten.
+
+**Lösung**:
+- Implementierung eines autonomen `TrainingLoop` mit intelligentem Fehlermanagement.
+- **Context Recovery**: Erkennt Token-Limits und kürzt den Kontext automatisch um 50%.
+- **API Fallback**: Schaltet bei Erreichen von Tageslimits (RPD) automatisch auf lokale Modelle (Ollama) um.
+- **Memory Protection**: Verhindert das Speichern von API-Fehlermeldungen im Gedächtnis.
+- **Kumulative Zusammenfassungen**: Konsolidiert den Chat-Kontext alle 24 Nachrichten, um die Performance beizubehalten, ohne den Gesprächsfaden zu verlieren.
+
 ---
 
 ### 🚀 Neue Features
+
+#### 1. 🎓 CHAPiEs Trainingspartner
+**Neue Dateien**: `Chappies_Trainingspartner/*.py`
+
+**Funktionen**:
+- **Autonomes Training**: Ein Trainer-Agent simuliert einen User basierend auf einer wählbaren Persona und einem Fokus-Thema.
+- **Rate-Limit Schutz**: Automatisierte Pausen (60s bei RPM, 30min bei Dauerfehlern).
+- **Automatischer Schlafmodus**: Alle 24 Nachrichten wird eine Traum-Phase gestartet, die Erinnerungen konsolidiert und den Kontext für maximale Geschwindigkeit optimiert.
+- **Persistenz**: Fortschritt wird in `training_state.json` gespeichert und kann jederzeit fortgesetzt werden.
+
 
 #### 1. ✨ Voice Engine V2
 **Neue Datei**: `brain/voice_engine_v2.py`

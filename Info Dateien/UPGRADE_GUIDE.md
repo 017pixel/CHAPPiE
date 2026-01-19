@@ -81,6 +81,20 @@ python -c "import edge_tts; print('Edge-TTS OK')"
 python -c "from faster_whisper import WhisperModel; print('Faster-Whisper OK')"
 ```
 
+### 4. Trainingsmodus nutzen
+
+Der neue automatisierte Trainingsmodus ermöglicht es, CHAPiE ohne manuelles Zutun über lange Zeit zu trainieren.
+
+```powershell
+# Starte den Trainingspartner
+python -m Chappies_Trainingspartner.trainingspartner_main
+```
+
+**Features**:
+- Wählbare Trainer-Persona und Fokus-Area
+- Automatischer Fallback auf lokale Modelle bei API-Limits
+- Regelmäßige Memory-Consolidation (alle 24 Nachrichten)
+
 ---
 
 ## ⚙️ Konfigurationsoptionen

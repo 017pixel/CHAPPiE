@@ -61,6 +61,12 @@ Das ist eines der coolsten Features. Im `/sleep` Modus passiert folgendes:
 - Die unwichtigen Details werden gelöscht, die "Essenz" (Zusammenfassung) wird als permanente Erinnerung gespeichert.
 - Seine **Energie** wird wieder aufgeladen.
 
+### 4. 🎓 Der Trainingsmodus (`Chappies_Trainingspartner/`)
+Für die langfristige Entwicklung gibt es einen autonomen Trainings-Modus:
+- **Trainer-Agent:** Simuliert einen Benutzer mit spezifischer Persona.
+- **Fehler-Resilienz:** Das System erkennt API-Fehler (RPM/RPD) und schaltet automatisch auf lokale Backends um oder legt Pausen ein.
+- **Iterative Konsolidierung:** Alle 24 Nachrichten wird eine Traum-Phase ausgelöst. Dabei wird der Kontext nicht gelöscht, sondern durch eine kumulative Zusammenfassung ersetzt. So bleibt der "rote Faden" erhalten, während die Token-Last minimal bleibt.
+
 ---
 
 ## 🛠️ Technik-Stack
