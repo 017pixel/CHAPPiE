@@ -10,6 +10,8 @@ import os
 import logging
 from datetime import datetime
 
+import json
+
 # Force UTF-8 encoding
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
@@ -54,14 +56,41 @@ def main():
     logging.info("=" * 70)
     
     try:
-        # Standard configuration for autonomous operation
-        config = TrainerConfig(
-            persona="Ein kritischer User, der versucht Fehler zu finden",
-            focus_area="Logikfehler und Konsistenz im Gedächtnis",
-            provider="local"  # Use local models for 24/7 operation
-        )
+        # Konfiguration laden
+        config_path = os.path.join(os.path.dirname(__file__), '..', 'training_config.json')
         
-        logging.info(f"Konfiguration: {config.__dict__}")
+        if os.path.exists(config_path):
+            logging.info("Lade Konfiguration aus training_config.json")
+            with open(config_path, 'r', encoding='utf-8') as f:
+                saved_config = json.load(f)
+                
+            config = TrainerConfig(
+                persona=saved_config.get("persona", "Ein kritischer User"),
+                focus_area=saved_config.get("focus_area", "Logikfehler"),
+                provider=saved_config.get("provider", "local"),
+                model_name=saved_config.get("model_name")
+            )
+        else:
+            logging.warning("Keine training_config.json gefunden! Nutze Defaults.")
+            # Fallback configuration
+            config = TrainerConfig(
+                persona="Ein kritischer User, der versucht Fehler zu finden",
+                focus_area="Logikfehler und Konsistenz im Gedächtnis",
+                provider="local"
+            )
+        
+        logging.info(f"Aktive Konfiguration: {config.__dict__}")
+        
+        # WICHTIG: Settings global setzen, damit Chappie auch den richtigen Provider nutzt
+        from config.config import settings, LLMProvider
+        if config.provider == "groq":
+             settings.llm_provider = LLMProvider.GROQ
+             if config.model_name: settings.groq_model = config.model_name
+        else:
+             settings.llm_provider = LLMProvider.OLLAMA
+             if config.model_name: settings.ollama_model = config.model_name
+             
+        logging.info(f"Globale Settings aktualisiert: Provider={settings.llm_provider}")
         
         trainer = TrainerAgent(config)
         loop = TrainingLoop(trainer)

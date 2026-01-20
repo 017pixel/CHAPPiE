@@ -330,8 +330,20 @@ class TrainingLoop:
                     )
                 
                 if not trainer_response: 
-                    log.warning("Trainer Antwort leer/war fehlerhaft - breche Loop ab")
-                    break # Stop/Error
+                    log.warning("Trainer Antwort leer - starte Retry (max 3 Versuche)...")
+                    retry_count = 0
+                    while not trainer_response and retry_count < 3:
+                        retry_count += 1
+                        time.sleep(2)
+                        trainer_response = self._safe_execute(
+                            self.trainer.generate_reply, 
+                            chappie_response, 
+                            self.conversation_history
+                        )
+                    
+                    if not trainer_response:
+                        log.error("Trainer Antwort bleibt leer nach Retries - breche Loop ab")
+                        break # Stop/Error
 
                 # Prüfe ob es ein Fehler ist
                 if self._is_error_response(trainer_response):

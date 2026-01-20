@@ -14,9 +14,21 @@ if "%1"=="tail" goto tail
 goto usage
 
 :start
-echo [GREEN]Verbinde mit Server und starte Training-Daemon...[/GREEN]
+echo [GREEN]Verbinde mit Server...[/GREEN]
+
+REM 1. Updates holen und Dependencies installieren (nicht-interaktiv)
+echo [YELLOW]Hole Updates von GitHub...[/YELLOW]
+ssh %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && git pull && source venv/bin/activate && pip install -r requirements.txt"
+
+REM 2. Setup-Wizard starten (INTERAKTIV - fragt nach Persona/Focus)
+echo [YELLOW]Starte Setup-Wizard...[/YELLOW]
+ssh -t %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && source venv/bin/activate && python Chappies_Trainingspartner/setup_training.py"
+
+REM 3. Daemon im Hintergrund starten
+echo [GREEN]Starte Training-Daemon im Hintergrund...[/GREEN]
 ssh %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && source venv/bin/activate && nohup python Chappies_Trainingspartner/training_daemon.py ^> training_daemon.log 2^>^&1 ^&"
-echo [GREEN]Daemon gestartet auf dem Server[/GREEN]
+
+echo [GREEN]Daemon erfolgreich gestartet![/GREEN]
 echo Logs ansehen: deploy_training.bat tail
 goto end
 
