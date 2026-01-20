@@ -10,6 +10,9 @@ import os
 import logging
 from datetime import datetime
 
+# Force UTF-8 encoding
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 # Ensure project root is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -19,18 +22,22 @@ from Chappies_Trainingspartner.training_loop import TrainingLoop
 def setup_logging():
     """Setup logging to file for headless operation."""
     log_file = os.path.join(os.path.dirname(__file__), '..', 'training_daemon.log')
-    
+
+    # Remove default handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
     logging.basicConfig(
         filename=log_file,
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
-    # Also log to console for systemd
-    console = logging.StreamHandler()
+
+    # Also log to console for systemd (simple format)
+    console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
 
