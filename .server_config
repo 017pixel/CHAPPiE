@@ -1,0 +1,13 @@
+# SSH Verbindung zum Server
+SERVER_USER="bbecker"
+SERVER_HOST="100.105.94.71"
+SERVER_PORT="22"
+
+# Pfad zum CHAPiE Projekt auf dem Server
+SERVER_PROJECT_PATH="/home/bbecker/CHAPiE"
+
+# Pfad zur SSH Private Key (leer lassen für Default)
+SSH_KEY_PATH="~/.ssh/id_rsa"
+
+# Virtuelle Environment auf dem Server
+VENV_PATH="venv"  # Relativ zu SERVER_PROJECT_PATH

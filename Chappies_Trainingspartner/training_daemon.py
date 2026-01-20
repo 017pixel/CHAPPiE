@@ -29,21 +29,29 @@ def setup_logging():
 
     logging.basicConfig(
         filename=log_file,
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=logging.DEBUG,  # DEBUG für detailliertere Logs
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
     # Also log to console for systemd (simple format)
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
+    
+    # Rich console output auch enable
+    from rich.logging import RichHandler
+    rich_handler = RichHandler(rich_tracebacks=True, show_time=False, show_path=False)
+    rich_handler.setLevel(logging.INFO)
+    logging.getLogger('').addHandler(rich_handler)
 
 def main():
     setup_logging()
-    logging.info("Starting CHAPiE Training Daemon")
+    logging.info("=" * 70)
+    logging.info("CHAPiE TRAINING DAEMON GESTARTET")
+    logging.info("=" * 70)
     
     try:
         # Standard configuration for autonomous operation
@@ -53,16 +61,18 @@ def main():
             provider="local"  # Use local models for 24/7 operation
         )
         
-        logging.info(f"Configuration: {config.__dict__}")
+        logging.info(f"Konfiguration: {config.__dict__}")
         
         trainer = TrainerAgent(config)
         loop = TrainingLoop(trainer)
         
-        logging.info("Starting training loop...")
+        logging.info("Starte Training-Loop (autonomer 24/7 Betrieb)...")
         loop.run_training()  # This runs forever until stopped
         
+    except KeyboardInterrupt:
+        logging.warning("Training durch Keyboard-Interrupt gestoppt")
     except Exception as e:
-        logging.error(f"Critical error in training daemon: {e}")
+        logging.error(f"Kritischer Fehler im Training-Daemon: {e}", exc_info=True)
         raise
 
 if __name__ == "__main__":

@@ -17,6 +17,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.live import Live
 
+import logging
+log = logging.getLogger(__name__)
+
 # Backend Imports (Manuell um Streamlit Dependencies zu vermeiden)
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.prompts import get_system_prompt_with_emotions
@@ -38,9 +41,12 @@ class TrainingLoop:
         self.stop_flag = threading.Event()
         self.conversation_history = []
         self.messages_since_dream = 0
+        self.loop_count = 0
         
         # Chappie Backend Initialisierung (ohne Streamlit Cache)
-        print("Initialisiere Chappie Backend...")
+        msg = "Initialisiere Chappie Backend..."
+        print(msg)
+        log.info(msg)
         self.memory = MemoryEngine()
         self.emotions = EmotionsEngine()
         self.brain = get_brain()
@@ -51,7 +57,9 @@ class TrainingLoop:
             emotions_engine=self.emotions,
             brain=self.brain
         )
-        print("Chappie Backend bereit.")
+        msg = "Chappie Backend bereit."
+        print(msg)
+        log.info(msg)
 
     def _safe_execute(self, func: Callable, *args, **kwargs) -> Optional[str]:
         """
@@ -65,13 +73,18 @@ class TrainingLoop:
         
         while not self.stop_flag.is_set():
             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                console.print(f"\n[bold red]🛑 Zu viele Fehler in Folge ({consecutive_errors}). Pausiere für 30 Minuten...[/bold red]")
+                error_msg = f"Zu viele Fehler in Folge ({consecutive_errors}). Pausiere für 30 Minuten..."
+                console.print(f"\n[bold red]🛑 {error_msg}[/bold red]")
+                log.error(error_msg)
                 # Warte 30 Minuten (unterbrechbar)
                 for _ in range(30 * 60):
                     if self.stop_flag.is_set(): return None
                     time.sleep(1)
+                    if _ % 60 == 0:
+                        log.info(f"Pause läuft: {_//60} Minuten verstrichen")
                 consecutive_errors = 0 # Reset nach langer Pause
                 console.print("[green]Versuche es erneut nach langer Pause...[/green]")
+                log.info("Versuche es erneut nach langer Pause")
             
             time.sleep(2.5)
             
@@ -83,17 +96,20 @@ class TrainingLoop:
                     error_msg = response
                     error_type = self._classify_error(error_msg)
                     consecutive_errors += 1
+                    log.error(f"API FEHLER: {error_msg} (Type: {error_type})")
                     
                     if error_type == "CONTEXT_LENGTH":
                         console.print(f"\n[bold red]⚠️ Context Length Error![/bold red]")
                         self._reduce_conversation_context()
                         console.print("[yellow]Erneuter Versuch mit reduziertem Context...[/yellow]")
+                        log.info("Context reduziert, versuche erneut...")
                         time.sleep(2)
                         continue
                         
                     elif error_type == "TIMEOUT":
                         console.print(f"\n[bold red]⚠️ Timeout/Connection Error![/bold red]")
                         console.print("[yellow]Warte 5 Sekunden vor Retry...[/yellow]")
+                        log.warning("Timeout-Error, warte 5 Sekunden...")
                         for _ in range(5):
                             if self.stop_flag.is_set(): return None
                             time.sleep(1)
@@ -103,6 +119,7 @@ class TrainingLoop:
                     elif error_type == "RPM":
                         console.print(f"\n[bold red]⚠️ Rate Limit erreicht! (RPM)[/bold red]")
                         console.print(f"[yellow]Pausiere für 60 Sekunden zum Abkühlen...[/yellow]")
+                        log.warning("RPM Rate Limit erreicht, pausiere 60 Sekunden...")
                         for _ in range(60):
                             if self.stop_flag.is_set(): return None
                             time.sleep(1)
@@ -112,6 +129,7 @@ class TrainingLoop:
                     elif error_type == "RPD":
                         console.print(f"\n[bold red]⚠️ Tages-Limit erreicht! (RPD)[/bold red]")
                         console.print(f"[yellow]Wechsle Trainer UND Chappie auf lokale Modelle...[/yellow]")
+                        log.warning("RPD Limit erreicht, wechsle auf lokale Modelle...")
                         
                         # 1. Trainer wechseln
                         trainer_switched = self.trainer.switch_to_local()
@@ -121,10 +139,12 @@ class TrainingLoop:
                         
                         if trainer_switched:
                             console.print(f"[green]Trainer & Chappie laufen jetzt lokal.[/green]")
+                            log.info("Erfolgreich auf lokale Modelle gewechselt")
                             time.sleep(2)
                             continue
                         else:
                             console.print(f"[red]Trainer war bereits lokal. Warte 30s...[/red]")
+                            log.info("Trainer bereits lokal, warte 30 Sekunden...")
                             time.sleep(30)
                             continue
                             
@@ -132,6 +152,7 @@ class TrainingLoop:
                         # Anderer API Fehler
                         console.print(f"\n[bold red]⚠️ API Fehler: {error_msg}[/bold red]")
                         console.print("[yellow]Warte 10s bevor Retry...[/yellow]")
+                        log.warning(f"Anderer API Fehler: {error_msg}")
                         time.sleep(10)
                         continue
                 
@@ -143,6 +164,7 @@ class TrainingLoop:
                 consecutive_errors += 1
                 error_msg = str(e)
                 error_type = self._classify_error(error_msg)
+                log.error(f"Unerwarteter Fehler: {error_msg} (Type: {error_type})")
                 
                 if error_type == "TIMEOUT":
                     console.print(f"\n[bold red]⚠️ Timeout/Connection Error![/bold red]")
@@ -209,6 +231,10 @@ class TrainingLoop:
     def run_training(self):
         """Der eigentliche Thread-Loop."""
         
+        log.info("=" * 50)
+        log.info("TRAINING LOOP GESTARTET")
+        log.info("=" * 50)
+        
         # Versuche Status zu laden
         self.load_state()
         
@@ -218,13 +244,16 @@ class TrainingLoop:
             current_input = first_input
             
             console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {current_input}", border_style="blue"))
+            log.info(f"TRAINER: {current_input}")
             
             # Zur History hinzufuegen (User Role fuer Chappie)
             self.conversation_history.append({"role": "user", "content": current_input})
         else:
             # Wiederaufnahme: Letzte Nachricht ermitteln
             last_msg = self.conversation_history[-1]
-            console.print(Panel(f"[yellow]Wiederaufnahme des Trainings... Letzte Rolle: {last_msg['role']}[/yellow]", border_style="yellow"))
+            msg = f"Wiederaufnahme des Trainings... Letzte Rolle: {last_msg['role']}"
+            console.print(Panel(f"[yellow]{msg}[/yellow]", border_style="yellow"))
+            log.info(msg)
             
             # Wenn letzte Nachricht vom Trainer (user) war, ist Chappie dran
             # Wenn letzte Nachricht von Chappie (assistant) war, ist Trainer dran
@@ -233,10 +262,6 @@ class TrainingLoop:
             else:
                 # Trainer muss auf Chappie reagieren
                 current_input = None # Signalisiert, dass wir direkt zum Trainer-Teil springen koennten
-                # Aber wir nutzen den Loop normal, nur dass wir den Chappie-Teil überspringen müssten?
-                # Einfacher: Wir nehmen die letzte User-Nachricht als input, falls Chappie geantwortet hat.
-                # Oder wir lassen Chappie einfach nochmal antworten auf den letzten User-Input (einfacher für Loop-Struktur)
-                # BESSER: Wir schauen uns den Loop an.
                 pass
                 
         # Wenn wir wiederaufnehmen, müssen wir sicherstellen, dass wir an der richtigen Stelle weitermachen.
@@ -255,32 +280,48 @@ class TrainingLoop:
             else:
                 current_input = self.conversation_history[-1]["content"]
 
+        log.info(f"Startparameter: skip_chappie_turn={skip_chappie_turn}, total_messages={len(self.conversation_history)}")
+
         while not self.stop_flag.is_set():
             try:
+                self.loop_count += 1
+                log.info(f"--- LOOP {self.loop_count} START ---")
+                
                 # === CHAPPIE ANTWORTET ===
                 if not skip_chappie_turn:
+                    log.info("CHAPPIE GENERIERE...")
                     with console.status("[bold green]Chappie denkt nach...[/bold green]", spinner="dots"):
                         # Wrap the actual generation/process logic in a lambda for safe execution
                         chappie_response = self._safe_execute(self._chappie_process, current_input)
                     
-                    if not chappie_response: break # Stop/Error
+                    if not chappie_response: 
+                        log.warning("Chappie Antwort leer/war fehlerhaft - breche Loop ab")
+                        break # Stop/Error
                     
                     # Prüfe ob es ein Fehler ist
                     if self._is_error_response(chappie_response):
+                        log.error(f"FEHLER in Chappie Antwort: {chappie_response}")
                         console.print(f"[red]Fehler-Antwort nicht in History gespeichert: {chappie_response}[/red]")
+                        time.sleep(2)
                         continue # Keine History-Update, sofort neuer Versuch
                     
                     console.print(Panel(f"[bold green]CHAPPIE:[/bold green] {chappie_response}", border_style="green"))
+                    log.info(f"CHAPPIE: {chappie_response}")
                     
                     # History Update (Assistant Role fuer Chappie)
                     self.conversation_history.append({"role": "assistant", "content": chappie_response})
                     self.save_state() # SAVE
+                    log.info(f"State gespeichert: {len(self.conversation_history)} Nachrichten")
                 else:
+                    log.info("SKIP CHAPPIE (Wiederaufnahme nach Trainer-Antwort)")
                     skip_chappie_turn = False # Nur beim ersten Loop überspringen
 
-                if self.stop_flag.is_set(): break
+                if self.stop_flag.is_set(): 
+                    log.info("Stop-Flag gesetzt - breche ab")
+                    break
 
                 # === TRAINER REAGIERT ===
+                log.info("TRAINER GENERIERE...")
                 with console.status("[bold blue]Trainer überlegt...[/bold blue]", spinner="dots"):
                     trainer_response = self._safe_execute(
                         self.trainer.generate_reply, 
@@ -288,14 +329,19 @@ class TrainingLoop:
                         self.conversation_history
                     )
                 
-                if not trainer_response: break # Stop/Error
+                if not trainer_response: 
+                    log.warning("Trainer Antwort leer/war fehlerhaft - breche Loop ab")
+                    break # Stop/Error
 
                 # Prüfe ob es ein Fehler ist
                 if self._is_error_response(trainer_response):
+                    log.error(f"FEHLER in Trainer Antwort: {trainer_response}")
                     console.print(f"[red]Fehler-Antwort nicht in History gespeichert: {trainer_response}[/red]")
+                    time.sleep(2)
                     continue # Keine History-Update, sofort neuer Versuch
                 
                 console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {trainer_response}", border_style="blue"))
+                log.info(f"TRAINER: {trainer_response}")
                 
                 # History Update
                 self.conversation_history.append({"role": "user", "content": trainer_response})
@@ -303,6 +349,7 @@ class TrainingLoop:
                 
                 # === TRAUM-PHASE CHECK (alle 24 Nachrichten / 12 Paare) ===
                 if self.messages_since_dream >= 24:
+                    log.info("=== TRAUM-PHASE EINGELEITET ===")
                     console.print(Panel("[bold magenta]🌙 TRAUM-PHASE EINGELEITET[/bold magenta]\nKonsolidiere neue Nachrichten und aktualisiere Langzeit-Kontext...", border_style="magenta"))
                     
                     # 1. Erinnerungen konsolidieren (via Memory Engine)
@@ -310,6 +357,7 @@ class TrainingLoop:
                     summary_result = self._safe_execute(self.memory.consolidate_memories, self.brain)
                     
                     if summary_result:
+                        log.info(f"Traum-Phase erfolgreich: {summary_result[:200]}...")
                         # Extrahiere die reine Zusammenfassung für den Kontext (aus dem Log-String falls möglich, 
                         # oder wir nutzen eine saubere Methode)
                         console.print(f"[dim]{summary_result}[/dim]")
@@ -333,12 +381,16 @@ class TrainingLoop:
                         
                         self.conversation_history = new_history
                         self.messages_since_dream = 0 # Reset Counter
+                        log.info("Kontext konsolidiert, Traum-Phase abgeschlossen")
                         console.print("[bold green]✅ Kontext wurde konsolidiert und kompaktiert.[/bold green]")
                     else:
+                        log.error("Traum-Phase fehlgeschlagen")
                         console.print("[red]❌ Traum-Phase fehlgeschlagen. Mache normal weiter.[/red]")
 
                 self.save_state() # SAVE
+                log.info(f"State gespeichert: {len(self.conversation_history)} Nachrichten, messages_since_dream={self.messages_since_dream}")
                 current_input = trainer_response
+                log.info(f"--- LOOP {self.loop_count} BEENDET ---\n")
                 
                 # Zusaetzliche Pause nicht mehr noetig, da safe_execute schon 2.5s hat
                 # Aber fuer Lesbarkeit schadet eine kleine Pause nicht
@@ -371,6 +423,7 @@ class TrainingLoop:
             return # Bereits lokal
             
         console.print("[bold yellow]Schalte Chappie auf lokales Modell um (Ollama)...[/bold yellow]")
+        log.info("Wechsle Chappie auf lokales Modell (Ollama)")
         
         # 1. Globale Settings ändern
         settings.llm_provider = LLMProvider.OLLAMA
@@ -385,7 +438,9 @@ class TrainingLoop:
             emotions_engine=self.emotions,
             brain=self.brain
         )
-        console.print(f"[green]Chappie läuft jetzt lokal mit {settings.ollama_model}[/green]")
+        msg = f"Chappie läuft jetzt lokal mit {settings.ollama_model}"
+        console.print(f"[green]{msg}[/green]")
+        log.info(msg)
 
     def save_state(self):
         """Speichert den aktuellen Trainings-Status in eine JSON-Datei."""
@@ -397,12 +452,15 @@ class TrainingLoop:
         try:
             with open("training_state.json", "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
+            log.debug(f"State gespeichert: {len(self.conversation_history)} Nachrichten")
         except Exception as e:
             console.print(f"[red]Fehler beim Speichern des Status: {e}[/red]")
+            log.error(f"Fehler beim Speichern des Status: {e}")
 
     def load_state(self):
         """Lädt den Trainings-Status falls vorhanden."""
         if not os.path.exists("training_state.json"):
+            log.info("Kein vorheriger Trainings-Status gefunden, starte neu")
             return
             
         try:
@@ -413,10 +471,13 @@ class TrainingLoop:
             self.conversation_history = state.get("history", [])
             self.messages_since_dream = state.get("messages_since_dream", 0)
             last_save = state.get("timestamp", "Unbekannt")
-            console.print(f"[green]Status geladen ({len(self.conversation_history)} Nachrichten). Letztes Save: {last_save}[/green]")
+            msg = f"Status geladen ({len(self.conversation_history)} Nachrichten). Letztes Save: {last_save}"
+            console.print(f"[green]{msg}[/green]")
+            log.info(msg)
             
         except Exception as e:
             console.print(f"[red]Konnte Status nicht laden: {e}[/red]")
+            log.error(f"Status konnte nicht geladen werden: {e}")
 
     def _reduce_conversation_context(self):
         """Reduziert die Conversation-History auf 50%."""
@@ -426,7 +487,9 @@ class TrainingLoop:
         
         new_length = max(4, original_length // 2)
         self.conversation_history = self.conversation_history[-new_length:]
-        console.print(f"[yellow]Context reduziert: {original_length} -> {new_length} Nachrichten[/yellow]")
+        msg = f"Context reduziert: {original_length} -> {new_length} Nachrichten"
+        console.print(f"[yellow]{msg}[/yellow]")
+        log.info(msg)
         return True
 
     def _is_error_response(self, response: str) -> bool:

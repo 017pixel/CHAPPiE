@@ -1,0 +1,23 @@
+[Unit]
+Description=CHAPiE Training Daemon - 24/7 AI Training
+After=network.target ollama.service
+
+[Service]
+Type=simple
+User=bbecker
+WorkingDirectory=/home/bbecker/CHAPiE
+ExecStart=/home/bbecker/CHAPiE/venv/bin/python Chappies_Trainingspartner/training_daemon.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=chappie-training
+
+# Resource Limits
+LimitNOFILE=65536
+
+# Security
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
