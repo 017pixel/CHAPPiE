@@ -42,6 +42,8 @@ class TrainingLoop:
         self.conversation_history = []
         self.messages_since_dream = 0
         self.loop_count = 0
+        self.consecutive_empty_responses = 0  # Zählt aufeinanderfolgende leere Antworten
+        self.MAX_EMPTY_BEFORE_RESET = 10  # Nach X leeren Antworten: Conversation resetten
         
         # Chappie Backend Initialisierung (ohne Streamlit Cache)
         msg = "Initialisiere Chappie Backend..."
@@ -291,30 +293,45 @@ class TrainingLoop:
                 if not skip_chappie_turn:
                     log.info("CHAPPIE GENERIERE...")
                     with console.status("[bold green]Chappie denkt nach...[/bold green]", spinner="dots"):
-                        # Wrap the actual generation/process logic in a lambda for safe execution
                         chappie_response = self._safe_execute(self._chappie_process, current_input)
                     
-                    if not chappie_response: 
-                        log.warning("Chappie Antwort leer/war fehlerhaft - breche Loop ab")
-                        break # Stop/Error
+                    # Strikte Validierung: Mindestens 10 Zeichen
+                    if not chappie_response or len(chappie_response.strip()) < 10:
+                        self.consecutive_empty_responses += 1
+                        log.warning(f"Chappie Antwort leer/zu kurz (#{self.consecutive_empty_responses}) - versuche erneut")
+                        
+                        # Bei zu vielen leeren Antworten: Conversation resetten
+                        if self.consecutive_empty_responses >= self.MAX_EMPTY_BEFORE_RESET:
+                            log.error(f"Zu viele leere Antworten ({self.consecutive_empty_responses}) - Reset Conversation")
+                            console.print(f"[bold red]Reset Conversation nach {self.consecutive_empty_responses} leeren Antworten[/bold red]")
+                            self._force_conversation_reset()
+                            current_input = "Hallo Chappie! Lass uns ein neues Thema besprechen."
+                            self.consecutive_empty_responses = 0
+                        
+                        time.sleep(3)
+                        continue  # Neuer Versuch, KEIN BREAK!
                     
                     # Prüfe ob es ein Fehler ist
                     if self._is_error_response(chappie_response):
+                        self.consecutive_empty_responses += 1
                         log.error(f"FEHLER in Chappie Antwort: {chappie_response}")
-                        console.print(f"[red]Fehler-Antwort nicht in History gespeichert: {chappie_response}[/red]")
+                        console.print(f"[red]Fehler-Antwort nicht in History gespeichert[/red]")
                         time.sleep(2)
-                        continue # Keine History-Update, sofort neuer Versuch
+                        continue  # Neuer Versuch, KEIN BREAK!
+                    
+                    # Erfolgreiche Antwort - Reset Counter
+                    self.consecutive_empty_responses = 0
                     
                     console.print(Panel(f"[bold green]CHAPPIE:[/bold green] {chappie_response}", border_style="green"))
                     log.info(f"CHAPPIE: {chappie_response}")
                     
-                    # History Update (Assistant Role fuer Chappie)
+                    # History Update (nur valide Antworten!)
                     self.conversation_history.append({"role": "assistant", "content": chappie_response})
-                    self.save_state() # SAVE
+                    self.save_state()
                     log.info(f"State gespeichert: {len(self.conversation_history)} Nachrichten")
                 else:
                     log.info("SKIP CHAPPIE (Wiederaufnahme nach Trainer-Antwort)")
-                    skip_chappie_turn = False # Nur beim ersten Loop überspringen
+                    skip_chappie_turn = False
 
                 if self.stop_flag.is_set(): 
                     log.info("Stop-Flag gesetzt - breche ab")
@@ -328,19 +345,25 @@ class TrainingLoop:
                         self.conversation_history
                     )
                 
+                # Strikte Validierung: Mindestens 10 Zeichen (Trainer hat jetzt Fallback-Garantie)
+                if not trainer_response or len(trainer_response.strip()) < 10:
+                    log.warning(f"Trainer Antwort zu kurz: '{trainer_response}' - wird übersprungen (sollte nicht passieren)")
+                    time.sleep(2)
+                    continue
+                
                 # Prüfe ob es ein Fehler ist
                 if self._is_error_response(trainer_response):
                     log.error(f"FEHLER in Trainer Antwort: {trainer_response}")
-                    console.print(f"[red]Fehler-Antwort nicht in History gespeichert: {trainer_response}[/red]")
+                    console.print(f"[red]Fehler-Antwort nicht in History gespeichert[/red]")
                     time.sleep(2)
-                    continue # Keine History-Update, sofort neuer Versuch
+                    continue
                 
                 console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {trainer_response}", border_style="blue"))
                 log.info(f"TRAINER: {trainer_response}")
                 
-                # History Update
+                # History Update (nur valide Antworten!)
                 self.conversation_history.append({"role": "user", "content": trainer_response})
-                self.messages_since_dream += 2 # +2 Nachrichten (Chappie + Trainer)
+                self.messages_since_dream += 2
                 
                 # === TRAUM-PHASE CHECK (alle 24 Nachrichten / 12 Paare) ===
                 if self.messages_since_dream >= 24:
@@ -514,3 +537,40 @@ class TrainingLoop:
             return "RPD"
         else:
             return "OTHER"
+
+    def _force_conversation_reset(self):
+        """
+        Erzwingt einen Reset der Konversation bei Stuck-Zuständen.
+        Speichert wichtige Infos via Traum-Phase und startet frisch.
+        """
+        log.warning("=== FORCE CONVERSATION RESET ===")
+        console.print(Panel(
+            "[bold yellow]⚠️ CONVERSATION RESET[/bold yellow]\n"
+            "Zu viele Fehler in Folge. Konsolidiere Wissen und starte neu...",
+            border_style="yellow"
+        ))
+        
+        # 1. Versuche vorhandenes Wissen zu speichern (falls genug Messages)
+        if len(self.conversation_history) >= 4:
+            try:
+                log.info("Versuche Wissen vor Reset zu konsolidieren...")
+                summary_result = self.memory.consolidate_memories(self.brain)
+                if summary_result:
+                    log.info(f"Konsolidierung vor Reset erfolgreich: {summary_result[:100]}...")
+            except Exception as e:
+                log.error(f"Konsolidierung vor Reset fehlgeschlagen: {e}")
+        
+        # 2. History komplett leeren
+        self.conversation_history = []
+        self.messages_since_dream = 0
+        
+        # 3. Trainer-Fallback-Counter resetten
+        if hasattr(self.trainer, 'reset_fallback_counter'):
+            self.trainer.reset_fallback_counter()
+        
+        # 4. State speichern
+        self.save_state()
+        
+        log.info("Conversation Reset abgeschlossen - starte frisch")
+        console.print("[green]✅ Reset abgeschlossen. Starte mit frischer Konversation.[/green]")
+
