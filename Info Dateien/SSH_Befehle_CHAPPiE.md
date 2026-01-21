@@ -1,8 +1,16 @@
-# 🚀 SSH Befehle für CHAPPiE-Training
+# SSH Befehle fuer CHAPPiE-Training
 
 Hier sind alle wichtigen Befehle, um CHAPPiE auf deinem Ubuntu-Server zu verwalten.
 
-## 1. Einloggen & Vorbereiten
+## 0. Einmalige Setup-Schritte (nur beim ersten Mal)
+Falls neue Dependencies fehlen:
+
+```bash
+source ~/CHAPPiE/venv/bin/activate
+pip install ollama
+```
+
+## 1. Einloggen und Vorbereiten
 Logge dich per SSH ein und navigiere zum Projektordner:
 
 ```bash

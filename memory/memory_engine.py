@@ -71,42 +71,74 @@ class MemoryEngine:
     def add_memory(self, content: str, role: str = "user", mem_type: str = "interaction", label: str = "original", source: str = "conversation") -> str:
         """
         Speichert eine neue Erinnerung.
+        
+        ROBUST: Bei ChromaDB-Konflikten (z.B. gleichzeitiger Zugriff durch
+        Training-Daemon und Web-App) wird mehrfach versucht und Fehler
+        werden graceful behandelt ohne den Prozess zu stoppen.
 
         Args:
             content: Der zu speichernde Text
             role: "user" oder "assistant"
             mem_type: "interaction" oder "summary"
             label: "original", "zsm gefasst" oder "self_reflection"
-            source: "conversation" oder "self_reflection" (für Deep Think)
+            source: "conversation" oder "self_reflection" (fuer Deep Think)
 
         Returns:
-            Die ID der gespeicherten Erinnerung
+            Die ID der gespeicherten Erinnerung oder "" bei Fehler
         """
-        # Generiere eindeutige ID
-        memory_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
+        import time
+        
+        max_retries = 3
+        retry_delay = 0.5  # Sekunden
+        
+        for attempt in range(max_retries):
+            try:
+                # Generiere eindeutige ID
+                memory_id = str(uuid.uuid4())
+                timestamp = datetime.now().isoformat()
 
-        # Erstelle Embedding
-        embedding = self.embedder.encode(content).tolist()
+                # Erstelle Embedding
+                embedding = self.embedder.encode(content).tolist()
 
-        # Speichere in ChromaDB mit erweitertem Metadata
-        self.collection.add(
-            ids=[memory_id],
-            embeddings=[embedding],
-            documents=[content],
-            metadatas=[{
-                "role": role,
-                "timestamp": timestamp,
-                "type": mem_type,
-                "label": label,
-                "source": source  # NEU: Quelle der Erinnerung
-            }]
-        )
+                # Speichere in ChromaDB mit erweitertem Metadata
+                self.collection.add(
+                    ids=[memory_id],
+                    embeddings=[embedding],
+                    documents=[content],
+                    metadatas=[{
+                        "role": role,
+                        "timestamp": timestamp,
+                        "type": mem_type,
+                        "label": label,
+                        "source": source
+                    }]
+                )
 
-        if settings.debug:
-            print(f"   Memory gespeichert: [{role}] [{source}] {content[:50]}...")
+                if settings.debug:
+                    print(f"   Memory gespeichert: [{role}] [{source}] {content[:50]}...")
 
-        return memory_id
+                return memory_id
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Bei Locking/Busy-Fehlern: Retry
+                if any(kw in error_msg for kw in ["lock", "busy", "timeout", "database is locked"]):
+                    if attempt < max_retries - 1:
+                        if settings.debug:
+                            print(f"   Memory-Speicherung blockiert (Versuch {attempt+1}/{max_retries}), warte...")
+                        time.sleep(retry_delay * (attempt + 1))  # Progressiv laengere Pause
+                        continue
+                
+                # Bei anderen Fehlern oder nach allen Retries: Warnen aber weitermachen
+                if settings.debug:
+                    print(f"   WARNUNG: Memory konnte nicht gespeichert werden: {e}")
+                
+                # Nicht den Prozess stoppen, nur leere ID zurueckgeben
+                return ""
+        
+        return ""
+    
     
     def search_self_reflections(self, query: str, top_k: int = 5) -> list[Memory]:
         """
@@ -273,6 +305,9 @@ class MemoryEngine:
     def search_memory(self, query: str, top_k: Optional[int] = None) -> list[Memory]:
         """
         Sucht nach relevanten Erinnerungen.
+        
+        ROBUST: Bei ChromaDB-Konflikten wird graceful eine leere Liste
+        zurueckgegeben statt den Prozess zu stoppen.
 
         Args:
             query: Suchanfrage
@@ -281,54 +316,81 @@ class MemoryEngine:
         Returns:
             Liste von Memory-Objekten, sortiert nach Relevanz
         """
+        import time
+        
         if top_k is None:
             top_k = settings.memory_top_k
 
-        # Pruefe ob Erinnerungen vorhanden
-        if self.collection.count() == 0:
-            return []
+        max_retries = 3
+        retry_delay = 0.3
+        
+        for attempt in range(max_retries):
+            try:
+                # Pruefe ob Erinnerungen vorhanden
+                if self.collection.count() == 0:
+                    return []
 
-        # Smart Query Extraction: Optimiere den Query vor der Vektorisierung
-        optimized_query = self.extract_search_query(query)
+                # Smart Query Extraction: Optimiere den Query vor der Vektorisierung
+                optimized_query = self.extract_search_query(query)
 
-        # Erstelle Query-Embedding
-        query_embedding = self.embedder.encode(optimized_query).tolist()
+                # Erstelle Query-Embedding
+                query_embedding = self.embedder.encode(optimized_query).tolist()
 
-        # Suche in ChromaDB
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(top_k, self.collection.count())
-        )
-
-        # Konvertiere zu Memory-Objekten
-        memories = []
-        if results and results["documents"] and results["documents"][0]:
-            for i, doc in enumerate(results["documents"][0]):
-                # ChromaDB gibt Cosine Distance zurück (0-2), nicht Ähnlichkeit
-                # 0 = identisch, 1 = orthogonal, 2 = gegensätzlich
-                distance = results["distances"][0][i] if results["distances"] else 0
-                relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
-
-                metadata = results.get("metadatas") or []
-                metadata = metadata[0][i] if metadata and metadata[0] else {}
-
-                # Ensure metadata is a dict to prevent NoneType errors
-                if not isinstance(metadata, dict):
-                    metadata = metadata or {}
-
-                memory = Memory(
-                    id=results["ids"][0][i],
-                    content=doc,
-                    role=metadata.get("role", "unknown"),
-                    timestamp=metadata.get("timestamp", ""),
-                    mem_type=metadata.get("type", "interaction"),
-                    relevance_score=relevance,
-                    label=metadata.get("label", "original")
+                # Suche in ChromaDB
+                results = self.collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=min(top_k, self.collection.count())
                 )
-                memories.append(memory)
 
-        return memories
+                # Konvertiere zu Memory-Objekten
+                memories = []
+                if results and results["documents"] and results["documents"][0]:
+                    for i, doc in enumerate(results["documents"][0]):
+                        # ChromaDB gibt Cosine Distance zurueck (0-2), nicht Aehnlichkeit
+                        # 0 = identisch, 1 = orthogonal, 2 = gegensaetzlich
+                        distance = results["distances"][0][i] if results["distances"] else 0
+                        relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
+
+                        metadata = results.get("metadatas") or []
+                        metadata = metadata[0][i] if metadata and metadata[0] else {}
+
+                        # Ensure metadata is a dict to prevent NoneType errors
+                        if not isinstance(metadata, dict):
+                            metadata = metadata or {}
+
+                        memory = Memory(
+                            id=results["ids"][0][i],
+                            content=doc,
+                            role=metadata.get("role", "unknown"),
+                            timestamp=metadata.get("timestamp", ""),
+                            mem_type=metadata.get("type", "interaction"),
+                            relevance_score=relevance,
+                            label=metadata.get("label", "original")
+                        )
+                        memories.append(memory)
+
+                return memories
+                
+            except Exception as e:
+                error_msg = str(e).lower()
+                
+                # Bei Locking/Busy-Fehlern: Retry
+                if any(kw in error_msg for kw in ["lock", "busy", "timeout", "database is locked"]):
+                    if attempt < max_retries - 1:
+                        if settings.debug:
+                            print(f"   Memory-Suche blockiert (Versuch {attempt+1}/{max_retries}), warte...")
+                        time.sleep(retry_delay * (attempt + 1))
+                        continue
+                
+                # Bei anderen Fehlern: Warnen und leere Liste zurueckgeben
+                if settings.debug:
+                    print(f"   WARNUNG: Memory-Suche fehlgeschlagen: {e}")
+                
+                return []
+        
+        return []
     
+
     def get_recent_memories(self, limit: int = 10) -> list[Memory]:
         """
         Holt die neuesten Erinnerungen.
