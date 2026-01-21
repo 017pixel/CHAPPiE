@@ -95,22 +95,23 @@ class TrainerAgent:
         while retry_count < max_retries:
             retry_count += 1
             try:
-                # Basis System-Prompt mit STRIKTEN Formatierungsregeln
+                # Basis System-Prompt mit STRIKTEN Formatierungsregeln fuer menschlichen Stil
                 system_prompt = (
                     f"Du bist ein Trainings-Partner fuer eine KI namens Chappie.\n"
                     f"DEINE ROLLE: {self.config.persona}\n"
                     f"TRAININGS-FOKUS: {self.config.focus_area}\n\n"
-                    f"AUFGABE: Fuehre eine Konversation mit Chappie. Simuliere einen User.\n"
+                    f"AUFGABE: Fuehre eine Konversation mit Chappie. Simuliere einen echten Menschen.\n"
                     f"Achte besonders auf den Trainings-Fokus.\n"
-                    f"Antworte direkt als User, ohne Meta-Kommentare wie 'Als Trainer sage ich...'.\n\n"
-                    f"STRIKTE FORMATIERUNGSREGELN:\n"
-                    f"- KEINE Tabellen verwenden (kein |, keine Spalten)\n"
-                    f"- KEINE Markdown-Formatierung (kein #, kein **, kein *, kein ```)\n"
-                    f"- KEINE Emojis verwenden\n"
-                    f"- Schreibe in normalen, vollstaendigen Saetzen\n"
-                    f"- Beende JEDEN Satz vollstaendig mit Punkt, Fragezeichen oder Ausrufezeichen\n"
-                    f"- Halte dich kurz: Maximal 3-4 Saetze pro Antwort\n"
-                    f"- Schreibe natuerlich wie ein Mensch, nicht wie eine KI"
+                    f"Antworte direkt als User, ohne Meta-Kommentare.\n\n"
+                    f"DEIN SCHREIBSTIL:\n"
+                    f"Du schreibst wie ein echter Mensch in normalen Saetzen und Absaetzen.\n"
+                    f"Du verwendest NIEMALS Stichpunkte, Aufzaehlungen, nummerierte Listen oder Tabellen.\n"
+                    f"Formuliere alles in zusammenhaengenden Saetzen.\n\n"
+                    f"STRIKTE VERBOTE:\n"
+                    f"Keine Bindestriche am Zeilenanfang, keine Sternchen, keine Nummerierungen,\n"
+                    f"keine Tabellen, kein Markdown, keine Emojis.\n"
+                    f"Schreibe ausschliesslich in Fliesstext wie in einem normalen Gespraech.\n"
+                    f"Halte dich kurz: Maximal 2-3 Saetze pro Antwort."
                 )
                 
                 # Bei Retries: Nudge hinzufügen um Antwort zu erzwingen

@@ -230,8 +230,14 @@ class TrainingLoop:
         
         return response
 
-    def run_training(self):
-        """Der eigentliche Thread-Loop."""
+    def run_training(self, initial_prompt: str = None):
+        """
+        Der eigentliche Thread-Loop.
+        
+        Args:
+            initial_prompt: Optionale Start-Nachricht fuer neues Training.
+                           Wenn None, wird der Default oder gespeicherter State verwendet.
+        """
         
         log.info("=" * 50)
         log.info("TRAINING LOOP GESTARTET")
@@ -242,11 +248,15 @@ class TrainingLoop:
         
         if not self.conversation_history:
             # Start-Nachricht des Trainers (Initial) falls keine History
-            first_input = "Hallo Chappie! Bist du bereit für unser Training?"
+            if initial_prompt:
+                first_input = initial_prompt
+            else:
+                first_input = "Hallo Chappie! Bist du bereit fuer unser Training?"
             current_input = first_input
             
             console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {current_input}", border_style="blue"))
             log.info(f"TRAINER: {current_input}")
+            
             
             # Zur History hinzufuegen (User Role fuer Chappie)
             self.conversation_history.append({"role": "user", "content": current_input})
