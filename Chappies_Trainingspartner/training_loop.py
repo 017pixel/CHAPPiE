@@ -209,9 +209,9 @@ class TrainingLoop:
             self.conversation_history
         )
         
-        # 4. Generierung
+        # 4. Generierung (erhoehte Tokens fuer vollstaendige Saetze)
         gen_config = GenerationConfig(
-            max_tokens=250, # Reduziert für Rate-Limit Optimierung (vorher Settings default)
+            max_tokens=500,  # Erhoeht um abgeschnittene Saetze zu vermeiden
             temperature=settings.temperature,
             stream=False,
         )
@@ -322,8 +322,14 @@ class TrainingLoop:
                     # Erfolgreiche Antwort - Reset Counter
                     self.consecutive_empty_responses = 0
                     
+                    # Log mit klarer Formatierung (Zeilenumbrueche fuer Lesbarkeit)
+                    log.info("")
+                    log.info("=" * 60)
+                    log.info("CHAPPIE:")
+                    log.info(chappie_response)
+                    log.info("=" * 60)
+                    log.info("")
                     console.print(Panel(f"[bold green]CHAPPIE:[/bold green] {chappie_response}", border_style="green"))
-                    log.info(f"CHAPPIE: {chappie_response}")
                     
                     # History Update (nur valide Antworten!)
                     self.conversation_history.append({"role": "assistant", "content": chappie_response})
@@ -357,9 +363,14 @@ class TrainingLoop:
                     console.print(f"[red]Fehler-Antwort nicht in History gespeichert[/red]")
                     time.sleep(2)
                     continue
-                
+                # Log mit klarer Formatierung (Zeilenumbrueche fuer Lesbarkeit)
+                log.info("")
+                log.info("-" * 60)
+                log.info("TRAINER:")
+                log.info(trainer_response)
+                log.info("-" * 60)
+                log.info("")
                 console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {trainer_response}", border_style="blue"))
-                log.info(f"TRAINER: {trainer_response}")
                 
                 # History Update (nur valide Antworten!)
                 self.conversation_history.append({"role": "user", "content": trainer_response})

@@ -23,18 +23,19 @@ class TrainerConfig:
     provider: str  # "groq" oder "local"
     model_name: Optional[str] = None
 
-# Fallback-Nachrichten für den Trainer wenn LLM versagt
+# Fallback-Nachrichten fuer den Trainer wenn LLM versagt
+# KEINE Emojis, keine Formatierung - einfache Saetze
 FALLBACK_MESSAGES = [
-    "Das ist ein interessanter Punkt! Kannst du mir mehr dazu erzählen?",
+    "Das ist ein interessanter Punkt. Kannst du mir mehr dazu erzaehlen?",
     "Ich verstehe. Was denkst du, wie das in der Praxis funktioniert?",
-    "Spannend! Lass uns das vertiefen - was sind die Details?",
-    "Okay, da hast du recht. Was würdest du als nächstes vorschlagen?",
-    "Hmm, ich muss darüber nachdenken. Was meinst du dazu?",
-    "Interessant! Kannst du das an einem Beispiel erklären?",
-    "Das macht Sinn. Wie siehst du das im größeren Zusammenhang?",
+    "Spannend. Lass uns das vertiefen, was sind die Details?",
+    "Okay, da hast du recht. Was wuerdest du als naechstes vorschlagen?",
+    "Hmm, ich muss darueber nachdenken. Was meinst du dazu?",
+    "Interessant. Kannst du das an einem Beispiel erklaeren?",
+    "Das macht Sinn. Wie siehst du das im groesseren Zusammenhang?",
     "Verstehe. Was sind deiner Meinung nach die wichtigsten Aspekte?",
-    "Cool! Erzähl mir mehr über deine Gedanken dazu.",
-    "Das klingt gut. Wie können wir das konkret anwenden?",
+    "Cool. Erzaehl mir mehr ueber deine Gedanken dazu.",
+    "Das klingt gut. Wie koennen wir das konkret anwenden?",
 ]
 
 class TrainerAgent:
@@ -94,15 +95,22 @@ class TrainerAgent:
         while retry_count < max_retries:
             retry_count += 1
             try:
-                # Basis System-Prompt
+                # Basis System-Prompt mit STRIKTEN Formatierungsregeln
                 system_prompt = (
-                    f"Du bist ein Trainings-Partner für eine KI namens Chappie.\n"
+                    f"Du bist ein Trainings-Partner fuer eine KI namens Chappie.\n"
                     f"DEINE ROLLE: {self.config.persona}\n"
                     f"TRAININGS-FOKUS: {self.config.focus_area}\n\n"
-                    f"AUFGABE: Führe eine Konversation mit Chappie. Simuliere einen User.\n"
+                    f"AUFGABE: Fuehre eine Konversation mit Chappie. Simuliere einen User.\n"
                     f"Achte besonders auf den Trainings-Fokus.\n"
-                    f"Antworte direkt als User, ohne Meta-Kommentare wie 'Als Trainer sage ich...'.\n"
-                    f"WICHTIG: Deine Antwort muss mindestens einen vollständigen Satz enthalten!"
+                    f"Antworte direkt als User, ohne Meta-Kommentare wie 'Als Trainer sage ich...'.\n\n"
+                    f"STRIKTE FORMATIERUNGSREGELN:\n"
+                    f"- KEINE Tabellen verwenden (kein |, keine Spalten)\n"
+                    f"- KEINE Markdown-Formatierung (kein #, kein **, kein *, kein ```)\n"
+                    f"- KEINE Emojis verwenden\n"
+                    f"- Schreibe in normalen, vollstaendigen Saetzen\n"
+                    f"- Beende JEDEN Satz vollstaendig mit Punkt, Fragezeichen oder Ausrufezeichen\n"
+                    f"- Halte dich kurz: Maximal 3-4 Saetze pro Antwort\n"
+                    f"- Schreibe natuerlich wie ein Mensch, nicht wie eine KI"
                 )
                 
                 # Bei Retries: Nudge hinzufügen um Antwort zu erzwingen
@@ -125,10 +133,10 @@ class TrainerAgent:
                 if chappie_response and chappie_response.strip():
                     messages.append(Message(role="user", content=chappie_response))
 
-                # Generierungs-Konfiguration (erhöhte Tokens, steigende Temperatur bei Retries)
+                # Generierungs-Konfiguration (erhoehte Tokens fuer vollstaendige Saetze)
                 temperature = min(0.7 + (retry_count * 0.15), 1.2)  # 0.85 -> 1.0 -> 1.15
                 gen_config = GenerationConfig(
-                    max_tokens=400,  # Erhöht für längere Antworten
+                    max_tokens=600,  # Erhoeht um abgeschnittene Saetze zu vermeiden
                     temperature=temperature,
                     stream=False
                 )
