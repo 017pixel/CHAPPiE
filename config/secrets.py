@@ -37,7 +37,7 @@ GROQ_MODEL = "moonshotai/kimi-k2-instruct-0905"
 
 # --- Cerebras (Cloud - High Speed) ---
 # Hole dir einen API Key von: https://cloud.cerebras.ai
-CEREBRAS_API_KEY = ""
+CEREBRAS_API_KEY = "csk-rrfvnwjeyh5c6nvfcchnd446whnfvemy29353mdrxpnn6v8k"
 
 # Verfügbare Modelle: llama-3.3-70b, llama-3.1-8b, qwen-3-32b
 CEREBRAS_MODEL = "llama-3.3-70b"
