@@ -48,9 +48,21 @@ class MemoryEngine:
         """Initialisiert die Memory Engine."""
         print("Initialisiere Memory Engine...")
         
-        # Embedding-Modell laden (laeuft lokal)
+        # Embedding-Modell laden (laeuft lokal) mit Fehlerbehandlung
         print(f"   Lade Embedding-Modell: {settings.embedding_model}")
-        self.embedder = SentenceTransformer(settings.embedding_model)
+        try:
+            self.embedder = SentenceTransformer(settings.embedding_model)
+            # Test-Embedding um sicherzustellen, dass es funktioniert
+            test_embedding = self.embedder.encode("test")
+            print(f"   Embedding-Modell bereit! (Dimension: {len(test_embedding)})")
+        except Exception as e:
+            print(f"   FEHLER beim Laden des Embedding-Modells: {e}")
+            print("   Fallback: Verwende CPU-only Modus")
+            import torch
+            self.embedder = SentenceTransformer(
+                settings.embedding_model,
+                device='cpu'  # Erzwinge CPU-Modus bei GPU-Problemen
+            )
         
         # ChromaDB Client initialisieren (PERSISTENT für dauerhafte Speicherung)
         print(f"   Verbinde mit ChromaDB (persistent: {CHROMA_DB_DIR})")
@@ -97,8 +109,19 @@ class MemoryEngine:
                 memory_id = str(uuid.uuid4())
                 timestamp = datetime.now().isoformat()
 
-                # Erstelle Embedding
-                embedding = self.embedder.encode(content).tolist()
+                # Erstelle Embedding mit Fehlerbehandlung
+                try:
+                    embedding = self.embedder.encode(content).tolist()
+                except Exception as embed_err:
+                    error_msg = f"Embedding-Fehler für '{content[:50]}...': {str(embed_err)}"
+                    print(f"   WARNUNG: {error_msg}")
+                    # Fallback: Verwende einen Dummy-Embedding (alle Nullen)
+                    # Dies erlaubt das Training weiterzulaufen, auch wenn Embeddings fehlschlagen
+                    embedding_dim = 384  # Standard-Dimension für all-MiniLM-L6-v2
+                    embedding = [0.0] * embedding_dim
+                    # Logge den Fehler für spätere Analyse
+                    import logging
+                    logging.warning(f"Memory embedding failed, using dummy: {error_msg}")
 
                 # Speichere in ChromaDB mit erweitertem Metadata
                 self.collection.add(
@@ -158,7 +181,15 @@ class MemoryEngine:
         
         # Versuche zuerst mit Filter nach self_reflection
         try:
-            query_embedding = self.embedder.encode(query).tolist()
+            try:
+                query_embedding = self.embedder.encode(query).tolist()
+            except Exception as embed_err:
+                error_msg = f"Filtered search embedding failed for '{query[:50]}...': {str(embed_err)}"
+                print(f"   WARNUNG: {error_msg}")
+                embedding_dim = 384
+                query_embedding = [0.0] * embedding_dim
+                import logging
+                logging.warning(f"Memory filtered search embedding failed, using dummy: {error_msg}")
             
             # Suche mit Filter
             results = self.collection.query(
@@ -333,8 +364,17 @@ class MemoryEngine:
                 # Smart Query Extraction: Optimiere den Query vor der Vektorisierung
                 optimized_query = self.extract_search_query(query)
 
-                # Erstelle Query-Embedding
-                query_embedding = self.embedder.encode(optimized_query).tolist()
+                # Erstelle Query-Embedding mit Fehlerbehandlung
+                try:
+                    query_embedding = self.embedder.encode(optimized_query).tolist()
+                except Exception as embed_err:
+                    error_msg = f"Query-Embedding-Fehler für '{optimized_query[:50]}...': {str(embed_err)}"
+                    print(f"   WARNUNG: {error_msg}")
+                    # Fallback: Verwende einen Dummy-Embedding für Suche
+                    embedding_dim = 384  # Standard-Dimension für all-MiniLM-L6-v2
+                    query_embedding = [0.0] * embedding_dim
+                    import logging
+                    logging.warning(f"Memory search embedding failed, using dummy: {error_msg}")
 
                 # Suche in ChromaDB
                 results = self.collection.query(
