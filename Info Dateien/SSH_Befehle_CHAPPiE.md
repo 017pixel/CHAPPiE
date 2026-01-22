@@ -22,22 +22,23 @@ pip install -r requirements.txt
 ## 🚀 1. Training Starten (nohup - Empfohlen)
 Die einfachste Methode: Starten und Logout möglich.
 
-**Wichtig:** Nutze den neuen Modul-Aufruf (`python -m ...`), damit alle Imports funktionieren!
+**Wichtig:** Nutze `training_daemon.py` (NICHT `training_loop.py` - das hat keinen Einstiegspunkt!)
 
 ```bash
-# A: Standard-Start (Nutzt settings.json / training_config.json)
-nohup python3 -m Chappies_Trainingspartner.training_loop > training.log 2>&1 &
+# A: Standard-Start (Setzt vorheriges Training fort mit training_config.json)
+nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
 
-# B: Mit vorherigem Setup (Wizard kurz starten, dann abbrechen und nohup nutzen)
-# 1. python3 -m Chappies_Trainingspartner.setup_training
-# 2. Konfigurieren & Speichern
-# 3. STRG+C
-# 4. nohup python3 -m Chappies_Trainingspartner.training_loop > training.log 2>&1 &
+# B: NEUES Training starten (interaktiv - fragt Konfiguration ab)
+python3 Chappies_Trainingspartner/training_daemon.py --neu
+
+# C: NEUES Training mit direkter Angabe (non-interactive - perfekt für SSH)
+python3 Chappies_Trainingspartner/training_daemon.py --fokus "Logik und Programmierung" --persona "Ein kritischer Code-Reviewer" --start "Hallo Chappie, prüfe bitte diesen Code..."
+# Danach im Hintergrund: nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
 ```
 
 **Erklärung:**
 - `nohup`: Verhindert Beenden beim Logout
-- `-m ...`: Startet das Modul korrekt (wichtig für Imports!)
+- `training_daemon.py`: Hat den eigentlichen main() Einstiegspunkt
 - `> training.log`: Speichert alle Ausgaben in diese Datei
 - `2>&1`: Leitet auch Fehler in die Datei um
 - `&`: Startet den Prozess im Hintergrund
@@ -47,7 +48,7 @@ nohup python3 -m Chappies_Trainingspartner.training_loop > training.log 2>&1 &
 ## 🖥 2. Alternative: "Screen" (für Interaktion)
 Falls du zwischendurch in die Konsole schauen willst.
 1. `screen -S chappie`
-2. `python3 -m Chappies_Trainingspartner.training_loop`
+2. `python3 Chappies_Trainingspartner/training_daemon.py`
 3. `STRG+A`, dann `D` zum Verlassen.
 
 ---
@@ -67,14 +68,28 @@ Für automatischen Start beim Booten (siehe `chappie-training.service`).
 tail -f training.log
 
 # Prüfen, ob der Prozess noch läuft
-ps aux | grep training_loop
+ps aux | grep training_daemon
+
+# Wie lange läuft der Prozess schon? (PID aus ps entnehmen)
+ps -p <PID> -o etime=
 ```
 
 ## 🛑 5. Training Stoppen
 Um den Prozess zu beenden:
 
 ```bash
-pkill -f training_loop
+# Prozess-ID finden
+ps aux | grep training_daemon
+
+# Prozess killen (soft: SIGTERM)
+kill <PID>
+
+# Falls nicht reagiert: hard kill (SIGKILL)
+kill -9 <PID>
+
+# Alternative: Alle Training-Prozesse gleichzeitig beenden
+pkill -f training_daemon
+pkill -f python.*Chappies_Trainingspartner
 ```
 
 ---
@@ -129,8 +144,8 @@ WorkingDirectory=/home/bbecker/CHAPPiE
 Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 
-# Start-Befehl (Direkt den Loop starten, ohne Wizard)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_loop
+# Start-Befehl (Direkt den Daemon starten)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 Chappies_Trainingspartner/training_daemon.py
 
 # Restart bei Crash (Wichtig für Autonomie!)
 Restart=always
