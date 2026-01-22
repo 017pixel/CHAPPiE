@@ -135,7 +135,10 @@ def render_memory_item(mem: Any, index: int = 1):
         else:
             # Kompakte Ansicht (Chat RAG)
             st.markdown(f"**Info {index}** {label_html} (Relevanz: {score}%)", unsafe_allow_html=True)
-            st.caption(content[:250] + "..." if len(content) > 250 else content)
+            if content and isinstance(content, str):
+                st.caption(content[:250] + "..." if len(content) > 250 else content)
+            else:
+                st.caption("*Keine Inhaltsdaten verfügbar*")
             
     with col2:
         # Nur Score anzeigen wenn relevant
