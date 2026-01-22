@@ -391,22 +391,27 @@ class MemoryEngine:
         return []
     
 
-    def get_recent_memories(self, limit: int = 10) -> list[Memory]:
+    def get_recent_memories(self, limit: int = 10, offset: int = 0) -> list[Memory]:
         """
-        Holt die neuesten Erinnerungen.
+        Holt die neuesten Erinnerungen mit Pagination-Support.
 
         Args:
-            limit: Maximale Anzahl
+            limit: Maximale Anzahl pro Seite
+            offset: Anzahl der zu überspringenden Einträge (für Pagination)
 
         Returns:
             Liste von Memory-Objekten
         """
-        if self.collection.count() == 0:
+        total_count = self.collection.count()
+        if total_count == 0:
             return []
 
-        # Hole alle Erinnerungen
+        # Hole alle und sortiere dann (ChromaDB hat kein natives Offset)
+        # Für sehr große DBs: Hole nur was nötig ist
+        fetch_limit = min(offset + limit, total_count)
+        
         results = self.collection.get(
-            limit=limit,
+            limit=fetch_limit,
             include=["documents", "metadatas"]
         )
 
@@ -432,7 +437,9 @@ class MemoryEngine:
         # Sortiere nach Timestamp (neueste zuerst)
         memories.sort(key=lambda m: m.timestamp, reverse=True)
 
-        return memories[:limit]
+        # Wende Offset und Limit an
+        return memories[offset:offset + limit]
+
     
     def delete_memories(self, ids: list[str]):
         """
@@ -612,11 +619,13 @@ class MemoryEngine:
         - Chunking (Batch-Verarbeitung) bei vielen Erinnerungen
         - Fehlerbehandlung für Token-Limits (413 Errors)
         - Atomare Operationen (Löschen erst nach Speichern)
+        - Unbegrenzte Verarbeitung (kein Limit mehr)
         """
         from config.prompts import format_dream_prompt
 
-        # Erinnerungen holen
-        all_memories = self.get_recent_memories(limit=1000)
+        # Erinnerungen holen - UNBEGRENZT (alle Interaction-Erinnerungen)
+        total_count = self.get_memory_count()
+        all_memories = self.get_recent_memories(limit=total_count)
         interaction_memories = [m for m in all_memories if m.mem_type == "interaction"]
 
         if not interaction_memories:

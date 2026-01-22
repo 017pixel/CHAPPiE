@@ -1,23 +1,27 @@
 [Unit]
-Description=CHAPiE Training Daemon - 24/7 AI Training
-After=network.target ollama.service
+Description=CHAPPiE Autonomous Training Service
+After=network.target
 
 [Service]
-Type=simple
+# User unter dem es laufen soll (Anpassen falls nötig!)
 User=bbecker
-WorkingDirectory=/home/bbecker/CHAPiE
-ExecStart=/home/bbecker/CHAPiE/venv/bin/python Chappies_Trainingspartner/training_daemon.py
+Group=bbecker
+
+# Pfad zum Projekt
+WorkingDirectory=/home/bbecker/CHAPPiE
+
+# Environment Variablen laden
+Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+# Falls du Cerebras Token direkt hier setzen willst:
+# Environment="CEREBRAS_API_KEY=dein-key"
+
+# Start-Befehl (Direkt den Loop starten, nutzt gespeicherte Config)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_loop
+
+# Restart bei Crash (Autonomie ist Key!)
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=chappie-training
-
-# Resource Limits
-LimitNOFILE=65536
-
-# Security
-NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target

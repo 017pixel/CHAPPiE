@@ -21,6 +21,7 @@ class LLMProvider(str, Enum):
     """Verfuegbare LLM-Backend Provider."""
     OLLAMA = "ollama"
     GROQ = "groq"
+    CEREBRAS = "cerebras"
 
 
 # === Lade Einstellungen ===
@@ -78,6 +79,10 @@ class Settings:
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
         self.groq_model = self._get_val("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
         
+        # === Cerebras ===
+        self.cerebras_api_key = self._get_val("CEREBRAS_API_KEY", "")
+        self.cerebras_model = self._get_val("CEREBRAS_MODEL", "llama-3.3-70b")
+        
         # === Memory / Embedding ===
         self.embedding_model = self._get_val("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 5))
@@ -99,7 +104,7 @@ class Settings:
         # === System ===
         self.debug = bool(self._get_val("DEBUG", True))
 
-    def update_from_ui(self, provider=None, api_key=None, model=None):
+    def update_from_ui(self, provider=None, api_key=None, model=None, cerebras_api_key=None):
         """Erlaubt Updates zur Laufzeit durch die UI."""
         if provider:
             try:
@@ -107,11 +112,21 @@ class Settings:
             except: pass
             
         if api_key is not None: # Leerer String ist erlaubt (Loeschen)
-            self.groq_api_key = api_key
+            # Je nach aktuellem Provider den richtigen Key setzen
+            if self.llm_provider == LLMProvider.CEREBRAS:
+                self.cerebras_api_key = api_key
+            else:
+                self.groq_api_key = api_key
+        
+        # Expliziter Cerebras API Key (separat)
+        if cerebras_api_key is not None:
+            self.cerebras_api_key = cerebras_api_key
             
         if model:
             if self.llm_provider == LLMProvider.GROQ:
                 self.groq_model = model
+            elif self.llm_provider == LLMProvider.CEREBRAS:
+                self.cerebras_model = model
             else:
                 self.ollama_model = model
 
@@ -124,7 +139,10 @@ def get_active_model() -> str:
     """Gibt das aktive Modell basierend auf dem Provider zurueck."""
     if settings.llm_provider == LLMProvider.GROQ:
         return settings.groq_model
+    elif settings.llm_provider == LLMProvider.CEREBRAS:
+        return settings.cerebras_model
     return settings.ollama_model
+
 
 
 def print_config():

@@ -12,6 +12,7 @@ import os
 import json
 from datetime import datetime
 from typing import Optional, Callable
+import traceback
 
 from rich.console import Console
 from rich.panel import Panel
@@ -45,6 +46,23 @@ class TrainingLoop:
         self.consecutive_empty_responses = 0  # Zählt aufeinanderfolgende leere Antworten
         self.MAX_EMPTY_BEFORE_RESET = 10  # Nach X leeren Antworten: Conversation resetten
         
+        # === AUTONOMIE-FEATURES für Nacht-Training ===
+        self.start_time = datetime.now()
+        self.total_exchanges = 0  # Erfolgreiche Trainer<->Chappie Austausche
+        self.total_errors = 0
+        self.total_dreams = 0  # Anzahl der Traum-Phasen
+        self.last_successful_exchange = None
+        self.provider_switches = 0  # Wie oft wurde auf Lokal gewechselt
+        
+        # Statistik-Tracking
+        self.stats = {
+            "exchanges_per_hour": [],
+            "errors_per_hour": [],
+            "memories_created": 0,
+            "memories_consolidated": 0,
+            "topics_completed": 0,
+        }
+        
         # Chappie Backend Initialisierung (ohne Streamlit Cache)
         msg = "Initialisiere Chappie Backend..."
         print(msg)
@@ -59,9 +77,18 @@ class TrainingLoop:
             emotions_engine=self.emotions,
             brain=self.brain
         )
-        msg = "Chappie Backend bereit."
+        
+        # Provider Info loggen
+        provider_name = settings.llm_provider.value.upper()
+        model_name = get_active_model()
+        msg = f"Chappie Backend bereit. Provider: {provider_name}, Modell: {model_name}"
         print(msg)
         log.info(msg)
+        
+        # Initial Memory Count
+        initial_memories = self.memory.get_memory_count()
+        log.info(f"Geladene Erinnerungen: {initial_memories}")
+
 
     def _safe_execute(self, func: Callable, *args, **kwargs) -> Optional[str]:
         """
@@ -98,6 +125,10 @@ class TrainingLoop:
                     error_msg = response
                     error_type = self._classify_error(error_msg)
                     consecutive_errors += 1
+                    
+                    # Statistik Update
+                    self.total_errors += 1
+                    
                     log.error(f"API FEHLER: {error_msg} (Type: {error_type})")
                     
                     if error_type == "CONTEXT_LENGTH":
@@ -164,9 +195,13 @@ class TrainingLoop:
 
             except Exception as e:
                 consecutive_errors += 1
+                self.total_errors += 1
+                
                 error_msg = str(e)
                 error_type = self._classify_error(error_msg)
-                log.error(f"Unerwarteter Fehler: {error_msg} (Type: {error_type})")
+                
+                log.error(f"EXCEPTION in _safe_execute: {error_msg} (Type: {error_type})")
+                log.debug(f"Traceback: {traceback.format_exc()}")
                 
                 if error_type == "TIMEOUT":
                     console.print(f"\n[bold red]⚠️ Timeout/Connection Error![/bold red]")
@@ -299,7 +334,13 @@ class TrainingLoop:
                 self.loop_count += 1
                 log.info(f"--- LOOP {self.loop_count} START ---")
                 
+                # === CURRICULUM STATUS ===
+                curriculum_status = self.trainer.get_curriculum_status()
+                console.print(f"[dim]📚 {curriculum_status}[/dim]")
+                log.info(f"Curriculum: {curriculum_status}")
+                
                 # === CHAPPIE ANTWORTET ===
+
                 if not skip_chappie_turn:
                     log.info("CHAPPIE GENERIERE...")
                     with console.status("[bold green]Chappie denkt nach...[/bold green]", spinner="dots"):
@@ -386,6 +427,12 @@ class TrainingLoop:
                 self.conversation_history.append({"role": "user", "content": trainer_response})
                 self.messages_since_dream += 2
                 
+                # === STATISTIK TRACKING ===
+                self.total_exchanges += 1
+                self.last_successful_exchange = datetime.now()
+                self.stats["memories_created"] += 2  # User + Assistant
+
+                
                 # === TRAUM-PHASE CHECK (alle 24 Nachrichten / 12 Paare) ===
                 if self.messages_since_dream >= 24:
                     log.info("=== TRAUM-PHASE EINGELEITET ===")
@@ -420,6 +467,11 @@ class TrainingLoop:
                         
                         self.conversation_history = new_history
                         self.messages_since_dream = 0 # Reset Counter
+                        
+                        # Statistik Update
+                        self.total_dreams += 1
+                        self.stats["memories_consolidated"] += summary_result.count("Fakten extrahiert") * 5 # Schätzung oder Parsen
+                        
                         log.info("Kontext konsolidiert, Traum-Phase abgeschlossen")
                         console.print("[bold green]✅ Kontext wurde konsolidiert und kompaktiert.[/bold green]")
                     else:
@@ -453,8 +505,87 @@ class TrainingLoop:
         return training_thread
 
     def stop(self):
-        """Setzt das Stop-Flag."""
+        """
+        Stoppt das Training graceful mit vollständigem Status-Report.
+        Speichert alle Daten und gibt Statistiken aus.
+        """
+        console.print("\n[bold yellow]Training wird beendet...[/bold yellow]")
+        log.info("=== TRAINING STOP INITIATED ===")
+        
+        # Stop-Flag setzen
         self.stop_flag.set()
+        
+        # Kurz warten für laufende Operationen
+        time.sleep(2)
+        
+        # State speichern
+        self.save_state()
+        
+        # Statistik-Report generieren und ausgeben
+        report = self.generate_statistics_report()
+        console.print(Panel(report, title="[bold cyan]Training Statistiken[/bold cyan]", border_style="cyan"))
+        log.info(f"TRAINING BEENDET:\n{report}")
+
+    def generate_statistics_report(self) -> str:
+        """
+        Generiert einen umfassenden Statistik-Report über das Training.
+        
+        Returns:
+            Formatierter Report-String
+        """
+        runtime = datetime.now() - self.start_time
+        hours = runtime.total_seconds() / 3600
+        
+        # Berechnungen
+        exchanges_per_hour = self.total_exchanges / max(hours, 0.01)
+        errors_per_hour = self.total_errors / max(hours, 0.01)
+        current_memories = self.memory.get_memory_count()
+        
+        lines = [
+            f"Laufzeit: {runtime}",
+            f"Gesamte Austausche: {self.total_exchanges}",
+            f"Austausche/Stunde: {exchanges_per_hour:.1f}",
+            f"",
+            f"Fehler gesamt: {self.total_errors}",
+            f"Fehler/Stunde: {errors_per_hour:.1f}",
+            f"Provider-Wechsel: {self.provider_switches}",
+            f"",
+            f"Traum-Phasen: {self.total_dreams}",
+            f"Erinnerungen aktuell: {current_memories:,}",
+            f"Curriculum-Status: {self.trainer.get_curriculum_status() if hasattr(self.trainer, 'get_curriculum_status') else 'N/A'}",
+        ]
+        
+        if self.last_successful_exchange:
+            lines.append(f"Letzter erfolgreicher Austausch: {self.last_successful_exchange.strftime('%H:%M:%S')}")
+        
+        return "\n".join(lines)
+
+    def health_check(self) -> dict:
+        """
+        Führt einen Health-Check durch für Monitoring.
+        
+        Returns:
+            Dict mit Status-Informationen
+        """
+        runtime = datetime.now() - self.start_time
+        
+        # Prüfe ob Training noch aktiv ist
+        is_stuck = False
+        if self.last_successful_exchange:
+            time_since_last = datetime.now() - self.last_successful_exchange
+            is_stuck = time_since_last.total_seconds() > 300  # 5 Minuten ohne Aktivität
+        
+        return {
+            "running": not self.stop_flag.is_set(),
+            "runtime_seconds": runtime.total_seconds(),
+            "total_exchanges": self.total_exchanges,
+            "total_errors": self.total_errors,
+            "is_stuck": is_stuck,
+            "current_provider": settings.llm_provider.value,
+            "memory_count": self.memory.get_memory_count(),
+            "curriculum_status": self.trainer.get_curriculum_status() if hasattr(self.trainer, 'get_curriculum_status') else "N/A"
+        }
+
 
     def switch_chappie_to_local(self):
         """Schaltet Chappie auf das lokale Modell um (z.B. bei API Limit)."""

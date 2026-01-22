@@ -1,0 +1,147 @@
+IMPLEMENTATION PLAN: AUTONOMOUS TRAINING & MODEL SELECTION
+==========================================================
+IMPLEMENTIERT AM: 22.01.2026
+
+ZIELSETZUNG
+-----------
+Verbesserung des autonomen Trainingssystems von CHAPiE.
+1. Behebung der Monotonie des Trainers durch einen dynamischen Lehrplan.
+2. Erweiterung der Modellauswahl (Lokal & Cerebras API).
+
+PHASE 1: FEHLERBEHEBUNG (Erledigt)
+----------------------------------
+[x] TypeError in 'render_memory_item' beheben (Absturz bei leerem Content).
+
+PHASE 2: DYNAMISCHER LEHRPLAN (✅ IMPLEMENTIERT)
+------------------------------------------------
+
+PHASE 3: CEREBRAS INTEGRATION (✅ IMPLEMENTIERT)
+-----------------------------------------------
+
+PHASE 4: SETUP WIZARD & UI (✅ IMPLEMENTIERT)
+--------------------------------------------
+
+OPTIMIERUNGEN FÜR AUTONOMEN BETRIEB (✅ IMPLEMENTIERT)
+-----------------------------------------------------
+[x] Entfernung 1000-Limit bei Erinnerungen
+[x] Pagination im Web UI für Massendaten
+[x] Statistik-Tracking & Reporting für Nacht-Training
+[x] Robustes Error Handling ohne Absturz
+[x] Autonomie-Guide für Ubuntu-Server erstellt (Systemd/Screen)
+
+
+
+
+PHASE 2: DYNAMISCHER LEHRPLAN (DYNAMIC CURRICULUM)
+--------------------------------------------------
+Ziel: Der Trainer soll nicht mehr nur ein Thema ("Focus Area") haben, sondern eine Liste von Themen abarbeiten.
+
+SCHRITTE:
+
+1.  **Konfiguration erweitern (`training_config.json`)**
+    *   Statt einem simplen String für `focus_area`, wird eine Liste von Aufgaben unterstützt.
+    *   Struktur-Beispiel:
+        ```json
+        {
+          "persona": "Kritischer User",
+          "curriculum": [
+            {"topic": "Philosophie & Moral", "duration_minutes": 120},
+            {"topic": "Umgang mit wütenden Usern", "duration_minutes": 60},
+            {"topic": "Allgemeinwissen & Smalltalk", "duration_minutes": "infinite"}
+          ]
+        }
+        ```
+
+2.  **Trainer Agent Update (`trainer_agent.py`)**
+    *   Klasse `TrainerConfig` anpassen: `focus_area` wird zu `curriculum` (List).
+    *   Neue Logik im `TrainerAgent`:
+        *   `current_topic_index`: Trackt, wo wir im Lehrplan sind.
+        *   `topic_start_time`: Trackt, wann das aktuelle Thema begann.
+        *   Methode `get_current_focus()`: Prüft die Zeit und wechselt bei Bedarf zum nächsten Thema.
+    *   System-Prompt-Update: Der System-Prompt wird bei jedem `generate_reply` Aufruf dynamisch mit dem *aktuellen* Fokus (aus `get_current_focus()`) gebaut.
+
+3.  **Training Loop Integration (`training_loop.py`)**
+    *   Visualisierung: In der Konsole anzeigen, welches Thema gerade aktiv ist ("Thema 1/3: Philosophie").
+    *   Der Loop selbst muss wenig geändert werden, da der Trainer das Thema intern wechselt.
+    *   Optional: Ein Event/Log, wenn das Thema gewechselt wird.
+
+PHASE 3: MODELL-AUSWAHL & CEREBRAS INTEGRATION
+----------------------------------------------
+Ziel: Auswahl spezifischer Modelle (Lokal & API) vor dem Training.
+
+SCHRITTE:
+
+1.  **Konfiguration erweitern (`config/config.py`)**
+    *   Neuen Provider im Enum `LLMProvider` hinzufügen: `CEREBRAS`.
+    *   Neue Settings hinzufügen:
+        *   `CEREBRAS_API_KEY` (in `secrets.py` und `config.py`).
+        *   `CEREBRAS_MODEL` (Default z.B. "llama3.1-70b").
+
+2.  **Brain Engine erweitern**
+    *   Erstellen von `brain/cerebras_brain.py`.
+    *   Implementation analog zu `GroqBrain` (nutzt OpenAI SDK kompatiblen Client).
+        *   Base URL: `https://api.cerebras.ai/v1`
+        *   Models: `llama3.1-70b`, `zai-glm-4.7` (sofern verfügbar), `qwen-3-235b...` (sofern im API Katalog).
+    *   Update `brain/__init__.py`: `get_brain()` muss `CEREBRAS` unterstützen.
+
+3.  **Setup Script Update (`setup_training.py`)**
+    *   Die Auswahl-Logik am Anfang überarbeiten.
+    *   Neue Menüstruktur:
+        1. [API] Groq (Bestehend)
+        2. [API] Cerebras (Neu - High Speed)
+        3. [Lokal] Ollama
+    *   Bei Auswahl "2. Cerebras":
+        *   Sub-Menü Modelle: `zai-glm-4.7`, `qwen-3-235b-a22b-instruct-2507`, `llama-3.3-70b`.
+    *   Bei Auswahl "3. Lokal":
+        *   Sub-Menü Modelle: `llama3:70b`, `llama3:8b`, Custom Input.
+
+4.  **Secrets Management**
+    *   Sicherstellen, dass der Cerebras API Key abgefragt oder aus `config/secrets.py` geladen wird.
+
+ZUSAMMENFASSUNG DER DATEI-ÄNDERUNGEN
+------------------------------------
+1. `web_infrastructure/components.py` (Gefixed)
+2. `trainer_agent.py` (Curriculum-Logik)
+3. `setup_training.py` (Menüs für Modelle)
+4. `config/config.py` & `secrets.py` (Cerebras Support)
+5. `brain/cerebras_brain.py` (Neue Datei)
+6. `brain/__init__.py` (Provider-Weiche)
+
+90: NICHT IMPLEMENTIERT (GESTRICHEN)
+91: --------------------------------
+92: - Multi-Persona Rotation (erstmal Fokus auf Curriculum)
+93: 
+94: PHASE 4: API SYSTEM & UX OPTIMIERUNG (WICHTIG / NEU)
+95: ----------------------------------------------------
+96: Ziel: Verbessertes Handling von API Keys und vollständige Konfigurierbarkeit.
+97: 
+98: 1.  **API Key System (`api.py` / `secrets.py`)**
+99:     *   Erstellen/Anpassen einer Datei (z.B. `api.py` oder `secrets.py`) mit klaren Platzhaltern für API Keys (`GROQ_API_KEY`, `CEREBRAS_API_KEY`).
+100:    *   **Logic-Check:** Beim Start prüfen, ob Keys gesetzt sind.
+101:    *   **User-Prompt:** Wenn Keys fehlen (oder leer sind), muss der User aufgefordert werden, diese einzugeben (Terminal oder UI).
+102:    *   Keys sollen nahtlos zwischen Terminal-Training und Web-Interface funktionieren.
+103:
+104: 2.  **Web Interface Erweiterung**
+105:    *   In den Einstellungen (Settings Sidebar/Page):
+106:        *   Hinzufügen eines Eingabefeldes für den **Cerebras API Key**.
+107:        *   Anzeige des Status (Gesetzt / Nicht gesetzt).
+108:    *   Sicherstellen, dass im Web-UI auch Cerebras als Modell ausgewählt werden kann, sobald der Key da ist.
+109:
+110: 3.  **Erweiterter Startup-Wizard (Terminal)**
+111:    *   Beim Start von `setup_training.py` / Main Loop:
+112:        *   Der User muss **alles** einstellen können:
+113:            *   Trainer Persona (Custom Input).
+114:            *   Focus Area (Custom Input oder Curriculum).
+115:            *   Modell-Auswahl (Groq, Cerebras, Lokal).
+116:            *   API Keys (falls noch nicht vorhanden).
+117:    *   Diese Einstellungen sollen für die Session gelten, aber auch gespeichert werden können.
+118:
+119: ZUSAMMENFASSUNG DER DATEI-ÄNDERUNGEN (AKTUALISIERT)
+120: ---------------------------------------------------
+121: 1. `web_infrastructure/components.py` (Gefixed)
+122: 2. `trainer_agent.py` (Curriculum-Logik)
+123: 3. `setup_training.py` (Erweiterter Wizard)
+124: 4. `config/api.py` oder `secrets.py` (Neues Key Management)
+125: 5. `brain/cerebras_brain.py` (Cerebras Integration)
+126: 6. `brain/__init__.py` (Provider-Weiche)
+127: 7. `app.py` / `pages/settings.py` (Web UI Anpassungen für Keys)

@@ -3,7 +3,7 @@ import streamlit as st
 from web_infrastructure.components import render_memory_item
 
 def render_memories_overlay(backend):
-    """Rendert das Overlay für alle Erinnerungen."""
+    """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
     if not st.session_state.show_memories:
         return
 
@@ -14,20 +14,39 @@ def render_memories_overlay(backend):
         st.rerun()
 
     with st.container(border=True):
-        # Alle Erinnerungen laden
-        all_memories = backend.memory.get_recent_memories(limit=1000)
-
-        if not all_memories:
+        # Gesamtzahl der Erinnerungen (unbegrenzt)
+        total_count = backend.memory.get_memory_count()
+        
+        if total_count == 0:
             st.info("Keine Erinnerungen vorhanden.")
         else:
-            st.markdown(f"**Gesamt: {len(all_memories)} Erinnerungen**")
-
+            st.markdown(f"**Gesamt: {total_count:,} Erinnerungen**")
+            
+            # Pagination Setup
+            items_per_page = st.selectbox(
+                "Erinnerungen pro Seite",
+                [50, 100, 250, 500],
+                index=1,
+                key="memories_per_page"
+            )
+            
+            # Session State für Pagination
+            if "memories_page" not in st.session_state:
+                st.session_state.memories_page = 0
+            
+            max_pages = max(1, (total_count - 1) // items_per_page + 1)
+            current_page = st.session_state.memories_page
+            
             # Filter-Optionen
             col1, col2 = st.columns(2)
             with col1:
                 filter_label = st.selectbox("Filter nach Label", ["Alle", "original", "zsm gefasst"])
             with col2:
                 filter_type = st.selectbox("Filter nach Typ", ["Alle", "interaction", "summary"])
+
+            # Erinnerungen laden (mit Offset für Pagination)
+            offset = current_page * items_per_page
+            all_memories = backend.memory.get_recent_memories(limit=items_per_page, offset=offset)
 
             # Filter anwenden
             filtered_memories = []
@@ -38,11 +57,35 @@ def render_memories_overlay(backend):
                 if label_match and type_match:
                     filtered_memories.append(mem)
 
-            st.markdown(f"**Angezeigt: {len(filtered_memories)} Erinnerungen**")
+            st.markdown(f"**Seite {current_page + 1} von {max_pages} | Zeige: {len(filtered_memories)} Erinnerungen**")
+
+            # Pagination Controls
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+            with nav_col1:
+                if st.button("◀ Zurück", disabled=current_page == 0, use_container_width=True):
+                    st.session_state.memories_page = max(0, current_page - 1)
+                    st.rerun()
+            with nav_col2:
+                # Direkte Seiten-Eingabe
+                new_page = st.number_input(
+                    "Gehe zu Seite", 
+                    min_value=1, 
+                    max_value=max_pages, 
+                    value=current_page + 1,
+                    key="goto_page"
+                )
+                if new_page != current_page + 1:
+                    st.session_state.memories_page = new_page - 1
+                    st.rerun()
+            with nav_col3:
+                if st.button("Weiter ▶", disabled=current_page >= max_pages - 1, use_container_width=True):
+                    st.session_state.memories_page = min(max_pages - 1, current_page + 1)
+                    st.rerun()
 
             # Erinnerungen anzeigen
             for i, mem in enumerate(filtered_memories):
-                render_memory_item(mem, i + 1)
+                render_memory_item(mem, offset + i + 1)
                 st.divider()
 
     st.markdown("---")
+

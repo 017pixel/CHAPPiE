@@ -1,218 +1,380 @@
 """
 Trainer Agent Module
-===================
-Simuliert den 'User' fuer das Chappie-Training.
-Robust fuer 24/7 autonomen Betrieb.
+=====================
+Simuliert einen User-Agenten der CHAPPiE trainiert.
+Unterstützt dynamisches Curriculum mit mehreren Themen und Zeiten.
 """
 
 import time
-import random
-from dataclasses import dataclass
-from typing import Optional
+import json
+import os
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from typing import List, Optional, Union, Dict, Any
 
-from brain.base_brain import BaseBrain, Message, GenerationConfig
-from brain.groq_brain import GroqBrain
+from rich.console import Console
+
+import logging
+log = logging.getLogger(__name__)
+
+# Imports für LLM Backend
+from config.config import settings, get_active_model, LLMProvider
+from brain import get_brain
 from brain.ollama_brain import OllamaBrain
-from config.config import settings
+from brain.base_brain import Message, GenerationConfig
+
+console = Console()
+
+
+@dataclass
+class CurriculumItem:
+    """Ein einzelnes Thema im Lehrplan."""
+    topic: str
+    duration_minutes: Union[int, str]  # int oder "infinite"
+    
+    def get_duration(self) -> Optional[int]:
+        """Gibt die Dauer in Minuten zurück, None für infinite."""
+        if self.duration_minutes == "infinite":
+            return None
+        return int(self.duration_minutes)
+
 
 @dataclass
 class TrainerConfig:
-    """Konfiguration fuer den Trainer."""
-    persona: str
-    focus_area: str
-    provider: str  # "groq" oder "local"
-    model_name: Optional[str] = None
+    """
+    Konfiguration für den Trainer Agent.
+    
+    Unterstützt:
+    - Einfache focus_area (Rückwärtskompatibilität)
+    - Curriculum mit mehreren Themen und Zeiten
+    """
+    persona: str = "Kritischer User"
+    
+    # Neues Curriculum-System: Liste von Themen mit Dauer
+    curriculum: List[CurriculumItem] = field(default_factory=list)
+    
+    # Legacy: Einzelnes Focus Area (wird zu Curriculum konvertiert)
+    focus_area: str = ""
+    
+    # Timeout nach X Sekunden ohne Antwort
+    timeout_seconds: int = 60
+    
+    def __post_init__(self):
+        """Konvertiert focus_area zu curriculum falls nötig."""
+        if self.focus_area and not self.curriculum:
+            # Legacy-Support: Konvertiere einzelnes Focus zu Curriculum
+            self.curriculum = [CurriculumItem(topic=self.focus_area, duration_minutes="infinite")]
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TrainerConfig":
+        """Erstellt TrainerConfig aus einem Dictionary."""
+        curriculum = []
+        if "curriculum" in data:
+            for item in data["curriculum"]:
+                curriculum.append(CurriculumItem(
+                    topic=item.get("topic", "Allgemeinwissen"),
+                    duration_minutes=item.get("duration_minutes", "infinite")
+                ))
+        
+        return cls(
+            persona=data.get("persona", "Kritischer User"),
+            curriculum=curriculum,
+            focus_area=data.get("focus_area", ""),
+            timeout_seconds=data.get("timeout_seconds", 60)
+        )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Konvertiert zu Dictionary für JSON-Speicherung."""
+        return {
+            "persona": self.persona,
+            "curriculum": [
+                {"topic": item.topic, "duration_minutes": item.duration_minutes}
+                for item in self.curriculum
+            ],
+            "timeout_seconds": self.timeout_seconds
+        }
 
-# Fallback-Nachrichten fuer den Trainer wenn LLM versagt
-# KEINE Emojis, keine Formatierung - einfache Saetze
-FALLBACK_MESSAGES = [
-    "Das ist ein interessanter Punkt. Kannst du mir mehr dazu erzaehlen?",
-    "Ich verstehe. Was denkst du, wie das in der Praxis funktioniert?",
-    "Spannend. Lass uns das vertiefen, was sind die Details?",
-    "Okay, da hast du recht. Was wuerdest du als naechstes vorschlagen?",
-    "Hmm, ich muss darueber nachdenken. Was meinst du dazu?",
-    "Interessant. Kannst du das an einem Beispiel erklaeren?",
-    "Das macht Sinn. Wie siehst du das im groesseren Zusammenhang?",
-    "Verstehe. Was sind deiner Meinung nach die wichtigsten Aspekte?",
-    "Cool. Erzaehl mir mehr ueber deine Gedanken dazu.",
-    "Das klingt gut. Wie koennen wir das konkret anwenden?",
-]
 
 class TrainerAgent:
     """
-    Der Trainer-Agent simuliert einen User, um Chappie zu trainieren.
-    Er nutzt dieselben Brain-Klassen wie Chappie, aber mit einer anderen Rolle.
+    Ein KI-Agent, der CHAPPiE trainiert.
     
-    ROBUST: Liefert IMMER eine Antwort, auch bei LLM-Fehlern (via Fallback).
+    Features:
+    - Dynamisches Curriculum mit automatischem Themenwechsel
+    - Fallback auf lokales Modell bei API-Limits
+    - Robuste Fehlerbehandlung mit Fallback-Antworten
     """
-
+    
     def __init__(self, config: TrainerConfig):
-        self.config = config
-        self.brain = self._init_brain()
-        self.consecutive_fallbacks = 0  # Zählt aufeinanderfolgende Fallbacks
-        
-    def _init_brain(self) -> BaseBrain:
-        """Initialisiert das gewaehlte Brain fuer den Trainer."""
-        if self.config.provider == "groq":
-            model = self.config.model_name or settings.groq_model
-            return GroqBrain(model=model)
-        else:
-            model = self.config.model_name or settings.ollama_model
-            return OllamaBrain(model=model)
-
-    def _get_fallback_message(self) -> str:
-        """Gibt eine zufällige Fallback-Nachricht zurück."""
-        return random.choice(FALLBACK_MESSAGES)
-
-    def _build_nudge_prompt(self, retry_count: int) -> str:
-        """Erstellt einen zusätzlichen Nudge-Prompt für Retries."""
-        nudges = [
-            "\n\nWICHTIG: Du MUSST jetzt eine Antwort geben. Schreibe einfach etwas Passendes zum Gespräch.",
-            "\n\nHINWEIS: Antworte jetzt sofort mit einem kurzen, relevanten Satz oder einer Frage.",
-            "\n\nDRINGEND: Generiere eine Antwort. Stelle eine Frage oder kommentiere das Gesagte.",
-        ]
-        return nudges[min(retry_count - 1, len(nudges) - 1)]
-
-    def generate_reply(self, chappie_response: str, conversation_history: list[dict]) -> str:
         """
-        Generiert eine Antwort auf Chappies Nachricht.
-        
-        GARANTIERT: Liefert IMMER eine nicht-leere Antwort (notfalls Fallback).
+        Initialisiert den Trainer Agent.
         
         Args:
-            chappie_response: Die letzte Nachricht von Chappie
-            conversation_history: Der bisherige Verlauf
+            config: TrainerConfig mit Persona und Curriculum
+        """
+        self.config = config
+        
+        # Curriculum Tracking
+        self.current_topic_index = 0
+        self.topic_start_time = datetime.now()
+        
+        # Fallback Counter für robuste Antworten
+        self._fallback_counter = 0
+        self.MAX_FALLBACK_BEFORE_LOCAL = 3
+        
+        # Brain initialisieren (eigenes Brain für den Trainer)
+        self.brain = get_brain()
+        self._is_local = settings.llm_provider == LLMProvider.OLLAMA
+        
+        msg = f"TrainerAgent initialisiert: Persona='{config.persona}'"
+        console.print(f"[cyan]{msg}[/cyan]")
+        log.info(msg)
+        
+        if self.config.curriculum:
+            topics = [item.topic for item in self.config.curriculum]
+            log.info(f"Curriculum geladen: {len(topics)} Themen: {topics}")
+    
+    def get_current_focus(self) -> str:
+        """
+        Gibt das aktuelle Fokus-Thema zurück.
+        Wechselt automatisch zum nächsten Thema wenn die Zeit abgelaufen ist.
+        
+        Returns:
+            Das aktuelle Thema als String
+        """
+        if not self.config.curriculum:
+            return "Allgemeinwissen & Smalltalk"
+        
+        current_item = self.config.curriculum[self.current_topic_index]
+        duration = current_item.get_duration()
+        
+        # Wenn infinite, bleibe beim Thema
+        if duration is None:
+            return current_item.topic
+        
+        # Prüfe ob Zeit abgelaufen
+        elapsed = datetime.now() - self.topic_start_time
+        elapsed_minutes = elapsed.total_seconds() / 60
+        
+        if elapsed_minutes >= duration:
+            # Wechsle zum nächsten Thema
+            old_topic = current_item.topic
+            self.current_topic_index += 1
+            
+            # Falls alle Themen durch, bleibe beim letzten
+            if self.current_topic_index >= len(self.config.curriculum):
+                self.current_topic_index = len(self.config.curriculum) - 1
+                log.info(f"Alle Themen abgeschlossen. Bleibe bei: {self.config.curriculum[self.current_topic_index].topic}")
+            else:
+                new_topic = self.config.curriculum[self.current_topic_index].topic
+                self.topic_start_time = datetime.now()
+                
+                log.info(f"=== THEMEN-WECHSEL: '{old_topic}' -> '{new_topic}' ===")
+                console.print(f"[bold yellow]📚 Themen-Wechsel: {old_topic} → {new_topic}[/bold yellow]")
+        
+        return self.config.curriculum[self.current_topic_index].topic
+    
+    def get_curriculum_status(self) -> str:
+        """Gibt einen formatierten Status des Curriculums zurück."""
+        if not self.config.curriculum:
+            return "Kein Curriculum definiert"
+        
+        total = len(self.config.curriculum)
+        current = self.current_topic_index + 1
+        topic = self.get_current_focus()
+        
+        return f"Thema {current}/{total}: {topic}"
+    
+    def _build_system_prompt(self) -> str:
+        """
+        Baut den System-Prompt für den Trainer.
+        
+        Returns:
+            Dynamischer System-Prompt mit aktuellem Fokus
+        """
+        current_focus = self.get_current_focus()
+        
+        return f"""Du bist ein Trainingspartner für eine KI namens CHAPPiE.
+Deine Persona: {self.config.persona}
+Aktueller Trainings-Fokus: {current_focus}
+
+DEINE AUFGABE:
+- Führe ein natürliches Gespräch mit CHAPPiE
+- Stelle Fragen zum aktuellen Fokus-Thema
+- Reagiere auf CHAPPiEs Antworten mit Folgefragen oder neuen Inputs  
+- Sei {self.config.persona.lower()} in deinen Reaktionen
+- Gib auch mal kritisches Feedback wenn CHAPPiEs Antwort schwach ist
+
+WICHTIGE REGELN:
+- Antworte IMMER auf Deutsch
+- Schreibe 1-3 Sätze pro Nachricht (keine langen Texte)
+- Bleibe beim aktuellen Fokus-Thema
+- Sei abwechslungsreich - wiederhole dich nicht
+- Wenn CHAPPiE gut antwortet, gib positives Feedback UND stelle eine neue Frage
+
+Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer würde ich..."
+"""
+    
+    def generate_reply(self, chappie_response: str, conversation_history: List[dict]) -> str:
+        """
+        Generiert eine Trainer-Antwort auf CHAPPiEs letzte Nachricht.
+        
+        Args:
+            chappie_response: Die letzte Antwort von CHAPPiE
+            conversation_history: Die bisherige Konversation
             
         Returns:
-            Die Antwort des Trainers (als User simuliert) - NIE leer!
+            Die Trainer-Antwort
         """
-        import logging
-        log = logging.getLogger(__name__)
+        system_prompt = self._build_system_prompt()
         
-        max_retries = 3
-        retry_count = 0
+        # Nachrichten für LLM vorbereiten
+        messages = [Message(role="system", content=system_prompt)]
         
-        while retry_count < max_retries:
-            retry_count += 1
-            try:
-                # Basis System-Prompt mit STRIKTEN Formatierungsregeln fuer menschlichen Stil
-                system_prompt = (
-                    f"Du bist ein Trainings-Partner fuer eine KI namens Chappie.\n"
-                    f"DEINE ROLLE: {self.config.persona}\n"
-                    f"TRAININGS-FOKUS: {self.config.focus_area}\n\n"
-                    f"AUFGABE: Fuehre eine Konversation mit Chappie. Simuliere einen echten Menschen.\n"
-                    f"Achte besonders auf den Trainings-Fokus.\n"
-                    f"Antworte direkt als User, ohne Meta-Kommentare.\n\n"
-                    f"DEIN SCHREIBSTIL:\n"
-                    f"Du schreibst wie ein echter Mensch in normalen Saetzen und Absaetzen.\n"
-                    f"Du verwendest NIEMALS Stichpunkte, Aufzaehlungen, nummerierte Listen oder Tabellen.\n"
-                    f"Formuliere alles in zusammenhaengenden Saetzen.\n\n"
-                    f"STRIKTE VERBOTE:\n"
-                    f"Keine Bindestriche am Zeilenanfang, keine Sternchen, keine Nummerierungen,\n"
-                    f"keine Tabellen, kein Markdown, keine Emojis.\n"
-                    f"Schreibe ausschliesslich in Fliesstext wie in einem normalen Gespraech.\n"
-                    f"Halte dich kurz: Maximal 2-3 Saetze pro Antwort."
-                )
-                
-                # Bei Retries: Nudge hinzufügen um Antwort zu erzwingen
-                if retry_count > 1:
-                    system_prompt += self._build_nudge_prompt(retry_count)
-
-                messages = [Message(role="system", content=system_prompt)]
-                
-                # History begrenzen bei langen Konversationen (verhindert Context-Overflow)
-                history_to_use = conversation_history[-20:] if len(conversation_history) > 20 else conversation_history
-                
-                for msg in history_to_use:
-                    # Rollen umdrehen für Trainer-Perspektive
-                    role = "user" if msg["role"] == "assistant" else "assistant"
-                    # Leere Nachrichten überspringen
-                    if msg.get("content", "").strip():
-                        messages.append(Message(role=role, content=msg["content"]))
-                    
-                # Aktuelle Nachricht von Chappie
-                if chappie_response and chappie_response.strip():
-                    messages.append(Message(role="user", content=chappie_response))
-
-                # Generierungs-Konfiguration (erhoehte Tokens fuer vollstaendige Saetze)
-                temperature = min(0.7 + (retry_count * 0.15), 1.2)  # 0.85 -> 1.0 -> 1.15
-                gen_config = GenerationConfig(
-                    max_tokens=600,  # Erhoeht um abgeschnittene Saetze zu vermeiden
-                    temperature=temperature,
-                    stream=False
-                )
-                
-                log.info(f"Trainer Agent: Generiere Antwort... (Versuch {retry_count}/{max_retries}, {len(messages)} Messages, temp={temperature:.2f})")
-                response = self.brain.generate(messages, config=gen_config)
-                
-                # Typ-Konvertierung
-                if not isinstance(response, str):
-                    log.warning(f"Trainer Agent: Kein String zurueckbekommen, konvertiere: {type(response)}")
-                    response = str(response) if response else ""
-                
-                # Strikte Validierung: Mindestens 10 Zeichen (nicht nur Whitespace)
-                clean_response = response.strip() if response else ""
-                if len(clean_response) < 10:
-                    log.warning(f"Trainer Agent: Antwort zu kurz ({len(clean_response)} Zeichen) - Versuch {retry_count}/{max_retries}")
-                    if retry_count < max_retries:
-                        time.sleep(2 + retry_count)  # Progressiv längere Pause
-                        continue
-                    # Nach allen Retries: Fallback nutzen
-                    break
-                
-                # Prüfe auf Fehler-Strings
-                if any(err in clean_response.lower() for err in ["fehler", "error", "exception", "timeout"]):
-                    log.warning(f"Trainer Agent: Fehler-String in Antwort erkannt - Versuch {retry_count}/{max_retries}")
-                    if retry_count < max_retries:
-                        time.sleep(2)
-                        continue
-                    break
-                
-                # Erfolg!
-                self.consecutive_fallbacks = 0  # Reset Fallback-Counter
-                log.info(f"Trainer Agent: Antwort erfolgreich ({len(clean_response)} Zeichen): {clean_response[:50]}...")
-                return clean_response
-                
-            except Exception as e:
-                log.error(f"Trainer Agent Exception (Versuch {retry_count}/{max_retries}): {e}", exc_info=True)
-                if retry_count < max_retries:
-                    time.sleep(3 + retry_count)
-                    continue
-                # Nach allen Retries bei Exception: Fallback
-                break
+        # History konvertieren (begrenzt auf letzte 10 für Context)
+        recent_history = conversation_history[-10:] if len(conversation_history) > 10 else conversation_history
+        for msg in recent_history:
+            # Im Trainer-Kontext: user = CHAPPiE, assistant = Trainer
+            # Wir invertieren die Rollen für den Trainer
+            role = "assistant" if msg["role"] == "user" else "user"
+            messages.append(Message(role=role, content=msg["content"]))
         
-        # === FALLBACK-LOGIK ===
-        # Wenn wir hier ankommen, haben alle Retries versagt
-        self.consecutive_fallbacks += 1
-        fallback = self._get_fallback_message()
-        log.warning(f"Trainer Agent: Nutze Fallback-Nachricht #{self.consecutive_fallbacks}: {fallback}")
+        # CHAPPiEs letzte Antwort (als "user" für den Trainer)
+        messages.append(Message(role="user", content=chappie_response))
         
-        # Bei zu vielen Fallbacks in Folge: Warnung
-        if self.consecutive_fallbacks >= 5:
-            log.error(f"Trainer Agent: {self.consecutive_fallbacks} Fallbacks in Folge! LLM möglicherweise nicht erreichbar.")
+        # Generierung mit Error Handling
+        try:
+            gen_config = GenerationConfig(
+                max_tokens=300,  # Kurze Trainer-Antworten
+                temperature=0.8,  # Etwas kreativ
+                stream=False
+            )
+            
+            response = self.brain.generate(messages, config=gen_config)
+            
+            # Validierung
+            if not response or len(response.strip()) < 5:
+                self._fallback_counter += 1
+                log.warning(f"Trainer Antwort zu kurz, Fallback #{self._fallback_counter}")
+                return self._get_fallback_response()
+            
+            # Prüfe auf API-Fehler
+            if isinstance(response, str) and "fehler" in response.lower():
+                self._fallback_counter += 1
+                log.error(f"API Fehler in Trainer: {response}")
+                return self._get_fallback_response()
+            
+            # Erfolg - Reset Fallback Counter
+            self._fallback_counter = 0
+            return response.strip()
+            
+        except Exception as e:
+            self._fallback_counter += 1
+            log.error(f"Fehler bei Trainer-Generierung: {e}")
+            return self._get_fallback_response()
+    
+    def _get_fallback_response(self) -> str:
+        """
+        Gibt eine Fallback-Antwort zurück wenn die Generierung fehlschlägt.
+        Wechselt zu lokalem Modell nach zu vielen Fehlern.
+        """
+        if self._fallback_counter >= self.MAX_FALLBACK_BEFORE_LOCAL:
+            self.switch_to_local()
         
-        return fallback
-
-    def switch_to_local(self):
-        """Wechselt den Trainer auf das lokale Modell (Fallback bei RPD-Limit)."""
-        import logging
-        log = logging.getLogger(__name__)
+        # Thema-basierte Fallback-Fragen
+        focus = self.get_current_focus()
+        fallbacks = [
+            f"Interessant. Erzähl mir mehr über {focus}.",
+            f"Was denkst du generell über {focus}?",
+            f"Kannst du das näher erklären?",
+            f"Hmm, das verstehe ich nicht ganz. Was meinst du genau?",
+            f"Okay, und wie hängt das mit {focus} zusammen?",
+            f"Spannend! Gibt es dazu ein konkretes Beispiel?",
+        ]
         
-        if self.config.provider == 'local':
-            return False  # Bereits lokal
+        import random
+        return random.choice(fallbacks)
+    
+    def switch_to_local(self) -> bool:
+        """
+        Wechselt den Trainer auf ein lokales Modell (Ollama).
         
-        log.info(f"Trainer Agent: Wechsle von {self.config.provider} auf local")
-        self.config.provider = 'local'
-        self.config.model_name = settings.ollama_model
-        self.brain = self._init_brain()
-        self.consecutive_fallbacks = 0  # Reset bei Provider-Wechsel
-        return True
-
-    def get_provider_info(self) -> str:
-        """Gibt den aktuellen Provider zurück."""
-        return self.config.provider
+        Returns:
+            True wenn gewechselt wurde, False wenn bereits lokal
+        """
+        if self._is_local:
+            return False
+        
+        log.info("Trainer wechselt auf lokales Modell...")
+        console.print("[yellow]Trainer wechselt auf lokales Modell (Ollama)...[/yellow]")
+        
+        try:
+            self.brain = OllamaBrain(model=settings.ollama_model)
+            self._is_local = True
+            self._fallback_counter = 0
+            
+            log.info(f"Trainer läuft jetzt lokal mit {settings.ollama_model}")
+            console.print(f"[green]Trainer läuft jetzt lokal mit {settings.ollama_model}[/green]")
+            return True
+            
+        except Exception as e:
+            log.error(f"Fehler beim Wechsel auf lokal: {e}")
+            return False
     
     def reset_fallback_counter(self):
-        """Setzt den Fallback-Counter zurück (z.B. nach erfolgreicher Traum-Phase)."""
-        self.consecutive_fallbacks = 0
+        """Setzt den Fallback-Counter zurück."""
+        self._fallback_counter = 0
 
+
+def load_training_config(config_path: str = None) -> TrainerConfig:
+    """
+    Lädt die Training-Konfiguration aus einer JSON-Datei.
+    
+    Args:
+        config_path: Pfad zur Konfigurationsdatei
+        
+    Returns:
+        TrainerConfig Objekt
+    """
+    if config_path is None:
+        # Standard-Pfad im Projekt-Root
+        from config.config import PROJECT_ROOT
+        config_path = os.path.join(PROJECT_ROOT, "training_config.json")
+    
+    if not os.path.exists(config_path):
+        log.info(f"Keine Konfiguration gefunden bei {config_path}, nutze Defaults")
+        return TrainerConfig()
+    
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        config = TrainerConfig.from_dict(data)
+        log.info(f"Konfiguration geladen: {config.persona}, {len(config.curriculum)} Themen")
+        return config
+        
+    except Exception as e:
+        log.error(f"Fehler beim Laden der Konfiguration: {e}")
+        return TrainerConfig()
+
+
+def save_training_config(config: TrainerConfig, config_path: str = None):
+    """
+    Speichert die Training-Konfiguration in eine JSON-Datei.
+    
+    Args:
+        config: Die zu speichernde Konfiguration
+        config_path: Zielpfad für die Datei
+    """
+    if config_path is None:
+        from config.config import PROJECT_ROOT
+        config_path = os.path.join(PROJECT_ROOT, "training_config.json")
+    
+    try:
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config.to_dict(), f, ensure_ascii=False, indent=2)
+        
+        log.info(f"Konfiguration gespeichert nach {config_path}")
+        
+    except Exception as e:
+        log.error(f"Fehler beim Speichern der Konfiguration: {e}")

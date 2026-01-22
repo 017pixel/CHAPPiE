@@ -15,15 +15,29 @@ def render_settings_overlay(backend):
     with tab_api:
         st.subheader("API & Modell Konfiguration")
         
-        # 1. Provider Auswahl
-        current_provider_index = 0 if settings.llm_provider == LLMProvider.GROQ else 1
+        # 1. Provider Auswahl (jetzt mit 3 Optionen)
+        provider_options = [
+            "Groq Cloud (Schnell & Stark)",
+            "Cerebras Cloud (Ultra-High-Speed)",
+            "Ollama Lokal (Privat & Offline)"
+        ]
+        
+        # Aktuellen Index ermitteln
+        if settings.llm_provider == LLMProvider.GROQ:
+            current_provider_index = 0
+        elif settings.llm_provider == LLMProvider.CEREBRAS:
+            current_provider_index = 1
+        else:
+            current_provider_index = 2
+            
         selected_provider = st.selectbox(
             "KI-Anbieter (Backend)", 
-            ["Groq Cloud (Schnell & Stark)", "Ollama Lokal (Privat & Offline)"],
+            provider_options,
             index=current_provider_index
         )
         
         is_groq = "Groq" in selected_provider
+        is_cerebras = "Cerebras" in selected_provider
         
         st.divider()
         
@@ -49,6 +63,45 @@ def render_settings_overlay(backend):
             if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True):
                 settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
                 st.success("✅ Einstellungen für Groq gespeichert!")
+                time.sleep(0.5)
+                st.rerun()
+                
+        elif is_cerebras:
+            st.markdown("### ⚡ Cerebras Cloud Konfiguration")
+            st.caption("Ultra-schnelle Inferenz (2000+ Token/s). API Key von [cloud.cerebras.ai](https://cloud.cerebras.ai)")
+            
+            # API Key Status anzeigen
+            if settings.cerebras_api_key:
+                st.success("✓ Cerebras API Key ist gesetzt")
+            else:
+                st.warning("⚠️ Kein Cerebras API Key konfiguriert")
+            
+            # API Key Input
+            new_cerebras_key = st.text_input(
+                "Cerebras API Key", 
+                value=settings.cerebras_api_key if settings.cerebras_api_key else "",
+                type="password",
+                help="Hole dir einen Key von cloud.cerebras.ai"
+            )
+            
+            # Model Auswahl
+            cerebras_models = {
+                "llama-3.3-70b": "Llama 3.3 70B - Leistungsstark (Empfohlen)",
+                "llama-3.1-8b": "Llama 3.1 8B - Schnell & Kompakt",
+                "qwen-3-32b": "Qwen 3 32B - Alibaba"
+            }
+            
+            current_cerebras_model = settings.cerebras_model if hasattr(settings, 'cerebras_model') else "llama-3.3-70b"
+            new_cerebras_model = st.selectbox(
+                "Cerebras Modell",
+                list(cerebras_models.keys()),
+                index=list(cerebras_models.keys()).index(current_cerebras_model) if current_cerebras_model in cerebras_models else 0,
+                format_func=lambda x: cerebras_models.get(x, x)
+            )
+            
+            if st.button("Cerebras Einstellungen Speichern", type="primary", use_container_width=True):
+                settings.update_from_ui(provider="cerebras", api_key=new_cerebras_key, model=new_cerebras_model)
+                st.success("✅ Einstellungen für Cerebras gespeichert!")
                 time.sleep(0.5)
                 st.rerun()
                 
@@ -85,6 +138,7 @@ def render_settings_overlay(backend):
                     st.success("✅ Einstellungen für Ollama gespeichert!")
                     time.sleep(0.5)
                     st.rerun()
+
 
     with tab1:
         st.subheader("Generierungs-Einstellungen")
