@@ -18,8 +18,8 @@ GROQ_API_KEY = "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"
 # ═══════════════════════════════════════════════════════════════════
 
 # Welches Backend soll verwendet werden?
-# Optionen: "ollama" (lokal) oder "groq" (cloud)
-LLM_PROVIDER = "ollama"
+# Optionen: "ollama" (lokal), "groq" (cloud), "cerebras" (cloud high-speed)
+LLM_PROVIDER = "cerebras"
 
 
 # --- Ollama (Lokal) ---
