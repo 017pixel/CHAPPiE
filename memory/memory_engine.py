@@ -516,7 +516,35 @@ class MemoryEngine:
     
     def get_memory_count(self) -> int:
         """Gibt die Anzahl der gespeicherten Erinnerungen zurueck."""
-        return self.collection.count()
+        try:
+            return self.collection.count()
+        except Exception as e:
+            print(f"WARNUNG: Konnte Memory-Count nicht ermitteln: {e}")
+            return 0
+
+    def health_check(self) -> dict:
+        """Führt einen Health-Check der Memory-Engine durch."""
+        status = {
+            "memory_count": 0,
+            "embedding_model_loaded": False,
+            "chromadb_connected": False,
+            "errors": []
+        }
+
+        try:
+            status["memory_count"] = self.collection.count()
+            status["chromadb_connected"] = True
+        except Exception as e:
+            status["errors"].append(f"ChromaDB: {str(e)}")
+
+        try:
+            # Test-Embedding
+            test_embed = self.embedder.encode("health check")
+            status["embedding_model_loaded"] = len(test_embed) > 0
+        except Exception as e:
+            status["errors"].append(f"Embedding: {str(e)}")
+
+        return status
 
     def reset_all_memories(self) -> str:
         """
