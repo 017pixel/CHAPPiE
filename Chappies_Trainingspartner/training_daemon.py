@@ -180,18 +180,18 @@ Beispiele:
             
             config = TrainerConfig(
                 persona=config_dict["persona"],
-                focus_area=config_dict["focus_area"],
-                provider=config_dict["provider"],
-                model_name=config_dict.get("model_name")
+                focus_area=config_dict["focus_area"]
             )
             start_prompt = config_dict.get("start_prompt", "Hallo Chappie!")
-            
+            provider = config_dict["provider"]
+            model_name = config_dict.get("model_name")
+
             print("\n" + "=" * 60)
             print("    TRAINING KONFIGURATION")
             print("=" * 60)
             print(f"  Persona:    {config.persona}")
             print(f"  Fokus:      {config.focus_area}")
-            print(f"  Provider:   {config.provider}")
+            print(f"  Provider:   {provider}")
             print(f"  Start:      {start_prompt}")
             print("=" * 60 + "\n")
             
@@ -204,31 +204,32 @@ Beispiele:
                     
                 config = TrainerConfig(
                     persona=saved_config.get("persona", "Ein kritischer User"),
-                    focus_area=saved_config.get("focus_area", "Logikfehler"),
-                    provider=saved_config.get("provider", "local"),
-                    model_name=saved_config.get("model_name")
+                    focus_area=saved_config.get("focus_area", "Logikfehler")
                 )
+                provider = saved_config.get("provider", "local")
+                model_name = saved_config.get("model_name")
                 start_prompt = saved_config.get("start_prompt", "Hallo Chappie!")
             else:
                 logging.warning("Keine training_config.json gefunden! Nutze Defaults.")
                 # Fallback configuration
                 config = TrainerConfig(
                     persona="Ein kritischer User, der versucht Fehler zu finden",
-                    focus_area="Logikfehler und Konsistenz im Gedaechtnis",
-                    provider="local"
+                    focus_area="Logikfehler und Konsistenz im Gedaechtnis"
                 )
+                provider = "local"
+                model_name = None
                 start_prompt = "Hallo Chappie! Lass uns ein Gespraech fuehren."
         
         logging.info(f"Aktive Konfiguration: {config.__dict__}")
         
         # WICHTIG: Settings global setzen, damit Chappie auch den richtigen Provider nutzt
         from config.config import settings, LLMProvider
-        if config.provider == "groq":
+        if provider == "groq":
              settings.llm_provider = LLMProvider.GROQ
-             if config.model_name: settings.groq_model = config.model_name
+             if model_name: settings.groq_model = model_name
         else:
              settings.llm_provider = LLMProvider.OLLAMA
-             if config.model_name: settings.ollama_model = config.model_name
+             if model_name: settings.ollama_model = model_name
              
         logging.info(f"Globale Settings aktualisiert: Provider={settings.llm_provider}")
         
