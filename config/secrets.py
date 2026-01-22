@@ -23,9 +23,9 @@ LLM_PROVIDER = "ollama"
 
 
 # --- Ollama (Lokal) ---
-# Hauptmodell für Unterhaltungen (Fallback auf DeepSeek da GPT-OSS Update braucht)
+# Hauptmodell für Unterhaltungen
 OLLAMA_HOST = "http://localhost:11434"
-OLLAMA_MODEL = "gpt-oss:20b"
+OLLAMA_MODEL = "llama3:70b"
 
 # Modell für Gehirnzusammenfassungen / Sleep Modus
 EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b"

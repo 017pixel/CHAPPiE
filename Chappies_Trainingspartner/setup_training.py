@@ -50,7 +50,7 @@ CEREBRAS_MODELS = {
 OLLAMA_MODELS = {
     "1": ("llama3:70b", "Llama 3 70B - Maximum Power"),
     "2": ("llama3:8b", "Llama 3 8B - Ausgewogen (Empfohlen)"),
-    "3": ("gpt-oss:20b", "GPT-OSS 20B - Custom"),
+    "3": ("qwen2.5:72b", "Qwen 2.5 72B - Alternative Power-Modell"),
     "4": ("deepseek-r1:14b", "DeepSeek R1 14B - Reasoning"),
     "5": ("CUSTOM", "Eigenes Modell eingeben..."),
 }

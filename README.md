@@ -88,7 +88,7 @@ pip install -r requirements.txt
 LLM_PROVIDER = "ollama"
 
 # Modelle (Empfohlen für lokale Nutzung)
-OLLAMA_MODEL = "gpt-oss:20b"           # Haupt-Chat
+OLLAMA_MODEL = "llama3:70b"           # Haupt-Chat
 EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b" # Hintergrund-Prozesse (Schnell!)
 ```
 
@@ -97,14 +97,14 @@ EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b" # Hintergrund-Prozesse (Schnell!)
 ```bash
 # Ollama installieren: https://ollama.ai
 # Modelle herunterladen:
-ollama pull gpt-oss:20b
+ollama pull llama3:70b
 ollama pull qwen2.5:1.5b
 ```
 
 ## 🆕 Performance Update (Januar 2026)
 
 Das System wurde massiv für lokale Nutzung optimiert:
-*   **Dual-Brain Architektur:** Nutzt das leistungsstarke `gpt-oss:20b` für den Chat, aber das pfeilschnelle `qwen2.5:1.5b` für Hintergrundaufgaben (Träume, Analyse).
+*   **Dual-Brain Architektur:** Nutzt das leistungsstarke `llama3:70b` für den Chat, aber das pfeilschnelle `qwen2.5:1.5b` für Hintergrundaufgaben (Träume, Analyse).
 *   **Smart Query Extraction:** Einfache Fragen ("Wie geht es dir?") umgehen das LLM komplett -> Sofortige Antwort ohne Wartezeit.
 *   **Modulare Web-UI:** Die Benutzeroberfläche wurde komplett refactored und ist nun extrem reaktionsschnell dank asynchronem Speichern.
 
