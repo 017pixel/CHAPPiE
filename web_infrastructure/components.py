@@ -1,5 +1,6 @@
 import streamlit as st
 from typing import Dict, Any
+from memory.memory_engine import MemoryEngine
 
 def render_emotion_metric(label, value, color="#2ea043"):
     st.markdown(f"""
@@ -21,6 +22,23 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
     render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#9C27B0") # Lila
     render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#FF9800") # Orange
     render_emotion_metric("Frustration", emotions_dict.get("frustration", 0), "#F44336") # Rot
+
+    # Memory Status hinzufügen
+    st.markdown("---")
+    try:
+        live_memory = MemoryEngine()
+        memory_count = live_memory.get_memory_count()
+        health = live_memory.health_check()
+
+        if health["embedding_model_loaded"] and health["chromadb_connected"]:
+            st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+            st.caption("✅ Live-Daten aus Training")
+        else:
+            st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+            st.caption("⚠️ Memory-System Probleme")
+    except Exception as e:
+        st.metric("🧠 Erinnerungen", "Fehler")
+        st.caption(f"❌ {str(e)[:30]}...")
 
 
 def render_brain_monitor(metadata: Dict[str, Any]):

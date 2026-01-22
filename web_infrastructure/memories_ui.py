@@ -1,8 +1,26 @@
 import streamlit as st
 
 from web_infrastructure.components import render_memory_item
+from memory.memory_engine import MemoryEngine
 
 def render_memories_overlay(backend):
+    """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
+
+    # Live Memory Engine für aktuelle Daten (nicht gecacht!)
+    live_memory = MemoryEngine()
+
+    # Refresh Button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🔄 Refresh", key="refresh_memories"):
+            st.rerun()
+    with col2:
+        # Health Status anzeigen
+        health = live_memory.health_check()
+        if health["embedding_model_loaded"] and health["chromadb_connected"]:
+            st.success(f"✅ Live-Daten ({health['memory_count']} Erinnerungen)")
+        else:
+            st.error("⚠️ Memory-System hat Probleme")
     """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
     if not st.session_state.show_memories:
         return
@@ -15,7 +33,7 @@ def render_memories_overlay(backend):
 
     with st.container(border=True):
         # Gesamtzahl der Erinnerungen (unbegrenzt)
-        total_count = backend.memory.get_memory_count()
+        total_count = live_memory.get_memory_count()
         
         if total_count == 0:
             st.info("Keine Erinnerungen vorhanden.")
@@ -46,7 +64,7 @@ def render_memories_overlay(backend):
 
             # Erinnerungen laden (mit Offset für Pagination)
             offset = current_page * items_per_page
-            all_memories = backend.memory.get_recent_memories(limit=items_per_page, offset=offset)
+            all_memories = live_memory.get_recent_memories(limit=items_per_page, offset=offset)
 
             # Filter anwenden
             filtered_memories = []
