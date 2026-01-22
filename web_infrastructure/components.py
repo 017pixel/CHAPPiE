@@ -36,6 +36,18 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
         else:
             st.metric("🧠 Erinnerungen", f"{memory_count:,}")
             st.caption("⚠️ Memory-System Probleme")
+
+        # Zeige letzte Memory wenn verfügbar
+        if memory_count > 0:
+            try:
+                recent = live_memory.get_recent_memories(limit=1)
+                if recent:
+                    last_memory = recent[0]
+                    timestamp = getattr(last_memory, 'timestamp', 'Unbekannt')
+                    st.caption(f"📅 Letzte: {timestamp[:19] if timestamp != 'Unbekannt' else 'Unbekannt'}")
+            except:
+                pass
+
     except Exception as e:
         st.metric("🧠 Erinnerungen", "Fehler")
         st.caption(f"❌ {str(e)[:30]}...")
