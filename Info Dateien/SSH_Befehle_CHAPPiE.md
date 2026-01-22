@@ -1,6 +1,20 @@
 # 🚀 CHAPPiE Server Guide: Maximum Autonomy
 *"Set and Forget" - Anleitung für den 24/7 Betrieb auf Ubuntu*
 
+## 📋 Inhaltsverzeichnis
+
+| Abschnitt | Beschreibung |
+|-----------|-------------|
+| [🛠 0. Setup & Updates](#-0-setup--updates) | Projekt aktualisieren und Environment einrichten |
+| [🚀 1. Training Starten](#-1-training-starten-nohup---empfohlen) | Verschiedene Methoden das Training zu starten |
+| [🖥 2. Screen für Interaktion](#-2-alternative-screen-fr-interaktion) | Interaktives Arbeiten mit dem Training |
+| [🤖 3. Systemd Service](#-3-alternative-systemd-service) | Automatischer Start beim Booten |
+| [📊 4. Monitoring & Logs](#-4-monitoring-wichtig-bei-nohup) | Prozesse überwachen und Logs analysieren |
+| [🛑 5. Training Stoppen](#-5-training-stoppen) | Das Training graceful beenden |
+| [🏥 6. Server Health Check](#-6-server-health-check) | System-Überwachung und Diagnose |
+| [📂 7. Daten-Management](#-7-daten-management--backups) | Backups und Datenverwaltung |
+| [📝 Service Template](#-service-template) | Systemd-Service Konfiguration |
+
 ## 🛠 0. Setup & Updates
 Bevor du startest, sichere dir immer den neuesten Stand.
 
@@ -60,18 +74,55 @@ Für automatischen Start beim Booten (siehe `chappie-training.service`).
 
 ---
 
-## 📊 4. Monitoring (Wichtig bei nohup!)
-Überwache den Prozess im Hintergrund.
+## 📊 4. Monitoring & Logs (Wichtig bei nohup!)
+Überwache den Prozess im Hintergrund und analysiere Logs.
 
+### 🔍 Prozess-Monitoring
 ```bash
-# Live-Logs verfolgen (Drücke STRG+C zum Verlassen)
-tail -f training.log
-
-# Prüfen, ob der Prozess noch läuft
+# Prüfen, ob das Training läuft
 ps aux | grep training_daemon
 
 # Wie lange läuft der Prozess schon? (PID aus ps entnehmen)
 ps -p <PID> -o etime=
+
+# CPU & RAM Auslastung des Training-Prozesses
+ps aux | grep training_daemon | head -1
+```
+
+### 📝 Log-Analyse
+```bash
+# Live-Logs verfolgen (STRG+C zum Verlassen)
+tail -f training.log
+
+# Letzte 50 Zeilen der Logs ansehen
+tail -50 training.log
+
+# Vollständige Logs durchsuchen (mit less für Navigation)
+less training.log
+# Mit /suchbegriff suchen, q zum Beenden
+
+# Nach Fehlern suchen
+grep -i error training.log
+
+# Nach Chappie-Antworten suchen
+grep "CHAPPIE:" training.log
+
+# Logs der letzten Stunde filtern
+tail -f training.log | grep "$(date -d '1 hour ago' +'%Y-%m-%d %H')"
+
+# Training-Statistiken aus Logs extrahieren
+grep -E "(Austausche|Fehler|Traum-Phasen)" training.log | tail -10
+```
+
+### 🖥️ Alternative: Screen für Log-Monitoring
+```bash
+# Screen für kontinuierliches Log-Monitoring starten
+screen -S chappie-logs
+tail -f training.log
+
+# Screen verlassen: STRG+A, dann D
+# Zurückkommen: screen -r chappie-logs
+# Screen beenden: exit (im Screen)
 ```
 
 ## 🛑 5. Training Stoppen
