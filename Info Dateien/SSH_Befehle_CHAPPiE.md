@@ -46,7 +46,7 @@ nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
 python3 Chappies_Trainingspartner/training_daemon.py --neu
 
 # C: NEUES Training mit direkter Angabe (non-interactive - perfekt für SSH)
-python3 Chappies_Trainingspartner/training_daemon.py --fokus "Logik und Programmierung" --persona "Ein kritischer Code-Reviewer" --start "Hallo Chappie, prüfe bitte diesen Code..."
+python3 Chappies_Trainingspartner/training_daemon.py --fokus "Menschliches Gespräch, Wie ein Mensch evrhalten. Unterhalten." --persona "Ein Freundlicher Trainer, der nur das beste für Chappie will" --start "Hallo Chappie, wie geht es dir?..."
 # Danach im Hintergrund: nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
 ```
 

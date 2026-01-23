@@ -37,9 +37,22 @@ def inject_modern_css():
             margin-bottom: 5px !important;
             white-space: nowrap !important;
             display: inline-block !important;
-            overflow: hidden;
+            overflow: hidden !important;
             text-overflow: ellipsis;
             text-align: left !important;
+        }
+
+        /* Refresh Button specific styling */
+        .refresh-btn button {
+            background: linear-gradient(135deg, rgba(26, 92, 32, 0.2) 0%, rgba(22, 27, 34, 0.8) 100%) !important;
+            border: 1px solid var(--accent-green) !important;
+            box-shadow: 0 2px 8px rgba(26, 92, 32, 0.3) !important;
+        }
+
+        .refresh-btn button:hover {
+            background: linear-gradient(135deg, rgba(46, 160, 67, 0.3) 0%, rgba(22, 27, 34, 0.9) 100%) !important;
+            box-shadow: 0 4px 12px rgba(46, 160, 67, 0.5) !important;
+            transform: translateY(-1px) !important;
         }
 
         .stButton button:hover, .stButton button:active, .stButton button:focus {
@@ -371,6 +384,39 @@ def inject_modern_css():
         .deep-think-buttons .stSelectbox label {
             color: var(--text-secondary) !important;
             font-size: 0.9rem !important;
+        }
+
+        /* Pagination styling */
+        .pagination-container {
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8) 0%, rgba(13, 17, 23, 0.9) 100%) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            padding: 15px !important;
+            margin: 10px 0 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .pagination-container .stButton button {
+            background: linear-gradient(135deg, rgba(26, 92, 32, 0.2) 0%, rgba(22, 27, 34, 0.8) 100%) !important;
+            border: 1px solid var(--accent-green) !important;
+            border-radius: 6px !important;
+            font-size: 0.9rem !important;
+            padding: 8px 12px !important;
+            min-width: 80px !important;
+            text-align: center !important;
+        }
+
+        .pagination-container .stButton button:hover {
+            background: linear-gradient(135deg, rgba(46, 160, 67, 0.3) 0%, rgba(22, 27, 34, 0.9) 100%) !important;
+            box-shadow: 0 2px 8px rgba(46, 160, 67, 0.4) !important;
+        }
+
+        .pagination-container .stNumberInput input {
+            background-color: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 4px !important;
+            padding: 8px !important;
         }
     </style>
     """, unsafe_allow_html=True)

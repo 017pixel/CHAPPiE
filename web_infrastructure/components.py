@@ -31,8 +31,8 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
         health = live_memory.health_check()
 
         if health["embedding_model_loaded"] and health["chromadb_connected"]:
-            st.metric("🧠 Erinnerungen", f"{memory_count:,}")
-            st.caption("✅ Live-Daten aus Training")
+            st.metric("Erinnerungen", f"{memory_count:,}")
+            st.caption("Live-Daten aus Training")
         else:
             st.metric("🧠 Erinnerungen", f"{memory_count:,}")
             st.caption("⚠️ Memory-System Probleme")
@@ -43,8 +43,17 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
                 recent = live_memory.get_recent_memories(limit=1)
                 if recent:
                     last_memory = recent[0]
-                    timestamp = getattr(last_memory, 'timestamp', 'Unbekannt')
-                    st.caption(f"📅 Letzte: {timestamp[:19] if timestamp != 'Unbekannt' else 'Unbekannt'}")
+                    timestamp_str = getattr(last_memory, 'timestamp', 'Unbekannt')
+                    if timestamp_str != 'Unbekannt':
+                        try:
+                            from datetime import datetime
+                            dt = datetime.fromisoformat(timestamp_str)
+                            formatted = dt.strftime("%d.%m.%Y %H:%M:%S")
+                            st.caption(f"Letzte: {formatted}")
+                        except ValueError:
+                            st.caption("Letzte: Unbekannt")
+                    else:
+                        st.caption("Letzte: Unbekannt")
             except:
                 pass
 
@@ -142,11 +151,11 @@ def render_memory_item(mem: Any, index: int = 1):
 
     # Label-Formatierung
     if label == "zsm gefasst":
-        label_html = '<span style="color: #2ea043; font-weight: bold;">[zsm gefasst]</span>'
-        label_badge = "🔖"
+        label_html = '<span style="color: #2ea043; font-weight: bold; border: 1px solid #2ea043; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">SUMMARY</span>'
+        badge_symbol = "S" # Fallback char if needed, but we use label_html
     else:
-        label_html = '<span style="color: #8b949e; font-weight: bold;">[original]</span>'
-        label_badge = "📝"
+        label_html = '<span style="color: #8b949e; font-weight: bold; border: 1px solid #8b949e; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">ORIGINAL</span>'
+        badge_symbol = "O"
 
     # Role & Type Badges (für Memories View)
     role_label = "User" if role == "user" else "CHAPiE"
@@ -156,7 +165,7 @@ def render_memory_item(mem: Any, index: int = 1):
     col1, col2 = st.columns([3, 1])
     with col1:
         # Header bauen
-        header = f"{label_badge} `{mem_id}...`"
+        # header = f"{label_badge} `{mem_id}...`" # OLD with emoji
         if timestamp: 
             # Detaillierte Ansicht (Memories Overlay)
             st.markdown(f"### {label_html} {type_badge} {role_label} #{index}", unsafe_allow_html=True)

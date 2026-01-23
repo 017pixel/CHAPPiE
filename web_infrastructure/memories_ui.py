@@ -12,15 +12,15 @@ def render_memories_overlay(backend):
     # Refresh Button
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("🔄 Refresh", key="refresh_memories"):
+        if st.button("Refresh", key="refresh_memories"):
             st.rerun()
     with col2:
         # Health Status anzeigen
         health = live_memory.health_check()
         if health["embedding_model_loaded"] and health["chromadb_connected"]:
-            st.success(f"✅ Live-Daten ({health['memory_count']} Erinnerungen)")
+            st.success(f"Live-Daten ({health['memory_count']} Erinnerungen)")
         else:
-            st.error("⚠️ Memory-System hat Probleme")
+            st.error("Memory-System hat Probleme")
     """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
     if not st.session_state.show_memories:
         return
@@ -66,39 +66,43 @@ def render_memories_overlay(backend):
             offset = current_page * items_per_page
             all_memories = live_memory.get_recent_memories(limit=items_per_page, offset=offset)
 
-            # Filter anwenden
-            filtered_memories = []
-            for mem in all_memories:
-                label = getattr(mem, 'label', 'original')
-                label_match = filter_label == "Alle" or label == filter_label
-                type_match = filter_type == "Alle" or mem.mem_type == filter_type
-                if label_match and type_match:
-                    filtered_memories.append(mem)
+            # Filter anwenden - wenn beide Filter auf "Alle", zeige alles direkt
+            if filter_label == "Alle" and filter_type == "Alle":
+                filtered_memories = all_memories
+            else:
+                filtered_memories = []
+                for mem in all_memories:
+                    label = getattr(mem, 'label', 'original')
+                    label_match = filter_label == "Alle" or label == filter_label
+                    type_match = filter_type == "Alle" or mem.mem_type == filter_type
+                    if label_match and type_match:
+                        filtered_memories.append(mem)
 
             st.markdown(f"**Seite {current_page + 1} von {max_pages} | Zeige: {len(filtered_memories)} Erinnerungen**")
 
             # Pagination Controls
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-            with nav_col1:
-                if st.button("◀ Zurück", disabled=current_page == 0, use_container_width=True):
-                    st.session_state.memories_page = max(0, current_page - 1)
-                    st.rerun()
-            with nav_col2:
-                # Direkte Seiten-Eingabe
-                new_page = st.number_input(
-                    "Gehe zu Seite", 
-                    min_value=1, 
-                    max_value=max_pages, 
-                    value=current_page + 1,
-                    key="goto_page"
-                )
-                if new_page != current_page + 1:
-                    st.session_state.memories_page = new_page - 1
-                    st.rerun()
-            with nav_col3:
-                if st.button("Weiter ▶", disabled=current_page >= max_pages - 1, use_container_width=True):
-                    st.session_state.memories_page = min(max_pages - 1, current_page + 1)
-                    st.rerun()
+            with st.container():
+                nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+                with nav_col1:
+                    if st.button("◀ Zurück", disabled=current_page == 0, use_container_width=True, key="mem_prev_page"):
+                        st.session_state.memories_page = max(0, current_page - 1)
+                        st.rerun()
+                with nav_col2:
+                    # Direkte Seiten-Eingabe
+                    new_page = st.number_input(
+                        "Gehe zu Seite",
+                        min_value=1,
+                        max_value=max_pages,
+                        value=current_page + 1,
+                        key="goto_page"
+                    )
+                    if new_page != current_page + 1:
+                        st.session_state.memories_page = new_page - 1
+                        st.rerun()
+                with nav_col3:
+                    if st.button("Weiter ▶", disabled=current_page >= max_pages - 1, use_container_width=True, key="mem_next_page"):
+                        st.session_state.memories_page = min(max_pages - 1, current_page + 1)
+                        st.rerun()
 
             # Erinnerungen anzeigen
             for i, mem in enumerate(filtered_memories):

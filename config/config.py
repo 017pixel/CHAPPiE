@@ -104,24 +104,25 @@ class Settings:
         # === System ===
         self.debug = bool(self._get_val("DEBUG", True))
 
-    def update_from_ui(self, provider=None, api_key=None, model=None, cerebras_api_key=None):
+    def update_from_ui(self, provider=None, api_key=None, model=None, cerebras_api_key=None,
+                      temperature=None, max_tokens=None, chain_of_thought=None, memory_top_k=None):
         """Erlaubt Updates zur Laufzeit durch die UI."""
         if provider:
             try:
                 self.llm_provider = LLMProvider(provider.lower())
             except: pass
-            
+
         if api_key is not None: # Leerer String ist erlaubt (Loeschen)
             # Je nach aktuellem Provider den richtigen Key setzen
             if self.llm_provider == LLMProvider.CEREBRAS:
                 self.cerebras_api_key = api_key
             else:
                 self.groq_api_key = api_key
-        
+
         # Expliziter Cerebras API Key (separat)
         if cerebras_api_key is not None:
             self.cerebras_api_key = cerebras_api_key
-            
+
         if model:
             if self.llm_provider == LLMProvider.GROQ:
                 self.groq_model = model
@@ -129,6 +130,64 @@ class Settings:
                 self.cerebras_model = model
             else:
                 self.ollama_model = model
+
+        # Generation settings
+        if temperature is not None:
+            self.temperature = temperature
+        if max_tokens is not None:
+            self.max_tokens = max_tokens
+        if chain_of_thought is not None:
+            self.chain_of_thought = chain_of_thought
+        if memory_top_k is not None:
+            self.memory_top_k = memory_top_k
+
+        # Persist to addSecrets.py
+        self._persist_to_addsecrets()
+
+    def _persist_to_addsecrets(self):
+        """Schreibt die aktuellen Settings in addSecrets.py für Persistierung."""
+        try:
+            addsecrets_path = PROJECT_ROOT / "config" / "addSecrets.py"
+            with open(addsecrets_path, "w") as f:
+                f.write("# Automatisch generierte Benutzer-Overrides\n")
+                f.write("# Diese Datei wird von der UI aktualisiert - nicht manuell bearbeiten!\n\n")
+
+                # Provider
+                f.write(f"LLM_PROVIDER = '{self.llm_provider.value}'\n")
+
+                # API Keys
+                if self.groq_api_key:
+                    f.write(f"GROQ_API_KEY = '{self.groq_api_key}'\n")
+                if self.cerebras_api_key:
+                    f.write(f"CEREBRAS_API_KEY = '{self.cerebras_api_key}'\n")
+
+                # Models
+                f.write(f"GROQ_MODEL = '{self.groq_model}'\n")
+                f.write(f"CEREBRAS_MODEL = '{self.cerebras_model}'\n")
+                f.write(f"OLLAMA_MODEL = '{self.ollama_model}'\n")
+                f.write(f"OLLAMA_HOST = '{self.ollama_host}'\n")
+                f.write(f"EMOTION_ANALYSIS_MODEL = '{self.emotion_analysis_model}'\n")
+                f.write(f"EMBEDDING_MODEL = '{self.embedding_model}'\n")
+
+                # Memory
+                f.write(f"MEMORY_TOP_K = {self.memory_top_k}\n")
+                f.write(f"CHROMA_COLLECTION = '{self.chroma_collection_name}'\n")
+
+                # Query Extraction
+                f.write(f"ENABLE_QUERY_EXTRACTION = {self.enable_query_extraction}\n")
+                f.write(f"QUERY_EXTRACTION_GROQ_MODEL = '{self.query_extraction_groq_model}'\n")
+                f.write(f"QUERY_EXTRACTION_OLLAMA_MODEL = '{self.query_extraction_ollama_model}'\n")
+
+                # Generation
+                f.write(f"MAX_TOKENS = {self.max_tokens}\n")
+                f.write(f"TEMPERATURE = {self.temperature}\n")
+                f.write(f"STREAM = {self.stream}\n")
+
+                # Chain of Thought
+                f.write(f"CHAIN_OF_THOUGHT = {self.chain_of_thought}\n")
+
+        except Exception as e:
+            print(f"Warnung: Konnte addSecrets.py nicht schreiben: {e}")
 
 
 # === Globale Settings-Instanzen ===

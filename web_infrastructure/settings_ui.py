@@ -59,13 +59,19 @@ def render_settings_overlay(backend):
                 value=settings.groq_model,
                 help="z.B. moonshotai/kimi-k2-instruct-0905 oder llama-3.1-70b-versatile"
             )
-            
-            if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True):
-                settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
-                st.success("✅ Einstellungen für Groq gespeichert!")
-                time.sleep(0.5)
-                st.rerun()
-                
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_groq"):
+                    settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
+                    st.success("✅ Einstellungen für Groq gespeichert!")
+                    time.sleep(0.5)
+                    st.rerun()
+            with col2:
+                if st.button("Schließen", use_container_width=True, key="close_settings_groq"):
+                    st.session_state.show_settings = False
+                    st.rerun()
+                    
         elif is_cerebras:
             st.markdown("### ⚡ Cerebras Cloud Konfiguration")
             st.caption("Ultra-schnelle Inferenz (2000+ Token/s). API Key von [cloud.cerebras.ai](https://cloud.cerebras.ai)")
@@ -98,13 +104,19 @@ def render_settings_overlay(backend):
                 index=list(cerebras_models.keys()).index(current_cerebras_model) if current_cerebras_model in cerebras_models else 0,
                 format_func=lambda x: cerebras_models.get(x, x)
             )
-            
-            if st.button("Cerebras Einstellungen Speichern", type="primary", use_container_width=True):
-                settings.update_from_ui(provider="cerebras", api_key=new_cerebras_key, model=new_cerebras_model)
-                st.success("✅ Einstellungen für Cerebras gespeichert!")
-                time.sleep(0.5)
-                st.rerun()
-                
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Cerebras Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_cerebras"):
+                    settings.update_from_ui(provider="cerebras", api_key=new_cerebras_key, model=new_cerebras_model)
+                    st.success("✅ Einstellungen für Cerebras gespeichert!")
+                    time.sleep(0.5)
+                    st.rerun()
+            with col2:
+                if st.button("Schließen", use_container_width=True, key="close_settings_cerebras"):
+                    st.session_state.show_settings = False
+                    st.rerun()
+                    
         else:
             st.markdown("### 🏠 Ollama Lokal Konfiguration")
             st.caption("Benötigt eine laufende Ollama-Instanz auf deinem PC.")
@@ -120,10 +132,10 @@ def render_settings_overlay(backend):
                 - Host: `http://localhost:11434`
                 """)
                 
-                if st.button("Standard-Werte setzen & Speichern", type="primary", use_container_width=True):
+                if st.button("Standard-Werte setzen & Speichern", type="primary", use_container_width=True, key="save_settings_ollama_std"):
                     settings.update_from_ui(provider="ollama", model="llama3:8b")
                     # Wir setzen hier direkt die config attribute für host da update_from_ui das (noch) nicht kann
-                    settings.ollama_host = "http://localhost:11434" 
+                    settings.ollama_host = "http://localhost:11434"
                     settings.emotion_analysis_model = "qwen2.5:1.5b"
                     st.success("✅ Standard-Werte gesetzt! Bitte stelle sicher, dass du `ollama run llama3:8b` im Terminal ausgeführt hast.")
                     time.sleep(1.5)
@@ -131,13 +143,19 @@ def render_settings_overlay(backend):
             else:
                 new_host = st.text_input("Ollama URL", value=settings.ollama_host)
                 new_ollama_model = st.text_input("Chat Modell", value=settings.ollama_model)
-                
-                if st.button("Ollama Einstellungen Speichern", type="primary", use_container_width=True):
-                    settings.update_from_ui(provider="ollama", model=new_ollama_model)
-                    settings.ollama_host = new_host
-                    st.success("✅ Einstellungen für Ollama gespeichert!")
-                    time.sleep(0.5)
-                    st.rerun()
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Ollama Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_ollama"):
+                        settings.update_from_ui(provider="ollama", model=new_ollama_model)
+                        settings.ollama_host = new_host
+                        st.success("✅ Einstellungen für Ollama gespeichert!")
+                        time.sleep(0.5)
+                        st.rerun()
+                with col2:
+                    if st.button("Schließen", use_container_width=True, key="close_settings_ollama"):
+                        st.session_state.show_settings = False
+                        st.rerun()
 
 
     with tab1:
@@ -155,16 +173,14 @@ def render_settings_overlay(backend):
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Speichern", use_container_width=True, type="primary"):
-                settings.temperature = new_temp
-                settings.max_tokens = new_tokens
-                settings.chain_of_thought = new_cot
-                settings.memory_top_k = new_k
+            if st.button("Speichern", use_container_width=True, type="primary", key="save_settings_gen"):
+                settings.update_from_ui(temperature=new_temp, max_tokens=new_tokens,
+                                       chain_of_thought=new_cot, memory_top_k=new_k)
                 st.success("Einstellungen gespeichert!")
                 time.sleep(0.5)
                 st.rerun()
         with col2:
-            if st.button("Schliessen", use_container_width=True):
+            if st.button("Schliessen", use_container_width=True, key="close_settings_gen"):
                 st.session_state.show_settings = False
                 st.rerun()
     
@@ -189,10 +205,10 @@ def render_settings_overlay(backend):
                                   help="Motivations-Level")
         new_frustration = st.slider("Frustration", 0, 100, int(emo.get("frustration", 0)),
                                    help="Frustrations-Level (niedrig ist besser)")
-        
-        col1, col2 = st.columns(2)
+
+        col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("Emotionen speichern", use_container_width=True, type="primary"):
+            if st.button("Emotionen speichern", use_container_width=True, type="primary", key="save_settings_emo"):
                 new_emotions = {
                     "joy": new_joy,
                     "trust": new_trust,
@@ -215,7 +231,7 @@ def render_settings_overlay(backend):
                 time.sleep(0.5)
                 st.rerun()
         with col2:
-            if st.button("Zuruecksetzen", use_container_width=True):
+            if st.button("Zuruecksetzen", use_container_width=True, key="reset_settings_emo"):
                 default_emotions = {
                     "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
                     "frustration": 0, "motivation": 80
@@ -225,6 +241,10 @@ def render_settings_overlay(backend):
                 backend.emotions.reset()
                 st.success("Emotionen zurueckgesetzt!")
                 time.sleep(0.5)
+                st.rerun()
+        with col3:
+            if st.button("Schließen", use_container_width=True, key="close_settings_emo"):
+                st.session_state.show_settings = False
                 st.rerun()
     
     with tab3:
@@ -237,14 +257,20 @@ def render_settings_overlay(backend):
         
         # Sicherheits-Checkbox
         confirm_delete = st.checkbox("Ich verstehe, dass alle Erinnerungen unwiderruflich geloescht werden")
-        
-        if st.button("ChromaDB loeschen", use_container_width=True, 
-                    type="primary" if confirm_delete else "secondary",
-                    disabled=not confirm_delete):
-            if confirm_delete:
-                deleted_count = backend.memory.clear_memory()
-                st.success(f"{deleted_count} Erinnerungen geloescht!")
-                time.sleep(1)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("ChromaDB loeschen", use_container_width=True,
+                        type="primary" if confirm_delete else "secondary",
+                        disabled=not confirm_delete, key="delete_chromadb"):
+                if confirm_delete:
+                    deleted_count = backend.memory.clear_memory()
+                    st.success(f"{deleted_count} Erinnerungen geloescht!")
+                    time.sleep(1)
+                    st.rerun()
+        with col2:
+            if st.button("Schließen", use_container_width=True, key="close_settings_db"):
+                st.session_state.show_settings = False
                 st.rerun()
     
     st.markdown("---")
