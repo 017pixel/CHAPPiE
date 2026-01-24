@@ -14,8 +14,16 @@ def render_emotion_metric(label, value, color="#2ea043"):
     """, unsafe_allow_html=True)
 
 
-def render_vital_signs(emotions_dict: Dict[str, int]):
+def render_vital_signs(backend):
     """Rendert den kompletten Block der Vitalzeichen."""
+    # Fallback für Emotions (falls nicht im Session State)
+    emotions_dict = st.session_state.get("current_emotions", {})
+    if not emotions_dict:
+        try:
+            emotions_dict = backend._get_emotions_snapshot()
+        except:
+            emotions_dict = {}
+
     render_emotion_metric("Freude", emotions_dict.get("joy", 50), "#FFD700")      # Gold
     render_emotion_metric("Vertrauen", emotions_dict.get("trust", 50), "#2196F3") # Blau
     render_emotion_metric("Energie", emotions_dict.get("energy", 80), "#4CAF50")  # Gruen
@@ -26,8 +34,13 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
     # Memory Status hinzufügen
     st.markdown("---")
     try:
-        live_memory = MemoryEngine()
+        # Optimierung: Nutze die existierende Memory-Instanz vom Backend
+        # statt eine neue zu erstellen (verhindert Reloads)
+        live_memory = backend.memory
+        
         memory_count = live_memory.get_memory_count()
+        
+        # Health Check ist nun sehr schnell, da Instanz existiert
         health = live_memory.health_check()
 
         if health["embedding_model_loaded"] and health["chromadb_connected"]:
@@ -40,11 +53,17 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
         # Zeige letzte Memory wenn verfügbar
         if memory_count > 0:
             try:
+                # Nutze cached memory engine
                 recent = live_memory.get_recent_memories(limit=1)
                 if recent:
                     last_memory = recent[0]
-                    timestamp_str = getattr(last_memory, 'timestamp', 'Unbekannt')
-                    if timestamp_str != 'Unbekannt':
+                    # Robust attribute access
+                    if isinstance(last_memory, dict):
+                        timestamp_str = last_memory.get('timestamp', 'Unbekannt')
+                    else:
+                        timestamp_str = getattr(last_memory, 'timestamp', 'Unbekannt')
+                        
+                    if timestamp_str and timestamp_str != 'Unbekannt':
                         try:
                             from datetime import datetime
                             dt = datetime.fromisoformat(timestamp_str)
@@ -54,7 +73,8 @@ def render_vital_signs(emotions_dict: Dict[str, int]):
                             st.caption("Letzte: Unbekannt")
                     else:
                         st.caption("Letzte: Unbekannt")
-            except:
+            except Exception as ex:
+                # Silent fail für UI cleaness
                 pass
 
     except Exception as e:

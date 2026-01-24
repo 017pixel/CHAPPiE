@@ -7,12 +7,17 @@ def render_memories_overlay(backend):
     """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
 
     # Live Memory Engine für aktuelle Daten (nicht gecacht!)
-    live_memory = MemoryEngine()
+    # OPTIMIERUNG: Nutze backend.memory statt new MemoryEngine()
+    # backend.memory hat eine persistente Verbindung, sieht aber Updates,
+    # da query/count calls immer gegen die DB laufen.
+    live_memory = backend.memory
 
     # Refresh Button
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("Refresh", key="refresh_memories"):
+            # Bei Refresh explizit DB-Verbindung prüfen/resetten falls nötig
+            # Meist reicht rerun, da count() live ist.
             st.rerun()
     with col2:
         # Health Status anzeigen

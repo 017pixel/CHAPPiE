@@ -29,7 +29,7 @@ def render_sidebar(backend):
         st.markdown("---")
         
         st.markdown("**VITALZEICHEN**")
-        render_vital_signs(st.session_state.current_emotions)
+        render_vital_signs(backend)
         
         st.markdown("---")
 
