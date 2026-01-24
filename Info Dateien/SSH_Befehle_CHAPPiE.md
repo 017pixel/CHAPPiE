@@ -148,6 +148,46 @@ scp bbecker@100.105.94.71:~/CHAPPiE/backup_chappie_*.tar.gz .
 
 ---
 
+## 🔄 Training Neustarten (Neue Anweisungen / Reset)
+
+Wenn du das Training komplett neu starten willst (z.B. neue Trainer-Persona, neuer Fokus), gehe so vor:
+
+### 1. Service Stoppen
+```bash
+sudo systemctl stop chappie-training.service
+```
+
+### 2. Neuen Fokus setzen (2 Methoden)
+
+**Methode A: Konfiguration per Befehl überschreiben (Schnell)**
+Dies löscht automatisch den alten Status und speichert die neue Config.
+```bash
+python3 Chappies_Trainingspartner/training_daemon.py --fokus "Menschlichkeit & Eigener Wille" --persona "Ein Mentor, der Chappie beibringt, Nein zu sagen und Gefühle zu zeigen" --start "Chappie, hör auf mich bedienen zu wollen. Wer bist du wirklich?"
+```
+
+**Methode B: Konfiguration via Git Update (Sauber)**
+Wenn du die `training_config.json` lokal am PC bearbeitet und gepusht hast:
+```bash
+# 1. Neueste Config laden
+git pull
+
+# 2. Alten Speicherstand löschen (WICHTIG für frischen Start!)
+rm training_state.json
+```
+
+### 3. Service wieder starten
+Damit läuft das Training mit den neuen Anweisungen weiter im Hintergrund.
+```bash
+sudo systemctl start chappie-training.service
+```
+
+### 4. Prüfen
+```bash
+./deploy_training.sh tail
+```
+
+---
+
 ## 📝 Service Template (`/etc/systemd/system/chappie-training.service`)
 Dies ist die Konfiguration, die von `./deploy_training.sh install-service` installiert wird.
 **WICHTIG:** `ExecStart` muss auf `training_daemon.py` zeigen!
