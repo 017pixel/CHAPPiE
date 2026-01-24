@@ -17,7 +17,7 @@ Environment="PYTHONUNBUFFERED=1"
 # Environment="CEREBRAS_API_KEY=dein-key"
 
 # Start-Befehl (Direkt den Loop starten, nutzt gespeicherte Config)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_loop
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
 
 # Restart bei Crash (Autonomie ist Key!)
 Restart=always

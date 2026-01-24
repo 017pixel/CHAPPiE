@@ -53,12 +53,41 @@ def render_settings_overlay(backend):
                 help="Der Key wird nur für die aktuelle Sitzung temporär gespeichert, wenn addSecrets.py leer ist."
             )
             
-            # Model Input
-            new_model = st.text_input(
-                "Modell Name",
-                value=settings.groq_model,
-                help="z.B. moonshotai/kimi-k2-instruct-0905 oder llama-3.1-70b-versatile"
+            # Model Selection
+            groq_models = {
+                "llama-3.3-70b-versatile": "Llama 3.3 70B (Versatile - Empfohlen)",
+                "llama-3.1-8b-instant": "Llama 3.1 8B (Instant - Schnell)",
+                "moonshotai/kimi-k2-instruct-0905": "Kimi k2 Instruct (0905)",
+                "moonshotai/kimi-k2-instruct": "Kimi k2 Instruct (Latest)",
+                "openai/gpt-oss-120b": "OpenAI GPT-OSS 120B",
+                "openai/gpt-oss-20b": "OpenAI GPT-OSS 20B",
+                "groq/compound": "Groq Compound (Agentic)",
+                "custom": "Eigenes Modell eingeben..."
+            }
+            
+            # Determine current selection (preserve custom values)
+            current_groq_val = settings.groq_model
+            start_index = 0
+            if current_groq_val in groq_models:
+                start_index = list(groq_models.keys()).index(current_groq_val)
+            else:
+                start_index = list(groq_models.keys()).index("custom")
+            
+            selected_groq_key = st.selectbox(
+                "Groq Modell",
+                list(groq_models.keys()),
+                index=start_index,
+                format_func=lambda x: str(groq_models.get(x, x))
             )
+            
+            if selected_groq_key == "custom":
+                new_model = st.text_input(
+                    "Manuelle Modell-ID",
+                    value=current_groq_val if current_groq_val not in groq_models else "",
+                    help="Gib hier die exakte Model-ID ein (z.B. gemma2-9b-it)"
+                )
+            else:
+                new_model = selected_groq_key
 
             col1, col2 = st.columns(2)
             with col1:
@@ -92,18 +121,43 @@ def render_settings_overlay(backend):
             
             # Model Auswahl
             cerebras_models = {
-                "llama-3.3-70b": "Llama 3.3 70B - Leistungsstark (Empfohlen)",
-                "llama-3.1-8b": "Llama 3.1 8B - Schnell & Kompakt",
-                "qwen-3-32b": "Qwen 3 32B - Alibaba"
+                # Production
+                "llama-3.3-70b": "Llama 3.3 70B (Standard - Empfohlen)",
+                "llama3.1-8b": "Llama 3.1 8B (Speed: ~2200 t/s)",
+                "qwen-3-32b": "Qwen 3 32B (Speed: ~2600 t/s)",
+                "gpt-oss-120b": "OpenAI GPT-OSS 120B (Speed: ~3000 t/s)",
+                
+                # Preview
+                "qwen-3-235b-a22b-instruct-2507": "Qwen 3 235B (Preview - Massive)",
+                "zai-glm-4.7": "Z.ai GLM 4.7 355B (Preview - Largest)",
+                
+                # Custom
+                "custom": "Eigenes Modell eingeben..."
             }
             
-            current_cerebras_model = settings.cerebras_model if hasattr(settings, 'cerebras_model') else "llama-3.3-70b"
-            new_cerebras_model = st.selectbox(
+            # Determine current selection
+            current_cer_val = settings.cerebras_model
+            cer_start_index = 0
+            if current_cer_val in cerebras_models:
+                cer_start_index = list(cerebras_models.keys()).index(current_cer_val)
+            else:
+                cer_start_index = list(cerebras_models.keys()).index("custom")
+            
+            selected_cerebras_key = st.selectbox(
                 "Cerebras Modell",
                 list(cerebras_models.keys()),
-                index=list(cerebras_models.keys()).index(current_cerebras_model) if current_cerebras_model in cerebras_models else 0,
-                format_func=lambda x: cerebras_models.get(x, x)
+                index=cer_start_index,
+                format_func=lambda x: str(cerebras_models.get(x, x))
             )
+            
+            if selected_cerebras_key == "custom":
+                new_cerebras_model = st.text_input(
+                    "Manuelle Modell-ID",
+                    value=current_cer_val if current_cer_val not in cerebras_models else "",
+                    help="Gib hier die exakte Model-ID ein"
+                )
+            else:
+                new_cerebras_model = selected_cerebras_key
 
             col1, col2 = st.columns(2)
             with col1:

@@ -17,14 +17,14 @@ colors
 
 case "$1" in
     start)
-        echo -e "${GREEN}Verbinde mit Server und starte Training-Daemon...${NC}"
+        echo -e "${GREEN}Verbinde mit Server und starte Training-Daemon (nohup)...${NC}"
         ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && source venv/bin/activate && nohup python Chappies_Trainingspartner/training_daemon.py > training_daemon.log 2>&1 &"
         echo -e "${GREEN}✅ Daemon gestartet auf dem Server${NC}"
         echo -e "${YELLOW}Logs ansehen: ./deploy_training.sh tail${NC}"
         ;;
 
     stop)
-        echo -e "${YELLOW}Stoppe Training-Daemon...${NC}"
+        echo -e "${YELLOW}Stoppe Training-Daemon (nohup)...${NC}"
         ssh "$SERVER_USER@$SERVER_HOST" "pkill -f training_daemon.py"
         echo -e "${GREEN}✅ Daemon gestoppt${NC}"
         ;;
@@ -41,8 +41,40 @@ case "$1" in
         ssh "$SERVER_USER@$SERVER_HOST" "tail -f $PROJECT_PATH/training_daemon.log"
         ;;
 
+    # === SYSTEMD SERVICE COMMANDS ===
+    install-service)
+        echo -e "${YELLOW}Installiere Systemd Service auf dem Server...${NC}"
+        # 1. Service Datei kopieren
+        echo "Kopiere Service-Datei..."
+        scp chappie-training.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
+        
+        # 2. Service installieren und aktivieren
+        echo "Richte Service ein (sudo wird benötigt)..."
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service"
+        
+        echo -e "${GREEN}✅ Service installiert und enabled.${NC}"
+        echo -e "${YELLOW}Starte mit: ./deploy_training.sh service-start${NC}"
+        ;;
+
+    service-start)
+        echo -e "${GREEN}Starte CHAPPiE via Systemd...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl start chappie-training.service"
+        echo -e "${GREEN}✅ Start-Befehl gesendet.${NC}"
+        ;;
+
+    service-stop)
+        echo -e "${YELLOW}Stoppe CHAPPiE Service...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl stop chappie-training.service"
+        echo -e "${GREEN}✅ Stop-Befehl gesendet.${NC}"
+        ;;
+
+    service-status)
+        echo -e "${YELLOW}Prüfe Systemd Service Status...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl status chappie-training.service"
+        ;;
+        
     *)
-        echo "Usage: $0 {start|stop|status|tail}"
+        echo "Usage: $0 {start|stop|status|tail|install-service|service-start|service-stop|service-status}"
         exit 1
         ;;
 esac
