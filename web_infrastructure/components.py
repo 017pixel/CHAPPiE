@@ -1,5 +1,7 @@
 import streamlit as st
 from typing import Dict, Any
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from memory.memory_engine import MemoryEngine
 
 def render_emotion_metric(label, value, color="#2ea043"):
@@ -65,9 +67,16 @@ def render_vital_signs(backend):
                         
                     if timestamp_str and timestamp_str != 'Unbekannt':
                         try:
-                            from datetime import datetime
+                            # Parse ISO timestamp
                             dt = datetime.fromisoformat(timestamp_str)
-                            formatted = dt.strftime("%d.%m.%Y %H:%M:%S")
+                            
+                            # Treat naive timestamps as UTC (as planned)
+                            if dt.tzinfo is None:
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            
+                            # Convert to German time
+                            german_tz = ZoneInfo("Europe/Berlin")
+                            formatted = dt.astimezone(german_tz).strftime("%d.%m.%Y %H:%M:%S")
                             st.caption(f"Letzte: {formatted}")
                         except ValueError:
                             st.caption("Letzte: Unbekannt")

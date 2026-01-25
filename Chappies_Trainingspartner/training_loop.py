@@ -10,7 +10,7 @@ import time
 import sys
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Callable
 import traceback
 
@@ -227,7 +227,11 @@ class TrainingLoop:
         self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
         
         # 2. Memory Search
-        memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
+        memories = self.memory.search_memory(
+            user_input, 
+            top_k=settings.memory_top_k, 
+            min_relevance=settings.memory_min_relevance
+        )
         memories_for_prompt = self.memory.format_memories_for_prompt(memories)
         
         # 3. Prompt Building
@@ -615,7 +619,7 @@ class TrainingLoop:
     def save_state(self):
         """Speichert den aktuellen Trainings-Status in eine JSON-Datei."""
         state = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "history": self.conversation_history,
             "messages_since_dream": self.messages_since_dream
         }

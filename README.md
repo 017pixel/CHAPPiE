@@ -56,8 +56,13 @@ CHAPiE/
 │   └── chroma_db/         # Vektordatenbank (automatisch erstellt)
 ├── app.py                 # GUI-Anwendung (Startpunkt)
 ├── main.py                # CLI Haupt-Loop
-├── requirements.txt       # Dependencies
-├── .gitignore             # Git-Ignore Regeln
+├── Chappies_Trainingspartner/ # 🆕 Autonomes Training
+│   ├── training_daemon.py # 24/7 Hintergrund-Dienst
+│   ├── training_loop.py   # Trainings-Logik
+│   └── ...
+├── deploy_training.sh     # Deployment-Script für Linux/Ubuntu
+├── chappie-training.service # Systemd-Service Template
+├── .gitignore             # Git-Ignore Regeln (Schützt Secrets!)
 └── README.md              # Diese Datei
 ```
 
@@ -81,16 +86,10 @@ pip install -r requirements.txt
 
 ### 3. Konfiguration
 
-Öffne `config/secrets.py` und trage deine Einstellungen ein:
+1. Kopiere `config/secrets_example.py` nach `config/secrets.py`.
+2. Öffne `config/secrets.py` und trage deine Einstellungen/Keys ein.
 
-```python
-# LLM Provider wählen: "ollama" (lokal) oder "groq" (cloud)
-LLM_PROVIDER = "ollama"
-
-# Modelle (Empfohlen für lokale Nutzung)
-OLLAMA_MODEL = "llama3:70b"           # Haupt-Chat
-EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b" # Hintergrund-Prozesse (Schnell!)
-```
+Die `secrets.py` ist automatisch im `.gitignore` und wird nicht auf GitHub geladen!
 
 ### 4. Ollama einrichten (für lokale Modelle)
 
@@ -164,23 +163,38 @@ http://localhost:8501
 
 #### Streamlit Vorteile
 
-- **Keine Frontend-Entwicklung nötig**: Python-Code reicht aus
 - **Automatische UI**: Streamlit erstellt die Benutzeroberfläche automatisch
 - **Hot Reload**: Änderungen im Code werden sofort im Browser aktualisiert
 - **Interaktive Widgets**: Buttons, Slider, Textfelder mit wenigen Zeilen Code
 
-### Verfügbare Commands
+### 🎮 Verfügbare Commands
 
 - `/help` - Zeigt alle verfügbaren Commands
 - `/sleep` - Startet Traum-Zusammenfassungs-Modus
-- /config und noch viele mehr
+- `/think` - Startet Deep Think Modus
+
+### 🛡️ Server Deployment (24/7 Training)
+
+Für den autonomen Betrieb auf Ubuntu-Servern:
+
+1. Nutze `deploy_training.sh` zur Steuerung:
+   ```bash
+   ./deploy_training.sh start    # Startet den Daemon via nohup
+   ./deploy_training.sh status   # Zeigt Logs und Status
+   ```
+
+2. **Systemd Integration** (Empfohlen):
+   ```bash
+   ./deploy_training.sh install-service  # Installiert CHAPiE als System-Dienst
+   ./deploy_training.sh service-start    # Startet den Dienst permanent
+   ```
 
 ## 🧠 Features
 
 ### Kernfunktionen
 - **Episodisches Gedächtnis**: Speichert alle Konversationen als Vektoren in ChromaDB
 - **RAG (Retrieval Augmented Generation)**: Findet relevante Erinnerungen basierend auf Kontext
-- **Modulares Backend**: Wechsel zwischen Ollama (lokal) und Groq (Cloud)
+- **Modulares Backend**: Wechsel zwischen Ollama (lokal), Groq (Cloud) und Cerebras (High-Speed)
 - **Token-Streaming**: Flüssige Textausgabe im Terminal
 - **Persistenz**: Erinnerungen bleiben nach Neustart erhalten
 
@@ -249,4 +263,4 @@ Bei Fragen oder Problemen öffne ein Issue auf GitHub.
 ---
 
 *Erstellt am 08. Januar 2026*  
-*Aktualisiert am 11. Januar 2026*
+*Aktualisiert am 25. Januar 2026*

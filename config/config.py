@@ -86,6 +86,7 @@ class Settings:
         # === Memory / Embedding ===
         self.embedding_model = self._get_val("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 5))
+        self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
 
         # === Query Extraction ===
@@ -105,7 +106,7 @@ class Settings:
         self.debug = bool(self._get_val("DEBUG", True))
 
     def update_from_ui(self, provider=None, api_key=None, model=None, cerebras_api_key=None,
-                      temperature=None, max_tokens=None, chain_of_thought=None, memory_top_k=None):
+                      temperature=None, max_tokens=None, chain_of_thought=None, memory_top_k=None, memory_min_relevance=None):
         """Erlaubt Updates zur Laufzeit durch die UI."""
         if provider:
             try:
@@ -140,6 +141,8 @@ class Settings:
             self.chain_of_thought = chain_of_thought
         if memory_top_k is not None:
             self.memory_top_k = memory_top_k
+        if memory_min_relevance is not None:
+            self.memory_min_relevance = memory_min_relevance
 
         # Persist to addSecrets.py
         self._persist_to_addsecrets()
@@ -171,6 +174,7 @@ class Settings:
 
                 # Memory
                 f.write(f"MEMORY_TOP_K = {self.memory_top_k}\n")
+                f.write(f"MEMORY_MIN_RELEVANCE = {self.memory_min_relevance}\n")
                 f.write(f"CHROMA_COLLECTION = '{self.chroma_collection_name}'\n")
 
                 # Query Extraction
@@ -218,6 +222,7 @@ def print_config():
     table.add_row("Aktives Modell", get_active_model())
     table.add_row("Embedding Modell", settings.embedding_model)
     table.add_row("Memory Top-K", str(settings.memory_top_k))
+    table.add_row("Min Relevanz", f"{settings.memory_min_relevance:.2f}")
     table.add_row("Temperature", str(settings.temperature))
     table.add_row("Streaming", "Ja" if settings.stream else "Nein")
     table.add_row("Chain of Thought", "Ja" if settings.chain_of_thought else "Nein")

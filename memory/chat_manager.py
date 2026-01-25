@@ -3,7 +3,7 @@ import json
 import uuid
 import glob
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 class ChatManager:
     """
@@ -39,7 +39,7 @@ class ChatManager:
         data = {
             "id": session_id,
             "title": title,
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "messages": messages
         }
 

@@ -111,8 +111,14 @@ Dein nächster Gedanke:"""
         Returns:
             Liste von Memory-Dicts mit ID, Content, Score
         """
-        # Nutze die neue spezialisierte Suche
-        memories = self.memory.search_self_reflections(query, top_k=top_k)
+        from config.config import settings
+        
+        # Nutze die neue spezialisierte Suche mit Min-Relevanz
+        memories = self.memory.search_self_reflections(
+            query, 
+            top_k=top_k, 
+            min_relevance=settings.memory_min_relevance
+        )
         
         # Formatiere für Output
         result = []

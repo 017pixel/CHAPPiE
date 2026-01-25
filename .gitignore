@@ -142,3 +142,10 @@ cython_debug/
 data/chroma_db/
 data/chat_sessions/
 data/status.json
+training_state.json
+training_config.json
+*.log
+
+# Secrets and User Overrides (CRITICAL)
+config/secrets.py
+config/addSecrets.py

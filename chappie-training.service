@@ -8,16 +8,16 @@ User=bbecker
 Group=bbecker
 
 # Pfad zum Projekt
-WorkingDirectory=/home/bbecker/CHAPPiE
+WorkingDirectory=/home/bbecker/CHAPiE
 
 # Environment Variablen laden
-Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/bbecker/CHAPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 # Falls du Cerebras Token direkt hier setzen willst:
 # Environment="CEREBRAS_API_KEY=dein-key"
 
 # Start-Befehl (Direkt den Loop starten, nutzt gespeicherte Config)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
+ExecStart=/home/bbecker/CHAPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
 
 # Restart bei Crash (Autonomie ist Key!)
 Restart=always

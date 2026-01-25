@@ -34,7 +34,8 @@ Statt einer Liste schreibst du: Der erste Schritt waere, deine aktuelle Situatio
 # =============================================================================
 # Wird verwendet, um Gespraeche zusammenzufassen und wichtige Infos zu extrahieren.
 
-DREAM_SUMMARY_PROMPT = """Analysiere das folgende Gespraech zwischen User und Assistent.
+DREAM_SUMMARY_PROMPT = """WICHTIG: Antworte AUSCHLIESSLICH auf DEUTSCH.
+Analysiere das folgende Gespraech zwischen User und Assistent.
 Extrahiere die WICHTIGSTEN Erkenntnisse und Fakten.
 
 FOKUS AUF:
@@ -61,7 +62,7 @@ BEISPIEL:
 GESPRAECH:
 {conversation}
 
-ZUSAMMENFASSUNG (Nur Bullet Points):"""
+ZUSAMMENFASSUNG (Nur Bullet Points auf Deutsch):"""
 
 
 # =============================================================================

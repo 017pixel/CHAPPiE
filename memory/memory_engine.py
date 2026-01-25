@@ -11,7 +11,7 @@ Funktionen:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import dataclass
 
@@ -107,7 +107,7 @@ class MemoryEngine:
             try:
                 # Generiere eindeutige ID
                 memory_id = str(uuid.uuid4())
-                timestamp = datetime.now().isoformat()
+                timestamp = datetime.now(timezone.utc).isoformat()
 
                 # Erstelle Embedding mit Fehlerbehandlung
                 try:
@@ -163,7 +163,7 @@ class MemoryEngine:
         return ""
     
     
-    def search_self_reflections(self, query: str, top_k: int = 5) -> list[Memory]:
+    def search_self_reflections(self, query: str, top_k: int = 5, min_relevance: float = 0.0) -> list[Memory]:
         """
         Sucht speziell nach Selbstreflexions-Erinnerungen.
         
@@ -172,12 +172,17 @@ class MemoryEngine:
         Args:
             query: Suchanfrage
             top_k: Anzahl Ergebnisse
+            min_relevance: Minimale Relevanz (0-1), Default 0.0 fuer Abwaertskompatibilitaet
             
         Returns:
             Liste von Memory-Objekten
         """
         if self.collection.count() == 0:
             return []
+        
+        # Nutze Global Setting falls nicht spezifiziert (aber erlaube Override)
+        if min_relevance == 0.0 and hasattr(settings, 'memory_min_relevance'):
+             min_relevance = settings.memory_min_relevance
         
         # Versuche zuerst mit Filter nach self_reflection
         try:
@@ -194,19 +199,24 @@ class MemoryEngine:
             # Suche mit Filter
             results = self.collection.query(
                 query_embeddings=[query_embedding],
-                n_results=min(top_k, self.collection.count()),
+                n_results=min(top_k * 2, self.collection.count()), # Hole mehr für Filterung
                 where={"source": "self_reflection"}
             )
             
             # Wenn keine Selbstreflexionen, normale Suche
             if not results["documents"] or not results["documents"][0]:
-                return self.search_memory(query, top_k=top_k)
+                return self.search_memory(query, top_k=top_k, min_relevance=min_relevance)
             
-            # Konvertiere zu Memory-Objekten
+            # Konvertiere zu Memory-Objekten und filtere
             memories = []
             for i, doc in enumerate(results["documents"][0]):
                 distance = results["distances"][0][i] if results["distances"] else 0
                 relevance = max(0, 1 - distance / 2)
+                
+                # Filterung nach Relevanz
+                if relevance < min_relevance:
+                    continue
+
                 metadata = results["metadatas"][0][i] if results["metadatas"] else {}
 
                 # Normalize metadata to a dict to avoid None attribute errors
@@ -224,13 +234,16 @@ class MemoryEngine:
                 )
                 memories.append(memory)
             
-            return memories
+            # Sortiere nach Relevanz absteigend
+            memories.sort(key=lambda x: x.relevance_score, reverse=True)
+            
+            return memories[:top_k]
             
         except Exception as e:
             # Fallback auf normale Suche
             if settings.debug:
                 print(f"   Self-Reflection Suche fehlgeschlagen: {e}")
-            return self.search_memory(query, top_k=top_k)
+            return self.search_memory(query, top_k=top_k, min_relevance=min_relevance)
 
     def extract_search_query(self, user_input: str) -> str:
         """
@@ -333,7 +346,7 @@ class MemoryEngine:
             print(f"   Query Extraction fehlgeschlagen - nutze Original-Input")
         return user_input
 
-    def search_memory(self, query: str, top_k: Optional[int] = None) -> list[Memory]:
+    def search_memory(self, query: str, top_k: Optional[int] = None, min_relevance: float = 0.0) -> list[Memory]:
         """
         Sucht nach relevanten Erinnerungen.
         
@@ -343,6 +356,7 @@ class MemoryEngine:
         Args:
             query: Suchanfrage
             top_k: Anzahl der Ergebnisse (default: aus settings)
+            min_relevance: Minimale Relevanz (0-1)
 
         Returns:
             Liste von Memory-Objekten, sortiert nach Relevanz
@@ -351,6 +365,10 @@ class MemoryEngine:
         
         if top_k is None:
             top_k = settings.memory_top_k
+            
+        # Nutze Global Setting falls nicht spezifiziert
+        if min_relevance == 0.0 and hasattr(settings, 'memory_min_relevance'):
+             min_relevance = settings.memory_min_relevance
 
         max_retries = 3
         retry_delay = 0.3
@@ -376,10 +394,10 @@ class MemoryEngine:
                     import logging
                     logging.warning(f"Memory search embedding failed, using dummy: {error_msg}")
 
-                # Suche in ChromaDB
+                # Suche in ChromaDB - Hole mehr Ergebnisse zum Filtern
                 results = self.collection.query(
                     query_embeddings=[query_embedding],
-                    n_results=min(top_k, self.collection.count())
+                    n_results=min(top_k * 2, self.collection.count()) 
                 )
 
                 # Konvertiere zu Memory-Objekten
@@ -390,6 +408,10 @@ class MemoryEngine:
                         # 0 = identisch, 1 = orthogonal, 2 = gegensaetzlich
                         distance = results["distances"][0][i] if results["distances"] else 0
                         relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
+                        
+                        # FILTERUNG NACH RELEVANZ
+                        if relevance < min_relevance:
+                            continue
 
                         metadata = results.get("metadatas") or []
                         metadata = metadata[0][i] if metadata and metadata[0] else {}
@@ -408,8 +430,11 @@ class MemoryEngine:
                             label=metadata.get("label", "original")
                         )
                         memories.append(memory)
+                
+                # Sortiere explizit nach Relevanz (Sicherheitshalber)
+                memories.sort(key=lambda m: m.relevance_score, reverse=True)
 
-                return memories
+                return memories[:top_k]
                 
             except Exception as e:
                 error_msg = str(e).lower()
@@ -833,7 +858,7 @@ Dein naechster Gedanke:"""
         for step in range(1, steps + 1):
             # Suche relevante Erinnerungen basierend auf Thema und vorherigem Gedanken
             search_query = f"{topic} {previous_thought}"
-            memories = self.search_memory(search_query, top_k=3)
+            memories = self.search_memory(search_query, top_k=3, min_relevance=settings.memory_min_relevance)
             memories_text = self.format_memories_for_prompt(memories)
             
             # Prompt erstellen

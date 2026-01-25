@@ -4,6 +4,7 @@
 # === LLM Backends ===
 ollama>=0.4.0                   # Ollama Python Client für lokale Modelle
 groq>=0.4.0                     # Groq Cloud API Client
+openai>=1.0.0                   # OpenAI kompatibler Client (für Cerebras)
 
 # === Vector Database & Embeddings ===
 chromadb>=0.4.22                # Lokale Vektor-Datenbank
