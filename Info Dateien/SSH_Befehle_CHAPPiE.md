@@ -12,6 +12,7 @@
 | [🛑 4. Training Stoppen](#-4-training-stoppen) | Das Training beenden |
 | [🏥 5. Server Health Check](#-5-server-health-check) | System-Überwachung und Diagnose |
 | [📂 6. Daten-Management](#-6-daten-management--backups) | Backups und Datenverwaltung |
+| [🆘 7. Troubleshooting](#-7-troubleshooting--common-issues) | Lösungen für häufige Probleme |
 | [📝 Service Template](#-service-template) | Systemd-Service Konfiguration |
 
 ## 🛠 0. Setup & Updates
@@ -184,6 +185,27 @@ sudo systemctl start chappie-training.service
 ### 4. Prüfen
 ```bash
 ./deploy_training.sh tail
+```
+
+---
+
+## 🆘 7. Troubleshooting (Common Issues)
+
+### 🚫 "Permission denied" beim Ausführen von .sh Skripten
+Falls du Fehlermeldungen beim Starten der Skripte bekommst:
+```bash
+# Skript ausführbar machen
+chmod +x deploy_training.sh
+```
+
+### 🔄 "error: Your local changes... would be overwritten by merge"
+Falls `git pull` fehlschlägt, weil Dateien auf dem Server verändert wurden:
+```bash
+# 1. Lokale Änderungen an der Datei verwerfen (Beispiel: deploy_training.sh)
+git checkout deploy_training.sh
+
+# 2. Erneut versuchen
+git pull
 ```
 
 ---
