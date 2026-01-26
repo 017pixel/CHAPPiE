@@ -4,7 +4,7 @@
 
 SERVER_USER="bbecker"
 SERVER_HOST="100.105.94.71"
-PROJECT_PATH="/home/bbecker/CHAPiE"
+PROJECT_PATH="/home/bbecker/CHAPPiE"
 
 function colors() {
     GREEN='\033[0;32m'
