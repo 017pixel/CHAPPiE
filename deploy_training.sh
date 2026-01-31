@@ -17,7 +17,16 @@ function colors() {
 
 colors
 
+# Prüfen ob wir lokal auf dem Server sind
+IS_LOCAL=false
+if [[ "$(hostname)" == "benjaminsserver2" ]] || [[ "$HOSTNAME" == "benjaminsserver2" ]]; then
+    IS_LOCAL=true
+fi
+
 check_connection() {
+    if [ "$IS_LOCAL" = true ]; then
+        return 0
+    fi
     echo -e "${CYAN}Prüfe Verbindung zu $SERVER_HOST...${NC}"
     if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 "$SERVER_USER@$SERVER_HOST" exit; then
         echo -e "${RED}❌ Keine Verbindung zum Server möglich!${NC}"
@@ -25,18 +34,30 @@ check_connection() {
     fi
 }
 
+# Helper für Befehlsausführung (Lokal vs. Remote)
+run_cmd() {
+    local cmd=$1
+    if [ "$IS_LOCAL" = true ]; then
+        bash -c "$cmd"
+    else
+        ssh -t "$SERVER_USER@$SERVER_HOST" "$cmd"
+    fi
+}
+
 case "$1" in
     # === SYSTEMD SERVICE COMMANDS (EMPFOHLEN) ===
     install-service)
         check_connection
-        echo -e "${YELLOW}Installiere Systemd Services auf dem Server...${NC}"
-        # 1. Service Dateien kopieren
-        echo "Kopiere Service-Dateien..."
-        scp chappie-training.service chappie-web.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
+        echo -e "${YELLOW}Installiere Systemd Services...${NC}"
         
-        # 2. Services installieren und aktivieren
-        echo "Richte Services ein (sudo Passwort wird benötigt)..."
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service $PROJECT_PATH/chappie-web.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service chappie-web.service"
+        if [ "$IS_LOCAL" = true ]; then
+            sudo cp chappie-training.service chappie-web.service /etc/systemd/system/
+        else
+            scp chappie-training.service chappie-web.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
+            ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service $PROJECT_PATH/chappie-web.service /etc/systemd/system/"
+        fi
+        
+        run_cmd "sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service chappie-web.service"
         
         echo -e "${GREEN}✅ Services installiert und enabled.${NC}"
         echo -e "${YELLOW}Starte mit: ./deploy_training.sh service-start${NC}"
@@ -45,41 +66,45 @@ case "$1" in
     service-start)
         check_connection
         echo -e "${GREEN}Starte CHAPPiE Services via Systemd...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl start chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl start chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Start-Befehl gesendet.${NC}"
         ;;
 
     service-stop)
         check_connection
         echo -e "${YELLOW}Stoppe CHAPPiE Services...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl stop chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl stop chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Stop-Befehl gesendet.${NC}"
         ;;
 
     service-restart)
         check_connection
         echo -e "${YELLOW}Starte CHAPPiE Services neu...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl restart chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl restart chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Restart-Befehl gesendet.${NC}"
         ;;
 
     service-status)
         check_connection
         echo -e "${YELLOW}Prüfe Systemd Service Status...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl status chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl status chappie-training.service chappie-web.service"
         ;;
         
     # === LOGGING ===
     tail)
         check_connection
         echo -e "${YELLOW}Live-Logs vom Training (Ctrl+C zum Beenden):${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "tail -f $PROJECT_PATH/training_daemon.log"
+        if [ "$IS_LOCAL" = true ]; then
+            tail -f "$PROJECT_PATH/training_daemon.log"
+        else
+            ssh "$SERVER_USER@$SERVER_HOST" "tail -f $PROJECT_PATH/training_daemon.log"
+        fi
         ;;
 
     tail-web)
         check_connection
         echo -e "${YELLOW}Live-Logs vom Web-UI (Ctrl+C zum Beenden):${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "sudo journalctl -u chappie-web.service -f"
+        run_cmd "sudo journalctl -u chappie-web.service -f"
         ;;
 
     # === MANUAL COMMANDS (LEGACY) ===
