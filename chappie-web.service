@@ -13,8 +13,8 @@ Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONIOENCODING=utf-8"
 Environment="CUDA_VISIBLE_DEVICES=-1"
 
-# Streamlit auf allen Interfaces starten
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+# Streamlit auf allen Interfaces starten (Headless Mode wichtig für Server!)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
 
 # Restart-Policy
 Restart=always
