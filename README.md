@@ -1,6 +1,6 @@
 # 🤖 CHAPiE - AI Chat Assistant
 
-> Ein KI-Agent mit episodischem Gedächtnis und Emotions-Engine - "Lernen wie ein Kind"
+> Ein KI-Agent mit episodischem Gedächtnis, Emotions-Engine und autonomem Trainingsmodus.
 
 ## 🔗 Repository
 
@@ -8,7 +8,7 @@
 
 ## 📋 Überblick
 
-CHAPiE ist ein experimenteller KI-Agent, der sich an vergangene Interaktionen erinnert, sein Verhalten basierend auf Feedback anpasst und über eine Emotions-Engine verfügt. Das Kernkonzept ist ein **episodisches Gedächtnis** mit ChromaDB als Vektordatenbank, kombiniert mit einem dynamischen Emotionssystem.
+CHAPiE ist ein fortgeschrittener KI-Agent, der entwickelt wurde, um natürliche, kontextbewusste Gespräche zu führen. Er nutzt ein **episodisches Gedächtnis** (ChromaDB), um sich an vergangene Interaktionen zu erinnern, und eine **Emotions-Engine**, die sein Verhalten dynamisch anpasst. Zusätzlich verfügt er über einen **autonomen Trainingsmodus**, mit dem er sich selbstständig verbessern kann.
 
 ## 🏗️ Architektur
 
@@ -24,243 +24,102 @@ CHAPiE ist ein experimenteller KI-Agent, der sich an vergangene Interaktionen er
 │       ▼              │                      ▼               │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                  MEMORY ENGINE                       │   │
-│  │                   (ChromaDB)                         │   │
+│  │             (ChromaDB + Short Term)                  │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## 🚀 Key Features (Update 2026)
+
+### 🧠 Intelligentes Gedächtnis
+- **Langzeitgedächtnis:** Speicherung in Vektor-Datenbank (ChromaDB) für semantische Suche.
+- **Kurzzeitgedächtnis:** Automatische Verwaltung aktueller Kontext-Infos mit Auto-Cleanup nach 24h.
+- **Traum-Modus:** Konsolidierung von Erinnerungen während "Schlafphasen" (`/sleep`).
+
+### 🎓 Autonomes Training
+- **Trainingspartner:** Ein KI-Trainer simuliert User-Interaktionen basierend auf Personas.
+- **Curriculum:** Definierbare Lernziele und Themenbereiche.
+- **24/7 Server Mode:** Robuster Daemon für dauerhaftes Training auf Linux-Servern.
+
+### ❤️ Emotions & Persönlichkeit
+- **6 Dimensionen:** Happiness, Trust, Energy, Curiosity, Frustration, Motivation.
+- **Dynamische Anpassung:** Emotionen beeinflussen den Antwortstil in Echtzeit.
+
+### 🛡️ Sicherheit & Zuverlässigkeit
+- **API Security:** Strikte Trennung von Code und Keys (werden nicht ins Backup kopiert).
+- **Backup System v2.0:** Sichere Backups inklusive Datenbank-Archivierung (ZIP).
+- **Service Deployment:** Ready-to-use Systemd Services für Web-UI und Training.
 
 ## 📁 Projektstruktur
 
 ```
 CHAPiE/
+├── app.py                 # Hauptanwendung (Web-UI)
+├── main.py                # CLI-Version
+├── backup_project.py      # Backup-Tool v2.0
+├── deploy_training.sh     # Deployment Manager Script
 ├── config/
-│   ├── config.py          # Zentrale Konfiguration
-│   ├── prompts.py         # System-Prompts & Templates
-│   └── secrets.py         # API-Keys & Modell-Einstellungen ⚠️
-├── web_infrastructure/    # 🆕 Modulare Web-UI
-│   ├── components.py      # Wiederverwendbare UI-Elemente
-│   ├── chat_ui.py         # Chat-Interface
-│   └── ...
+│   ├── secrets.py         # ⚠️ API-Keys (wird nicht committed)
+│   ├── prompts.py         # System Prompts
+│   └── APIs/              # API-Konfigurationen
 ├── memory/
-│   ├── memory_engine.py   # ChromaDB Wrapper (Vektordatenbank)
-│   ├── emotions_engine.py # Emotions-Engine (6 Emotionen)
-│   └── chat_manager.py    # Chat-Session Management
-├── brain/
-│   ├── base_brain.py      # Abstrakte LLM-Klasse
-│   ├── ollama_brain.py    # Ollama Implementation (lokal)
-│   ├── groq_brain.py      # Groq Cloud Implementation
-│   ├── deep_think.py      # Deep Think Engine
-│   └── response_parser.py # Antwort-Parsing & Markdown
-├── data/
-│   ├── chat_sessions/     # Persistierte Chat-Sessions
-│   └── chroma_db/         # Vektordatenbank (automatisch erstellt)
-├── app.py                 # GUI-Anwendung (Startpunkt)
-├── main.py                # CLI Haupt-Loop
-├── Chappies_Trainingspartner/ # 🆕 Autonomes Training
-│   ├── training_daemon.py # 24/7 Hintergrund-Dienst
-│   ├── training_loop.py   # Trainings-Logik
-│   └── ...
-├── deploy_training.sh     # Deployment-Script für Linux/Ubuntu
-├── chappie-training.service # Systemd-Service Template
-├── .gitignore             # Git-Ignore Regeln (Schützt Secrets!)
-└── README.md              # Diese Datei
+│   ├── memory_engine.py   # ChromaDB Core
+│   ├── short_term_memory.py # Kontext-Speicher
+│   └── emotions_engine.py # Emotions-Logik
+├── web_infrastructure/    # Streamlit UI Komponenten
+└── Chappies_Trainingspartner/ # Autonomes Training
 ```
 
-## 🚀 Installation
+## 🚀 Installation & Start
 
-### 1. Repository klonen & Virtual Environment
-
+### 1. Setup
 ```bash
 git clone https://github.com/017pixel/CHAPPiE.git
 cd CHAPPiE
 python -m venv venv
-.\venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-```
+# Windows:
+.\venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
 
-### 2. Dependencies installieren
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. Konfiguration
+### 2. Konfiguration
+Kopiere `config/secrets_example.py` nach `config/secrets.py` und trage deine API-Keys (Groq, Cerebras, Ollama) ein.
 
-1. Kopiere `config/secrets_example.py` nach `config/secrets.py`.
-2. Öffne `config/secrets.py` und trage deine Einstellungen/Keys ein.
-
-Die `secrets.py` ist automatisch im `.gitignore` und wird nicht auf GitHub geladen!
-
-### 4. Ollama einrichten (für lokale Modelle)
-
-```bash
-# Ollama installieren: https://ollama.ai
-# Modelle herunterladen:
-ollama pull llama3:70b
-ollama pull qwen2.5:1.5b
-```
-
-## 🆕 Performance Update (Januar 2026)
-
-Das System wurde massiv für lokale Nutzung optimiert:
-*   **Dual-Brain Architektur:** Nutzt das leistungsstarke `llama3:70b` für den Chat, aber das pfeilschnelle `qwen2.5:1.5b` für Hintergrundaufgaben (Träume, Analyse).
-*   **Smart Query Extraction:** Einfache Fragen ("Wie geht es dir?") umgehen das LLM komplett -> Sofortige Antwort ohne Wartezeit.
-*   **Modulare Web-UI:** Die Benutzeroberfläche wurde komplett refactored und ist nun extrem reaktionsschnell dank asynchronem Speichern.
-
-## ⚙️ Konfiguration
-
-Alle Einstellungen befinden sich in `config/secrets.py`:
-
-| Variable | Beschreibung | Standard |
-|----------|-------------|----------|
-| `LLM_PROVIDER` | Backend: `ollama` oder `groq` | `ollama` |
-| `OLLAMA_MODEL` | Lokales Modell | `llama3:8b` |
-| `GROQ_API_KEY` | Groq Cloud API Key | (leer) |
-| `GROQ_MODEL` | Groq Modell | `kimi k2` |
-| `MEMORY_TOP_K` | Anzahl Erinnerungen | `5` |
-| `TEMPERATURE` | Kreativität (0.0-1.0) | `0.7` |
-| `USE_CHAIN_OF_THOUGHT` | Chain-of-Thought aktivieren | `True` |
-
-**⚠️ Wichtig:** `config/secrets.py` muss mit einem Groq gefüllt werden!
-
-## 🎮 Verwendung
-
-### CLI Modus (Terminal)
-
-```bash
-python main.py
-```
-
-### GUI Modus (Streamlit Web-App)
-
-CHAPiE verfügt über eine moderne Web-GUI basierend auf **Streamlit**, die im Browser läuft.
-
-#### Installation der GUI-Abhängigkeit
-
-```bash
-pip install streamlit
-```
-
-#### Starten der GUI
-
+### 3. Starten (Web-UI)
 ```bash
 streamlit run app.py
 ```
+Öffne http://localhost:8501 im Browser.
 
-Die App öffnet sich automatisch in deinem Standard-Browser unter:
+## 🛠️ Server Deployment (Ubuntu)
+
+CHAPiE ist "Server-Ready". Nutze den Deployment Manager:
+
+```bash
+chmod +x deploy_training.sh
+
+# Services installieren (Web + Training)
+./deploy_training.sh install-service
+
+# Starten
+./deploy_training.sh service-start
+
+# Status prüfen
+./deploy_training.sh service-status
 ```
-http://localhost:8501
-```
 
-#### GUI Features
-
-- **Chat-Interface**: Modernes Messaging-Interface mit Chat-Verlauf
-- **Emotions-Dashboard**: Echtzeit-Anzeige der 6 Emotionen (Happiness, Trust, Energy, Curiosity, Frustration, Motivation)
-- **Settings Panel**: Konfiguration von LLM-Provider, Temperatur, Memory-Top-K
-- **Session Management**: Mehrere Chat-Sessions speichern und laden
-- **Markdown-Support**: Formatierung für Code, Listen und Text
-- **Responsive Design**: Funktioniert auf Desktop und Tablet
-
-#### Streamlit Vorteile
-
-- **Automatische UI**: Streamlit erstellt die Benutzeroberfläche automatisch
-- **Hot Reload**: Änderungen im Code werden sofort im Browser aktualisiert
-- **Interaktive Widgets**: Buttons, Slider, Textfelder mit wenigen Zeilen Code
-
-### 🎮 Verfügbare Commands
-
-- `/help` - Zeigt alle verfügbaren Commands
-- `/sleep` - Startet Traum-Zusammenfassungs-Modus
-- `/think` - Startet Deep Think Modus
-
-### 🛡️ Server Deployment (24/7 Training)
-
-Für den autonomen Betrieb auf Ubuntu-Servern:
-
-1. Nutze `deploy_training.sh` zur Steuerung:
-   ```bash
-   ./deploy_training.sh start    # Startet den Daemon via nohup
-   ./deploy_training.sh status   # Zeigt Logs und Status
-   ```
-
-2. **Systemd Integration** (Empfohlen):
-   ```bash
-   ./deploy_training.sh install-service  # Installiert CHAPiE als System-Dienst
-   ./deploy_training.sh service-start    # Startet den Dienst permanent
-   ```
-
-## 🧠 Features
-
-### Kernfunktionen
-- **Episodisches Gedächtnis**: Speichert alle Konversationen als Vektoren in ChromaDB
-- **RAG (Retrieval Augmented Generation)**: Findet relevante Erinnerungen basierend auf Kontext
-- **Modulares Backend**: Wechsel zwischen Ollama (lokal), Groq (Cloud) und Cerebras (High-Speed)
-- **Token-Streaming**: Flüssige Textausgabe im Terminal
-- **Persistenz**: Erinnerungen bleiben nach Neustart erhalten
-
-### Emotions-Engine
-- **6 Emotionen**: Happiness, Trust, Energy, Curiosity, Frustration, Motivation
-- **Dynamisches System**: Emotionen ändern sich basierend auf Konversationen
-- **Kontext-Integration**: Emotions-Status wird in jeden Prompt eingebunden
-
-### Advanced Features
-- **Chain-of-Thought (CoT)**: Strukturiertes Denken für komplexere Antworten
-- **Sentiment-Analyse**: Analysiert Stimmung der Eingaben
-- **Query-Extraction**: Extrahiert Kerninformationen aus Nachrichten
-- **Traum-Zusammenfassung**: Konsolidiert Erinnerungen im Schlafmodus
-- **Markdown-Formatierung**: Saubere Darstellung von Code, Listen und Text
-
-
-## 📊 Hardware-Anforderungen
-
-| Umgebung | GPU | RAM | Modelle |
-|----------|-----|-----|---------|
-| Entwicklung | RTX 3060 (12GB) | 16GB | Llama-3-8b, Embeddings |
-| Produktion | Server-GPU | 32GB+ | GPT-OSS-20b/120b |
-
-## 🔧 Development Roadmap
-
-- [x] Phase 1: Setup & Konfiguration ✅
-- [x] Phase 2: Memory Engine (ChromaDB) ✅
-- [x] Phase 3: Brain Engine (Ollama/Groq) ✅
-- [x] Phase 4: Main Loop & Integration ✅
-- [x] Phase 5: Bug Fixes & Voice Engine V2 ✅
-
-## 🆕 Letzte Updates (11. Januar 2026)
-
-### GitHub Integration
-- ✅ Projekt auf GitHub veröffentlicht: https://github.com/017pixel/CHAPPiE
-- ✅ Git-Repository initialisiert und konfiguriert
-- ✅ `.gitignore` optimiert (schützt sensible Daten und Build-Artefakte)
-
-### Dokumentation
-- ✅ README aktualisiert mit neuen Informationen
-- ✅ Projektstruktur dokumentiert
-- ✅ Installationsanleitung vervollständigt
-
-### Vorherige Updates (10. Januar 2026)
-
-#### Bug Fixes
-- ✅ Commands funktionieren jetzt im Schlafmodus
-- ✅ Sprachmodus kann mit `/text` oder `/stop` deaktiviert werden
-- ✅ Intelligente Leertasten-Erkennung (kein PTT-Trigger während Texteingabe)
-- ✅ Verbesserte Markdown-Formatierung (Apostrophe, Bindestriche, Quotes)
-
----
-
-## 📄 Lizenz
-
-Dies ist ein experimentelles Projekt. Verwendung auf eigene Gefahr.
+Detaillierte Anleitung: Siehe `Info Dateien/SSH_Befehle_CHAPPiE.md`.
 
 ## 🤝 Beitrag
 
-Fork das Repository und erstelle einen Pull Request für Verbesserungen!
+Pull Requests sind willkommen! Bitte beachte die `Verbesserungsplan.md` für offene Tasks.
 
-## 📞 Kontakt
+## 📄 Lizenz
 
-Bei Fragen oder Problemen öffne ein Issue auf GitHub.
+Experimentelles Projekt. Nutzung auf eigene Gefahr.
 
 ---
-
-*Erstellt am 08. Januar 2026*  
-*Aktualisiert am 25. Januar 2026*
+*Maintained by 017pixel & CodeX*

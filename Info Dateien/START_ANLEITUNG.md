@@ -1,48 +1,52 @@
-# 🚀 CHAPiE Start-Anleitung
+# 🚀 CHAPPiE Schnellstart-Anleitung
 
-Folge diesen Schritten, um CHAPiE über das Terminal (Windows PowerShell oder CMD) zu starten.
+## Voraussetzungen
+- Python 3.10 oder neuer
+- Git
 
-## 1. Terminal öffnen
-Drücke `Win + R`, gib `powershell` ein und drücke Enter. Oder suche "PowerShell" im Startmenü.
+## 1. Installation
 
-## 2. In den Projekt-Ordner wechseln
-Kopiere diesen Befehl und füge ihn ein:
-```powershell
-cd "c:\Users\Benja\OneDrive\Desktop\CHAPiE"
-```
+```bash
+# Repository klonen
+git clone https://github.com/017pixel/CHAPPiE.git
+cd CHAPPiE
 
-## 3. Virtual Environment aktivieren
-Damit die installierten Pakete genutzt werden können:
-```powershell
+# Environment erstellen
+python -m venv venv
+
+# Aktivieren
+# Windows:
 .\venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# Pakete installieren
+pip install -r requirements.txt
 ```
-*(Du erkennst, dass es geklappt hat, wenn vor deiner Zeile nun `(venv)` steht.)*
 
-## 4. CHAPiE starten
-```powershell
-python main.py
-```
+## 2. API Keys einrichten
+1. Kopiere `config/secrets_example.py` zu `config/secrets.py`
+2. Öffne die Datei und trage deine API-Keys ein (Groq, Cerebras).
+   - Alternativ: Du kannst Keys auch später in der Web-UI eingeben.
 
-.\venv\Scripts\activate
+## 3. Starten
 
----
-
+**Web-Interface (Empfohlen):**
+```bash
 streamlit run app.py
+```
+> Öffnet http://localhost:8501
 
-## 💡 Ein-Zeilen-Befehl (Schnellstart)
-Wenn du dich bereits im Ordner befindest, kannst du auch einfach das hier eingeben:
-```powershell
-.\venv\Scripts\activate; python main.py
+**Training starten (Optional):**
+```bash
+python Chappies_Trainingspartner/setup_training.py
 ```
 
-## ⚠️ Wichtige Voraussetzungen
-1. **Ollama:** Stelle sicher, dass die Ollama-App im Hintergrund läuft (unten rechts in der Taskleiste).
-2. **API-Key:** Falls du Groq nutzt, muss der Key in `config/secrets.py` eingetragen sein.
-3. **Modelle:** Für die lokale Nutzung muss das Modell geladen sein (`ollama pull llama3:8b`).
+## 4. Updates holen
+```bash
+git pull
+pip install -r requirements.txt
+```
 
 ---
-
-Viel Spaß beim Chatten! 🤖
-
-gedächtniss löschen:
-python -c "from memory.memory_engine import MemoryEngine; engine = MemoryEngine(); engine.reset_all_memories()"
+Viel Spaß mit CHAPPiE! 🤖
