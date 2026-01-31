@@ -10,10 +10,34 @@ Funktionen:
 - clear_memory(): Loescht alle Erinnerungen
 """
 
+import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import dataclass
+
+# ============================================
+# CRITICAL: SQLite Threading Fix for ChromaDB
+# ============================================
+# ChromaDB uses SQLite internally and can cause Segmentation Faults
+# on certain Linux systems due to SQLite threading issues.
+# This MUST be set BEFORE importing chromadb.
+# ============================================
+try:
+    import sqlite3
+    # Check if we're on a system that might have threading issues
+    if hasattr(sqlite3, 'threadsafety'):
+        # SQLite threadsafety levels:
+        # 0 = single-thread, 1 = multi-thread, 3 = serialized
+        if sqlite3.threadsafety < 3:
+            print(f"   WARNUNG: SQLite threadsafety={sqlite3.threadsafety} (empfohlen: 3)")
+except Exception as e:
+    print(f"   SQLite check failed: {e}")
+
+# Set environment variable to help with ChromaDB SQLite issues
+os.environ.setdefault("CHROMA_SQLITE_JOURNAL_MODE", "WAL")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # Avoid tokenizer warnings
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
@@ -48,9 +72,14 @@ class MemoryEngine:
         """Initialisiert die Memory Engine."""
         print("Initialisiere Memory Engine...")
         
+        # Flag für den Modus (persistent vs in-memory)
+        self._is_persistent = True
+        self._init_failed = False
+        
         # Embedding-Modell laden (laeuft lokal) mit Fehlerbehandlung
         print(f"   Lade Embedding-Modell: {settings.embedding_model}")
         try:
+            # Versuche zuerst ohne explizites Device (auto-detect)
             self.embedder = SentenceTransformer(settings.embedding_model)
             # Test-Embedding um sicherzustellen, dass es funktioniert
             test_embedding = self.embedder.encode("test")
@@ -60,30 +89,105 @@ class MemoryEngine:
         except Exception as e:
             print(f"   FEHLER beim Laden des Embedding-Modells: {e}")
             print("   Fallback: Verwende CPU-only Modus")
-            import torch
-            self.embedder = SentenceTransformer(
-                settings.embedding_model,
-                device='cpu'  # Erzwinge CPU-Modus bei GPU-Problemen
-            )
-            # Auch hier Dimension ermitteln
-            test_embedding = self.embedder.encode("test")
-            self.embedding_dim = len(test_embedding)
+            try:
+                self.embedder = SentenceTransformer(
+                    settings.embedding_model,
+                    device='cpu'  # Erzwinge CPU-Modus bei GPU-Problemen
+                )
+                # Auch hier Dimension ermitteln
+                test_embedding = self.embedder.encode("test")
+                self.embedding_dim = len(test_embedding)
+            except Exception as e2:
+                print(f"   KRITISCH: Embedding-Modell konnte nicht geladen werden: {e2}")
+                self.embedder = None
+                self.embedding_dim = 384  # Default für all-MiniLM-L6-v2
+                self._init_failed = True
         
-        # ChromaDB Client initialisieren (PERSISTENT für dauerhafte Speicherung)
+        # ChromaDB Client initialisieren mit robuster Fehlerbehandlung
+        self.client = None
+        self.collection = None
+        
+        # Versuche persistent Client
+        if not self._init_failed:
+            self._init_chromadb_persistent()
+        
+        # Fallback auf In-Memory wenn persistent fehlschlägt
+        if self.client is None:
+            self._init_chromadb_inmemory()
+        
+        # Finale Status-Meldung
+        if self.collection is not None:
+            try:
+                memory_count = self.collection.count()
+                mode = "persistent" if self._is_persistent else "in-memory"
+                print(f"   Memory Engine bereit! ({memory_count} Erinnerungen, Modus: {mode})")
+            except Exception as e:
+                print(f"   Memory Engine bereit! (Modus: {'persistent' if self._is_persistent else 'in-memory'})")
+        else:
+            print("   WARNUNG: Memory Engine im degradierten Modus (keine Speicherung)")
+            self._init_failed = True
+    
+    def _init_chromadb_persistent(self):
+        """Versucht ChromaDB im persistenten Modus zu initialisieren."""
         print(f"   Verbinde mit ChromaDB (persistent: {CHROMA_DB_DIR})")
-        self.client = chromadb.PersistentClient(
-            path=str(CHROMA_DB_DIR),
-            settings=ChromaSettings(anonymized_telemetry=False)
-        )
-        
-        # Collection erstellen oder laden
-        self.collection = self.client.get_or_create_collection(
-            name=settings.chroma_collection_name,
-            metadata={"description": "CHAPiE episodic memory"}
-        )
-        
-        memory_count = self.collection.count()
-        print(f"   Memory Engine bereit! ({memory_count} Erinnerungen geladen)")
+        try:
+            # Stelle sicher, dass das Verzeichnis existiert
+            os.makedirs(str(CHROMA_DB_DIR), exist_ok=True)
+            
+            # ChromaDB Settings für bessere Stabilität
+            chroma_settings = ChromaSettings(
+                anonymized_telemetry=False,
+                allow_reset=True,
+                is_persistent=True
+            )
+            
+            self.client = chromadb.PersistentClient(
+                path=str(CHROMA_DB_DIR),
+                settings=chroma_settings
+            )
+            
+            # Collection erstellen oder laden
+            self.collection = self.client.get_or_create_collection(
+                name=settings.chroma_collection_name,
+                metadata={"description": "CHAPiE episodic memory"}
+            )
+            
+            # Test-Zugriff um sicherzustellen, dass es funktioniert
+            _ = self.collection.count()
+            
+            self._is_persistent = True
+            print(f"   ChromaDB persistent verbunden!")
+            
+        except Exception as e:
+            print(f"   FEHLER bei ChromaDB persistent: {e}")
+            print(f"   Fehlertyp: {type(e).__name__}")
+            self.client = None
+            self.collection = None
+            self._is_persistent = False
+    
+    def _init_chromadb_inmemory(self):
+        """Fallback: ChromaDB im In-Memory Modus."""
+        print("   Fallback: Versuche ChromaDB In-Memory Modus...")
+        try:
+            self.client = chromadb.Client(
+                settings=ChromaSettings(
+                    anonymized_telemetry=False,
+                    is_persistent=False
+                )
+            )
+            
+            self.collection = self.client.get_or_create_collection(
+                name=settings.chroma_collection_name,
+                metadata={"description": "CHAPiE episodic memory (in-memory)"}
+            )
+            
+            self._is_persistent = False
+            print("   ChromaDB In-Memory Modus aktiv (Daten werden nicht dauerhaft gespeichert!)")
+            
+        except Exception as e:
+            print(f"   KRITISCH: Auch In-Memory Modus fehlgeschlagen: {e}")
+            self.client = None
+            self.collection = None
     
     def add_memory(self, content: str, role: str = "user", mem_type: str = "interaction", label: str = "original", source: str = "conversation") -> str:
         """
@@ -103,6 +207,12 @@ class MemoryEngine:
         Returns:
             Die ID der gespeicherten Erinnerung oder "" bei Fehler
         """
+        # Prüfe ob Collection verfügbar ist
+        if self.collection is None:
+            if settings.debug:
+                print("   WARNUNG: Memory-Speicherung übersprungen (keine Collection)")
+            return ""
+        
         import time
         
         max_retries = 5  # Erhöht von 3 auf 5 für bessere Robustheit
@@ -116,7 +226,11 @@ class MemoryEngine:
 
                 # Erstelle Embedding mit Fehlerbehandlung
                 try:
-                    embedding = self.embedder.encode(content).tolist()
+                    if self.embedder is not None:
+                        embedding = self.embedder.encode(content).tolist()
+                    else:
+                        # Kein Embedder verfügbar - verwende Dummy
+                        embedding = [0.0] * self.embedding_dim
                 except Exception as embed_err:
                     error_msg = f"Embedding-Fehler für '{content[:50]}...': {str(embed_err)}"
                     print(f"   WARNUNG: {error_msg}")
@@ -183,6 +297,10 @@ class MemoryEngine:
         Returns:
             Liste von Memory-Objekten
         """
+        # Prüfe ob Collection verfügbar ist
+        if self.collection is None:
+            return []
+        
         if self.collection.count() == 0:
             return []
         
@@ -193,7 +311,10 @@ class MemoryEngine:
         # Versuche zuerst mit Filter nach self_reflection
         try:
             try:
-                query_embedding = self.embedder.encode(query).tolist()
+                if self.embedder is not None:
+                    query_embedding = self.embedder.encode(query).tolist()
+                else:
+                    query_embedding = [0.0] * self.embedding_dim
             except Exception as embed_err:
                 error_msg = f"Filtered search embedding failed for '{query[:50]}...': {str(embed_err)}"
                 print(f"   WARNUNG: {error_msg}")
@@ -367,6 +488,10 @@ class MemoryEngine:
         Returns:
             Liste von Memory-Objekten, sortiert nach Relevanz
         """
+        # Prüfe ob Collection verfügbar ist
+        if self.collection is None:
+            return []
+        
         import time
         
         if top_k is None:
@@ -390,7 +515,10 @@ class MemoryEngine:
 
                 # Erstelle Query-Embedding mit Fehlerbehandlung
                 try:
-                    query_embedding = self.embedder.encode(optimized_query).tolist()
+                    if self.embedder is not None:
+                        query_embedding = self.embedder.encode(optimized_query).tolist()
+                    else:
+                        query_embedding = [0.0] * self.embedding_dim
                 except Exception as embed_err:
                     error_msg = f"Search embedding failed for '{query[:50]}...': {str(embed_err)}"
                     print(f"   WARNUNG: {error_msg}")
@@ -474,6 +602,10 @@ class MemoryEngine:
         Returns:
             Liste von Memory-Objekten
         """
+        # Prüfe ob Collection verfügbar ist
+        if self.collection is None:
+            return []
+        
         total_count = self.collection.count()
         if total_count == 0:
             return []
@@ -522,6 +654,10 @@ class MemoryEngine:
         """
         if not ids:
             return
+        
+        # Prüfe ob Collection verfügbar ist
+        if self.collection is None:
+            return
             
         self.collection.delete(ids=ids)
         if settings.debug:
@@ -534,6 +670,10 @@ class MemoryEngine:
         Returns:
             Anzahl der geloeschten Erinnerungen
         """
+        # Prüfe ob Collection und Client verfügbar sind
+        if self.collection is None or self.client is None:
+            return 0
+        
         count = self.collection.count()
         
         # Collection loeschen und neu erstellen
@@ -548,6 +688,8 @@ class MemoryEngine:
     
     def get_memory_count(self) -> int:
         """Gibt die Anzahl der gespeicherten Erinnerungen zurueck."""
+        if self.collection is None:
+            return 0
         try:
             return self.collection.count()
         except Exception as e:
@@ -560,21 +702,28 @@ class MemoryEngine:
             "memory_count": 0,
             "embedding_model_loaded": False,
             "chromadb_connected": False,
+            "is_persistent": getattr(self, '_is_persistent', False),
             "errors": []
         }
 
-        try:
-            status["memory_count"] = self.collection.count()
-            status["chromadb_connected"] = True
-        except Exception as e:
-            status["errors"].append(f"ChromaDB: {str(e)}")
+        if self.collection is None:
+            status["errors"].append("ChromaDB: Collection nicht verfügbar")
+        else:
+            try:
+                status["memory_count"] = self.collection.count()
+                status["chromadb_connected"] = True
+            except Exception as e:
+                status["errors"].append(f"ChromaDB: {str(e)}")
 
-        try:
-            # Test-Embedding
-            test_embed = self.embedder.encode("health check")
-            status["embedding_model_loaded"] = len(test_embed) > 0
-        except Exception as e:
-            status["errors"].append(f"Embedding: {str(e)}")
+        if self.embedder is None:
+            status["errors"].append("Embedding: Modell nicht geladen")
+        else:
+            try:
+                # Test-Embedding
+                test_embed = self.embedder.encode("health check")
+                status["embedding_model_loaded"] = len(test_embed) > 0
+            except Exception as e:
+                status["errors"].append(f"Embedding: {str(e)}")
 
         return status
 
@@ -589,6 +738,10 @@ class MemoryEngine:
         Returns:
             Bestätigungsnachricht
         """
+        # Prüfe ob Client und Collection verfügbar sind
+        if self.client is None or self.collection is None:
+            return "⚠️ Gedächtnis nicht verfügbar (ChromaDB nicht initialisiert)"
+        
         count = self.get_memory_count()
 
         if count == 0:

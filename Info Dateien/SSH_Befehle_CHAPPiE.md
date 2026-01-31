@@ -368,6 +368,37 @@ rm -f ~/CHAPPiE/data/chroma_db/*.lock
 ./deploy_training.sh service-start
 ```
 
+### 💥 Segmentation Fault bei ChromaDB
+Falls "Segmentation fault (core dumped)" beim Start auftritt:
+```bash
+# 1. Alle Prozesse stoppen
+sudo systemctl stop chappie-web.service
+sudo pkill -9 -f streamlit
+sudo pkill -9 -f python3
+
+# 2. ChromaDB-Datenbank zurücksetzen (ACHTUNG: Löscht alle Erinnerungen!)
+rm -rf ~/CHAPPiE/data/chroma_db/*
+
+# 3. Service-Datei aktualisieren (mit neuen Umgebungsvariablen)
+sudo cp ~/CHAPPiE/chappie-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# 4. Neu starten
+sudo systemctl start chappie-web.service
+sudo systemctl status chappie-web.service
+```
+
+**Alternative: Ohne Datenverlust**
+```bash
+# Umgebungsvariablen setzen und manuell testen
+export CHROMA_SQLITE_JOURNAL_MODE=WAL
+export TOKENIZERS_PARALLELISM=false
+export OMP_NUM_THREADS=1
+
+cd ~/CHAPPiE && source venv/bin/activate
+streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+```
+
 ### 📊 Training produziert keine Ausgabe
 ```bash
 # Prüfe ob Log-Datei wächst
