@@ -156,27 +156,44 @@ def render_memory_item(mem: Any, index: int = 1):
     """
     Rendert eine einzelne Erinnerung konsistent für alle Views.
     
+    ROBUST: Behandelt None-Werte und fehlende Felder graceful.
+    
     Args:
         mem: Memory-Objekt oder Dictionary
         index: Index der Erinnerung (für Anzeige #1, #2...)
     """
+    # Sicherheitscheck: Wenn mem None oder ungültig ist, überspringen
+    if mem is None:
+        st.caption("*Ungültige Erinnerung (None)*")
+        return
+    
     # Handle both Objects (fresh) and Dicts (loaded from JSON)
     if isinstance(mem, dict):
-        content = mem.get("content", "")
-        score = int(mem.get("relevance_score", 0.0) * 100)
-        mem_id = mem.get("id", "?")[:8]
-        label = mem.get("label", "original")
-        role = mem.get("role", "unknown")
-        mem_type = mem.get("type", "interaction")
-        timestamp = mem.get("timestamp", "")
+        # ROBUST: Alle Werte mit explizitem None-Check
+        content = mem.get("content") or ""
+        raw_score = mem.get("relevance_score") or 0.0
+        score = int(float(raw_score) * 100) if raw_score else 0
+        raw_id = mem.get("id") or "?"
+        mem_id = str(raw_id)[:8] if raw_id else "?"
+        label = mem.get("label") or "original"
+        role = mem.get("role") or "unknown"
+        mem_type = mem.get("type") or "interaction"
+        timestamp = mem.get("timestamp") or ""
     else:
-        content = mem.content
-        score = int(mem.relevance_score * 100) if hasattr(mem, 'relevance_score') else 0
-        mem_id = mem.id[:8] if hasattr(mem, 'id') else "?"
-        label = getattr(mem, 'label', 'original')
-        role = getattr(mem, 'role', 'unknown')
-        mem_type = getattr(mem, 'mem_type', 'interaction')
-        timestamp = getattr(mem, 'timestamp', "")
+        # Objekt-basierte Memory: Defensive Attribut-Zugriffe
+        content = getattr(mem, 'content', None) or ""
+        raw_score = getattr(mem, 'relevance_score', None)
+        score = int(float(raw_score) * 100) if raw_score else 0
+        raw_id = getattr(mem, 'id', None)
+        mem_id = str(raw_id)[:8] if raw_id else "?"
+        label = getattr(mem, 'label', None) or 'original'
+        role = getattr(mem, 'role', None) or 'unknown'
+        mem_type = getattr(mem, 'mem_type', None) or 'interaction'
+        timestamp = getattr(mem, 'timestamp', None) or ""
+    
+    # SICHERHEIT: Stelle sicher, dass content ein String ist
+    if not isinstance(content, str):
+        content = str(content) if content is not None else ""
 
     # Label-Formatierung
     if label == "zsm gefasst":

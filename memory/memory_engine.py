@@ -54,7 +54,9 @@ class MemoryEngine:
             self.embedder = SentenceTransformer(settings.embedding_model)
             # Test-Embedding um sicherzustellen, dass es funktioniert
             test_embedding = self.embedder.encode("test")
-            print(f"   Embedding-Modell bereit! (Dimension: {len(test_embedding)})")
+            # DYNAMISCHE DIMENSION: Speichere die tatsächliche Dimension des Modells
+            self.embedding_dim = len(test_embedding)
+            print(f"   Embedding-Modell bereit! (Dimension: {self.embedding_dim})")
         except Exception as e:
             print(f"   FEHLER beim Laden des Embedding-Modells: {e}")
             print("   Fallback: Verwende CPU-only Modus")
@@ -63,6 +65,9 @@ class MemoryEngine:
                 settings.embedding_model,
                 device='cpu'  # Erzwinge CPU-Modus bei GPU-Problemen
             )
+            # Auch hier Dimension ermitteln
+            test_embedding = self.embedder.encode("test")
+            self.embedding_dim = len(test_embedding)
         
         # ChromaDB Client initialisieren (PERSISTENT für dauerhafte Speicherung)
         print(f"   Verbinde mit ChromaDB (persistent: {CHROMA_DB_DIR})")
@@ -100,8 +105,8 @@ class MemoryEngine:
         """
         import time
         
-        max_retries = 3
-        retry_delay = 0.5  # Sekunden
+        max_retries = 5  # Erhöht von 3 auf 5 für bessere Robustheit
+        base_delay = 0.3  # Sekunden (Basis für exponential backoff)
         
         for attempt in range(max_retries):
             try:
@@ -115,13 +120,12 @@ class MemoryEngine:
                 except Exception as embed_err:
                     error_msg = f"Embedding-Fehler für '{content[:50]}...': {str(embed_err)}"
                     print(f"   WARNUNG: {error_msg}")
-                    # Fallback: Verwende einen Dummy-Embedding (alle Nullen)
-                    # Dies erlaubt das Training weiterzulaufen, auch wenn Embeddings fehlschlagen
-                    embedding_dim = 384  # Standard-Dimension für all-MiniLM-L6-v2
-                    embedding = [0.0] * embedding_dim
+                    # DYNAMIC: Verwende die tatsächliche Dimension des geladenen Modells
+                    # statt hardcodierter 384 (die nur für all-MiniLM-L6-v2 gilt)
+                    embedding = [0.0] * self.embedding_dim
                     # Logge den Fehler für spätere Analyse
                     import logging
-                    logging.warning(f"Memory embedding failed, using dummy: {error_msg}")
+                    logging.warning(f"Memory embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
 
                 # Speichere in ChromaDB mit erweitertem Metadata
                 self.collection.add(
@@ -145,12 +149,14 @@ class MemoryEngine:
             except Exception as e:
                 error_msg = str(e).lower()
                 
-                # Bei Locking/Busy-Fehlern: Retry
+                # Bei Locking/Busy-Fehlern: Retry mit Exponential Backoff
                 if any(kw in error_msg for kw in ["lock", "busy", "timeout", "database is locked"]):
                     if attempt < max_retries - 1:
+                        # Exponential Backoff: 0.3s, 0.6s, 1.2s, 2.4s...
+                        wait_time = base_delay * (2 ** attempt)
                         if settings.debug:
-                            print(f"   Memory-Speicherung blockiert (Versuch {attempt+1}/{max_retries}), warte...")
-                        time.sleep(retry_delay * (attempt + 1))  # Progressiv laengere Pause
+                            print(f"   Memory-Speicherung blockiert (Versuch {attempt+1}/{max_retries}), warte {wait_time:.1f}s...")
+                        time.sleep(wait_time)
                         continue
                 
                 # Bei anderen Fehlern oder nach allen Retries: Warnen aber weitermachen
@@ -191,10 +197,10 @@ class MemoryEngine:
             except Exception as embed_err:
                 error_msg = f"Filtered search embedding failed for '{query[:50]}...': {str(embed_err)}"
                 print(f"   WARNUNG: {error_msg}")
-                embedding_dim = 384
-                query_embedding = [0.0] * embedding_dim
+                # DYNAMIC: Nutze die beim Init ermittelte Dimension
+                query_embedding = [0.0] * self.embedding_dim
                 import logging
-                logging.warning(f"Memory filtered search embedding failed, using dummy: {error_msg}")
+                logging.warning(f"Memory filtered search embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
             
             # Suche mit Filter
             results = self.collection.query(
@@ -386,13 +392,12 @@ class MemoryEngine:
                 try:
                     query_embedding = self.embedder.encode(optimized_query).tolist()
                 except Exception as embed_err:
-                    error_msg = f"Query-Embedding-Fehler für '{optimized_query[:50]}...': {str(embed_err)}"
+                    error_msg = f"Search embedding failed for '{query[:50]}...': {str(embed_err)}"
                     print(f"   WARNUNG: {error_msg}")
-                    # Fallback: Verwende einen Dummy-Embedding für Suche
-                    embedding_dim = 384  # Standard-Dimension für all-MiniLM-L6-v2
-                    query_embedding = [0.0] * embedding_dim
+                    # DYNAMIC: Nutze die beim Init ermittelte Dimension statt hardcodiert 384
+                    query_embedding = [0.0] * self.embedding_dim
                     import logging
-                    logging.warning(f"Memory search embedding failed, using dummy: {error_msg}")
+                    logging.warning(f"Memory search embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
 
                 # Suche in ChromaDB - Hole mehr Ergebnisse zum Filtern
                 results = self.collection.query(
@@ -439,12 +444,14 @@ class MemoryEngine:
             except Exception as e:
                 error_msg = str(e).lower()
                 
-                # Bei Locking/Busy-Fehlern: Retry
+                # Bei Locking/Busy-Fehlern: Retry mit Exponential Backoff
                 if any(kw in error_msg for kw in ["lock", "busy", "timeout", "database is locked"]):
                     if attempt < max_retries - 1:
+                        # Exponential Backoff: 0.3s, 0.6s, 1.2s...
+                        wait_time = retry_delay * (2 ** attempt)
                         if settings.debug:
-                            print(f"   Memory-Suche blockiert (Versuch {attempt+1}/{max_retries}), warte...")
-                        time.sleep(retry_delay * (attempt + 1))
+                            print(f"   Memory-Suche blockiert (Versuch {attempt+1}/{max_retries}), warte {wait_time:.1f}s...")
+                        time.sleep(wait_time)
                         continue
                 
                 # Bei anderen Fehlern: Warnen und leere Liste zurueckgeben

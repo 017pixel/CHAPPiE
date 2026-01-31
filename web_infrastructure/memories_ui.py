@@ -5,19 +5,22 @@ from memory.memory_engine import MemoryEngine
 
 def render_memories_overlay(backend):
     """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
+    if not st.session_state.show_memories:
+        return
 
     # Live Memory Engine für aktuelle Daten (nicht gecacht!)
-    # OPTIMIERUNG: Nutze backend.memory statt new MemoryEngine()
-    # backend.memory hat eine persistente Verbindung, sieht aber Updates,
-    # da query/count calls immer gegen die DB laufen.
     live_memory = backend.memory
+
+    st.markdown("## Alle Erinnerungen")
+
+    if st.button("Schließen", key="close_memories_top", use_container_width=True):
+        st.session_state.show_memories = False
+        st.rerun()
 
     # Refresh Button
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("Refresh", key="refresh_memories"):
-            # Bei Refresh explizit DB-Verbindung prüfen/resetten falls nötig
-            # Meist reicht rerun, da count() live ist.
             st.rerun()
     with col2:
         # Health Status anzeigen
@@ -26,15 +29,6 @@ def render_memories_overlay(backend):
             st.success(f"Live-Daten ({health['memory_count']} Erinnerungen)")
         else:
             st.error("Memory-System hat Probleme")
-    """Rendert das Overlay für alle Erinnerungen mit Pagination für unbegrenzte Skalierung."""
-    if not st.session_state.show_memories:
-        return
-
-    st.markdown("## Alle Erinnerungen")
-
-    if st.button("Schließen", key="close_memories_top", use_container_width=True):
-        st.session_state.show_memories = False
-        st.rerun()
 
     with st.container(border=True):
         # Gesamtzahl der Erinnerungen (unbegrenzt)

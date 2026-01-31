@@ -26,6 +26,26 @@ def render_sidebar(backend):
             st.session_state.debug_mode = not st.session_state.debug_mode
             st.rerun()
 
+        # === MEMORY ENHANCEMENT COMMANDS ===
+        st.markdown("---")
+        st.markdown("**MEMORY FEATURES**")
+        
+        if st.button("Daily Info", use_container_width=True, key="sidebar_daily"):
+            st.session_state.messages.append({"role": "user", "content": "/daily"})
+            st.rerun()
+        
+        if st.button("Persoenlichkeit", use_container_width=True, key="sidebar_personality"):
+            st.session_state.messages.append({"role": "user", "content": "/personality"})
+            st.rerun()
+        
+        if st.button("Konsolidieren", use_container_width=True, key="sidebar_consolidate"):
+            st.session_state.messages.append({"role": "user", "content": "/consolidate"})
+            st.rerun()
+        
+        if st.button("Reflektieren", use_container_width=True, key="sidebar_reflect"):
+            st.session_state.messages.append({"role": "user", "content": "/reflect"})
+            st.rerun()
+
         st.markdown("---")
         
         st.markdown("**VITALZEICHEN**")

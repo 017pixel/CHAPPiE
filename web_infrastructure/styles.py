@@ -94,15 +94,29 @@ def inject_modern_css():
             background-color: var(--bg-color);
         }
 
-        /* Chat Input */
+        /* Chat Input - Proper positioning within Streamlit layout */
+        section[data-testid="stMain"] {
+            padding-bottom: 80px !important;
+        }
         .stChatInputContainer {
-            padding-bottom: 20px !important;
+            position: sticky !important;
+            bottom: 10px !important;
+            background-color: var(--bg-color) !important;
+            padding: 15px 20px !important;
+            margin-top: 20px !important;
+            border-top: 1px solid var(--border-color) !important;
+            z-index: 100 !important;
         }
         .stChatInputContainer textarea {
             background-color: var(--card-bg) !important;
             color: #fff !important;
             border: 1px solid var(--border-color) !important;
             border-radius: 12px !important;
+            min-height: 50px !important;
+        }
+        .stChatInputContainer textarea:focus {
+            border-color: var(--accent-green) !important;
+            box-shadow: 0 0 0 2px rgba(46, 160, 67, 0.3) !important;
         }
         
         /* Thoughts & Code Block Wrapping (Fix horizontal scroll) */
@@ -418,5 +432,49 @@ def inject_modern_css():
             border-radius: 4px !important;
             padding: 8px !important;
         }
+
+        /* ============================================ */
+        /* RESPONSIVE DESIGN & MOBILE OPTIMIZATION */
+        /* ============================================ */
+        
+        /* Standard: Show Desktop, Hide Mobile */
+        .desktop-only {
+            display: block !important;
+        }
+        .mobile-only {
+            display: none !important;
+        }
+
+        @media screen and (max-width: 768px) {
+            /* Toggle visibility */
+            .desktop-only {
+                display: none !important;
+            }
+            .mobile-only {
+                display: block !important;
+            }
+            
+            /* Better font scaling on mobile */
+            h2 {
+                font-size: 1.5rem !important;
+            }
+            
+            /* Status Cards auto-stacking adjustments */
+            .status-card-container {
+                margin-bottom: 10px !important;
+            }
+            
+            /* Ensure buttons in mobile menu take full width */
+            .mobile-only button {
+                width: 100% !important;
+                margin: 5px 0 !important;
+            }
+            
+            /* Adjust Top padding for mobile to save space */
+             [data-testid="stMain"] {
+                padding-top: 50px !important;
+             }
+        }
+
     </style>
     """, unsafe_allow_html=True)

@@ -1,6 +1,10 @@
 # 🚀 CHAPPiE Server Guide: Maximum Autonomy
 *"Set and Forget" - Anleitung für den 24/7 Betrieb auf Ubuntu*
 
+**Aktualisiert: 31.01.2026**
+
+---
+
 ## 📋 Inhaltsverzeichnis
 
 | Abschnitt | Beschreibung |
@@ -12,35 +16,54 @@
 | [🛑 4. Training Stoppen](#-4-training-stoppen) | Das Training beenden |
 | [🏥 5. Server Health Check](#-5-server-health-check) | System-Überwachung und Diagnose |
 | [📂 6. Daten-Management](#-6-daten-management--backups) | Backups und Datenverwaltung |
-| [🆘 7. Troubleshooting](#-7-troubleshooting--common-issues) | Lösungen für häufige Probleme |
-| [📝 Service Template](#-service-template) | Systemd-Service Konfiguration |
+| [🌐 7. Web-UI Starten](#-7-web-ui-starten) | Streamlit-App für Browser-Zugriff |
+| [🆘 8. Troubleshooting](#-8-troubleshooting--common-issues) | Lösungen für häufige Probleme |
+| [📝 Service Templates](#-service-templates) | Systemd-Service Konfigurationen |
+
+---
 
 ## 🛠 0. Setup & Updates
-Bevor du startest, sichere dir immer den neuesten Stand.
 
+### Erstmalige Einrichtung
 ```bash
 # 1. Verbinden
 ssh bbecker@100.105.94.71
 
-# 2. In Projektordner
-cd ~/CHAPPiE
+# 2. Projekt klonen (falls noch nicht vorhanden)
+cd ~
+git clone https://github.com/DEIN_USER/CHAPPiE.git
 
-# 3. Update & Environment
-git pull
+# 3. Virtual Environment erstellen
+cd ~/CHAPPiE
+python3 -m venv venv
+
+# 4. Aktivieren & Dependencies installieren
 source venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+### Updates holen
+```bash
+# In Projektordner wechseln & Environment aktivieren
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Updates ziehen
+git pull
+
+# Dependencies aktualisieren (falls requirements.txt geändert)
+pip install -r requirements.txt --upgrade
 ```
 
 ---
 
 ## 🚀 1. Training Starten (Service - Empfohlen)
-Die robusteste Methode für 24/7 Betrieb. Der Service startet automatisch neu, falls der Server rebootet oder der Prozess crasht.
 
-### Installation & Start
-Wir nutzen das `deploy_training.sh` Skript, um alles einzurichten:
+Die robusteste Methode für 24/7 Betrieb. Der Service startet automatisch neu bei Reboot oder Crash.
 
+### Schnellstart (Service)
 ```bash
-# 1. Service installieren (nur einmalig nötig oder nach Änderungen an der .service Datei)
+# 1. Service installieren (einmalig oder nach Änderungen)
 ./deploy_training.sh install-service
 
 # 2. Service starten
@@ -50,194 +73,399 @@ Wir nutzen das `deploy_training.sh` Skript, um alles einzurichten:
 ./deploy_training.sh service-status
 ```
 
-### Logs ansehen
+### Alternative: Direkte systemctl Befehle
 ```bash
-# Live Logs
-journalctl -u chappie-training.service -f
+# Service starten
+sudo systemctl start chappie-training.service
 
-# Oder über unser Skript (liest die Log-Datei)
-./deploy_training.sh tail
+# Service stoppen
+sudo systemctl stop chappie-training.service
+
+# Status prüfen
+sudo systemctl status chappie-training.service
+
+# Autostart aktivieren (startet nach Reboot automatisch)
+sudo systemctl enable chappie-training.service
 ```
 
 ---
 
 ## 🖥 2. Manuelles Starten (nohup)
-Falls du keinen Systemd-Service nutzen willst.
 
-**Wichtig:** Nutze `training_daemon.py` (NICHT `training_loop.py` - das hat keinen Einstiegspunkt!)
+Falls du keinen Systemd-Service nutzen willst oder schnell testen möchtest.
 
+### Standard-Start (Setzt vorheriges Training fort)
 ```bash
-# A: Standard-Start (Setzt vorheriges Training fort mit training_config.json)
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Mit nohup im Hintergrund starten
 nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
 
-# B: NEUES Training starten (interaktiv - fragt Konfiguration ab)
+# PID merken für später
+echo $! > training.pid
+echo "Training gestartet mit PID: $(cat training.pid)"
+```
+
+### NEUES Training starten (interaktiv)
+```bash
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Interaktiver Modus (fragt Konfiguration ab)
 python3 Chappies_Trainingspartner/training_daemon.py --neu
 ```
 
-**Erklärung:**
-- `nohup`: Verhindert Beenden beim Logout
-- `training_daemon.py`: Hat den eigentlichen main() Einstiegspunkt
-- `> training.log`: Speichert alle Ausgaben in diese Datei
-- `2>&1`: Leitet auch Fehler in die Datei um
-- `&`: Startet den Prozess im Hintergrund
+### NEUES Training mit direkten Parametern
+```bash
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Fokus, Persona und Start-Prompt direkt angeben
+nohup python3 Chappies_Trainingspartner/training_daemon.py \
+    --fokus "Philosophie & Ethik" \
+    --persona "Ein neugieriger Student" \
+    --start "Hallo Chappie, erkläre mir die Welt!" \
+    > training.log 2>&1 &
+```
+
+**Erklärung der Parameter:**
+| Parameter | Bedeutung |
+|-----------|-----------|
+| `nohup` | Verhindert Beenden beim Logout |
+| `> training.log` | Speichert Ausgaben in Logdatei |
+| `2>&1` | Leitet Fehler auch in die Datei |
+| `&` | Startet im Hintergrund |
 
 ---
 
 ## 📊 3. Monitoring & Logs
-Überwache den Prozess im Hintergrund und analysiere Logs.
 
-### 🔍 Prozess-Monitoring
+### Prozess-Status prüfen
 ```bash
-# Prüfen, ob das Training läuft (bei Service)
-systemctl status chappie-training.service
+# Bei Service-Betrieb
+sudo systemctl status chappie-training.service
 
-# Manuell prüfen
-ps aux | grep training_daemon
+# Bei nohup-Betrieb
+ps aux | grep training_daemon | grep -v grep
+
+# Alternativ: Prüfe ob PID noch läuft
+if [ -f training.pid ]; then 
+    ps -p $(cat training.pid) && echo "Training läuft" || echo "Training gestoppt"
+fi
 ```
 
-### 📝 Log-Analyse
+### Logs ansehen
 ```bash
-# Über das Helper-Script
-./deploy_training.sh tail
+# Service-Logs (Live-Modus mit -f)
+sudo journalctl -u chappie-training.service -f
 
-# Manuell
+# Nur letzte 100 Zeilen
+sudo journalctl -u chappie-training.service -n 100
+
+# Manuelle Log-Datei (bei nohup)
 tail -f training_daemon.log
+
+# Letzte 50 Zeilen ohne Follow
+tail -n 50 training_daemon.log
+```
+
+### Speicherverbrauch prüfen
+```bash
+# Interaktiv (Beenden mit 'q')
+htop
+
+# Einmaliger Snapshot
+free -h
+
+# Prozess-spezifisch
+ps aux | grep python3 | grep -v grep
 ```
 
 ---
 
 ## 🛑 4. Training Stoppen
-Um den Prozess zu beenden:
 
+### Service stoppen
 ```bash
-# A: Wenn als Service gestartet (Empfohlen)
+# Empfohlen: Über deploy-Script
 ./deploy_training.sh service-stop
 
-# B: Wenn manuell gestartet
-pkill -f training_daemon.py
+# Alternativ: Direkt
+sudo systemctl stop chappie-training.service
+```
+
+### Manuellen Prozess stoppen
+```bash
+# Sanftes Beenden (gibt dem Prozess Zeit um Daten zu speichern)
+pkill -SIGTERM -f training_daemon.py
+
+# Falls das nicht funktioniert: Force Kill
+pkill -9 -f training_daemon.py
+
+# Mit PID-Datei
+if [ -f training.pid ]; then kill $(cat training.pid); rm training.pid; fi
 ```
 
 ---
 
 ## 🏥 5. Server Health Check
-Allgemeine Server-Überwachung.
 
+### Schneller Gesundheitscheck
 ```bash
-# CPU & RAM Auslastung (Bunt & Interaktiv)
-htop
-
-# Speicherplatz prüfen
-df -h
-
-# Wie groß ist die ChromaDB Datenbank?
-du -sh data/*
+# Einzeiler: Zeigt CPU, RAM, Disk auf einmal
+echo "=== CPU & RAM ===" && free -h && echo "" && echo "=== DISK ===" && df -h / && echo "" && echo "=== CHAPPiE Prozesse ===" && ps aux | grep -E "(training|streamlit)" | grep -v grep
 ```
 
+### Detaillierte Checks
+```bash
+# CPU & RAM Auslastung (interaktiv)
+htop
+
+# Speicherplatz
+df -h
+
+# ChromaDB Größe
+du -sh ~/CHAPPiE/data/
+
+# Einzelne Ordnergrößen
+du -sh ~/CHAPPiE/data/*
+```
+
+### Netzwerk-Check
+```bash
+# Prüfe ob Streamlit-Port offen ist
+netstat -tlnp | grep 8501
+
+# Oder mit ss (moderner)
+ss -tlnp | grep 8501
+```
 
 ---
 
 ## 📂 6. Daten-Management & Backups
-Sichere das Gehirn deines KI-Partners.
 
+### Backup erstellen
 ```bash
-# Backup der Datenbank erstellen (Zeitstempel im Namen)
-tar -czf backup_chappie_$(date +%F).tar.gz data/
+cd ~/CHAPPiE
 
-# Backup auf deinen PC ziehen (Befehl auf WINDOWS ausführen!)
-scp bbecker@100.105.94.71:~/CHAPPiE/backup_chappie_*.tar.gz .
+# Komplettes Backup mit Datum
+tar -czf ~/backups/chappie_$(date +%Y%m%d_%H%M%S).tar.gz \
+    --exclude='venv' \
+    --exclude='__pycache__' \
+    --exclude='*.log' \
+    .
+
+# Nur Datenbank + Config
+tar -czf ~/backups/chappie_data_$(date +%Y%m%d).tar.gz \
+    data/ \
+    training_config.json \
+    training_state.json
+```
+
+### Backup auf lokalen PC ziehen
+Führe diese Befehle **auf deinem Windows-PC** aus (PowerShell):
+```powershell
+# Backup-Ordner anlegen
+mkdir C:\CHAPPiE_Backups -ErrorAction SilentlyContinue
+
+# Neuestes Backup holen
+scp bbecker@100.105.94.71:~/backups/chappie_*.tar.gz C:\CHAPPiE_Backups\
+```
+
+### ChromaDB defragmentieren (bei großen Datenbanken)
+```bash
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Python-Skript für Kompaktierung
+python3 -c "
+from memory.memory_engine import MemoryEngine
+engine = MemoryEngine()
+print(f'Memories: {engine.get_memory_count()}')
+print('Fertig!')
+"
 ```
 
 ---
 
-## 🔄 Training Neustarten (Neue Anweisungen / Reset)
+## 🌐 7. Web-UI Starten
 
-Wenn du das Training komplett neu starten willst (z.B. neue Trainer-Persona, neuer Fokus), gehe so vor:
-
-### 1. Service Stoppen
+### Als Service (Empfohlen für 24/7)
 ```bash
-sudo systemctl stop chappie-training.service
+# Service installieren
+sudo cp chappie-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable chappie-web.service
+sudo systemctl start chappie-web.service
 ```
 
-### 2. Neuen Fokus setzen (2 Methoden)
-
-**Methode A: Konfiguration per Befehl überschreiben (Schnell)**
-Dies löscht automatisch den alten Status und speichert die neue Config.
+### Manuell mit nohup
 ```bash
-python3 Chappies_Trainingspartner/training_daemon.py --fokus "Menschlichkeit & Eigener Wille" --persona "Ein Mentor, der Chappie beibringt, Nein zu sagen und Gefühle zu zeigen" --start "Chappie, hör auf mich bedienen zu wollen. Wer bist du wirklich?"
+cd ~/CHAPPiE && source venv/bin/activate
+
+# Auf allen Interfaces erreichbar (für Remote-Zugriff)
+nohup streamlit run app.py --server.address 0.0.0.0 --server.port 8501 > web.log 2>&1 &
+
+# Nur lokal
+nohup streamlit run app.py > web.log 2>&1 &
 ```
 
-**Methode B: Konfiguration via Git Update (Sauber)**
-Wenn du die `training_config.json` lokal am PC bearbeitet und gepusht hast:
-```bash
-# 1. Neueste Config laden
-git pull
-
-# 2. Alten Speicherstand löschen (WICHTIG für frischen Start!)
-rm training_state.json
+### Zugriff im Browser
 ```
-
-### 3. Service wieder starten
-Damit läuft das Training mit den neuen Anweisungen weiter im Hintergrund.
-```bash
-sudo systemctl start chappie-training.service
-```
-
-### 4. Prüfen
-```bash
-./deploy_training.sh tail
+http://100.105.94.71:8501
 ```
 
 ---
 
-## 🆘 7. Troubleshooting (Common Issues)
+## 🆘 8. Troubleshooting (Common Issues)
 
-### 🚫 "Permission denied" beim Ausführen von .sh Skripten
-Falls du Fehlermeldungen beim Starten der Skripte bekommst:
+### 🚫 "Permission denied" bei .sh Skripten
 ```bash
-# Skript ausführbar machen
 chmod +x deploy_training.sh
+chmod +x *.sh
 ```
 
-### 🔄 "error: Your local changes... would be overwritten by merge"
-Falls `git pull` fehlschlägt, weil Dateien auf dem Server verändert wurden:
+### 🔄 "git pull" schlägt fehl wegen lokaler Änderungen
 ```bash
-# 1. Lokale Änderungen an der Datei verwerfen (Beispiel: deploy_training.sh)
-git checkout deploy_training.sh
-
-# 2. Erneut versuchen
+# Option A: Lokale Änderungen verwerfen
+git checkout -- .
 git pull
+
+# Option B: Änderungen stashen (aufheben)
+git stash
+git pull
+git stash pop  # Änderungen wieder anwenden
+```
+
+### 🐍 "ModuleNotFoundError" 
+```bash
+# Sicherstellen dass venv aktiv ist
+source ~/CHAPPiE/venv/bin/activate
+
+# Dependencies neu installieren
+pip install -r requirements.txt --force-reinstall
+```
+
+### 💾 "No space left on device"
+```bash
+# Große Log-Dateien finden
+find ~ -name "*.log" -size +100M
+
+# Alte Logs löschen
+rm -f ~/CHAPPiE/*.log
+
+# __pycache__ aufräumen
+find ~/CHAPPiE -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+```
+
+### 🔒 ChromaDB Lock-Fehler
+Falls "database is locked" auftritt:
+```bash
+# Alle Python-Prozesse stoppen
+pkill -9 -f python3
+
+# Lock-Datei entfernen (falls vorhanden)
+rm -f ~/CHAPPiE/data/chroma_db/*.lock
+
+# Neu starten
+./deploy_training.sh service-start
+```
+
+### 📊 Training produziert keine Ausgabe
+```bash
+# Prüfe ob Log-Datei wächst
+ls -la ~/CHAPPiE/training_daemon.log
+
+# Letzte Zeilen prüfen
+tail -20 ~/CHAPPiE/training_daemon.log
+
+# Prüfe auf Fehler
+grep -i "error\|exception\|failed" ~/CHAPPiE/training_daemon.log | tail -20
 ```
 
 ---
 
-## 📝 Service Template (`/etc/systemd/system/chappie-training.service`)
-Dies ist die Konfiguration, die von `./deploy_training.sh install-service` installiert wird.
-**WICHTIG:** `ExecStart` muss auf `training_daemon.py` zeigen!
+## 📝 Service Templates
 
+### Training Service (`/etc/systemd/system/chappie-training.service`)
 ```ini
 [Unit]
 Description=CHAPPiE Autonomous Training Service
 After=network.target
 
 [Service]
-# User unter dem es laufen soll
 User=bbecker
 Group=bbecker
-
-# Pfad zum Projekt
 WorkingDirectory=/home/bbecker/CHAPPiE
 
-# Environment Variablen laden
+# Python-Umgebung
 Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONIOENCODING=utf-8"
 
-# Start-Befehl (Direkt den Daemon starten - NICHT training_loop!)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
+# Start-Befehl (WICHTIG: Pfad mit Slash, nicht mit Punkt!)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 Chappies_Trainingspartner/training_daemon.py
 
-# Restart bei Crash (Wichtig für Autonomie!)
+# Restart-Policy
 Restart=always
 RestartSec=10
+
+# Logging
+StandardOutput=append:/home/bbecker/CHAPPiE/training_daemon.log
+StandardError=append:/home/bbecker/CHAPPiE/training_daemon.log
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+### Web-UI Service (`/etc/systemd/system/chappie-web.service`)
+```ini
+[Unit]
+Description=CHAPPiE Web Interface (Streamlit)
+After=network.target
+
+[Service]
+User=bbecker
+Group=bbecker
+WorkingDirectory=/home/bbecker/CHAPPiE
+
+Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Service-Installation (Einmalig)
+```bash
+# Training-Service
+sudo cp chappie-training.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable chappie-training.service
+
+# Web-Service
+sudo cp chappie-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable chappie-web.service
+
+# Beide starten
+sudo systemctl start chappie-training.service
+sudo systemctl start chappie-web.service
+```
+
+---
+
+## 🎯 Quick Reference (Spickzettel)
+
+| Aktion | Befehl |
+|--------|--------|
+| **Training starten** | `./deploy_training.sh service-start` |
+| **Training stoppen** | `./deploy_training.sh service-stop` |
+| **Training Status** | `sudo systemctl status chappie-training` |
+| **Logs ansehen** | `sudo journalctl -u chappie-training -f` |
+| **Web-UI starten** | `sudo systemctl start chappie-web` |
+| **Backup erstellen** | `tar -czf backup_$(date +%F).tar.gz data/` |
+| **Health Check** | `htop` oder `free -h && df -h` |
+| **Updates holen** | `cd ~/CHAPPiE && git pull` |

@@ -21,15 +21,25 @@ import json
 # Force UTF-8 encoding
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-# Ensure project root is in path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Ensure project root is in path (WICHTIG: Muss VOR den Imports passieren)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-from Chappies_Trainingspartner.trainer_agent import TrainerAgent, TrainerConfig
-from Chappies_Trainingspartner.training_loop import TrainingLoop
+# Relative Imports sind robuster als absolute mit explizitem Ordnernamen
+try:
+    from Chappies_Trainingspartner.trainer_agent import TrainerAgent, TrainerConfig
+    from Chappies_Trainingspartner.training_loop import TrainingLoop
+except ImportError as e:
+    # Fallback: Versuche mit alternativer Schreibweise (Case-Sensitivity auf Linux)
+    print(f"Import-Fehler: {e}")
+    print("Versuche alternative Import-Methode...")
+    from trainer_agent import TrainerAgent, TrainerConfig
+    from training_loop import TrainingLoop
 
 def setup_logging():
     """Setup logging to file for headless operation."""
-    log_file = os.path.join(os.path.dirname(__file__), '..', 'training_daemon.log')
+    log_file = os.path.join(PROJECT_ROOT, 'training_daemon.log')
 
     # Remove default handlers
     for handler in logging.root.handlers[:]:
@@ -49,11 +59,14 @@ def setup_logging():
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
     
-    # Rich console output auch enable
-    from rich.logging import RichHandler
-    rich_handler = RichHandler(rich_tracebacks=True, show_time=False, show_path=False)
-    rich_handler.setLevel(logging.INFO)
-    logging.getLogger('').addHandler(rich_handler)
+    # Rich console output auch enable (falls verfügbar)
+    try:
+        from rich.logging import RichHandler
+        rich_handler = RichHandler(rich_tracebacks=True, show_time=False, show_path=False)
+        rich_handler.setLevel(logging.INFO)
+        logging.getLogger('').addHandler(rich_handler)
+    except ImportError:
+        logging.warning("Rich nicht installiert - verwende Standard-Console-Output")
 
 
 def get_interactive_config() -> dict:
@@ -118,7 +131,7 @@ def save_config(config_dict: dict, config_path: str):
 
 def clear_training_state():
     """Loescht den gespeicherten Training-State fuer frischen Start."""
-    state_path = os.path.join(os.path.dirname(__file__), '..', 'training_state.json')
+    state_path = os.path.join(PROJECT_ROOT, 'training_state.json')
     if os.path.exists(state_path):
         os.remove(state_path)
         logging.info("Alter Training-State geloescht - starte frisch")
@@ -154,7 +167,7 @@ Beispiele:
     logging.info("=" * 70)
     
     try:
-        config_path = os.path.join(os.path.dirname(__file__), '..', 'training_config.json')
+        config_path = os.path.join(PROJECT_ROOT, 'training_config.json')
         
         # === NEUES TRAINING ===
         if args.neu or args.fokus:

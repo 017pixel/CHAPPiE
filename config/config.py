@@ -89,6 +89,13 @@ class Settings:
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
 
+        # === Short-Term Memory / Daily Info ===
+        self.daily_info_path = self._get_val("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
+        self.personality_path = self._get_val("PERSONALITY_PATH", str(DATA_DIR / "personality.md"))
+        self.short_term_ttl_hours = int(self._get_val("SHORT_TERM_TTL_HOURS", 24))
+        self.enable_functions = self._get_val("ENABLE_FUNCTIONS", True)
+        self.auto_consolidate = self._get_val("AUTO_CONSOLIDATE", True)
+
         # === Query Extraction ===
         self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
         self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
@@ -146,6 +153,9 @@ class Settings:
 
         # Persist to addSecrets.py
         self._persist_to_addsecrets()
+        
+        # Signal that a reload is needed (for frontend to know)
+        self._needs_reload = True
 
     def _persist_to_addsecrets(self):
         """Schreibt die aktuellen Settings in addSecrets.py für Persistierung."""
@@ -189,6 +199,16 @@ class Settings:
 
                 # Chain of Thought
                 f.write(f"CHAIN_OF_THOUGHT = {self.chain_of_thought}\n")
+
+                # Short-Term Memory / Daily Info
+                # Use forward slashes for paths to avoid backslash escape issues
+                daily_path = self.daily_info_path.replace('\\', '/')
+                personality_path = self.personality_path.replace('\\', '/')
+                f.write(f"DAILY_INFO_PATH = '{daily_path}'\n")
+                f.write(f"PERSONALITY_PATH = '{personality_path}'\n")
+                f.write(f"SHORT_TERM_TTL_HOURS = {self.short_term_ttl_hours}\n")
+                f.write(f"ENABLE_FUNCTIONS = {self.enable_functions}\n")
+                f.write(f"AUTO_CONSOLIDATE = {self.auto_consolidate}\n")
 
         except Exception as e:
             print(f"Warnung: Konnte addSecrets.py nicht schreiben: {e}")

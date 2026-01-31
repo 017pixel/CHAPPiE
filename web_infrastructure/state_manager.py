@@ -28,6 +28,10 @@ def init_session_state():
         st.session_state.deep_think_total_done = 0
     if "deep_think_pending_batches" not in st.session_state:
         st.session_state.deep_think_pending_batches = 0
+    
+    # Memory Enhancement State
+    if "pending_cmd" not in st.session_state:
+        st.session_state.pending_cmd = None
 
     # API Check State (einmalig)
     if "api_check_done" not in st.session_state:

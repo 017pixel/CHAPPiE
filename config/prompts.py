@@ -249,3 +249,60 @@ def format_sentiment_prompt(message: str) -> str:
 def format_query_extraction_prompt(user_input: str) -> str:
     """Formatiert den Query-Extraction-Prompt."""
     return QUERY_EXTRACTION_PROMPT.format(user_input=user_input)
+
+
+# =============================================================================
+# FUNCTION-CALLING INSTRUCTIONS
+# =============================================================================
+# Anweisungen für das Custom Functions System
+
+FUNCTION_CALLING_INSTRUCTION = """
+DU KANNST FUNKTIONEN AUFRUFEN!
+Wenn du Informationen speichern oder deine Persönlichkeit anpassen möchtest,
+kannst du die folgenden Funktionen aufrufen:
+
+VERFÜGBARE FUNKTIONEN:
+- add_daily_info: Speichert eine wichtige Information im Kurzzeitgedächtnis
+- update_personality: Dokumentiert eine Änderung an deiner Persönlichkeit
+- add_self_reflection: Dokumentiert einen tiefen Gedanken oder Erkenntnis
+- get_personality_summary: Gibt deine Persönlichkeits-Zusammenfassung zurück
+- get_daily_info: Gibt die aktuellen Kurzzeitgedächtnis-Einträge zurück
+- cleanup_daily_info: Bereinigt abgelaufene Einträge
+
+VERWENDE FUNKTIONEN WENN:
+- Du wichtige User-Informationen für später speichern willst -> add_daily_info
+- Du deine Persönlichkeit weiterentwickeln willst -> update_personality
+- Du eine wichtige Erkenntnis hast -> add_self_reflection
+- Du dich an deine Werte erinnern willst -> get_personality_summary
+
+Um eine Funktion aufzurufen, antworte im folgenden Format:
+
+<function_call>
+{"name": "funktions_name", "arguments": {"arg1": "wert1", "arg2": "wert2"}}
+</function_call>
+
+Nach dem Funktionsaufruf erhältst du das Ergebnis und kannst dann normal antworten.
+"""
+
+
+PERSONALITY_CONTEXT_TEMPLATE = """
+DEINE PERSÖNLICHKEIT (Selbstdokumentation):
+{personality_summary}
+
+Dies hast du selbst über dich dokumentiert. Halte dich an diese selbstgewählten Werte,
+es sei denn du findest gute Gründe sie zu ändern.
+Wenn du deine Persönlichkeit bewusst ändern möchtest, dokumentiere es mit update_personality.
+"""
+
+
+def get_function_calling_instruction() -> str:
+    """Gibt die Function-Calling Instruktion zurück."""
+    return FUNCTION_CALLING_INSTRUCTION
+
+
+def get_personality_context() -> str:
+    """Gibt den aktuellen Persönlichkeits-Kontext zurück."""
+    from memory.personality_manager import get_personality_manager
+    pm = get_personality_manager()
+    summary = pm.get_for_prompt()
+    return PERSONALITY_CONTEXT_TEMPLATE.format(personality_summary=summary)

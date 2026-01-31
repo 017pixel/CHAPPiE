@@ -54,6 +54,10 @@ class CHAPPiE:
         "/config": "Zeigt die aktuelle Konfiguration",
         "/sleep": "CHAPiE geht schlafen (konsolidiert Erinnerungen)",
         "/think": "Startet tiefen Reflektionsmodus (10 Schritte)",
+        "/daily": "Zeigt Kurzzeitgedächtnis (Daily Info)",
+        "/personality": "Zeigt aktuelle Persönlichkeit",
+        "/consolidate": "Bereinigt abgelaufene Daily Infos",
+        "/functions": "Listet verfügbare Funktionen auf",
         "/help": "Zeigt alle verfuegbaren Befehle",
         "/exit": "Beendet CHAPPiE",
         "/quit": "Alias fuer /exit",
@@ -155,6 +159,41 @@ class CHAPPiE:
                     break
             return True
         
+        # === NEU: Memory Enhancement Commands ===
+        if cmd == "/daily":
+            from memory.short_term_memory import get_short_term_memory
+            stm = get_short_term_memory()
+            infos = stm.get_relevant_infos()
+            print_section("KURZZEITGEDÄCHTNIS", Colors.MEMORY)
+            print(f"Einträge: {len(infos)}")
+            for timestamp, importance, category, content in infos:
+                print(f"  [{importance}] [{category}] {content[:60]}...")
+            return True
+        
+        if cmd == "/personality":
+            from memory.personality_manager import get_personality_manager
+            pm = get_personality_manager()
+            print_section("PERSÖNLICHKEIT", Colors.MEMORY)
+            print(pm.get_for_prompt())
+            return True
+        
+        if cmd == "/consolidate":
+            from memory.short_term_memory import get_short_term_memory
+            stm = get_short_term_memory()
+            count = stm.cleanup_expired()
+            print_section("KONSOLIDIERUNG", Colors.MEMORY)
+            print(f"Bereinigt: {count} abgelaufene Einträge")
+            return True
+        
+        if cmd == "/functions":
+            from memory.function_registry import get_function_registry
+            func_registry = get_function_registry()
+            funcs = func_registry.get_function_names()
+            print_section("VERFÜGBARE FUNKTIONEN", Colors.MEMORY)
+            for f in funcs:
+                print(f"  🔧 {f}")
+            return True
+        
         # Help
         if cmd == "/help":
             print_section("COMMANDS", Colors.DEBUG)
@@ -207,6 +246,13 @@ class CHAPPiE:
             **state.__dict__, 
             use_chain_of_thought=settings.chain_of_thought
         )
+        
+        # NEU: Persönlichkeits-Kontext hinzufügen
+        from config.prompts import get_personality_context, get_function_calling_instruction
+        if settings.enable_functions:
+            system_prompt += f"\n\n{get_personality_context()}"
+            system_prompt += f"\n\n{get_function_calling_instruction()}"
+        
         messages = self.brain.build_prompt(system_prompt, memories_text, user_text)
  
        # 5. Generation
@@ -237,9 +283,39 @@ class CHAPPiE:
         
         print("\n") # Newline after generation
 
-        # 6. Post-Processing (Speichern)
-        # Parse final result to separate thought/answer for storage
+        # 6. Post-Processing (Speichern & Function-Calling)
+        import re
         from brain.response_parser import parse_chain_of_thought
+        
+        # NEU: Function Calls extrahieren
+        function_calls = []
+        func_pattern = r'<function_call>\s*(\{.*?\})\s*</function_call>'
+        func_matches = re.findall(func_pattern, full_response, re.DOTALL)
+        
+        if func_matches:
+            from memory.function_registry import get_function_registry
+            func_registry = get_function_registry()
+            
+            print_log("FUNC", f"{len(func_matches)} Funktion(en) erkannt!", Colors.MEMORY)
+            
+            for func_match in func_matches:
+                try:
+                    func_data = eval(func_match)
+                    func_name = func_data.get("name", "")
+                    args = func_data.get("arguments", {})
+                    
+                    print_log("FUNC", f"> Führe {func_name} aus...", Colors.MEMORY)
+                    
+                    if func_registry.has_function(func_name):
+                        result = func_registry.execute(func_name, args)
+                        function_calls.append({"name": func_name, "arguments": args, "result": result})
+                        print_log("FUNC", f"  ✓ {result[:60]}...", Colors.SUCCESS)
+                    else:
+                        print_log("FUNC", f"  ✗ Unbekannte Funktion: {func_name}", Colors.ERROR)
+                except Exception as e:
+                    print_log("FUNC", f"  ✗ Fehler: {e}", Colors.ERROR)
+        
+        # Parse final result
         parsed = parse_chain_of_thought(full_response)
         display_response = parsed.answer
         
@@ -249,6 +325,14 @@ class CHAPPiE:
             self.memory.add_memory(display_response, role="assistant")
         else:
             print_log("WARN", "Leere Antwort generiert, wird nicht gespeichert.", Colors.ERROR)
+        
+        # NEU: Function Calls anzeigen wenn welche ausgeführt wurden
+        if function_calls:
+            print_section("AUSGEFÜHRTE FUNKTIONEN", Colors.MEMORY)
+            for func in function_calls:
+                print(f"  🔧 {func['name']}")
+                print(f"     Args: {func['arguments']}")
+                print(f"     Result: {func['result'][:80]}...")
 
     def run(self):
         """Main Loop mit Standard Input."""

@@ -1,80 +1,127 @@
 #!/bin/bash
-# CHAPiE Training Deployment Script
-# Startet/stoppt/überwacht den Training-Daemon auf dem Server
+# CHAPiE Training & Web Deployment Script
+# Startet/stoppt/überwacht Training-Daemon und Web-UI auf dem Server
 
 SERVER_USER="bbecker"
 SERVER_HOST="100.105.94.71"
 PROJECT_PATH="/home/bbecker/CHAPPiE"
+VENV_PATH="$PROJECT_PATH/venv"
 
 function colors() {
     GREEN='\033[0;32m'
     RED='\033[0;31m'
     YELLOW='\033[1;33m'
+    CYAN='\033[0;36m'
     NC='\033[0m' # No Color
 }
 
 colors
 
+check_connection() {
+    echo -e "${CYAN}Prüfe Verbindung zu $SERVER_HOST...${NC}"
+    if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 "$SERVER_USER@$SERVER_HOST" exit; then
+        echo -e "${RED}❌ Keine Verbindung zum Server möglich!${NC}"
+        exit 1
+    fi
+}
+
 case "$1" in
-    start)
-        echo -e "${GREEN}Verbinde mit Server und starte Training-Daemon (nohup)...${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && source venv/bin/activate && nohup python Chappies_Trainingspartner/training_daemon.py > training_daemon.log 2>&1 &"
-        echo -e "${GREEN}✅ Daemon gestartet auf dem Server${NC}"
-        echo -e "${YELLOW}Logs ansehen: ./deploy_training.sh tail${NC}"
-        ;;
-
-    stop)
-        echo -e "${YELLOW}Stoppe Training-Daemon (nohup)...${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "pkill -f training_daemon.py"
-        echo -e "${GREEN}✅ Daemon gestoppt${NC}"
-        ;;
-
-    status)
-        echo -e "${YELLOW}Prüfe Status des Training-Daemons...${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "ps aux | grep training_daemon.py | grep -v grep && echo -e '${GREEN}✅ RUNNING${NC}' || echo -e '${RED}❌ STOPPED${NC}'"
-        echo -e "${YELLOW}=== Letzte Logs ===${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "tail -20 $PROJECT_PATH/training_daemon.log"
-        ;;
-
-    tail)
-        echo -e "${YELLOW}Live-Logs vom Server (Ctrl+C zum Beenden):${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "tail -f $PROJECT_PATH/training_daemon.log"
-        ;;
-
-    # === SYSTEMD SERVICE COMMANDS ===
+    # === SYSTEMD SERVICE COMMANDS (EMPFOHLEN) ===
     install-service)
-        echo -e "${YELLOW}Installiere Systemd Service auf dem Server...${NC}"
-        # 1. Service Datei kopieren
-        echo "Kopiere Service-Datei..."
-        scp chappie-training.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
+        check_connection
+        echo -e "${YELLOW}Installiere Systemd Services auf dem Server...${NC}"
+        # 1. Service Dateien kopieren
+        echo "Kopiere Service-Dateien..."
+        scp chappie-training.service chappie-web.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
         
-        # 2. Service installieren und aktivieren
-        echo "Richte Service ein (sudo wird benötigt)..."
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service"
+        # 2. Services installieren und aktivieren
+        echo "Richte Services ein (sudo Passwort wird benötigt)..."
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service $PROJECT_PATH/chappie-web.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service chappie-web.service"
         
-        echo -e "${GREEN}✅ Service installiert und enabled.${NC}"
+        echo -e "${GREEN}✅ Services installiert und enabled.${NC}"
         echo -e "${YELLOW}Starte mit: ./deploy_training.sh service-start${NC}"
         ;;
 
     service-start)
-        echo -e "${GREEN}Starte CHAPPiE via Systemd...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl start chappie-training.service"
+        check_connection
+        echo -e "${GREEN}Starte CHAPPiE Services via Systemd...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl start chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Start-Befehl gesendet.${NC}"
         ;;
 
     service-stop)
-        echo -e "${YELLOW}Stoppe CHAPPiE Service...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl stop chappie-training.service"
+        check_connection
+        echo -e "${YELLOW}Stoppe CHAPPiE Services...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl stop chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Stop-Befehl gesendet.${NC}"
         ;;
 
+    service-restart)
+        check_connection
+        echo -e "${YELLOW}Starte CHAPPiE Services neu...${NC}"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl restart chappie-training.service chappie-web.service"
+        echo -e "${GREEN}✅ Restart-Befehl gesendet.${NC}"
+        ;;
+
     service-status)
+        check_connection
         echo -e "${YELLOW}Prüfe Systemd Service Status...${NC}"
-        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl status chappie-training.service"
+        ssh -t "$SERVER_USER@$SERVER_HOST" "sudo systemctl status chappie-training.service chappie-web.service"
         ;;
         
+    # === LOGGING ===
+    tail)
+        check_connection
+        echo -e "${YELLOW}Live-Logs vom Training (Ctrl+C zum Beenden):${NC}"
+        ssh "$SERVER_USER@$SERVER_HOST" "tail -f $PROJECT_PATH/training_daemon.log"
+        ;;
+
+    tail-web)
+        check_connection
+        echo -e "${YELLOW}Live-Logs vom Web-UI (Ctrl+C zum Beenden):${NC}"
+        ssh "$SERVER_USER@$SERVER_HOST" "sudo journalctl -u chappie-web.service -f"
+        ;;
+
+    # === MANUAL COMMANDS (LEGACY) ===
+    start-manual)
+        check_connection
+        echo -e "${YELLOW}Starte Training-Daemon manuell (nohup)...${NC}"
+        ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && source venv/bin/activate && nohup python3 Chappies_Trainingspartner/training_daemon.py > training_daemon.log 2>&1 &"
+        echo -e "${GREEN}✅ Daemon manuell gestartet${NC}"
+        ;;
+
+    stop-manual)
+        check_connection
+        echo -e "${YELLOW}Stoppe manuellen Training-Daemon...${NC}"
+        ssh "$SERVER_USER@$SERVER_HOST" "pkill -f training_daemon.py"
+        echo -e "${GREEN}✅ Prozess gekillt${NC}"
+        ;;
+    
+    # === REMOTE UPDATES ===
+    update)
+        check_connection
+        echo -e "${CYAN}Aktualisiere Server-Code & Dependencies...${NC}"
+        ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && git pull && source venv/bin/activate && pip install -r requirements.txt"
+        echo -e "${GREEN}✅ Update abgeschlossen. Bitte Services neustarten.${NC}"
+        ;;
+
     *)
-        echo "Usage: $0 {start|stop|status|tail|install-service|service-start|service-stop|service-status}"
+        echo "CHAPPiE Deployment Manager"
+        echo "Usage: $0 {COMMAND}"
+        echo ""
+        echo "Service Commands (Empfohlen):"
+        echo "  install-service  - Installiert systemd Services auf dem Server"
+        echo "  service-start    - Startet Training & Web-UI"
+        echo "  service-stop     - Stoppt Training & Web-UI"
+        echo "  service-restart  - Startet alles neu (z.B. nach Config-Änderung)"
+        echo "  service-status   - Zeigt Status aller Services"
+        echo ""
+        echo "Monitoring:"
+        echo "  tail             - Live-Logs vom Training"
+        echo "  tail-web         - Live-Logs vom Web-UI"
+        echo ""
+        echo "Maintenance:"
+        echo "  update           - Git Pull & Pip Install auf dem Server"
         exit 1
         ;;
 esac

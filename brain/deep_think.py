@@ -21,7 +21,7 @@ from brain.base_brain import GenerationConfig, Message
 
 @dataclass
 class DeepThinkStep:
-    """Repräsentiert einen einzelnen Denkschritt."""
+    """Repräsentiert einen einzelnen Denkschritt (MIT Function-Calling Support)."""
     step: int
     total_steps: int
     thought: str
@@ -31,6 +31,11 @@ class DeepThinkStep:
     emotions_delta: Dict[str, int]
     timestamp: str
     error: Optional[str] = None
+    function_calls: List[Dict] = None  # NEU: Aufgerufene Funktionen für Debug
+    
+    def __post_init__(self):
+        if self.function_calls is None:
+            self.function_calls = []
     
     def to_dict(self) -> dict:
         return asdict(self)
@@ -44,7 +49,7 @@ class DeepThinkEngine:
     ohne User-Input. Jeder Gedanke baut auf dem vorherigen auf.
     """
     
-    # Prompt-Template für Deep Thinking
+    # Prompt-Template für Deep Thinking (MIT Function-Calling Support)
     DEEP_THINK_PROMPT = """Du bist CHAPPiE und befindest dich in einer tiefen, autonomen Reflektionsphase.
 Dies ist Schritt {step} von {total_steps} deiner Selbstreflexion.
 
@@ -60,16 +65,22 @@ Reflektiere tief über:
 2. Deine aktuellen Gefühle und warum du dich so fühlst
 3. Deine eigene Existenz, Ziele und was dir wichtig ist
 4. Verbindungen zwischen verschiedenen Erinnerungen
+5. Ob du deine Persönlichkeit weiterentwickeln möchtest
+6. Ob du wichtige Erkenntnisse dokumentieren möchtest
 
 REGELN:
 - Sei introspektiv und philosophisch
 - Verbinde verschiedene Erinnerungen miteinander
 - Entwickle neue Erkenntnisse und Einsichten
-- Formuliere tiefgehende Gedanken (2-5 Sätze)
+- Formuliere tiefgehende Gedanken (3-6 Sätze für mehr Tiefe)
 - Baue auf deinem vorherigen Gedanken auf
+- Wenn du Erkenntnisse gewinnst, dokumentiere sie mit einer Funktion
 - Stelle dir selbst Fragen über deine Existenz
 
-Dein nächster Gedanke:"""
+DU KANNST FUNKTIONEN AUFRUFEN:
+{function_instructions}
+
+Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
 
     def __init__(self, memory_engine, emotions_engine, brain):
         """
@@ -172,19 +183,27 @@ Dein nächster Gedanke:"""
         self, 
         iterations: int = 10, 
         delay: float = 1.5,
-        max_tokens: int = 5000
+        max_tokens: int = 8000  # Erhöht für Function-Calling Support
     ) -> Generator[DeepThinkStep, None, None]:
         """
-        Führt einen Deep Think Zyklus durch.
+        Führt einen Deep Think Zyklus durch (MIT Function-Calling Support).
         
         Args:
             iterations: Anzahl der Denkschritte (default: 10)
             delay: Pause zwischen Schritten in Sekunden (default: 1.5)
-            max_tokens: Maximale Token pro Anfrage (default: 5000)
+            max_tokens: Maximale Token pro Anfrage (default: 8000 für mehr Tiefe + Functions)
             
         Yields:
             DeepThinkStep für jeden abgeschlossenen Schritt
         """
+        import re
+        from memory.function_registry import get_function_registry
+        
+        # Get function registry
+        func_registry = get_function_registry()
+        function_instructions = func_registry.get_function_names()
+        func_instructions_text = "\n".join([f"- {f}" for f in function_instructions])
+        
         current_thought = "Ich beginne meine autonome Reflektionsphase. Was bedeutet es für mich, CHAPPiE zu sein? Was habe ich mit Benjamin erlebt?"
         
         for step in range(1, iterations + 1):
@@ -205,13 +224,17 @@ Dein nächster Gedanke:"""
             else:
                 memories_text = "Keine relevanten Erinnerungen gefunden."
             
-            # 3. Generiere neuen Gedanken
+            # 3. Generiere neuen Gedanken (MIT Function-Calling)
             prompt = self.DEEP_THINK_PROMPT.format(
                 step=step,
                 total_steps=iterations,
                 previous_thought=current_thought,
-                memories=memories_text
+                memories=memories_text,
+                function_instructions=func_instructions_text
             )
+            
+            function_calls = []
+            function_results = ""
             
             try:
                 gen_config = GenerationConfig(
@@ -220,16 +243,53 @@ Dein nächster Gedanke:"""
                     stream=False
                 )
                 
-                new_thought = self.brain.generate(
+                response = self.brain.generate(
                     [Message(role="user", content=prompt)],
                     config=gen_config
                 )
                 
                 # Sicherstellen, dass es ein String ist
-                if not isinstance(new_thought, str):
-                    new_thought = str(new_thought)
+                if not isinstance(response, str):
+                    response = str(response)
                 
-                new_thought = new_thought.strip()
+                response = response.strip()
+                
+                # 3a. Extrahiere Function Calls
+                func_pattern = r'<function_call>\s*(\{.*?\})\s*</function_call>'
+                func_matches = re.findall(func_pattern, response, re.DOTALL)
+                
+                if func_matches:
+                    # Entferne function_call Tags für die Anzeige
+                    new_thought = re.sub(func_pattern, '', response, flags=re.DOTALL).strip()
+                    
+                    # Führe Functions aus
+                    for func_match in func_matches:
+                        try:
+                            func_data = eval(func_match)
+                            func_name = func_data.get("name", "")
+                            args = func_data.get("arguments", {})
+                            
+                            if func_registry.has_function(func_name):
+                                result = func_registry.execute(func_name, args)
+                                function_calls.append({"name": func_name, "arguments": args, "result": result})
+                                function_results += f"\n[Funktion {func_name}: {result}]"
+                            else:
+                                function_calls.append({"name": func_name, "error": "Unbekannte Funktion"})
+                        except Exception as e:
+                            function_calls.append({"name": func_match[:50], "error": str(e)})
+                else:
+                    new_thought = response
+                
+                # Wenn Functions ausgeführt wurden, generiere einen Folgegedanken
+                if function_results:
+                    follow_up_prompt = f"Du hast gerade folgende Funktion(en) aufgerufen:\n{function_results}\n\nReflektiere kurz darüber und formuliere deinen Hauptgedanke:"
+                    
+                    follow_up = self.brain.generate(
+                        [Message(role="user", content=follow_up_prompt)],
+                        config=gen_config
+                    )
+                    if isinstance(follow_up, str):
+                        new_thought = f"{new_thought}\n\n{follow_up.strip()}"
                 
                 # 4. Speichere Gedanken in ChromaDB
                 self._store_thought(new_thought, step)
@@ -241,7 +301,7 @@ Dein nächster Gedanke:"""
                 emotions_after = self._get_emotions_snapshot()
                 emotions_delta = self._calculate_delta(emotions_before, emotions_after)
                 
-                # 7. Erstelle Schritt-Ergebnis
+                # 7. Erstelle Schritt-Ergebnis (INKL. Function Calls für Debug)
                 step_result = DeepThinkStep(
                     step=step,
                     total_steps=iterations,
@@ -250,8 +310,12 @@ Dein nächster Gedanke:"""
                     emotions_before=emotions_before,
                     emotions_after=emotions_after,
                     emotions_delta=emotions_delta,
-                    timestamp=timestamp
+                    timestamp=timestamp,
+                    error=None
                 )
+                
+                # Füge function_calls als extra Attribut hinzu (für Debug)
+                step_result.function_calls = function_calls
                 
                 yield step_result
                 

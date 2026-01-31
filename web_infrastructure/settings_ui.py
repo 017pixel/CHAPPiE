@@ -50,7 +50,7 @@ def render_settings_overlay(backend):
                 "Groq API Key", 
                 value=settings.groq_api_key if settings.groq_api_key else "",
                 type="password",
-                help="Der Key wird nur für die aktuelle Sitzung temporär gespeichert, wenn addSecrets.py leer ist."
+                help="Der Key wird in config/addSecrets.py gespeichert und bleibt nach einem Neustart erhalten."
             )
             
             # Model Selection
@@ -93,6 +93,7 @@ def render_settings_overlay(backend):
             with col1:
                 if st.button("Groq Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_groq"):
                     settings.update_from_ui(provider="groq", api_key=new_api_key, model=new_model)
+                    backend.reinit_brain_if_needed()  # Hot-swap Brain
                     st.success("✅ Einstellungen für Groq gespeichert!")
                     time.sleep(0.5)
                     st.rerun()
@@ -163,6 +164,7 @@ def render_settings_overlay(backend):
             with col1:
                 if st.button("Cerebras Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_cerebras"):
                     settings.update_from_ui(provider="cerebras", api_key=new_cerebras_key, model=new_cerebras_model)
+                    backend.reinit_brain_if_needed()  # Hot-swap Brain
                     st.success("✅ Einstellungen für Cerebras gespeichert!")
                     time.sleep(0.5)
                     st.rerun()
@@ -191,6 +193,7 @@ def render_settings_overlay(backend):
                     # Wir setzen hier direkt die config attribute für host da update_from_ui das (noch) nicht kann
                     settings.ollama_host = "http://localhost:11434"
                     settings.emotion_analysis_model = "qwen2.5:1.5b"
+                    backend.reinit_brain_if_needed()  # Hot-swap Brain
                     st.success("✅ Standard-Werte gesetzt! Bitte stelle sicher, dass du `ollama run llama3:8b` im Terminal ausgeführt hast.")
                     time.sleep(1.5)
                     st.rerun()
@@ -203,6 +206,7 @@ def render_settings_overlay(backend):
                     if st.button("Ollama Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_ollama"):
                         settings.update_from_ui(provider="ollama", model=new_ollama_model)
                         settings.ollama_host = new_host
+                        backend.reinit_brain_if_needed()  # Hot-swap Brain
                         st.success("✅ Einstellungen für Ollama gespeichert!")
                         time.sleep(0.5)
                         st.rerun()

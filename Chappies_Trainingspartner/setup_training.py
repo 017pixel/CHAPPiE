@@ -370,7 +370,7 @@ def run_setup():
         return True
     
     console.print("\n[dim]Setup beendet. Starte das Training später mit:[/dim]")
-    console.print("[cyan]python -m Chappies_Trainingspartner.training_loop[/cyan]")
+    console.print("[cyan]python3 Chappies_Trainingspartner/training_daemon.py[/cyan]")
     return False
 
 
@@ -412,9 +412,14 @@ if __name__ == "__main__":
         if should_start:
             console.print("\n[bold cyan]Starte Training...[/bold cyan]\n")
             
-            # Training Loop starten
-            from Chappies_Trainingspartner.training_loop import TrainingLoop
-            from Chappies_Trainingspartner.trainer_agent import TrainerAgent, load_training_config
+            # Training Loop starten - Nutze relative Imports für Linux-Kompatibilität
+            try:
+                from Chappies_Trainingspartner.training_loop import TrainingLoop
+                from Chappies_Trainingspartner.trainer_agent import TrainerAgent, load_training_config
+            except ImportError:
+                # Fallback: Direkter Import wenn wir im selben Ordner sind
+                from training_loop import TrainingLoop
+                from trainer_agent import TrainerAgent, load_training_config
             
             config = load_training_config()
             trainer = TrainerAgent(config)

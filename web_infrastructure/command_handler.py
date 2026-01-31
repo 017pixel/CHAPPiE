@@ -147,6 +147,16 @@ def process_command(user_input: str, backend) -> bool:
         # Zusammenfassung
         summary = backend.deep_think_engine.get_summary_after_cycle(current_batch_steps)
         
+        # NEU: Füge Function Calls zur Summary hinzu
+        total_func_calls = sum(len(s.function_calls) for s in current_batch_steps)
+        func_names = set()
+        for step in current_batch_steps:
+            for func in step.function_calls:
+                func_names.add(func.get("name", "unknown"))
+        
+        summary["functions_called"] = total_func_calls
+        summary["function_names"] = list(func_names)
+        
         # Formatiere Gedanken OHNE HTML (nur Markdown)
         thoughts_md = ""
         name_map = {"happiness": "Freude", "trust": "Vertrauen", "energy": "Energie", 
@@ -163,11 +173,20 @@ def process_command(user_input: str, backend) -> bool:
                         delta_parts.append(f"{color_emoji} {name}: {sign}{val}")
                 delta_str = ", ".join(delta_parts) if delta_parts else "keine Änderung"
                 
+                # NEU: Function Calls anzeigen
+                func_calls_str = ""
+                if step.function_calls:
+                    func_icons = []
+                    for func in step.function_calls:
+                        func_name = func.get("name", "unknown")
+                        func_icons.append(f"🔧 {func_name}")
+                    func_calls_str = f"\n**Funktionen:** {' '.join(func_icons)}"
+                
                 thoughts_md += f"""
 **Schritt {step.step}/{step.total_steps}**
 > {step.thought}
 
-*Emotions-Delta: {delta_str}* | *Memories: {len(step.memories_used)}*
+*Emotions-Delta: {delta_str}* | *Memories: {len(step.memories_used)}*{func_calls_str}
 
 ---
 """
@@ -188,6 +207,7 @@ def process_command(user_input: str, backend) -> bool:
 - Gedanken in diesem Batch: {len(current_batch_steps)}
 - Gesamt Gedanken bisher: {st.session_state.deep_think_total_done}
 - Eindeutige Memories abgerufen: {summary.get("memories_accessed", 0)}
+- Funktionen aufgerufen: {sum(len(s.function_calls) for s in current_batch_steps)}
 - Gesamt Emotions-Delta: {total_delta_str}
 
 ---
@@ -197,6 +217,7 @@ def process_command(user_input: str, backend) -> bool:
 
 ---
 *Alle Gedanken wurden mit `source: self_reflection` in ChromaDB gespeichert.*
+*Funktionsaufrufe werden automatisch ausgeführt.*
 """
         
         # Speichere Nachricht ZUERST
@@ -268,7 +289,20 @@ def process_command(user_input: str, backend) -> bool:
 - **/clear** - Loescht aktuellen Chat und startet neue Sitzung
 - **/stats** - Zeigt System-Statistiken
 - **/config** - Oeffnet Einstellungen
+
+- **/daily** - Zeigt Kurzzeitgedächtnis (Daily Info)
+- **/personality** - Zeigt aktuelle Persönlichkeit
+- **/consolidate** - Bereinigt abgelaufene Daily Infos
+- **/reflect** - Zeigt letzte Selbst-Reflexionen
+- **/functions** - Listet verfügbare Funktionen auf
+
 - **/help** - Zeigt diese Hilfe
+
+**Memory Enhancement Features:**
+CHAPI kann jetzt selbstständig:
+- Wichtige Infos im Kurzzeitgedächtnis speichern
+- Seine Persönlichkeit dokumentieren
+- Selbst-Reflexionen anlegen
 
 **Debug Mode:**
 Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
@@ -283,11 +317,13 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
     elif cmd == "/stats":
         status = backend.get_status()
         memory_count = backend.memory.get_memory_count()
+        daily_count = backend.short_term_memory.get_count()
         stats_text = f"""**System-Statistiken:**
 
 **Brain:** {'Verfügbar' if status['brain_available'] else 'Nicht verfügbar'}
 **Modell:** {status['model']}
-**Erinnerungen:** {memory_count} gespeichert
+**Langzeitgedächtnis:** {memory_count} Erinnerungen
+**Kurzzeitgedächtnis:** {daily_count} Einträge
 
 **Emotionen:**
 - Freude: {status['emotions']['joy']}%
@@ -302,6 +338,48 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
     
     elif cmd == "/config":
         st.session_state.show_settings = True
+        st.rerun()
+        return True
+    
+    # === NEU: Memory Enhancement Commands ===
+    elif cmd == "/daily":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /daily ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/personality":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /personality ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/consolidate":
+        with st.status("Bereinige Kurzzeitgedächtnis...", expanded=True):
+            response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /consolidate ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/reflect":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /reflect ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/functions":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /functions ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
         st.rerun()
         return True
     
