@@ -32,6 +32,18 @@ def init_session_state():
     # Memory Enhancement State
     if "pending_cmd" not in st.session_state:
         st.session_state.pending_cmd = None
+    
+    # Short-term Memory Count fuer Sidebar Anzeige
+    if "short_term_count" not in st.session_state:
+        st.session_state.short_term_count = 0
+    
+    # Context Files Anzeige States
+    if "show_soul_context" not in st.session_state:
+        st.session_state.show_soul_context = False
+    if "show_user_context" not in st.session_state:
+        st.session_state.show_user_context = False
+    if "show_prefs_context" not in st.session_state:
+        st.session_state.show_prefs_context = False
 
     # API Check State (einmalig)
     if "api_check_done" not in st.session_state:

@@ -8,6 +8,7 @@ Zeigt detaillierte Hintergrundinformationen zu jedem Schritt an.
 import sys
 import time
 import threading
+import json
 import colorama
 from datetime import datetime
 from typing import Optional, List
@@ -300,7 +301,7 @@ class CHAPPiE:
             
             for func_match in func_matches:
                 try:
-                    func_data = eval(func_match)
+                    func_data = json.loads(func_match)
                     func_name = func_data.get("name", "")
                     args = func_data.get("arguments", {})
                     

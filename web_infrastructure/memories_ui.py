@@ -12,6 +12,38 @@ def render_memories_overlay(backend):
     live_memory = backend.memory
 
     st.markdown("## Alle Erinnerungen")
+    
+    # === KURZZEITGEDAECHTNIS (Short-Term Memory V2) ===
+    with st.container(border=True):
+        st.markdown("### Kurzzeitgedächtnis (24h)")
+        
+        if hasattr(backend, 'short_term_memory_v2'):
+            stm_count = backend.short_term_memory_v2.get_count()
+            
+            if stm_count > 0:
+                st.success(f"{stm_count} aktive Eintraege")
+                
+                # Zeige alle aktiven Einträge
+                entries = backend.short_term_memory_v2.get_active_entries()
+                for i, entry in enumerate(entries[:20]):  # Max 20 anzeigen
+                    with st.expander(f"[{entry.importance}] {entry.category} - {entry.content[:50]}...", expanded=False):
+                        st.markdown(f"**Inhalt:** {entry.content}")
+                        st.markdown(f"**Kategorie:** {entry.category}")
+                        st.markdown(f"**Wichtigkeit:** {entry.importance}")
+                        st.markdown(f"**Erstellt:** {entry.created_at}")
+                        st.markdown(f"**Laueft ab:** {entry.expires_at}")
+                        if entry.migrated:
+                            st.info("Bereits migriert")
+            else:
+                st.info("Keine aktiven Eintraege im Kurzzeitgedächtnis (24h)")
+        else:
+            st.warning("Short-term Memory V2 nicht verfuegbar")
+        
+        if st.button("Kurzzeitgedächtnis bereinigen", key="cleanup_stm"):
+            if hasattr(backend, 'short_term_memory_v2'):
+                migrated = backend.short_term_memory_v2.migrate_expired_entries()
+                st.success(f"{migrated} Eintraege ins Langzeitgedächtnis migriert")
+                st.rerun()
 
     if st.button("Schließen", key="close_memories_top", use_container_width=True):
         st.session_state.show_memories = False

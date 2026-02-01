@@ -250,7 +250,7 @@ class TrainingLoop:
         
         # 4. Generierung (erhoehte Tokens fuer vollstaendige Saetze)
         gen_config = GenerationConfig(
-            max_tokens=500,  # Erhoeht um abgeschnittene Saetze zu vermeiden
+            max_tokens=200,  # REDUZIERT um 60% (von 500 auf 200) für effizienteres Training
             temperature=settings.temperature,
             stream=False,
         )

@@ -361,6 +361,9 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
     elif cmd == "/consolidate":
         with st.status("Bereinige Kurzzeitgedächtnis...", expanded=True):
             response = backend.handle_command(cmd)
+        # Aktualisiere Short-term Count nach Bereinigung
+        if hasattr(backend, 'short_term_memory_v2'):
+            st.session_state.short_term_count = backend.short_term_memory_v2.get_count()
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /consolidate ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
         backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
@@ -383,16 +386,90 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         st.rerun()
         return True
     
+    # === NEU: Zwei-Schritte System Commands ===
+    elif cmd == "/debug":
+        response = backend.handle_command(cmd)
+        # Toggle Debug Mode im Session State
+        st.session_state.debug_mode = not st.session_state.get("debug_mode", False)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /debug ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/step1":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /step1 ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/soul":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /soul ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/user":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /user ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/prefs" or cmd == "/preferences":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /prefs ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
+    elif cmd == "/twostep":
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /twostep ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
+    
     return False
 
 def process_chat_message(user_input: str, backend):
     """Verarbeitet eine normale Chat-Nachricht."""
+    # Debug Mode aus Session State holen
+    debug_mode = st.session_state.get("debug_mode", False)
+    
     with st.chat_message("assistant"):
         with st.spinner("CHAPPiE denkt nach..."):
-            result = backend.process(user_input, st.session_state.messages[:-1])
+            result = backend.process(user_input, st.session_state.messages[:-1], debug_mode=debug_mode)
             st.markdown(result["response_text"])
             if result.get("emotions") and isinstance(result["emotions"], dict):
                 st.session_state.current_emotions = result["emotions"]
+            
+            # Aktualisiere Short-term Memory Count fuer Sidebar
+            if result.get("short_term_count") is not None:
+                st.session_state.short_term_count = result["short_term_count"]
+            
+            # Zeige Debug Info wenn Debug Mode an
+            if debug_mode and result.get("debug_log"):
+                with st.expander("🔍 DEBUG INFO", expanded=False):
+                    st.text(result["debug_log"])
+                    
+                    # Zeige Intent Info
+                    if result.get("intent_type"):
+                        st.markdown(f"**Intent:** {result['intent_type']} ({result.get('intent_confidence', 0):.0%})")
+                    
+                    # Zeige Tool Calls
+                    if result.get("tool_calls_executed", 0) > 0:
+                        st.markdown(f"**Tool Calls:** {result['tool_calls_executed']} ausgeführt")
+                    
+                    # Zeige Short Term Count
+                    st.markdown(f"**Short-Term Entries:** {result.get('short_term_count', 0)}")
     
     # Helper to serialize memories for JSON storage (Memory objects are not JSON serializable by default)
     formatted_memories = []

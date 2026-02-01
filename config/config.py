@@ -101,6 +101,27 @@ class Settings:
         self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
 
+        # === Intent Processor (Step 1) ===
+        # NEUE MODELLE fuer Intent Analysis (Step 1):
+        # - Cerebras: qwen-3-235b-a22b-instruct-2507
+        # - Groq: openai/gpt-oss-120b
+        # - Ollama: gpt-oss-20b
+        self.enable_two_step_processing = self._get_val("ENABLE_TWO_STEP_PROCESSING", True)
+        self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-120b")
+        self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
+        self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "gpt-oss-20b")
+        
+        # === Context Files ===
+        self.soul_path = self._get_val("SOUL_PATH", str(DATA_DIR / "soul.md"))
+        self.user_path = self._get_val("USER_PATH", str(DATA_DIR / "user.md"))
+        self.preferences_path = self._get_val("PREFERENCES_PATH", str(DATA_DIR / "CHAPPiEsPreferences.md"))
+        
+        # === Debug Mode ===
+        # CLI: Debug ist immer an
+        # Web UI: Debug ist standardmäßig aus (per /debug oder Button aktivierbar)
+        self.cli_debug_always_on = True
+        self.web_debug_default = False
+
         # === Generation ===
         self.max_tokens = int(self._get_val("MAX_TOKENS", 1024))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))

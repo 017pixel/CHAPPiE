@@ -12,6 +12,7 @@ Features:
 """
 
 import time
+import json
 from typing import Generator, Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -265,7 +266,7 @@ Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
                     # Führe Functions aus
                     for func_match in func_matches:
                         try:
-                            func_data = eval(func_match)
+                            func_data = json.loads(func_match)
                             func_name = func_data.get("name", "")
                             args = func_data.get("arguments", {})
                             

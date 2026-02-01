@@ -46,11 +46,26 @@ def render_vital_signs(backend):
         health = live_memory.health_check()
 
         if health["embedding_model_loaded"] and health["chromadb_connected"]:
-            st.metric("Erinnerungen", f"{memory_count:,}")
-            st.caption("Live-Daten aus Training")
+            if health.get("is_persistent", True):
+                st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+                st.caption("Langzeitgedaechtnis aktiv")
+            else:
+                st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+                st.caption("In-Memory Modus (nicht persistent)")
         else:
-            st.metric("🧠 Erinnerungen", f"{memory_count:,}")
-            st.caption("⚠️ Memory-System Probleme")
+            # Detaillierte Fehleranzeige
+            error_details = []
+            if not health["embedding_model_loaded"]:
+                error_details.append("Embedding-Modell")
+            if not health["chromadb_connected"]:
+                error_details.append("ChromaDB")
+            
+            if error_details:
+                st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+                st.caption(f"⚠️ Probleme: {', '.join(error_details)}")
+            else:
+                st.metric("🧠 Erinnerungen", f"{memory_count:,}")
+                st.caption("⚠️ Memory-System Probleme")
 
         # Zeige letzte Memory wenn verfügbar
         if memory_count > 0:
@@ -87,8 +102,34 @@ def render_vital_signs(backend):
                 pass
 
     except Exception as e:
-        st.metric("🧠 Erinnerungen", "Fehler")
-        st.caption(f"❌ {str(e)[:30]}...")
+        st.metric("[BRAIN] Erinnerungen", "Fehler")
+        st.caption(f"[ERROR] {str(e)[:30]}...")
+    
+    # KURZZEITGEDAECHTNIS (Short-Term Memory V2)
+    st.markdown("---")
+    try:
+        # Lese Count aus Session State (wird nach jeder Nachricht aktualisiert)
+        stm_count = st.session_state.get("short_term_count", 0)
+        
+        if stm_count > 0:
+            st.metric("Kurzzeit", f"{stm_count} Eintraege")
+            st.caption("Aktive Eintraege (24h)")
+        else:
+            # Versuche vom Backend zu laden (bei Initialisierung)
+            if hasattr(backend, 'short_term_memory_v2'):
+                backend_count = backend.short_term_memory_v2.get_count()
+                st.session_state.short_term_count = backend_count
+                st.metric("Kurzzeit", f"{backend_count} Eintraege")
+                if backend_count > 0:
+                    st.caption("Aktive Eintraege (24h)")
+                else:
+                    st.caption("Keine aktiven Eintraege")
+            else:
+                st.metric("Kurzzeit", "0 Eintraege")
+                st.caption("Keine aktiven Eintraege")
+    except Exception as e:
+        st.metric("Kurzzeit", "Fehler")
+        st.caption(f"[ERROR] {str(e)[:20]}...")
 
 
 def render_brain_monitor(metadata: Dict[str, Any]):

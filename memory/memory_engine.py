@@ -107,12 +107,14 @@ class MemoryEngine:
         self.client = None
         self.collection = None
         
-        # Versuche persistent Client
+        # Strategie: Versuche zuerst persistent (fuer Ubuntu Server)
+        # Fallback auf In-Memory nur bei Fehler (Windows SQLite-Probleme)
         if not self._init_failed:
             self._init_chromadb_persistent()
         
-        # Fallback auf In-Memory wenn persistent fehlschlägt
+        # Fallback auf In-Memory wenn persistent fehlschlaegt
         if self.client is None:
+            print("   Fallback: Verwende ChromaDB In-Memory Modus...")
             self._init_chromadb_inmemory()
         
         # Finale Status-Meldung

@@ -10,8 +10,12 @@ from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.chat_manager import ChatManager
 from memory.short_term_memory import ShortTermMemory
+from memory.short_term_memory_v2 import get_short_term_memory_v2
 from memory.personality_manager import PersonalityManager
 from memory.function_registry import get_function_registry
+from memory.context_files import get_context_files_manager
+from memory.intent_processor import get_intent_processor
+from memory.debug_logger import get_debug_logger
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import parse_chain_of_thought
@@ -20,14 +24,14 @@ from brain.deep_think import DeepThinkEngine
 
 @st.cache_resource
 def init_chappie():
-    """Initialisiert das Backend (Memory, Emotions, Brain, ChatManager, Short-Term Memory, Personality, Functions)."""
+    """Initialisiert das Backend mit neuem Zwei-Schritte System."""
     class CHAPPiEBackend:
         def __init__(self):
             # Module init
             self.memory = MemoryEngine()
             self.emotions = EmotionsEngine()
             self.brain = get_brain()
-            self._current_provider = settings.llm_provider  # Track current provider
+            self._current_provider = settings.llm_provider
 
             # Chat Manager init
             data_dir = os.path.join(PROJECT_ROOT, "data")
@@ -40,35 +44,57 @@ def init_chappie():
                 brain=self.brain
             )
 
-            # NEU: Short-Term Memory (Daily Info)
-            self.short_term_memory = ShortTermMemory(memory_engine=self.memory)
+            # NEU: Context Files Manager (soul.md, user.md, CHAPPiEsPreferences.md)
+            self.context_files = get_context_files_manager()
+
+            # NEU: Short-Term Memory V2 (JSON-basiert mit Timestamps)
+            self.short_term_memory_v2 = get_short_term_memory_v2(memory_engine=self.memory)
             
-            # P2-FIX: Automatische Bereinigung abgelaufener Einträge beim Start
+            # Migration von abgelaufenen Einträgen beim Start
+            try:
+                migrated = self.short_term_memory_v2.migrate_expired_entries()
+                if migrated > 0:
+                    print(f"[CHAPPiE] {migrated} Einträge ins Langzeitgedächtnis migriert")
+            except Exception as e:
+                print(f"[CHAPPiE] Migration fehlgeschlagen: {e}")
+
+            # LEGACY: Altes Short-Term Memory (für Abwärtskompatibilität)
+            self.short_term_memory = ShortTermMemory(memory_engine=self.memory)
             try:
                 cleaned = self.short_term_memory.cleanup_expired()
                 if cleaned > 0:
-                    print(f"   Short-Term Memory: {cleaned} abgelaufene Einträge bereinigt")
+                    print(f"[CHAPPiE] Short-Term Memory: {cleaned} abgelaufene Einträge bereinigt")
             except Exception as e:
-                print(f"   WARNUNG: Short-Term Memory Bereinigung fehlgeschlagen: {e}")
+                print(f"[CHAPPiE] WARNUNG: Short-Term Memory Bereinigung fehlgeschlagen: {e}")
 
-            # NEU: Personality Manager
+            # NEU: Intent Processor (Step 1)
+            self.intent_processor = get_intent_processor()
+
+            # NEU: Debug Logger
+            self.debug_logger = get_debug_logger()
+            # CLI Debug ist immer an
+            if settings.cli_debug_always_on:
+                self.debug_logger.enable()
+
+            # Personality Manager
             self.personality_manager = PersonalityManager()
 
-            # NEU: Function Registry
+            # Function Registry
             self.function_registry = get_function_registry()
         
         def reinit_brain_if_needed(self):
             """Prüfe ob der Provider gewechselt wurde und initialisiere Brain neu."""
             if settings.llm_provider != self._current_provider:
                 print(f"🔄 Provider wechsel erkannt: {self._current_provider} -> {settings.llm_provider}")
-                self.brain = get_brain()  # Neu laden
+                self.brain = get_brain()
                 self._current_provider = settings.llm_provider
-                # Deep Think Engine auch neu laden
                 self.deep_think_engine = DeepThinkEngine(
                     memory_engine=self.memory,
                     emotions_engine=self.emotions,
                     brain=self.brain
                 )
+                # Intent Processor auch neu laden
+                self.intent_processor = get_intent_processor()
                 return True
             return False
 
@@ -88,14 +114,15 @@ def init_chappie():
                     "energy": state.energy,
                     "curiosity": state.curiosity,
                 },
-                "daily_info_count": self.short_term_memory.get_count(),
+                "daily_info_count": self.short_term_memory_v2.get_count(),
+                "two_step_enabled": settings.enable_two_step_processing,
             }
 
         def _get_emotions_snapshot(self) -> Dict[str, int]:
             """Erstellt einen Snapshot der aktuellen Emotionen."""
             state = self.emotions.get_state()
             return {
-                "joy": state.happiness,
+                "happiness": state.happiness,
                 "trust": state.trust,
                 "energy": state.energy,
                 "curiosity": state.curiosity,
@@ -103,231 +130,450 @@ def init_chappie():
                 "motivation": state.motivation
             }
 
-        def _extract_function_calls(self, response: str) -> List[Dict]:
+        def process(self, user_input: str, history: List[Dict], debug_mode: bool = False) -> Dict[str, Any]:
             """
-            Extrahiert Funktionsaufrufe aus der Antwort.
-
+            Hauptverarbeitung mit Zwei-Schritte System.
+            
             Args:
-                response: Die LLM-Antwort
-
+                user_input: Eingabe des Users
+                history: Chat Verlauf
+                debug_mode: Ob Debug Info gesammelt werden soll
+                
             Returns:
-                Liste von Funktionsaufrufen
+                Dict mit Response und Metadaten
             """
-            pattern = r'<function_call>\s*(\{.*?\})\s*</function_call>'
-            matches = re.findall(pattern, response, re.DOTALL)
+            # Debug Mode setzen
+            if debug_mode:
+                self.debug_logger.enable()
+            else:
+                # Immer an für CLI, standardmäßig aus für Web UI (außer explizit an)
+                if not settings.cli_debug_always_on:
+                    self.debug_logger.disable()
 
-            function_calls = []
-            for match in matches:
-                try:
-                    func_data = eval(match)
-                    function_calls.append(func_data)
-                except:
-                    continue
+            # === STEP 1: Intent Analysis (wenn aktiviert) ===
+            if settings.enable_two_step_processing:
+                return self._process_two_step(user_input, history)
+            else:
+                # Fallback: Altes System
+                return self._process_legacy(user_input, history)
 
-            return function_calls
-
-        def _execute_function_calls(self, function_calls: List[Dict]) -> str:
+        def _process_two_step(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
             """
-            Führt alle Funktionsaufrufe aus und gibt die Ergebnisse zurück.
-
-            Args:
-                function_calls: Liste von Funktionsaufrufen
-
-            Returns:
-                Formatierte Ergebnisse
+            Zwei-Schritte Verarbeitung.
+            Step 1: Intent Analysis mit kleinem Modell
+            Step 2: Response Generation mit Hauptmodell
             """
-            results = []
-            for func_call in function_calls:
-                func_name = func_call.get("name", "")
-                args = func_call.get("arguments", {})
-
-                if self.function_registry.has_function(func_name):
-                    result = self.function_registry.execute(func_name, args)
-                    results.append(f"Funktion {func_name}: {result}")
-                else:
-                    results.append(f"FEHLER: Unbekannte Funktion {func_name}")
-
-            return "\n".join(results)
-
-        def process(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
-            # ===== BRAIN MONITOR: Emotionen VORHER =====
+            self.debug_logger.log_step1_start()
+            
+            # Emotionen Snapshot
             emotions_before = self._get_emotions_snapshot()
+            
+            # === STEP 1: Intent Analysis ===
+            intent_result = self.intent_processor.process(
+                user_input=user_input,
+                history=history,
+                current_emotions=emotions_before
+            )
+            
+            self.debug_logger.log_step1_complete(
+                intent_result.intent_type.value,
+                intent_result.confidence
+            )
+            self.debug_logger.log_step1_json(intent_result.raw_json)
+            
+            # === AUSFÜHRUNG: Tool Calls ===
+            self._execute_step1_tool_calls(intent_result.tool_calls)
+            
+            # === AUSFÜHRUNG: Emotions Updates ===
+            emotions_after = self._apply_emotion_updates(
+                emotions_before, 
+                intent_result.emotions_update
+            )
+            
+            # === AUSFÜHRUNG: Short-Term Entries ===
+            self._add_short_term_entries(intent_result.short_term_entries)
+            
+            # === AUSFÜHRUNG: Migration ===
+            migrated = self.short_term_memory_v2.migrate_expired_entries()
+            if migrated > 0:
+                self.debug_logger.log_migration(migrated)
+            
+            # === CONTEXT AUFBAUEN ===
+            context = self._build_context(intent_result.context_requirements)
+            
+            # === STEP 2: Response Generation ===
+            self.debug_logger.log_step2_start(get_active_model())
+            
+            response_data = self._generate_response(
+                user_input=user_input,
+                history=history,
+                context=context,
+                emotions=emotions_after
+            )
+            
+            self.debug_logger.log_step2_complete(
+                len(response_data["response_text"].split())
+            )
+            
+            # === AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN ===
+            # User Nachricht
+            self.short_term_memory_v2.add_entry(
+                content=f"User: {user_input}",
+                category="chat",
+                importance="normal"
+            )
+            # CHAPPiE Antwort
+            self.short_term_memory_v2.add_entry(
+                content=f"CHAPPiE: {response_data['response_text'][:200]}",  # Erste 200 chars
+                category="chat",
+                importance="normal"
+            )
+            
+            # === ERGEBNIS ZUSAMMENSTELLEN ===
+            return {
+                "response_text": response_data["response_text"],
+                "emotions": emotions_after,
+                "emotions_before": emotions_before,
+                "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
+                "thought_process": response_data.get("thought_process", ""),
+                "rag_memories": response_data.get("rag_memories", []),
+                "intent_type": intent_result.intent_type.value,
+                "intent_confidence": intent_result.confidence,
+                "tool_calls_executed": len(intent_result.tool_calls),
+                "short_term_count": self.short_term_memory_v2.get_count(),
+                "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+            }
 
-            # 1. LLM-basierte Emotions-Analyse (intelligent, kontextbewusst)
-            self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
+        def _execute_step1_tool_calls(self, tool_calls: List[Any]):
+            """Führt Tool Calls aus Step 1 aus."""
+            from memory.context_files import ContextFilesManager
+            
+            for tool_call in tool_calls:
+                try:
+                    if tool_call.tool == "update_user_profile":
+                        # Aktualisiere user.md
+                        self.context_files.update_user(tool_call.data)
+                        self.debug_logger.log_tool_call(
+                            "update_user_profile", 
+                            tool_call.action, 
+                            tool_call.data, 
+                            True
+                        )
+                        self.debug_logger.log_file_update("user.md", "updated")
+                        
+                    elif tool_call.tool == "update_soul":
+                        # Aktualisiere soul.md
+                        self.context_files.update_soul(tool_call.data)
+                        self.debug_logger.log_tool_call(
+                            "update_soul", 
+                            tool_call.action, 
+                            tool_call.data, 
+                            True
+                        )
+                        self.debug_logger.log_file_update("soul.md", "updated")
+                        
+                    elif tool_call.tool == "update_preferences":
+                        # Aktualisiere CHAPPiEsPreferences.md
+                        self.context_files.update_preferences(tool_call.data)
+                        self.debug_logger.log_tool_call(
+                            "update_preferences", 
+                            tool_call.action, 
+                            tool_call.data, 
+                            True
+                        )
+                        self.debug_logger.log_file_update("CHAPPiEsPreferences.md", "updated")
+                        
+                    else:
+                        self.debug_logger.log_warning(
+                            "TOOL_CALL", 
+                            f"Unbekannter Tool: {tool_call.tool}"
+                        )
+                        
+                except Exception as e:
+                    self.debug_logger.log_error(
+                        "TOOL_CALL", 
+                        f"Fehler bei {tool_call.tool}: {str(e)}"
+                    )
 
-            # ===== BRAIN MONITOR: Emotionen NACHHER =====
-            emotions_after = self._get_emotions_snapshot()
+        def _apply_emotion_updates(self, emotions_before: Dict[str, int], 
+                                   emotion_updates: Dict[str, Any]) -> Dict[str, int]:
+            """Wendet Emotions Updates an."""
+            emotions_after = emotions_before.copy()
+            
+            for emotion_name, update_data in emotion_updates.items():
+                if emotion_name in emotions_after:
+                    delta = update_data.delta
+                    new_value = emotions_after[emotion_name] + delta
+                    # Clamp to 0-100
+                    new_value = max(0, min(100, new_value))
+                    
+                    emotions_after[emotion_name] = new_value
+                    
+                    # Update im EmotionsEngine
+                    if hasattr(self.emotions.state, emotion_name):
+                        setattr(self.emotions.state, emotion_name, new_value)
+                    
+                    # Log
+                    self.debug_logger.log_emotion_update(
+                        emotion_name,
+                        emotions_before[emotion_name],
+                        new_value,
+                        update_data.reason
+                    )
+            
+            return emotions_after
 
-            # ===== BRAIN MONITOR: Delta berechnen =====
-            emotions_delta = {}
-            for key in emotions_before:
-                delta = emotions_after[key] - emotions_before[key]
-                if delta != 0:
-                    emotions_delta[key] = {
-                        "before": emotions_before[key],
-                        "after": emotions_after[key],
-                        "change": delta
-                    }
+        def _add_short_term_entries(self, entries: List[Any]):
+            """Fügt Short-Term Einträge hinzu."""
+            for entry in entries:
+                try:
+                    self.short_term_memory_v2.add_entry(
+                        content=entry.content,
+                        category=entry.category,
+                        importance=entry.importance
+                    )
+                    self.debug_logger.log_tool_call(
+                        "short_term_memory",
+                        "add",
+                        {"content": entry.content[:50], "category": entry.category},
+                        True
+                    )
+                except Exception as e:
+                    self.debug_logger.log_error(
+                        "SHORT_TERM",
+                        f"Fehler beim Hinzufügen: {str(e)}"
+                    )
 
-            # 2. RAG Memory Search
+        def _build_context(self, requirements: Dict[str, bool]) -> str:
+            """Baut den Context String basierend auf Requirements."""
+            context_parts = []
+            
+            if requirements.get("need_soul_context", True):
+                soul = self.context_files.get_soul_context()
+                if soul:
+                    context_parts.append(f"=== CHAPPiE'S SOUL ===\\n{soul}")
+            
+            if requirements.get("need_user_context", True):
+                user = self.context_files.get_user_context()
+                if user:
+                    context_parts.append(f"=== USER PROFILE ===\\n{user}")
+            
+            if requirements.get("need_preferences", True):
+                prefs = self.context_files.get_preferences_context()
+                if prefs:
+                    context_parts.append(f"=== CHAPPiE'S PREFERENCES ===\\n{prefs}")
+            
+            if requirements.get("need_short_term_memory", True):
+                short_term = self.short_term_memory_v2.get_formatted_for_prompt()
+                if short_term:
+                    context_parts.append(short_term)
+            
+            return "\\n\\n".join(context_parts)
+
+        def _generate_response(self, user_input: str, history: List[Dict], 
+                              context: str, emotions: Dict[str, int]) -> Dict[str, Any]:
+            """Generiert die finale Antwort (Step 2)."""
+            # RAG Memory Search
             memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            
+            # System Prompt bauen
+            system_prompt = get_system_prompt_with_emotions(
+                happiness=emotions["happiness"],
+                trust=emotions["trust"],
+                energy=emotions["energy"],
+                curiosity=emotions["curiosity"],
+                frustration=emotions["frustration"],
+                motivation=emotions["motivation"],
+                use_chain_of_thought=settings.chain_of_thought
+            )
+            
+            # Context hinzufügen
+            if context:
+                system_prompt += f"\\n\\n{context}"
+            
+            # Memories hinzufügen
+            if memories_for_prompt:
+                system_prompt += f"\\n\\n{memories_for_prompt}"
+            
+            # Messages bauen
+            messages = self.brain.build_prompt(system_prompt, "", user_input, history)
+            
+            # Generierung
+            gen_config = GenerationConfig(
+                max_tokens=settings.max_tokens,
+                temperature=settings.temperature,
+                stream=False,
+            )
+            
+            raw_response = self.brain.generate(messages, config=gen_config)
+            
+            # Parsing (CoT)
+            thought = ""
+            if settings.chain_of_thought:
+                parsed = parse_chain_of_thought(raw_response)
+                display_response = parsed.answer
+                thought = parsed.thought or ""
+            else:
+                display_response = raw_response
+            
+            # In Langzeitgedächtnis speichern
+            self.memory.add_memory(user_input, role="user")
+            self.memory.add_memory(display_response, role="assistant")
+            
+            return {
+                "response_text": display_response,
+                "thought_process": thought,
+                "rag_memories": memories,
+            }
 
-            # NEU: Daily Info Context
-            daily_info_for_prompt = self.short_term_memory.get_formatted_for_prompt(query=user_input)
+        def _calculate_emotion_delta(self, before: Dict[str, int], 
+                                     after: Dict[str, int]) -> Dict[str, Any]:
+            """Berechnet Emotions Deltas."""
+            delta = {}
+            for key in before:
+                change = after[key] - before[key]
+                if change != 0:
+                    delta[key] = {
+                        "before": before[key],
+                        "after": after[key],
+                        "change": change
+                    }
+            return delta
 
-            # 3. Prompt Building mit Persönlichkeit und Functions
+        def _process_legacy(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
+            """Legacy Verarbeitung (altes System als Fallback)."""
+            emotions_before = self._get_emotions_snapshot()
+            
+            # Einfache Emotions Analyse
+            self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
+            emotions_after = self._get_emotions_snapshot()
+            
+            # RAG
+            memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
+            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            
+            # Prompt
             state = self.emotions.get_state()
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 use_chain_of_thought=settings.chain_of_thought
             )
-
-            # NEU: Persönlichkeits-Kontext hinzufügen
-            personality_context = get_personality_context()
-            system_prompt += f"\n\n{personality_context}"
-
-            # NEU: Function-Calling Instruction (wenn aktiviert)
-            if settings.enable_functions:
-                func_instruction = get_function_calling_instruction()
-                system_prompt += f"\n\n{func_instruction}"
-
-            # NEU: Daily Info zum Prompt hinzufügen
-            if daily_info_for_prompt:
-                system_prompt += f"\n\n{daily_info_for_prompt}"
-
-            # Baue Nachrichten-Verlauf beachte Context
+            
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
-
-            # 4. Generierung
+            
+            # Generierung
             gen_config = GenerationConfig(
                 max_tokens=settings.max_tokens,
                 temperature=settings.temperature,
                 stream=False,
             )
             raw_response = self.brain.generate(messages, config=gen_config)
-
-            # 5. Function-Calling Check
-            function_calls = self._extract_function_calls(raw_response)
-            function_results = ""
-
-            if function_calls:
-                # Entferne function_call Tags für die Anzeige
-                display_response = re.sub(r'<function_call>.*?</function_call>', '', raw_response, flags=re.DOTALL).strip()
-                # Führe Funktionen aus
-                function_results = self._execute_function_calls(function_calls)
-                # Wenn Functions ausgeführt wurden, generiere nochmal ohne die Funktionsaufrufe
-                if function_results:
-                    messages.append(Message(role="user", content=f"Ergebnisse der Funktionsaufrufe:\n{function_results}\n\nBitte antworte jetzt auf die ursprüngliche Anfrage unter Berücksichtigung dieser Ergebnisse."))
-                    raw_response = self.brain.generate(messages, config=gen_config)
-            else:
-                display_response = raw_response
-
-            # 6. Parsing (CoT)
+            
+            # Parsing
+            thought = ""
             if settings.chain_of_thought:
-                parsed = parse_chain_of_thought(display_response)
+                parsed = parse_chain_of_thought(raw_response)
                 display_response = parsed.answer
                 thought = parsed.thought or ""
             else:
-                thought = ""
-
-            # 7. Kurzzeitgedaechtnis speichern (ChromaDB)
+                display_response = raw_response
+            
+            # Speichern
             self.memory.add_memory(user_input, role="user")
             self.memory.add_memory(display_response, role="assistant")
-
-            # NEU: Automatisch wichtige Infos in Daily Info speichern
-            if self._should_store_in_daily_info(user_input):
-                info = self._extract_daily_info(user_input)
-                if info:
-                    importance = "high" if self._is_important(user_input) else "normal"
-                    self.short_term_memory.add_info(
-                        content=info,
-                        importance=importance,
-                        category="user"
-                    )
-
+            
+            # AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN (Legacy Mode)
+            self.short_term_memory_v2.add_entry(
+                content=f"User: {user_input}",
+                category="chat",
+                importance="normal"
+            )
+            self.short_term_memory_v2.add_entry(
+                content=f"CHAPPiE: {display_response[:200]}",
+                category="chat",
+                importance="normal"
+            )
+            
             return {
                 "response_text": display_response,
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
-                "emotions_delta": emotions_delta,
+                "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
                 "thought_process": thought,
                 "rag_memories": memories,
-                "input_analysis": user_input,
-                "function_results": function_results,
-                "daily_info_count": self.short_term_memory.get_count(),
+                "intent_type": "legacy",
+                "intent_confidence": 1.0,
+                "tool_calls_executed": 0,
+                "short_term_count": self.short_term_memory_v2.get_count(),
+                "debug_log": None,
             }
 
-        def _should_store_in_daily_info(self, user_input: str) -> bool:
-            """
-            Prüft ob die User-Eingabe wichtige Infos enthält die im Daily Info gespeichert werden sollten.
-            """
-            important_keywords = [
-                "ich heiße", "mein name", "ich mag", "ich hasse",
-                "ich möchte", "ich brauche", "erinnere mich",
-                "ich arbeite", "ich wohne", "ich studiere"
-            ]
-
-            user_lower = user_input.lower()
-            return any(keyword in user_lower for keyword in important_keywords)
-
-        def _extract_daily_info(self, user_input: str) -> str:
-            """
-            Extrahiert wichtige Infos aus der User-Eingabe.
-            """
-            # Einfache Extraktion - könnte mit LLM verbessert werden
-            user_lower = user_input.lower()
-
-            if "ich heiße" in user_lower or "mein name" in user_lower:
-                return f"User hat sich vorgestellt: {user_input}"
-            elif "ich mag" in user_lower:
-                return f"User mag: {user_input}"
-            elif "ich hasse" in user_lower:
-                return f"User hasst/nicht mag: {user_input}"
-            elif "ich wohne" in user_lower or "ich lebe" in user_lower:
-                return f"Wohnort/Standort: {user_input}"
-            elif "ich arbeite" in user_lower or "ich jobbe" in user_lower:
-                return f"Arbeit/Beruf: {user_input}"
-            else:
-                return user_input[:100] if len(user_input) > 100 else user_input
-
-        def _is_important(self, user_input: str) -> bool:
-            """Prüft ob die Info besonders wichtig ist."""
-            important_patterns = ["erinnere mich", "wichtig", "merke dir", "nicht vergessen"]
-            user_lower = user_input.lower()
-            return any(pattern in user_lower for pattern in important_patterns)
-
-        # === NEU: Command Handler ===
+        # === Command Handler ===
 
         def handle_command(self, command: str) -> str:
             """Verarbeitet Slash-Commands."""
             cmd = command.lower().strip()
 
-            if cmd == "/daily":
-                infos = self.short_term_memory.get_relevant_infos()
-                if not infos:
+            if cmd == "/daily" or cmd == "/shortterm":
+                entries = self.short_term_memory_v2.get_active_entries()
+                if not entries:
                     return "Keine Einträge im Kurzzeitgedächtnis."
-                lines = ["**Kurzzeitgedächtnis:**\n"]
-                for timestamp, importance, category, content in infos:
-                    lines.append(f"- [{importance}] [{category}] {content}")
-                return "\n".join(lines)
+                lines = ["**Kurzzeitgedächtnis (24h):**\\n"]
+                for entry in entries[:20]:
+                    from datetime import datetime
+                    created = datetime.fromisoformat(entry.created_at)
+                    time_str = created.strftime("%d.%m %H:%M")
+                    lines.append(f"- [{time_str}] [{entry.importance}] [{entry.category}] {entry.content}")
+                return "\\n".join(lines)
 
             elif cmd == "/personality":
                 return self.personality_manager.get_for_prompt()
+            
+            elif cmd == "/soul":
+                return self.context_files.get_soul_context()
+            
+            elif cmd == "/user":
+                return self.context_files.get_user_context()
+            
+            elif cmd == "/prefs" or cmd == "/preferences":
+                return self.context_files.get_preferences_context()
 
             elif cmd == "/consolidate":
-                count = self.short_term_memory.cleanup_expired()
-                return f"Bereinigung abgeschlossen: {count} abgelaufene Einträge entfernt."
+                migrated = self.short_term_memory_v2.migrate_expired_entries()
+                return f"Bereinigung abgeschlossen: {migrated} Einträge migriert."
 
             elif cmd == "/reflect":
-                # CHAPI reflektiert über seine Persönlichkeit
                 insights = self.personality_manager.get_recent_reflections(limit=3)
-                return f"Deine letzten Selbst-Reflexionen:\n" + "\n".join(insights) if insights else "Noch keine Reflexionen dokumentiert."
+                return f"Deine letzten Selbst-Reflexionen:\\n" + "\\n".join(insights) if insights else "Noch keine Reflexionen dokumentiert."
 
             elif cmd == "/functions":
                 funcs = self.function_registry.get_function_names()
-                return "Verfügbare Funktionen:\n" + "\n".join(f"- {f}" for f in funcs)
+                return "Verfügbare Funktionen:\\n" + "\\n".join(f"- {f}" for f in funcs)
+            
+            elif cmd == "/debug":
+                # Toggle Debug Mode
+                if self.debug_logger.enabled:
+                    self.debug_logger.disable()
+                    return "Debug Mode: AUS"
+                else:
+                    self.debug_logger.enable()
+                    return "Debug Mode: AN\\n\\n" + self.debug_logger.get_formatted_log()
+            
+            elif cmd == "/step1":
+                # Zeige letzten Step 1 JSON
+                entries = self.debug_logger.get_entries_by_category("STEP1_JSON")
+                if entries:
+                    last_entry = entries[-1]
+                    json_preview = last_entry.details.get("json_preview", "Keine Daten")
+                    return f"**Letzter Step 1 JSON:**\\n\\n```json\\n{json_preview}\\n```"
+                return "Noch kein Step 1 JSON vorhanden."
+            
+            elif cmd == "/twostep":
+                # Toggle Two-Step Processing
+                settings.enable_two_step_processing = not settings.enable_two_step_processing
+                status = "AN" if settings.enable_two_step_processing else "AUS"
+                return f"Zwei-Schritte System: {status}"
 
             return f"Unbekannter Command: {command}"
 

@@ -26,30 +26,37 @@ def render_sidebar(backend):
             st.session_state.debug_mode = not st.session_state.debug_mode
             st.rerun()
 
-        # === MEMORY ENHANCEMENT COMMANDS ===
         st.markdown("---")
-        st.markdown("**MEMORY FEATURES**")
-        
-        if st.button("Daily Info", use_container_width=True, key="sidebar_daily"):
-            st.session_state.messages.append({"role": "user", "content": "/daily"})
-            st.rerun()
-        
-        if st.button("Persoenlichkeit", use_container_width=True, key="sidebar_personality"):
-            st.session_state.messages.append({"role": "user", "content": "/personality"})
-            st.rerun()
-        
-        if st.button("Konsolidieren", use_container_width=True, key="sidebar_consolidate"):
-            st.session_state.messages.append({"role": "user", "content": "/consolidate"})
-            st.rerun()
-        
-        if st.button("Reflektieren", use_container_width=True, key="sidebar_reflect"):
-            st.session_state.messages.append({"role": "user", "content": "/reflect"})
-            st.rerun()
-
-        st.markdown("---")
-        
         st.markdown("**VITALZEICHEN**")
         render_vital_signs(backend)
+        
+        st.markdown("---")
+        
+        # === CONTEXT FILES WIDGETS ===
+        st.markdown("**CONTEXT DATEIEN**")
+        
+        # Clean und simple Anzeige der 3 Context-Dateien (ohne Farben)
+        try:
+            # Soul.md - CHAPPiE's Selbstwahrnehmung
+            st.markdown("**SOUL**")
+            if st.button("soul.md anzeigen", key="show_soul", use_container_width=True):
+                st.session_state.show_soul_context = True
+                st.rerun()
+            
+            # User.md - Benutzerprofil
+            st.markdown("**USER**")
+            if st.button("user.md anzeigen", key="show_user", use_container_width=True):
+                st.session_state.show_user_context = True
+                st.rerun()
+            
+            # Preferences.md - CHAPPiE's Vorlieben
+            st.markdown("**PREFS**")
+            if st.button("CHAPPiEsPreferences.md anzeigen", key="show_prefs", use_container_width=True):
+                st.session_state.show_prefs_context = True
+                st.rerun()
+                
+        except Exception as e:
+            st.error(f"Fehler beim Laden: {e}")
         
         st.markdown("---")
 
