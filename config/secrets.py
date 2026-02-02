@@ -10,7 +10,7 @@ Hier trägst du deine API-Schlüssel und Modellnamen ein.
 
 # Groq Cloud API Key
 # Hole dir einen kostenlosen Key von: https://console.groq.com/keys
-GROQ_API_KEY = "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"
+GROQ_API_KEY = ""
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -37,7 +37,7 @@ GROQ_MODEL = "moonshotai/kimi-k2-instruct-0905"
 
 # --- Cerebras (Cloud - High Speed) ---
 # Hole dir einen API Key von: https://cloud.cerebras.ai
-CEREBRAS_API_KEY = "csk-rrfvnwjeyh5c6nvfcchnd446whnfvemy29353mdrxpnn6v8k"
+CEREBRAS_API_KEY = ""
 
 # Verfügbare Modelle: llama-3.3-70b, llama-3.1-8b, qwen-3-32b
 CEREBRAS_MODEL = "llama-3.3-70b"
