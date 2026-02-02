@@ -102,7 +102,7 @@ def render_chat_interface(backend):
             <div class="info-card-box">
                 <div style='font-size: 0.8rem; color: #8b949e; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;'>Kurzzeit</div>
                 <div style='font-size: 1.1rem; font-weight: 600; color: #d2a8ff;'>
-                    {backend.short_term_memory.get_count()}
+                    {backend.short_term_memory_v2.get_count()}
                 </div>
                 <div style='font-size: 0.8rem;'>Einträge</div>
             </div>
