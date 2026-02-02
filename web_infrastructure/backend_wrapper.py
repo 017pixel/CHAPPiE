@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import re
+import datetime
+
 from typing import Dict, Any, List
 
 # CHAPiE imports
@@ -421,6 +423,10 @@ def init_chappie():
             self.memory.add_memory(user_input, role="user")
             self.memory.add_memory(display_response, role="assistant")
             
+            # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
+            
+            st.session_state.last_memory_timestamp = datetime.datetime.now().isoformat()
+            
             return {
                 "response_text": display_response,
                 "thought_process": thought,
@@ -483,6 +489,10 @@ def init_chappie():
             self.memory.add_memory(user_input, role="user")
             self.memory.add_memory(display_response, role="assistant")
             
+            # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
+            
+            st.session_state.last_memory_timestamp = datetime.datetime.now().isoformat()
+            
             # AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN (Legacy Mode)
             self.short_term_memory_v2.add_entry(
                 content=f"User: {user_input}",
@@ -521,7 +531,7 @@ def init_chappie():
                     return "Keine Einträge im Kurzzeitgedächtnis."
                 lines = ["**Kurzzeitgedächtnis (24h):**\\n"]
                 for entry in entries[:20]:
-                    from datetime import datetime
+                    from datetime import datetime 
                     created = datetime.fromisoformat(entry.created_at)
                     time_str = created.strftime("%d.%m %H:%M")
                     lines.append(f"- [{time_str}] [{entry.importance}] [{entry.category}] {entry.content}")

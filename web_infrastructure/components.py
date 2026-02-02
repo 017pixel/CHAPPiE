@@ -69,37 +69,41 @@ def render_vital_signs(backend):
 
         # Zeige letzte Memory wenn verfügbar
         if memory_count > 0:
-            try:
-                # Nutze cached memory engine
-                recent = live_memory.get_recent_memories(limit=1)
-                if recent:
-                    last_memory = recent[0]
-                    # Robust attribute access
-                    if isinstance(last_memory, dict):
-                        timestamp_str = last_memory.get('timestamp', 'Unbekannt')
-                    else:
-                        timestamp_str = getattr(last_memory, 'timestamp', 'Unbekannt')
-                        
-                    if timestamp_str and timestamp_str != 'Unbekannt':
-                        try:
-                            # Parse ISO timestamp
-                            dt = datetime.fromisoformat(timestamp_str)
-                            
-                            # Treat naive timestamps as UTC (as planned)
-                            if dt.tzinfo is None:
-                                dt = dt.replace(tzinfo=timezone.utc)
-                            
-                            # Convert to German time
-                            german_tz = ZoneInfo("Europe/Berlin")
-                            formatted = dt.astimezone(german_tz).strftime("%d.%m.%Y %H:%M:%S")
-                            st.caption(f"Letzte: {formatted}")
-                        except ValueError:
-                            st.caption("Letzte: Unbekannt")
-                    else:
-                        st.caption("Letzte: Unbekannt")
-            except Exception as ex:
-                # Silent fail für UI cleaness
-                pass
+            timestamp_str = None
+            
+            # Priorität 1: Session State Zeitstempel (wird bei jeder Chat-Nachricht aktualisiert)
+            if "last_memory_timestamp" in st.session_state:
+                timestamp_str = st.session_state.last_memory_timestamp
+            else:
+                # Fallback: Aus Datenbank laden (bei Initialisierung oder wenn keine Chat-Interaktion)
+                try:
+                    recent = live_memory.get_recent_memories(limit=1)
+                    if recent:
+                        last_memory = recent[0]
+                        if isinstance(last_memory, dict):
+                            timestamp_str = last_memory.get('timestamp')
+                        else:
+                            timestamp_str = getattr(last_memory, 'timestamp', None)
+                except Exception:
+                    pass
+            
+            # Zeitstempel formatieren und anzeigen
+            if timestamp_str:
+                try:
+                    dt = datetime.fromisoformat(timestamp_str)
+                    
+                    # Treat naive timestamps as UTC
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    
+                    # Convert to German time
+                    german_tz = ZoneInfo("Europe/Berlin")
+                    formatted = dt.astimezone(german_tz).strftime("%d.%m.%Y %H:%M:%S")
+                    st.caption(f"Letzte: {formatted}")
+                except (ValueError, TypeError):
+                    st.caption("Letzte: Unbekannt")
+            else:
+                st.caption("Letzte: Unbekannt")
 
     except Exception as e:
         st.metric("[BRAIN] Erinnerungen", "Fehler")
