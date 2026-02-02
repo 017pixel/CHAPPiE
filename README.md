@@ -4,7 +4,6 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-017pixel%2FCHAPPiE-blue?logo=github)](https://github.com/017pixel/CHAPPiE)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 **Ein KI-Agent mit episodischem Gedächtnis, Zwei-Schritte Verarbeitung und autonomem Trainingsmodus**
 
@@ -380,12 +379,6 @@ Pull Requests sind willkommen! Bitte:
 3. Committe deine Änderungen
 4. Push zum Branch
 5. Öffne einen Pull Request
-
----
-
-## 📄 Lizenz
-
-Dieses Projekt ist unter der MIT Lizenz lizenziert.
 
 ---
 
