@@ -16,6 +16,8 @@ def init_session_state():
         st.session_state.show_settings = False
     if "show_memories" not in st.session_state:
         st.session_state.show_memories = False
+    if "show_training" not in st.session_state:
+        st.session_state.show_training = False
     # Brain Monitor Debug Mode
     if "debug_mode" not in st.session_state:
         st.session_state.debug_mode = False

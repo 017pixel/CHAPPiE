@@ -167,11 +167,12 @@ class EmotionsEngine:
         """Initialisiert die Ollama Brain-Instanz einmalig (gecached)."""
         try:
             from brain.ollama_brain import OllamaBrain
-            brain = OllamaBrain(model=settings.emotion_analysis_model, host=settings.ollama_host)
+            emotion_host = getattr(settings, 'emotion_analysis_host', settings.ollama_host)
+            brain = OllamaBrain(model=settings.emotion_analysis_model, host=emotion_host)
             
             if brain.is_available():
                 EmotionsEngine._cached_brain = brain
-                print("   Emotions LLM (llama3:8b) geladen und gecached!")
+                print(f"   Emotions LLM ({settings.emotion_analysis_model}) geladen und gecached!")
             else:
                 print("   Ollama nicht verfuegbar - Fallback auf Simple-Analyse")
                 EmotionsEngine._cached_brain = None

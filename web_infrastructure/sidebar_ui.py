@@ -13,10 +13,20 @@ def render_sidebar(backend):
 
         if st.button("Alle Erinnerungen", use_container_width=True, key="sidebar_memories"):
             st.session_state.show_memories = not st.session_state.show_memories
+            st.session_state.show_settings = False
+            st.session_state.show_training = False
             st.rerun()
         
         if st.button("Einstellungen", use_container_width=True, key="sidebar_settings"):
             st.session_state.show_settings = not st.session_state.show_settings
+            st.session_state.show_memories = False
+            st.session_state.show_training = False
+            st.rerun()
+        
+        if st.button("Training", use_container_width=True, key="sidebar_training"):
+            st.session_state.show_training = not st.session_state.show_training
+            st.session_state.show_memories = False
+            st.session_state.show_settings = False
             st.rerun()
         
         # === BRAIN MONITOR TOGGLE ===

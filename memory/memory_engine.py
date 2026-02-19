@@ -432,25 +432,26 @@ class MemoryEngine:
         )
 
         messages = [Message(role="user", content=prompt)]
+        
+        query_provider = getattr(settings, 'query_extraction_provider', None) or settings.llm_provider
 
-        # Priority A: Groq API
-        try:
-            from brain.groq_brain import GroqBrain
-            groq_brain = GroqBrain(model=settings.query_extraction_groq_model)
+        if query_provider == LLMProvider.GROQ or settings.llm_provider == LLMProvider.GROQ:
+            try:
+                from brain.groq_brain import GroqBrain
+                groq_brain = GroqBrain(model=settings.query_extraction_groq_model)
 
-            if groq_brain.is_available():
-                result = groq_brain.generate(messages, config=gen_config)
+                if groq_brain.is_available():
+                    result = groq_brain.generate(messages, config=gen_config)
 
-                if isinstance(result, str) and result.strip():
-                    extracted = result.strip()
-                    if settings.debug:
-                        print(f"   Query Extraction (Groq): '{user_input}' -> '{extracted}'")
-                    return extracted
-        except Exception as e:
-            if settings.debug:
-                print(f"   Groq Query Extraction fehlgeschlagen: {e}")
+                    if isinstance(result, str) and result.strip():
+                        extracted = result.strip()
+                        if settings.debug:
+                            print(f"   Query Extraction (Groq): '{user_input}' -> '{extracted}'")
+                        return extracted
+            except Exception as e:
+                if settings.debug:
+                    print(f"   Groq Query Extraction fehlgeschlagen: {e}")
 
-        # Priority B: Ollama Fallback
         try:
             from brain.ollama_brain import OllamaBrain
             ollama_brain = OllamaBrain(

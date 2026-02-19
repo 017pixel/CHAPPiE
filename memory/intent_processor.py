@@ -77,38 +77,35 @@ class IntentProcessor:
         self._init_brain()
     
     def _init_brain(self):
-        """Initialisiert das kleine Modell basierend auf Provider."""
+        """Initialisiert das Modell basierend auf Intent-Provider oder Haupt-Provider."""
+        intent_provider = settings.intent_provider or settings.llm_provider
         original_provider = settings.llm_provider
-        original_model = None
+        original_models = {
+            LLMProvider.GROQ: settings.groq_model,
+            LLMProvider.CEREBRAS: settings.cerebras_model,
+            LLMProvider.NVIDIA: settings.nvidia_model,
+            LLMProvider.OLLAMA: settings.ollama_model
+        }
         
-        if original_provider == LLMProvider.GROQ:
-            original_model = settings.groq_model
-        elif original_provider == LLMProvider.CEREBRAS:
-            original_model = settings.cerebras_model
-        elif original_provider == LLMProvider.NVIDIA:
-            original_model = settings.nvidia_model
-        else:
-            original_model = settings.ollama_model
-        
-        if original_provider == LLMProvider.GROQ:
+        if intent_provider == LLMProvider.GROQ:
             settings.groq_model = settings.intent_processor_model_groq
-        elif original_provider == LLMProvider.CEREBRAS:
+        elif intent_provider == LLMProvider.CEREBRAS:
             settings.cerebras_model = settings.intent_processor_model_cerebras
-        elif original_provider == LLMProvider.NVIDIA:
+        elif intent_provider == LLMProvider.NVIDIA:
             settings.nvidia_model = settings.intent_processor_model_nvidia
         else:
             settings.ollama_model = settings.intent_processor_model_ollama
         
+        original_llm_provider = settings.llm_provider
+        settings.llm_provider = intent_provider
+        
         self.brain = get_brain()
         
-        if original_provider == LLMProvider.GROQ:
-            settings.groq_model = original_model
-        elif original_provider == LLMProvider.CEREBRAS:
-            settings.cerebras_model = original_model
-        elif original_provider == LLMProvider.NVIDIA:
-            settings.nvidia_model = original_model
-        else:
-            settings.ollama_model = original_model
+        settings.llm_provider = original_llm_provider
+        settings.groq_model = original_models[LLMProvider.GROQ]
+        settings.cerebras_model = original_models[LLMProvider.CEREBRAS]
+        settings.nvidia_model = original_models[LLMProvider.NVIDIA]
+        settings.ollama_model = original_models[LLMProvider.OLLAMA]
     
     def process(self, user_input: str, history: List[Dict], 
                 current_emotions: Dict[str, int]) -> IntentResult:

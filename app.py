@@ -8,6 +8,7 @@ from web_infrastructure.memories_ui import render_memories_overlay
 from web_infrastructure.context_ui import render_context_overlays
 from web_infrastructure.chat_ui import render_chat_interface
 from web_infrastructure.command_handler import process_command, process_chat_message
+from web_infrastructure.training_ui import render_training_ui
 
 # ============================================
 # KONFIGURATION UND INITIALISIERUNG
@@ -38,6 +39,8 @@ def main():
         render_memories_overlay(backend)
     elif st.session_state.show_settings:
         render_settings_overlay(backend)
+    elif st.session_state.show_training:
+        render_training_ui()
     else:
         # Chat Interface & Input Loop
         user_input = render_chat_interface(backend)

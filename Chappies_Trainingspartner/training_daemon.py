@@ -137,6 +137,28 @@ def clear_training_state():
         logging.info("Alter Training-State geloescht - starte frisch")
 
 
+def write_pid_file():
+    """Schreibt die PID des aktuellen Prozesses in training.pid."""
+    pid_file = os.path.join(PROJECT_ROOT, 'training.pid')
+    try:
+        with open(pid_file, 'w') as f:
+            f.write(str(os.getpid()))
+        logging.info(f"PID {os.getpid()} in {pid_file} geschrieben")
+    except Exception as e:
+        logging.warning(f"Konnte PID-Datei nicht schreiben: {e}")
+
+
+def remove_pid_file():
+    """Entfernt die PID-Datei beim Beenden."""
+    pid_file = os.path.join(PROJECT_ROOT, 'training.pid')
+    try:
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+            logging.info("PID-Datei entfernt")
+    except Exception as e:
+        logging.warning(f"Konnte PID-Datei nicht entfernen: {e}")
+
+
 def main():
     # Argument Parser
     parser = argparse.ArgumentParser(
@@ -162,6 +184,9 @@ Beispiele:
     args = parser.parse_args()
     
     setup_logging()
+    
+    write_pid_file()
+    
     logging.info("=" * 70)
     logging.info("CHAPiE TRAINING DAEMON GESTARTET")
     logging.info("=" * 70)
@@ -235,15 +260,32 @@ Beispiele:
         
         logging.info(f"Aktive Konfiguration: {config.__dict__}")
         
-        # WICHTIG: Settings global setzen, damit Chappie auch den richtigen Provider nutzt
         from config.config import settings, LLMProvider
-        if provider == "groq":
-             settings.llm_provider = LLMProvider.GROQ
-             if model_name: settings.groq_model = model_name
+        
+        if settings.training_use_global_settings:
+            logging.info(f"Verwende globale Settings: Provider={settings.llm_provider}")
         else:
-             settings.llm_provider = LLMProvider.OLLAMA
-             if model_name: settings.ollama_model = model_name
-             
+            if settings.training_chappie_provider:
+                settings.llm_provider = settings.training_chappie_provider
+                if settings.training_chappie_model:
+                    if settings.llm_provider == LLMProvider.GROQ:
+                        settings.groq_model = settings.training_chappie_model
+                    elif settings.llm_provider == LLMProvider.CEREBRAS:
+                        settings.cerebras_model = settings.training_chappie_model
+                    elif settings.llm_provider == LLMProvider.NVIDIA:
+                        settings.nvidia_model = settings.training_chappie_model
+                    else:
+                        settings.ollama_model = settings.training_chappie_model
+                logging.info(f"Training-spezifische Settings: Provider={settings.llm_provider}, Modell={settings.training_chappie_model}")
+            else:
+                if provider == "groq":
+                    settings.llm_provider = LLMProvider.GROQ
+                    if model_name: settings.groq_model = model_name
+                else:
+                    settings.llm_provider = LLMProvider.OLLAMA
+                    if model_name: settings.ollama_model = model_name
+                logging.info(f"Legacy Config Provider={settings.llm_provider}")
+              
         logging.info(f"Globale Settings aktualisiert: Provider={settings.llm_provider}")
         
         trainer = TrainerAgent(config)
@@ -262,6 +304,8 @@ Beispiele:
     except Exception as e:
         logging.error(f"Kritischer Fehler im Training-Daemon: {e}", exc_info=True)
         raise
+    finally:
+        remove_pid_file()
 
 if __name__ == "__main__":
     main()
