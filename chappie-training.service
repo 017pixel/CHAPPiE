@@ -1,0 +1,35 @@
+[Unit]
+Description=CHAPPiE Autonomous Training Service
+After=network.target
+
+[Service]
+# User unter dem es laufen soll (Anpassen falls nötig!)
+User=bbecker
+Group=bbecker
+
+# Pfad zum Projekt
+WorkingDirectory=/home/bbecker/CHAPPiE
+
+# Environment Variablen laden
+Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONIOENCODING=utf-8"
+# WICHTIG: Erzwinge CPU-Nutzung um Segmentation Faults bei NVML-Fehlern zu vermeiden
+Environment="CUDA_VISIBLE_DEVICES=-1"
+
+# Start-Befehl (Direkter Pfad ist robuster auf Linux)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 Chappies_Trainingspartner/training_daemon.py
+
+# Restart bei Crash (Autonomie ist Key!)
+Restart=always
+RestartSec=10
+
+# Graceful Shutdown
+TimeoutStopSec=30
+
+# Logging in Datei (zusätzlich zu journalctl)
+StandardOutput=append:/home/bbecker/CHAPPiE/training_daemon.log
+StandardError=append:/home/bbecker/CHAPPiE/training_daemon.log
+
+[Install]
+WantedBy=multi-user.target

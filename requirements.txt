@@ -1,0 +1,47 @@
+# CHAPiE - Requirements
+# Python 3.11+
+
+# === LLM Backends ===
+ollama>=0.4.0                   # Ollama Python Client für lokale Modelle
+groq>=0.4.0                     # Groq Cloud API Client
+openai>=1.0.0                   # OpenAI kompatibler Client (für Cerebras)
+
+# === Vector Database & Embeddings ===
+chromadb>=0.4.22                # Lokale Vektor-Datenbank
+sentence-transformers>=2.2.2   # Für all-MiniLM-L6-v2 Embedding Modell
+
+# === Utilities ===
+python-dotenv>=1.0.0            # .env Datei Support (optional)
+rich>=13.7.0                    # Schönes Terminal-Output mit Farben & Formatierung
+streamlit>=1.28.0               # Web-GUI Framework für Browser-Interface
+
+# === Optional: Development ===
+# pytest>=7.4.0                 # Testing (optional)
+# black>=23.0.0                 # Code Formatter (optional)
+
+# =============================================================================
+# NEUE MODELLE FUER STEP 1 (Intent Processor) - 2026
+# =============================================================================
+#
+# === Cerebras (Step 1 Intent Processor) ===
+# Model: qwen-3-235b-a22b-instruct-2507
+# Verwendung: Intent Analysis, Tool Calls, JSON Generation
+# API: https://api.cerebras.ai/v1
+#
+# === Groq (Step 1 Intent Processor) ===
+# Model: openai/gpt-oss-120b
+# Verwendung: Intent Analysis, Tool Calls, JSON Generation
+# API: https://api.groq.com/openai/v1
+#
+# === Ollama (Step 1 Intent Processor - Lokal) ===
+# Model: gpt-oss-20b
+# Verwendung: Intent Analysis, Tool Calls, JSON Generation
+# Installieren mit: ollama pull gpt-oss-20b
+# Alternative: qwen2.5:7b (fallback)
+#
+# === Chat Modelle (Step 2 - Response Generation) ===
+# Bleiben unverändert:
+# - Cerebras: llama-3.3-70b
+# - Groq: moonshotai/kimi-k2-instruct-0905
+# - Ollama: llama3:8b oder größere Modelle
+# =============================================================================

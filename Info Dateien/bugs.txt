@@ -1,0 +1,24 @@
+wenn ich mit chappie schreibe, wärend er gerade im trainingsmodus ist, passiert bei der ersten eingabe kein fehler, chappie antwortet und training ghet weiter, aber bei der zweiten eingabe kommt das hier: 
+
+TypeError: object of type 'NoneType' has no len()
+Traceback:
+File "/home/bbecker/CHAPPiE/venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/bbecker/CHAPPiE/venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/bbecker/CHAPPiE/app.py", line 51, in <module>
+    main()
+File "/home/bbecker/CHAPPiE/app.py", line 39, in main
+    user_input = render_chat_interface(backend)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/bbecker/CHAPPiE/web_infrastructure/chat_ui.py", line 50, in render_chat_interface
+    render_memory_item(m, idx + 1)
+File "/home/bbecker/CHAPPiE/web_infrastructure/components.py", line 138, in render_memory_item
+    st.caption(content[:250] + "..." if len(content) > 250 else content)
+                                        ^^^^^^^^^^^^
+
+
+Nächster bug: 
+
