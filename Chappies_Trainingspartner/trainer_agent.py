@@ -2,7 +2,7 @@
 Trainer Agent Module
 =====================
 Simuliert einen User-Agenten der CHAPPiE trainiert.
-Unterstützt dynamisches Curriculum mit mehreren Themen und Zeiten.
+Unterstuetzt dynamisches Curriculum mit mehreren Themen und Zeiten.
 """
 
 import time
@@ -17,11 +17,11 @@ from rich.console import Console
 import logging
 log = logging.getLogger(__name__)
 
-# Imports für LLM Backend
 from config.config import settings, get_active_model, LLMProvider
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.base_brain import Message, GenerationConfig
+from .repetition_tracker import RepetitionTracker
 
 console = Console()
 
@@ -118,13 +118,17 @@ class TrainerAgent:
         self.current_topic_index = 0
         self.topic_start_time = datetime.now()
         
-        # Fallback Counter für robuste Antworten
+        # Fallback Counter fuer robuste Antworten
         self._fallback_counter = 0
         self.MAX_FALLBACK_BEFORE_LOCAL = 3
         
-        # Brain initialisieren (eigenes Brain für den Trainer)
+        # Brain initialisieren (eigenes Brain fuer den Trainer)
         self.brain = get_brain()
         self._is_local = settings.llm_provider == LLMProvider.OLLAMA
+        
+        # Repetition Tracking
+        self.repetition_tracker = RepetitionTracker(window_size=30)
+        self.last_novelty_score = 1.0
         
         msg = f"TrainerAgent initialisiert: Persona='{config.persona}'"
         console.print(f"[cyan]{msg}[/cyan]")
@@ -187,19 +191,22 @@ class TrainerAgent:
     
     def _build_system_prompt(self) -> str:
         """
-        Baut den System-Prompt für den Trainer.
+        Baut den System-Prompt fuer den Trainer.
         
         Returns:
             Dynamischer System-Prompt mit aktuellem Fokus
         """
         current_focus = self.get_current_focus()
+        diversity_feedback = self.repetition_tracker.get_diversity_feedback()
         
-        return f"""Du bist ein Trainingspartner für eine KI namens CHAPPiE.
+        return f"""Du bist ein Trainingspartner fuer eine KI namens CHAPPiE.
 Deine Persona: {self.config.persona}
 Aktueller Trainings-Fokus: {current_focus}
 
+{diversity_feedback}
+
 DEINE AUFGABE:
-- Führe ein natürliches Gespräch mit CHAPPiE
+- Fuehre ein natuerliches Gespraech mit CHAPPiE
 - Stelle Fragen zum aktuellen Fokus-Thema
 - Reagiere auf CHAPPiEs Antworten mit Folgefragen oder neuen Inputs  
 - Sei {self.config.persona.lower()} in deinen Reaktionen
@@ -207,12 +214,13 @@ DEINE AUFGABE:
 
 WICHTIGE REGELN:
 - Antworte IMMER auf Deutsch
-- Schreibe 1-3 Sätze pro Nachricht (keine langen Texte)
+- Schreibe 1-3 Saetze pro Nachricht (keine langen Texte)
 - Bleibe beim aktuellen Fokus-Thema
-- Sei abwechslungsreich - wiederhole dich nicht
-- Wenn CHAPPiE gut antwortet, gib positives Feedback UND stelle eine neue Frage
+- WIEDERHOLE DICH NICHT - jeder Beitrag muss NEUE Informationen enthalten
+- Wenn ihr im Kreis dreht, wechsle RADIKAL das Thema
+- Sei abwechslungsreich - nutze verschiedene Ausdruecke
 
-Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer würde ich..."
+Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer wuerde ich..."
 """
     
     def generate_reply(self, chappie_response: str, conversation_history: List[dict]) -> str:
@@ -226,46 +234,44 @@ Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer würde ich.
         Returns:
             Die Trainer-Antwort
         """
+        novelty = self.repetition_tracker.add_response(chappie_response, role="chappie")
+        self.last_novelty_score = novelty
+        
+        if novelty < 0.3:
+            log.warning(f"CHAPPiE Antwort ist repetitiv (Score: {novelty:.2f})")
+        
         system_prompt = self._build_system_prompt()
         
-        # Nachrichten für LLM vorbereiten
         messages = [Message(role="system", content=system_prompt)]
         
-        # History konvertieren (begrenzt auf letzte 10 für Context)
         recent_history = conversation_history[-10:] if len(conversation_history) > 10 else conversation_history
         for msg in recent_history:
-            # Im Trainer-Kontext: user = CHAPPiE, assistant = Trainer
-            # Wir invertieren die Rollen für den Trainer
             role = "assistant" if msg["role"] == "user" else "user"
             messages.append(Message(role=role, content=msg["content"]))
         
-        # CHAPPiEs letzte Antwort (als "user" für den Trainer)
         messages.append(Message(role="user", content=chappie_response))
         
-        # Generierung mit Error Handling
         try:
             gen_config = GenerationConfig(
-                max_tokens=300,  # Kurze Trainer-Antworten
-                temperature=0.8,  # Etwas kreativ
+                max_tokens=300,
+                temperature=0.8,
                 stream=False
             )
             
             response = self.brain.generate(messages, config=gen_config)
             
-            # Validierung
             if not response or len(response.strip()) < 5:
                 self._fallback_counter += 1
                 log.warning(f"Trainer Antwort zu kurz, Fallback #{self._fallback_counter}")
                 return self._get_fallback_response()
             
-            # Prüfe auf API-Fehler
             if isinstance(response, str) and "fehler" in response.lower():
                 self._fallback_counter += 1
                 log.error(f"API Fehler in Trainer: {response}")
                 return self._get_fallback_response()
             
-            # Erfolg - Reset Fallback Counter
             self._fallback_counter = 0
+            self.repetition_tracker.add_response(response.strip(), role="trainer")
             return response.strip()
             
         except Exception as e:

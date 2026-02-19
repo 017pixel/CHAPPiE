@@ -33,6 +33,7 @@ from brain.base_brain import GenerationConfig
 from brain.deep_think import DeepThinkEngine
 
 from .trainer_agent import TrainerAgent
+from .repetition_tracker import RepetitionTracker
 
 console = Console()
 
@@ -61,7 +62,15 @@ class TrainingLoop:
             "memories_created": 0,
             "memories_consolidated": 0,
             "topics_completed": 0,
+            "repetitive_responses": 0,
+            "novel_responses": 0,
+            "avg_novelty_score": 0.0,
         }
+        
+        # Anti-Repetition Tracking
+        self.repetition_tracker = RepetitionTracker(window_size=30)
+        self.consecutive_repetitive = 0
+        self.MAX_CONSECUTIVE_REPETITIVE = 3
         
         # Chappie Backend Initialisierung (ohne Streamlit Cache)
         msg = "Initialisiere Chappie Backend..."
@@ -377,6 +386,32 @@ class TrainingLoop:
                     # Erfolgreiche Antwort - Reset Counter
                     self.consecutive_empty_responses = 0
                     
+                    # === NOVELTY TRACKING ===
+                    novelty_score = self.repetition_tracker.add_response(chappie_response, role="chappie")
+                    
+                    if novelty_score < 0.3:
+                        self.consecutive_repetitive += 1
+                        console.print(f"[yellow]Repetitive Antwort (Novelty: {novelty_score:.2%})[/yellow]")
+                        log.warning(f"Repetitive Antwort #{self.consecutive_repetitive} (Score: {novelty_score:.2f})")
+                        self.stats["repetitive_responses"] += 1
+                        
+                        if self.consecutive_repetitive >= self.MAX_CONSECUTIVE_REPETITIVE:
+                            suggested = self.repetition_tracker._suggest_new_topics()
+                            if suggested:
+                                console.print(f"[bold magenta]Erzwinge Themenwechsel zu: {suggested[0]}[/bold magenta]")
+                                log.info(f"Erzwinge Themenwechsel: {suggested[0]}")
+                    else:
+                        self.consecutive_repetitive = 0
+                        if novelty_score > 0.7:
+                            console.print(f"[green]Vielfaeltige Antwort (Novelty: {novelty_score:.2%})[/green]")
+                        self.stats["novel_responses"] += 1
+                    
+                    # Update avg novelty
+                    total = self.stats["repetitive_responses"] + self.stats["novel_responses"]
+                    if total > 0:
+                        current_avg = self.stats["avg_novelty_score"]
+                        self.stats["avg_novelty_score"] = current_avg + (novelty_score - current_avg) / total
+                    
                     # Log mit klarer Formatierung (Zeilenumbrueche fuer Lesbarkeit)
                     log.info("")
                     log.info("=" * 60)
@@ -556,6 +591,12 @@ class TrainingLoop:
             f"",
             f"Traum-Phasen: {self.total_dreams}",
             f"Erinnerungen aktuell: {current_memories:,}",
+            f"",
+            f"=== Vielfalt-Statistik ===",
+            f"Repetitive Antworten: {self.stats['repetitive_responses']}",
+            f"Neue Antworten: {self.stats['novel_responses']}",
+            f"Durchschn. Novelty: {self.stats['avg_novelty_score']:.1%}",
+            f"",
             f"Curriculum-Status: {self.trainer.get_curriculum_status() if hasattr(self.trainer, 'get_curriculum_status') else 'N/A'}",
         ]
         
