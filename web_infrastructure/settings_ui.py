@@ -15,10 +15,11 @@ def render_settings_overlay(backend):
     with tab_api:
         st.subheader("API & Modell Konfiguration")
         
-        # 1. Provider Auswahl (jetzt mit 3 Optionen)
+        # 1. Provider Auswahl (jetzt mit 4 Optionen)
         provider_options = [
             "Groq Cloud (Schnell & Stark)",
             "Cerebras Cloud (Ultra-High-Speed)",
+            "NVIDIA NIM (DeepSeek, GLM, Llama)",
             "Ollama Lokal (Privat & Offline)"
         ]
         
@@ -27,8 +28,10 @@ def render_settings_overlay(backend):
             current_provider_index = 0
         elif settings.llm_provider == LLMProvider.CEREBRAS:
             current_provider_index = 1
-        else:
+        elif settings.llm_provider == LLMProvider.NVIDIA:
             current_provider_index = 2
+        else:
+            current_provider_index = 3
             
         selected_provider = st.selectbox(
             "KI-Anbieter (Backend)", 
@@ -38,6 +41,7 @@ def render_settings_overlay(backend):
         
         is_groq = "Groq" in selected_provider
         is_cerebras = "Cerebras" in selected_provider
+        is_nvidia = "NVIDIA" in selected_provider
         
         st.divider()
         
@@ -170,6 +174,69 @@ def render_settings_overlay(backend):
                     st.rerun()
             with col2:
                 if st.button("Schließen", use_container_width=True, key="close_settings_cerebras"):
+                    st.session_state.show_settings = False
+                    st.rerun()
+                    
+        elif is_nvidia:
+            st.markdown("### 🟢 NVIDIA NIM Konfiguration")
+            st.caption("Zugriff auf DeepSeek, GLM, Llama und mehr. API Key von [build.nvidia.com](https://build.nvidia.com)")
+            
+            if settings.nvidia_api_key:
+                st.success("✓ NVIDIA API Key ist gesetzt")
+            else:
+                st.warning("⚠️ Kein NVIDIA API Key konfiguriert")
+            
+            new_nvidia_key = st.text_input(
+                "NVIDIA API Key", 
+                value=settings.nvidia_api_key if settings.nvidia_api_key else "",
+                type="password",
+                help="Hole dir einen Key von build.nvidia.com"
+            )
+            
+            nvidia_models = {
+                "z-ai/glm5": "GLM 5 - Z.ai's leistungsstarkes Modell",
+                "deepseek-ai/deepseek-v3.1-terminus": "DeepSeek V3.1 Terminus (Empfohlen)",
+                "moonshotai/kimi-k2.5": "Kimi K2.5 - Moonshot AI",
+                "meta/llama-3.3-70b-instruct": "Llama 3.3 70B",
+                "meta/llama-3.1-405b-instruct": "Llama 3.1 405B - Groesstes Llama",
+                "nvidia/llama-3.1-nemotron-70b": "Nemotron 70B - NVIDIA optimiert",
+                "deepseek-ai/deepseek-r1": "DeepSeek R1 - Reasoning",
+                "custom": "Eigenes Modell eingeben..."
+            }
+            
+            current_nvidia_val = settings.nvidia_model
+            nvidia_start_index = 0
+            if current_nvidia_val in nvidia_models:
+                nvidia_start_index = list(nvidia_models.keys()).index(current_nvidia_val)
+            else:
+                nvidia_start_index = list(nvidia_models.keys()).index("custom")
+            
+            selected_nvidia_key = st.selectbox(
+                "NVIDIA Modell",
+                list(nvidia_models.keys()),
+                index=nvidia_start_index,
+                format_func=lambda x: str(nvidia_models.get(x, x))
+            )
+            
+            if selected_nvidia_key == "custom":
+                new_nvidia_model = st.text_input(
+                    "Manuelle Modell-ID",
+                    value=current_nvidia_val if current_nvidia_val not in nvidia_models else "",
+                    help="Gib hier die exakte Model-ID ein"
+                )
+            else:
+                new_nvidia_model = selected_nvidia_key
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("NVIDIA Einstellungen Speichern", type="primary", use_container_width=True, key="save_settings_nvidia"):
+                    settings.update_from_ui(provider="nvidia", nvidia_api_key=new_nvidia_key, model=new_nvidia_model)
+                    backend.reinit_brain_if_needed()
+                    st.success("✅ Einstellungen für NVIDIA gespeichert!")
+                    time.sleep(0.5)
+                    st.rerun()
+            with col2:
+                if st.button("Schließen", use_container_width=True, key="close_settings_nvidia"):
                     st.session_state.show_settings = False
                     st.rerun()
                     

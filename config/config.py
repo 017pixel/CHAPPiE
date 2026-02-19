@@ -22,6 +22,7 @@ class LLMProvider(str, Enum):
     OLLAMA = "ollama"
     GROQ = "groq"
     CEREBRAS = "cerebras"
+    NVIDIA = "nvidia"
 
 
 # === Lade Einstellungen ===
@@ -83,6 +84,10 @@ class Settings:
         self.cerebras_api_key = self._get_val("CEREBRAS_API_KEY", "")
         self.cerebras_model = self._get_val("CEREBRAS_MODEL", "llama-3.3-70b")
         
+        # === NVIDIA NIM ===
+        self.nvidia_api_key = self._get_val("NVIDIA_API_KEY", "")
+        self.nvidia_model = self._get_val("NVIDIA_MODEL", "deepseek-ai/deepseek-v3.1-terminus")
+        
         # === Memory / Embedding ===
         self.embedding_model = self._get_val("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 5))
@@ -110,6 +115,7 @@ class Settings:
         self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-120b")
         self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "gpt-oss-20b")
+        self.intent_processor_model_nvidia = self._get_val("INTENT_PROCESSOR_MODEL_NVIDIA", "deepseek-ai/deepseek-v3.1-terminus")
         
         # === Context Files ===
         self.soul_path = self._get_val("SOUL_PATH", str(DATA_DIR / "soul.md"))
@@ -134,29 +140,35 @@ class Settings:
         self.debug = bool(self._get_val("DEBUG", True))
 
     def update_from_ui(self, provider=None, api_key=None, model=None, cerebras_api_key=None,
-                      temperature=None, max_tokens=None, chain_of_thought=None, memory_top_k=None, memory_min_relevance=None):
+                       nvidia_api_key=None, temperature=None, max_tokens=None, chain_of_thought=None, 
+                       memory_top_k=None, memory_min_relevance=None):
         """Erlaubt Updates zur Laufzeit durch die UI."""
         if provider:
             try:
                 self.llm_provider = LLMProvider(provider.lower())
             except: pass
 
-        if api_key is not None: # Leerer String ist erlaubt (Loeschen)
-            # Je nach aktuellem Provider den richtigen Key setzen
+        if api_key is not None:
             if self.llm_provider == LLMProvider.CEREBRAS:
                 self.cerebras_api_key = api_key
+            elif self.llm_provider == LLMProvider.NVIDIA:
+                self.nvidia_api_key = api_key
             else:
                 self.groq_api_key = api_key
 
-        # Expliziter Cerebras API Key (separat)
         if cerebras_api_key is not None:
             self.cerebras_api_key = cerebras_api_key
+            
+        if nvidia_api_key is not None:
+            self.nvidia_api_key = nvidia_api_key
 
         if model:
             if self.llm_provider == LLMProvider.GROQ:
                 self.groq_model = model
             elif self.llm_provider == LLMProvider.CEREBRAS:
                 self.cerebras_model = model
+            elif self.llm_provider == LLMProvider.NVIDIA:
+                self.nvidia_model = model
             else:
                 self.ollama_model = model
 
@@ -194,10 +206,13 @@ class Settings:
                     f.write(f"GROQ_API_KEY = '{self.groq_api_key}'\n")
                 if self.cerebras_api_key:
                     f.write(f"CEREBRAS_API_KEY = '{self.cerebras_api_key}'\n")
+                if self.nvidia_api_key:
+                    f.write(f"NVIDIA_API_KEY = '{self.nvidia_api_key}'\n")
 
                 # Models
                 f.write(f"GROQ_MODEL = '{self.groq_model}'\n")
                 f.write(f"CEREBRAS_MODEL = '{self.cerebras_model}'\n")
+                f.write(f"NVIDIA_MODEL = '{self.nvidia_model}'\n")
                 f.write(f"OLLAMA_MODEL = '{self.ollama_model}'\n")
                 f.write(f"OLLAMA_HOST = '{self.ollama_host}'\n")
                 f.write(f"EMOTION_ANALYSIS_MODEL = '{self.emotion_analysis_model}'\n")
@@ -245,6 +260,8 @@ def get_active_model() -> str:
         return settings.groq_model
     elif settings.llm_provider == LLMProvider.CEREBRAS:
         return settings.cerebras_model
+    elif settings.llm_provider == LLMProvider.NVIDIA:
+        return settings.nvidia_model
     return settings.ollama_model
 
 

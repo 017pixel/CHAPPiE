@@ -78,7 +78,6 @@ class IntentProcessor:
     
     def _init_brain(self):
         """Initialisiert das kleine Modell basierend auf Provider."""
-        # Speichere aktuelle Settings
         original_provider = settings.llm_provider
         original_model = None
         
@@ -86,25 +85,28 @@ class IntentProcessor:
             original_model = settings.groq_model
         elif original_provider == LLMProvider.CEREBRAS:
             original_model = settings.cerebras_model
+        elif original_provider == LLMProvider.NVIDIA:
+            original_model = settings.nvidia_model
         else:
             original_model = settings.ollama_model
         
-        # Setze Intent Processor Modell
         if original_provider == LLMProvider.GROQ:
             settings.groq_model = settings.intent_processor_model_groq
         elif original_provider == LLMProvider.CEREBRAS:
             settings.cerebras_model = settings.intent_processor_model_cerebras
+        elif original_provider == LLMProvider.NVIDIA:
+            settings.nvidia_model = settings.intent_processor_model_nvidia
         else:
             settings.ollama_model = settings.intent_processor_model_ollama
         
-        # Initialisiere Brain
         self.brain = get_brain()
         
-        # Stelle originale Settings wieder her
         if original_provider == LLMProvider.GROQ:
             settings.groq_model = original_model
         elif original_provider == LLMProvider.CEREBRAS:
             settings.cerebras_model = original_model
+        elif original_provider == LLMProvider.NVIDIA:
+            settings.nvidia_model = original_model
         else:
             settings.ollama_model = original_model
     
