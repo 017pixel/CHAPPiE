@@ -12,6 +12,7 @@ import json
 import time
 import signal
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -253,7 +254,7 @@ def get_training_stats() -> Dict[str, Any]:
     - Heartbeat-Check (wann war letzte Aktivität)
     - Fehler-Diagnose
     """
-    stats = {
+    stats: Dict[str, Any] = {
         'running': False,
         'pid': None,
         'model': None,
@@ -293,20 +294,21 @@ def get_training_stats() -> Dict[str, Any]:
                     stats['total_exchanges'] = heartbeat.get('total_exchanges', 0)
                     
                 try:
-                    from datetime import datetime
-                    last_save = datetime.fromisoformat(state['timestamp'].replace('Z', '+00:00'))
-                    now = datetime.now(last_save.tzinfo) if last_save.tzinfo else datetime.now()
-                    minutes_ago = (now - last_save).total_seconds() / 60
-                    stats['last_activity'] = f"vor {int(minutes_ago)} Min."
-                    
-                    if minutes_ago < 10:
-                        stats['daemon_healthy'] = True
-                    elif minutes_ago < 30:
-                        stats['daemon_healthy'] = True
-                        stats['diagnostic_messages'].append("⚠️ Lange keine Aktivität (>10 Min)")
-                    else:
-                        stats['daemon_healthy'] = False
-                        stats['diagnostic_messages'].append("🔴 Keine Aktivität seit >30 Min - Training evtl. hängengeblieben")
+                    last_save_str = state.get('timestamp', '')
+                    if last_save_str:
+                        last_save = datetime.fromisoformat(last_save_str.replace('Z', '+00:00'))
+                        now = datetime.now(timezone.utc)
+                        minutes_ago = (now - last_save).total_seconds() / 60
+                        stats['last_activity'] = f"vor {int(minutes_ago)} Min."
+                        
+                        if minutes_ago < 10:
+                            stats['daemon_healthy'] = True
+                        elif minutes_ago < 30:
+                            stats['daemon_healthy'] = True
+                            stats['diagnostic_messages'].append("⚠️ Lange keine Aktivität (>10 Min)")
+                        else:
+                            stats['daemon_healthy'] = False
+                            stats['diagnostic_messages'].append("🔴 Keine Aktivität seit >30 Min - Training evtl. hängengeblieben")
                 except Exception as e:
                     stats['diagnostic_messages'].append(f"Zeitstempel-Fehler: {str(e)[:50]}")
                     

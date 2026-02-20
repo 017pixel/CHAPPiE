@@ -12,7 +12,7 @@ import json
 import uuid
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, asdict
 
 from config.config import DATA_DIR
@@ -34,6 +34,7 @@ class ShortTermEntry:
 class ShortTermMemoryV2:
     """
     Short-Term Memory mit Timestamps und Auto-Migration.
+    Alle Timestamps werden in UTC gespeichert.
     """
     
     def __init__(self, memory_engine: MemoryEngine = None, ttl_hours: int = 24):
@@ -65,7 +66,7 @@ class ShortTermMemoryV2:
         try:
             data = {
                 'entries': [asdict(entry) for entry in self.entries],
-                'last_cleanup': datetime.now().isoformat()
+                'last_cleanup': datetime.now(timezone.utc).isoformat()
             }
             with open(self.storage_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
@@ -87,7 +88,7 @@ class ShortTermMemoryV2:
             ID des Eintrags
         """
         entry_id = str(uuid.uuid4())
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         ttl = ttl_hours if ttl_hours else self.ttl_hours
         expires = now + timedelta(hours=ttl)
         
@@ -118,34 +119,35 @@ class ShortTermMemoryV2:
         Returns:
             Liste von ShortTermEntry
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         active = []
         
         for entry in self.entries:
-            # Prüfe ob abgelaufen
-            expires = datetime.fromisoformat(entry.expires_at)
-            if now > expires:
+            try:
+                expires = datetime.fromisoformat(entry.expires_at)
+                if expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=timezone.utc)
+                    
+                if now > expires:
+                    continue
+            except (ValueError, TypeError):
                 continue
             
-            # Prüfe ob bereits migriert
             if entry.migrated:
                 continue
             
-            # Filter nach Kategorie
             if category and entry.category != category:
                 continue
             
-            # Filter nach Query
             if query and query.lower() not in entry.content.lower():
                 continue
             
             active.append(entry)
         
-        # Sortiere nach Wichtigkeit und Zeit
         importance_order = {"high": 0, "normal": 1, "low": 2}
         active.sort(key=lambda e: (
             importance_order.get(e.importance, 1),
-            datetime.fromisoformat(e.created_at)
+            e.created_at
         ), reverse=True)
         
         return active
@@ -160,28 +162,33 @@ class ShortTermMemoryV2:
         if not self.memory_engine:
             return 0
         
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         migrated_count = 0
         
         for entry in self.entries:
             if entry.migrated:
                 continue
             
-            expires = datetime.fromisoformat(entry.expires_at)
-            if now > expires:
-                # Migriere diesen Eintrag ins Langzeitgedächtnis
-                try:
-                    self.memory_engine.add_memory(
-                        content=entry.content,
-                        role="system",
-                        mem_type="short_term_migration",
-                        label=f"{entry.category}_{entry.importance}",
-                        source="short_term_memory"
-                    )
-                    entry.migrated = True
-                    migrated_count += 1
-                except Exception as e:
-                    print(f"[ShortTermV2] Migration fehlgeschlagen für {entry.id}: {e}")
+            try:
+                expires = datetime.fromisoformat(entry.expires_at)
+                if expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=timezone.utc)
+                    
+                if now > expires:
+                    try:
+                        self.memory_engine.add_memory(
+                            content=entry.content,
+                            role="system",
+                            mem_type="short_term_migration",
+                            label=f"{entry.category}_{entry.importance}",
+                            source="short_term_memory"
+                        )
+                        entry.migrated = True
+                        migrated_count += 1
+                    except Exception as e:
+                        print(f"[ShortTermV2] Migration fehlgeschlagen für {entry.id}: {e}")
+            except (ValueError, TypeError) as e:
+                print(f"[ShortTermV2] Fehler beim Parsen von expires_at: {e}")
         
         if migrated_count > 0:
             self._save_entries()
@@ -206,9 +213,14 @@ class ShortTermMemoryV2:
         
         lines = ["=== AKTUELLE SHORT-TERM ERINNERUNGEN (letzte 24h) ===", ""]
         
-        for entry in entries[:20]:  # Max 20 Einträge
-            created = datetime.fromisoformat(entry.created_at)
-            time_str = created.strftime("%d.%m %H:%M")
+        for entry in entries[:20]:
+            try:
+                created = datetime.fromisoformat(entry.created_at)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                time_str = created.strftime("%d.%m %H:%M")
+            except (ValueError, TypeError):
+                time_str = "??.?? ??:??"
             lines.append(f"[{time_str}] [{entry.importance}] [{entry.category}] {entry.content}")
         
         return "\n".join(lines)
@@ -232,16 +244,21 @@ class ShortTermMemoryV2:
         self._save_entries()
 
 
-# === Singleton Instance ===
-import threading
 _short_term_memory_v2 = None
-_short_term_memory_lock = threading.Lock()
+_short_term_memory_lock = None
+
+def _get_lock():
+    global _short_term_memory_lock
+    if _short_term_memory_lock is None:
+        import threading
+        _short_term_memory_lock = threading.Lock()
+    return _short_term_memory_lock
 
 
 def get_short_term_memory_v2(memory_engine: MemoryEngine = None) -> ShortTermMemoryV2:
     """Gibt die ShortTermMemoryV2 Instanz zurück (Thread-Safe Singleton)."""
     global _short_term_memory_v2
-    with _short_term_memory_lock:
+    with _get_lock():
         if _short_term_memory_v2 is None:
             _short_term_memory_v2 = ShortTermMemoryV2(memory_engine=memory_engine)
         return _short_term_memory_v2

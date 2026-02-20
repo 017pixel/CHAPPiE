@@ -18,7 +18,6 @@ def render_emotion_metric(label, value, color="#2ea043"):
 
 def render_vital_signs(backend):
     """Rendert den kompletten Block der Vitalzeichen."""
-    # Fallback für Emotions (falls nicht im Session State)
     emotions_dict = st.session_state.get("current_emotions", {})
     if not emotions_dict:
         try:
@@ -26,23 +25,19 @@ def render_vital_signs(backend):
         except:
             emotions_dict = {}
 
-    render_emotion_metric("Freude", emotions_dict.get("joy", 50), "#FFD700")      # Gold
-    render_emotion_metric("Vertrauen", emotions_dict.get("trust", 50), "#2196F3") # Blau
-    render_emotion_metric("Energie", emotions_dict.get("energy", 80), "#4CAF50")  # Gruen
-    render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#9C27B0") # Lila
-    render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#FF9800") # Orange
-    render_emotion_metric("Frustration", emotions_dict.get("frustration", 0), "#F44336") # Rot
+    render_emotion_metric("Freude", emotions_dict.get("joy", 50), "#FFD700")
+    render_emotion_metric("Vertrauen", emotions_dict.get("trust", 50), "#2196F3")
+    render_emotion_metric("Energie", emotions_dict.get("energy", 80), "#4CAF50")
+    render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#9C27B0")
+    render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#FF9800")
+    render_emotion_metric("Frustration", emotions_dict.get("frustration", 0), "#F44336")
 
-    # Memory Status hinzufügen
     st.markdown("---")
     try:
-        # Optimierung: Nutze die existierende Memory-Instanz vom Backend
-        # statt eine neue zu erstellen (verhindert Reloads)
         live_memory = backend.memory
         
         memory_count = live_memory.get_memory_count()
         
-        # Health Check ist nun sehr schnell, da Instanz existiert
         health = live_memory.health_check()
 
         if health["embedding_model_loaded"] and health["chromadb_connected"]:
@@ -53,7 +48,6 @@ def render_vital_signs(backend):
                 st.metric("🧠 Erinnerungen", f"{memory_count:,}")
                 st.caption("In-Memory Modus (nicht persistent)")
         else:
-            # Detaillierte Fehleranzeige
             error_details = []
             if not health["embedding_model_loaded"]:
                 error_details.append("Embedding-Modell")
@@ -67,59 +61,38 @@ def render_vital_signs(backend):
                 st.metric("🧠 Erinnerungen", f"{memory_count:,}")
                 st.caption("⚠️ Memory-System Probleme")
 
-        # Zeige letzte Memory wenn verfügbar
         if memory_count > 0:
-            timestamp_str = None
-            
-            # Priorität 1: Session State Zeitstempel (wird bei jeder Chat-Nachricht aktualisiert)
-            if "last_memory_timestamp" in st.session_state:
-                timestamp_str = st.session_state.last_memory_timestamp
-            else:
-                # Fallback: Aus Datenbank laden (bei Initialisierung oder wenn keine Chat-Interaktion)
-                try:
-                    recent = live_memory.get_recent_memories(limit=1)
-                    if recent:
-                        last_memory = recent[0]
-                        if isinstance(last_memory, dict):
-                            timestamp_str = last_memory.get('timestamp')
-                        else:
-                            timestamp_str = getattr(last_memory, 'timestamp', None)
-                except Exception:
-                    pass
-            
-            # Zeitstempel formatieren und anzeigen
-            if timestamp_str:
-                try:
-                    dt = datetime.fromisoformat(timestamp_str)
+            try:
+                recent = live_memory.get_recent_memories(limit=1)
+                if recent:
+                    last_memory = recent[0]
+                    if isinstance(last_memory, dict):
+                        timestamp_str = last_memory.get('timestamp')
+                    else:
+                        timestamp_str = getattr(last_memory, 'timestamp', None)
                     
-                    # Treat naive timestamps as UTC
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    
-                    # Convert to German time
-                    german_tz = ZoneInfo("Europe/Berlin")
-                    formatted = dt.astimezone(german_tz).strftime("%d.%m.%Y %H:%M:%S")
-                    st.caption(f"Letzte: {formatted}")
-                except (ValueError, TypeError):
+                    if timestamp_str:
+                        formatted = _format_timestamp_german(timestamp_str)
+                        st.caption(f"Letzte: {formatted}")
+                    else:
+                        st.caption("Letzte: Unbekannt")
+                else:
                     st.caption("Letzte: Unbekannt")
-            else:
+            except Exception:
                 st.caption("Letzte: Unbekannt")
 
     except Exception as e:
         st.metric("[BRAIN] Erinnerungen", "Fehler")
         st.caption(f"[ERROR] {str(e)[:30]}...")
     
-    # KURZZEITGEDAECHTNIS (Short-Term Memory V2)
     st.markdown("---")
     try:
-        # Lese Count aus Session State (wird nach jeder Nachricht aktualisiert)
         stm_count = st.session_state.get("short_term_count", 0)
         
         if stm_count > 0:
             st.metric("Kurzzeit", f"{stm_count} Eintraege")
             st.caption("Aktive Eintraege (24h)")
         else:
-            # Versuche vom Backend zu laden (bei Initialisierung)
             if hasattr(backend, 'short_term_memory_v2'):
                 backend_count = backend.short_term_memory_v2.get_count()
                 st.session_state.short_term_count = backend_count
@@ -197,7 +170,32 @@ def render_brain_monitor(metadata: Dict[str, Any]):
         st.caption("Keine Memories geladen")
 
 
-def render_memory_item(mem: Any, index: int = 1):
+def _format_timestamp_german(timestamp_str: str) -> str:
+    """
+    Konvertiert einen UTC-Timestamp zu deutscher Zeit (Europe/Berlin).
+    
+    Args:
+        timestamp_str: ISO-Format Timestamp String (UTC)
+    
+    Returns:
+        Formatierter String "DD.MM.YYYY HH:MM:SS" in deutscher Zeit
+    """
+    if not timestamp_str:
+        return "Unbekannt"
+    
+    try:
+        dt = datetime.fromisoformat(timestamp_str)
+        
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        german_tz = ZoneInfo("Europe/Berlin")
+        return dt.astimezone(german_tz).strftime("%d.%m.%Y %H:%M:%S")
+    except (ValueError, TypeError):
+        return timestamp_str
+
+
+def render_memory_item(mem: Any, index: int = 1, format_timestamp: bool = False):
     """
     Rendert eine einzelne Erinnerung konsistent für alle Views.
     
@@ -206,15 +204,13 @@ def render_memory_item(mem: Any, index: int = 1):
     Args:
         mem: Memory-Objekt oder Dictionary
         index: Index der Erinnerung (für Anzeige #1, #2...)
+        format_timestamp: Wenn True, wird Timestamp zu deutscher Zeit konvertiert
     """
-    # Sicherheitscheck: Wenn mem None oder ungültig ist, überspringen
     if mem is None:
         st.caption("*Ungültige Erinnerung (None)*")
         return
     
-    # Handle both Objects (fresh) and Dicts (loaded from JSON)
     if isinstance(mem, dict):
-        # ROBUST: Alle Werte mit explizitem None-Check
         content = mem.get("content") or ""
         raw_score = mem.get("relevance_score") or 0.0
         score = int(float(raw_score) * 100) if raw_score else 0
@@ -225,7 +221,6 @@ def render_memory_item(mem: Any, index: int = 1):
         mem_type = mem.get("type") or "interaction"
         timestamp = mem.get("timestamp") or ""
     else:
-        # Objekt-basierte Memory: Defensive Attribut-Zugriffe
         content = getattr(mem, 'content', None) or ""
         raw_score = getattr(mem, 'relevance_score', None)
         score = int(float(raw_score) * 100) if raw_score else 0
@@ -236,34 +231,29 @@ def render_memory_item(mem: Any, index: int = 1):
         mem_type = getattr(mem, 'mem_type', None) or 'interaction'
         timestamp = getattr(mem, 'timestamp', None) or ""
     
-    # SICHERHEIT: Stelle sicher, dass content ein String ist
     if not isinstance(content, str):
         content = str(content) if content is not None else ""
 
-    # Label-Formatierung
     if label == "zsm gefasst":
         label_html = '<span style="color: #2ea043; font-weight: bold; border: 1px solid #2ea043; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">SUMMARY</span>'
-        badge_symbol = "S" # Fallback char if needed, but we use label_html
     else:
         label_html = '<span style="color: #8b949e; font-weight: bold; border: 1px solid #8b949e; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">ORIGINAL</span>'
-        badge_symbol = "O"
 
-    # Role & Type Badges (für Memories View)
     role_label = "User" if role == "user" else "CHAPiE"
     type_badge = "[Interaction]" if mem_type == "interaction" else "[Summary]"
 
-    # Flexible Anzeige: Wenn wir im Chat sind (kurz), sonst (lang)
+    if format_timestamp and timestamp:
+        display_timestamp = _format_timestamp_german(timestamp)
+    else:
+        display_timestamp = timestamp
+
     col1, col2 = st.columns([3, 1])
     with col1:
-        # Header bauen
-        # header = f"{label_badge} `{mem_id}...`" # OLD with emoji
-        if timestamp: 
-            # Detaillierte Ansicht (Memories Overlay)
+        if display_timestamp: 
             st.markdown(f"### {label_html} {type_badge} {role_label} #{index}", unsafe_allow_html=True)
-            st.markdown(f"**ID:** `{mem_id}` | **Zeit:** {timestamp}")
+            st.markdown(f"**ID:** `{mem_id}` | **Zeit:** {display_timestamp}")
             st.markdown(content)
         else:
-            # Kompakte Ansicht (Chat RAG)
             st.markdown(f"**Info {index}** {label_html} (Relevanz: {score}%)", unsafe_allow_html=True)
             if content and isinstance(content, str):
                 st.caption(content[:250] + "..." if len(content) > 250 else content)
@@ -271,7 +261,6 @@ def render_memory_item(mem: Any, index: int = 1):
                 st.caption("*Keine Inhaltsdaten verfügbar*")
             
     with col2:
-        # Nur Score anzeigen wenn relevant
         if score > 0:
             st.progress(score / 100)
 

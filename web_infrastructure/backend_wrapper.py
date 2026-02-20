@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import re
-import datetime
+from datetime import datetime, timezone
 
 from typing import Dict, Any, List
 
@@ -425,7 +425,7 @@ def init_chappie():
             
             # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
             
-            st.session_state.last_memory_timestamp = datetime.datetime.now().isoformat()
+            st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
             
             return {
                 "response_text": display_response,
@@ -491,7 +491,7 @@ def init_chappie():
             
             # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
             
-            st.session_state.last_memory_timestamp = datetime.datetime.now().isoformat()
+            st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
             
             # AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN (Legacy Mode)
             self.short_term_memory_v2.add_entry(

@@ -594,18 +594,22 @@ class MemoryEngine:
         return []
     
 
-    def get_recent_memories(self, limit: int = 10, offset: int = 0) -> list[Memory]:
+    def get_recent_memories(self, limit: int = 10, offset: int = 0, mem_type_filter: str = None, label_filter: str = None) -> list[Memory]:
         """
         Holt die neuesten Erinnerungen mit Pagination-Support.
+
+        WICHTIG: ChromaDB gibt Einträge in Insertion-Order zurück (älteste zuerst).
+        Daher müssen wir ALLE Einträge laden, sortieren und dann offset/limit anwenden.
 
         Args:
             limit: Maximale Anzahl pro Seite
             offset: Anzahl der zu überspringenden Einträge (für Pagination)
+            mem_type_filter: Optionaler Filter nach mem_type ("interaction" oder "summary")
+            label_filter: Optionaler Filter nach label ("original" oder "zsm gefasst")
 
         Returns:
-            Liste von Memory-Objekten
+            Liste von Memory-Objekten (neueste zuerst)
         """
-        # Prüfe ob Collection verfügbar ist
         if self.collection is None:
             return []
         
@@ -613,12 +617,7 @@ class MemoryEngine:
         if total_count == 0:
             return []
 
-        # Hole alle und sortiere dann (ChromaDB hat kein natives Offset)
-        # Für sehr große DBs: Hole nur was nötig ist
-        fetch_limit = min(offset + limit, total_count)
-        
         results = self.collection.get(
-            limit=fetch_limit,
             include=["documents", "metadatas"]
         )
 
@@ -627,25 +626,73 @@ class MemoryEngine:
             for i, doc in enumerate(results["documents"]):
                 metadata = results["metadatas"][i] if results["metadatas"] else {}
 
-                # Sicherstellen, dass metadata ein Dict ist
                 if not isinstance(metadata, dict):
                     metadata = {}
+
+                mem_type = metadata.get("type", "interaction")
+                label = metadata.get("label", "original")
+                
+                if mem_type_filter and mem_type != mem_type_filter:
+                    continue
+                if label_filter and label != label_filter:
+                    continue
 
                 memory = Memory(
                     id=results["ids"][i] if i < len(results["ids"]) else str(uuid.uuid4()),
                     content=doc if isinstance(doc, str) else str(doc),
                     role=metadata.get("role", "unknown"),
                     timestamp=metadata.get("timestamp", ""),
-                    mem_type=metadata.get("type", "interaction"),
-                    label=metadata.get("label", "original")
+                    mem_type=mem_type,
+                    label=label
                 )
                 memories.append(memory)
 
-        # Sortiere nach Timestamp (neueste zuerst)
         memories.sort(key=lambda m: m.timestamp, reverse=True)
 
-        # Wende Offset und Limit an
         return memories[offset:offset + limit]
+    
+    def get_filtered_memory_count(self, mem_type_filter: str = None, label_filter: str = None) -> int:
+        """
+        Gibt die Anzahl der Erinnerungen nach Filter-Kriterien zurück.
+
+        Args:
+            mem_type_filter: Optionaler Filter nach mem_type ("interaction" oder "summary")
+            label_filter: Optionaler Filter nach label ("original" oder "zsm gefasst")
+
+        Returns:
+            Anzahl der gefilterten Erinnerungen
+        """
+        if self.collection is None:
+            return 0
+        
+        total_count = self.collection.count()
+        if total_count == 0:
+            return 0
+
+        if not mem_type_filter and not label_filter:
+            return total_count
+
+        results = self.collection.get(
+            include=["metadatas"]
+        )
+
+        count = 0
+        if results and results["metadatas"]:
+            for metadata in results["metadatas"]:
+                if not isinstance(metadata, dict):
+                    continue
+                    
+                mem_type = metadata.get("type", "interaction")
+                label = metadata.get("label", "original")
+                
+                if mem_type_filter and mem_type != mem_type_filter:
+                    continue
+                if label_filter and label != label_filter:
+                    continue
+                
+                count += 1
+
+        return count
 
     
     def delete_memories(self, ids: list[str]):
