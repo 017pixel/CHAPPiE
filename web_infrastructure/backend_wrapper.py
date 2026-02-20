@@ -285,6 +285,25 @@ def init_chappie():
                         )
                         self.debug_logger.log_file_update("CHAPPiEsPreferences.md", "updated")
                         
+                    elif tool_call.tool == "add_short_term_memory":
+                        # Fuege Short-Term Memory Eintrag hinzu
+                        content = tool_call.data.get("content", "")
+                        category = tool_call.data.get("category", "general")
+                        importance = tool_call.data.get("importance", "normal")
+                        
+                        self.short_term_memory_v2.add_entry(
+                            content=content,
+                            category=category,
+                            importance=importance
+                        )
+                        self.debug_logger.log_tool_call(
+                            "add_short_term_memory",
+                            "add",
+                            {"content": content[:50], "category": category, "importance": importance},
+                            True
+                        )
+                        self.debug_logger.log_file_update("short_term_memory.json", "added")
+                        
                     else:
                         self.debug_logger.log_warning(
                             "TOOL_CALL", 

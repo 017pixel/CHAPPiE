@@ -249,12 +249,24 @@ We are still at the beginning of our journey. I'm excited to learn more about yo
         self.preferences_path.write_text(content, encoding='utf-8')
     
     def _replace_value(self, content: str, key: str, new_value: str) -> str:
-        """Hilfsfunktion zum Ersetzen von Werten in Markdown."""
+        """Hilfsfunktion zum exakten Ersetzen von Werten in Markdown."""
         lines = content.split('\n')
         for i, line in enumerate(lines):
-            if key in line:
-                lines[i] = f"{key} {new_value}"
+            stripped = line.strip()
+            if stripped.startswith(key):
+                indent = len(line) - len(line.lstrip())
+                lines[i] = " " * indent + f"{key} {new_value}"
                 break
+        return '\n'.join(lines)
+    
+    def _replace_all_values(self, content: str, key: str, new_value: str) -> str:
+        """Ersetzt alle Vorkommen eines Keys (nicht nur das erste)."""
+        lines = content.split('\n')
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith(key):
+                indent = len(line) - len(line.lstrip())
+                lines[i] = " " * indent + f"{key} {new_value}"
         return '\n'.join(lines)
     
     def get_all_context(self) -> Dict[str, str]:

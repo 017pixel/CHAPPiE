@@ -45,65 +45,89 @@ ollama pull gpt-oss-20b  # NEU: GPT OSS 20B für Intent Analysis
 
 ## 📋 Übersicht
 
-CHAPPiE 2.0 ist ein fortgeschrittener KI-Agent mit einem revolutionären **Zwei-Schritte Verarbeitungssystem**:
+CHAPPiE 2.0 ist ein fortgeschrittener KI-Agent mit **Brain-Inspired Multi-Agent Architecture**:
 
-1. **Step 1:** Ein kleines KI-Modell analysiert User-Input und trifft Entscheidungen über Tool-Calls, Emotions-Updates und Memory-Management
-2. **Step 2:** Ein großes Hauptmodell generiert die Antwort basierend auf allen Context-Dateien
+### 🧠 Brain-Inspired Agents
+
+7 spezialisierte Agenten, die von Gehirnregionen inspiriert sind:
+
+| Agent | Funktion |
+|-------|----------|
+| **Sensory Cortex** | Input-Klassifikation, Spracherkennung |
+| **Amygdala** | Emotionale Verarbeitung, Memory-Verstärkung |
+| **Hippocampus** | Memory-Encoding, Retrieval, Konsolidierung |
+| **Prefrontal Cortex** | Zentrale Orchestrierung, Response-Strategie |
+| **Basal Ganglia** | Reward-basiertes Lernen, Dopamin-Signale |
+| **Neocortex** | Langzeit-Memory, semantisches Wissen |
+| **Memory Agent** | Tool-Call Entscheidungen |
 
 ### 🎯 Key Features
 
-- **🧠 Zwei-Schritte Architektur:** Intent Analysis → Tool Execution → Response Generation
+- **🧠 Multi-Agent Architecture:** Parallele Verarbeitung wie im menschlichen Gehirn
 - **💾 Mehrschichtiges Gedächtnis:**
   - **Langzeit:** ChromaDB Vektor-Datenbank
   - **Kurzzeit:** JSON-basiert mit 24h TTL & Auto-Migration
   - **Context:** soul.md, user.md, CHAPPiEsPreferences.md
+- **📈 Ebbinghaus Vergessenskurve:** Biologisch inspiriertes Memory-Management
+- **😴 Sleep Phase:** Memory Consolidation alle 24h/100 Interaktionen
 - **🎭 Emotions-Engine:** 6 Dimensionen (Happiness, Trust, Energy, Curiosity, Frustration, Motivation)
-- **🔧 Smart Tool System:** Automatische Tool-Call Entscheidungen basierend auf Intent
+- **🔧 Smart Tool System:** Automatische Tool-Call Entscheidungen
 - **🎓 Autonomes Training:** 24/7 Self-Training mit KI-Trainer
-- **🐛 Debug Mode:** CLI immer an, Web UI togglebar
 
 ---
 
 ## 🏗️ Architektur
 
 ```
-User Input
-    ↓
+USER INPUT
+    │
+    ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ STEP 1: Intent Processor (NEUE MODELLE 2026)               │
-│ • Cerebras: qwen-3-235b-a22b-instruct-2507                  │
-│ • Groq: openai/gpt-oss-120b                                 │
-│ • Ollama: gpt-oss-20b                                       │
+│ SENSORY CORTEX (Input Classification)                       │
+│ • Input Type: conversation|information|emotional|task       │
+│ • Language: de|en                                            │
+│ • Urgency: high|medium|low                                   │
 └─────────────────────────────────────────────────────────────┘
-    ↓
+    │
+    ├──────────────────────────────────────────────────────────┐
+    │                                                          │
+    ▼                                                          ▼
+┌─────────────────────────┐              ┌─────────────────────────┐
+│ AMYGDALA (Parallel)     │              │ HIPPOCAMPUS (Parallel)  │
+│ • Emotional Analysis    │◄────────────►│ • Memory Operations     │
+│ • Memory Boost Factor   │              │ • Query Extraction      │
+│ • Trust Tracking        │              │ • Encoding Decisions    │
+└─────────────────────────┘              └─────────────────────────┘
+    │                                          │
+    └──────────────────────┬───────────────────┘
+                           ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ JSON Output:                                                │
-│ • Intent Analysis (Type, Confidence, Entities)              │
-│ • Tool Calls (update_user, update_soul, update_prefs)       │
-│ • Emotions Update (Delta + Reason)                          │
-│ • Short-Term Entries (Content, Category, Importance)        │
-│ • Context Requirements (Welche .md Dateien nötig)           │
+│ PREFRONTAL CORTEX (Orchestrator)                            │
+│ • Context Assembly                                          │
+│ • Response Strategy                                         │
+│ • Working Memory                                            │
 └─────────────────────────────────────────────────────────────┘
-    ↓
+    │
+    ▼
+RESPONSE TO USER
+    │
+    │ (Background Processing)
+    ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Ausführung:                                                 │
-│ • Tool Calls → Aktualisiert .md Dateien                     │
-│ • Emotions Update → Passt Emotionen an                      │
-│ • Short-Term → Speichert in JSON (24h TTL)                  │
-│ • Migration → Ältere Einträge → ChromaDB                    │
+│ BACKGROUND AGENTS                                           │
+│ • BASAL GANGLIA: Reward Evaluation, Learning Signals        │
+│ • NEOCORTEX: Long-term Memory Storage, Consolidation        │
+│ • MEMORY AGENT: Tool Calls for soul.md, user.md, prefs.md  │
 └─────────────────────────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────────────────────────┐
-│ STEP 2: Response Generator (Hauptmodell)                   │
-│ • Cerebras: llama-3.3-70b                                   │
-│ • Groq: moonshotai/kimi-k2-instruct-0905                    │
-│ • Ollama: llama3:8b oder größere Modelle                    │
-│ Input: Context (soul + user + prefs + short + long)        │
-│ Output: Finale Antwort                                      │
-└─────────────────────────────────────────────────────────────┘
-    ↓
-Response an User
 ```
+
+### Agent Pipeline
+
+1. **Sensory Cortex:** Klassifiziert den Input (50-100ms)
+2. **Amygdala + Hippocampus:** Parallele Verarbeitung (parallel)
+3. **Prefrontal Cortex:** Orchestrierung und Response-Strategie
+4. **Response:** Antwort-Generierung
+5. **Background:** Basal Ganglia + Neocortex + Memory Agent (async)
 
 ---
 
@@ -405,18 +429,27 @@ Diese werden **NICHT** vom Cleanup-Script geloescht, da sie sonst bei jedem Star
 
 ## 📝 Changelog
 
-### Version 2.0 Update (Februar 2026)
-- ✅ **NEUE MODELLE für Step 1:**
-  - Cerebras: qwen-3-235b-a22b-instruct-2507
-  - Groq: openai/gpt-oss-120b
-  - Ollama: gpt-oss-20b (lokal)
-- ✅ **Context UI verbessert:** Direkte Anzeige von Soul, User, Prefs
-- ✅ **ChromaDB Health Check:** Detaillierte Fehleranzeige statt generischer Warnung
-- ✅ **Intent Processor optimiert:** Bessere Tool Call Verarbeitung
+### Version 2.1 Update (Februar 2026)
+- ✅ **BRAIN-INSPIRED MULTI-AGENT ARCHITECTURE:**
+  - 7 spezialisierte Agenten (Sensory Cortex, Amygdala, Hippocampus, Prefrontal Cortex, Basal Ganglia, Neocortex, Memory Agent)
+  - Parallele Verarbeitung für schnelle Responses
+  - Background Processing für Learning und Consolidation
+- ✅ **NVIDIA NIM INTEGRATION:**
+  - z-ai/glm5 für Prefrontal Cortex (Haupt-Reasoning)
+  - nemotron-70b für Amygdala, Hippocampus, Memory Agent
+  - llama-3.3-70b-instruct für andere Agenten
+- ✅ **EBBINGHAUS FORGETTING CURVE:**
+  - Biologisch inspiriertes Memory-Management
+  - Spaced Repetition für wichtige Erinnerungen
+  - Memory Strength System
+- ✅ **SLEEP PHASE:**
+  - Memory Consolidation alle 24h oder 100 Interaktionen
+  - Schutz gegen rekursive Konsolidierung
+- ✅ **KURZE ANTWORTEN:** System Prompt angepasst auf 1-5 Sätze
 
-### Version 2.0 (2026)
+### Version 2.0 Update (Januar 2026)
 - ✅ **Zwei-Schritte Verarbeitung:** Intent Processor + Response Generator
-- ✅ **Neue Context-Dateien:** soul.md, user.md, CHAPPiEsPreferences.md
+- ✅ **Context-Dateien:** soul.md, user.md, CHAPPiEsPreferences.md
 - ✅ **Short-Term Memory V2:** JSON-basiert mit Timestamps
 - ✅ **Smart Tool System:** Automatische Entscheidungen basierend auf Intent
 - ✅ **Debug Logger:** Zentrales Logging für CLI und Web UI
