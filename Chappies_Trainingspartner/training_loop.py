@@ -662,7 +662,14 @@ class TrainingLoop:
         state = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "history": self.conversation_history,
-            "messages_since_dream": self.messages_since_dream
+            "messages_since_dream": self.messages_since_dream,
+            "heartbeat": {
+                "last_exchange": self.last_successful_exchange.isoformat() if self.last_successful_exchange else None,
+                "total_exchanges": self.total_exchanges,
+                "total_errors": self.total_errors,
+                "memory_count": self.memory.get_memory_count(),
+                "loop_count": self.loop_count
+            }
         }
         try:
             with open("training_state.json", "w", encoding="utf-8") as f:

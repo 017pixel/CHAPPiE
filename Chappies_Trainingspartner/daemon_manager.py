@@ -248,8 +248,10 @@ def get_training_stats() -> Dict[str, Any]:
     """
     Liest Training-Statistiken aus State und Config.
     
-    Returns:
-        Dict mit allen Stats
+    Erweiterte Version mit:
+    - Live-Memory-Count aus ChromaDB
+    - Heartbeat-Check (wann war letzte Aktivität)
+    - Fehler-Diagnose
     """
     stats = {
         'running': False,
@@ -263,11 +265,17 @@ def get_training_stats() -> Dict[str, Any]:
         'messages_since_dream': 0,
         'focus': None,
         'persona': None,
-        'start_time': None
+        'start_time': None,
+        'last_activity': None,
+        'daemon_healthy': False,
+        'diagnostic_messages': [],
+        'heartbeat_memory_count': 0,
+        'total_exchanges': 0
     }
     
-    stats['running'] = is_daemon_running() is not None
-    stats['pid'] = is_daemon_running()
+    pid = is_daemon_running()
+    stats['running'] = pid is not None
+    stats['pid'] = pid
     
     if STATE_FILE.exists():
         try:
@@ -278,8 +286,32 @@ def get_training_stats() -> Dict[str, Any]:
                 
                 if 'timestamp' in state:
                     stats['start_time'] = state['timestamp']
-        except Exception:
-            pass
+                    
+                heartbeat = state.get('heartbeat', {})
+                if heartbeat:
+                    stats['heartbeat_memory_count'] = heartbeat.get('memory_count', 0)
+                    stats['total_exchanges'] = heartbeat.get('total_exchanges', 0)
+                    
+                try:
+                    from datetime import datetime
+                    last_save = datetime.fromisoformat(state['timestamp'].replace('Z', '+00:00'))
+                    now = datetime.now(last_save.tzinfo) if last_save.tzinfo else datetime.now()
+                    minutes_ago = (now - last_save).total_seconds() / 60
+                    stats['last_activity'] = f"vor {int(minutes_ago)} Min."
+                    
+                    if minutes_ago < 10:
+                        stats['daemon_healthy'] = True
+                    elif minutes_ago < 30:
+                        stats['daemon_healthy'] = True
+                        stats['diagnostic_messages'].append("⚠️ Lange keine Aktivität (>10 Min)")
+                    else:
+                        stats['daemon_healthy'] = False
+                        stats['diagnostic_messages'].append("🔴 Keine Aktivität seit >30 Min - Training evtl. hängengeblieben")
+                except Exception as e:
+                    stats['diagnostic_messages'].append(f"Zeitstempel-Fehler: {str(e)[:50]}")
+                    
+        except Exception as e:
+            stats['diagnostic_messages'].append(f"State-Datei Fehler: {str(e)[:50]}")
     
     if CONFIG_FILE.exists():
         try:
@@ -287,8 +319,8 @@ def get_training_stats() -> Dict[str, Any]:
                 config = json.load(f)
                 stats['focus'] = config.get('focus_area', None)
                 stats['persona'] = config.get('persona', None)
-        except Exception:
-            pass
+        except Exception as e:
+            stats['diagnostic_messages'].append(f"Config-Datei Fehler: {str(e)[:50]}")
     
     from config.config import settings, get_active_model
     stats['model'] = get_active_model()
@@ -298,8 +330,8 @@ def get_training_stats() -> Dict[str, Any]:
         from memory.memory_engine import MemoryEngine
         memory = MemoryEngine()
         stats['memory_count'] = memory.get_memory_count()
-    except Exception:
-        pass
+    except Exception as e:
+        stats['diagnostic_messages'].append(f"Memory-Fehler: {str(e)[:50]}")
     
     if LOG_FILE.exists():
         try:
@@ -307,8 +339,14 @@ def get_training_stats() -> Dict[str, Any]:
                 log_content = f.read()
                 stats['errors'] = log_content.lower().count('error')
                 stats['dreams'] = log_content.lower().count('traum-phase')
-        except Exception:
-            pass
+                
+                if stats['errors'] > 10:
+                    stats['diagnostic_messages'].append(f"⚠️ Viele Fehler im Log: {stats['errors']}")
+        except Exception as e:
+            stats['diagnostic_messages'].append(f"Log-Lese-Fehler: {str(e)[:50]}")
+    
+    if not stats['running'] and STATE_FILE.exists():
+        stats['diagnostic_messages'].append("ℹ️ Training war aktiv, läuft aber gerade nicht")
     
     return stats
 

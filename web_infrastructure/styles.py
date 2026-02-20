@@ -474,6 +474,18 @@ def inject_modern_css():
              [data-testid="stMain"] {
                 padding-top: 50px !important;
              }
+             
+            /* === TRAINING UI STAT CARDS ON MOBILE === */
+            /* Force stat cards to stack vertically on mobile */
+            div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] {
+                min-width: 100% !important;
+                flex-basis: 100% !important;
+            }
+            
+            /* Stat card spacing on mobile - 8px between cards */
+            div[data-testid="stHorizontalBlock"] > div > div > div {
+                margin-bottom: 8px !important;
+            }
         }
 
     </style>

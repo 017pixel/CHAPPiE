@@ -18,7 +18,7 @@ def _render_stat_card(label: str, value, icon: str = ""):
         padding: 15px;
         text-align: center;
         background: linear-gradient(145deg, #1e1e2e, #252540);
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     ">
         <div style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px;">
             {icon} {label}
@@ -30,16 +30,36 @@ def _render_stat_card(label: str, value, icon: str = ""):
     """, unsafe_allow_html=True)
 
 
-def _render_stat_row(items: list):
-    """Rendert eine Reihe von Stat-Karten."""
-    cols = st.columns(len(items))
-    for i, (label, value, icon) in enumerate(items):
-        with cols[i]:
+def _render_stat_row(items: list, mobile_stack: bool = False):
+    """Rendert eine Reihe von Stat-Karten. Auf Mobile werden sie untereinander gestapelt."""
+    if mobile_stack:
+        for label, value, icon in items:
             _render_stat_card(label, value, icon)
+    else:
+        cols = st.columns(len(items))
+        for i, (label, value, icon) in enumerate(items):
+            with cols[i]:
+                _render_stat_card(label, value, icon)
 
 
 def render_training_ui():
     """Rendert die Training-Control UI."""
+    
+    st.markdown("""
+    <style>
+        /* Training UI Mobile Anpassungen */
+        @media screen and (max-width: 768px) {
+            /* Stat-Karten untereinander auf Mobile */
+            .training-stat-row > div {
+                flex-direction: column !important;
+            }
+            .training-stat-row > div > div {
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
     
     st.markdown("## Training-Control")
     st.markdown("Starte, stoppe und überwache das autonome CHAPPiE Training.")
@@ -49,6 +69,8 @@ def render_training_ui():
     pid = stats['pid']
     
     if running:
+        health_status = "✅ Gesund" if stats.get('daemon_healthy', False) else "⚠️ Prüfen"
+        health_color = "#4ade80" if stats.get('daemon_healthy', False) else "#fbbf24"
         st.markdown(f"""
         <div style="
             background: linear-gradient(90deg, #1a472a, #2d5a3d);
@@ -60,9 +82,11 @@ def render_training_ui():
             <span style="font-size: 20px;">●</span>
             <span style="font-weight: bold; color: #4ade80; margin-left: 10px;">Training läuft</span>
             <span style="color: #888; margin-left: 15px;">PID: {pid}</span>
+            <span style="color: {health_color}; margin-left: 15px;">{health_status}</span>
         </div>
         """, unsafe_allow_html=True)
     else:
+        last_activity = stats.get('last_activity', 'Unbekannt')
         st.markdown(f"""
         <div style="
             background: linear-gradient(90deg, #2a2a3e, #35354a);
@@ -73,30 +97,52 @@ def render_training_ui():
         ">
             <span style="font-size: 20px;">○</span>
             <span style="color: #888; margin-left: 10px;">Kein Training aktiv</span>
+            <span style="color: #666; margin-left: 15px;">Letzte Aktivität: {last_activity}</span>
         </div>
         """, unsafe_allow_html=True)
+    
+    if stats.get('diagnostic_messages'):
+        with st.expander("🔍 Diagnose-Infos", expanded=not stats.get('daemon_healthy', True)):
+            for msg in stats['diagnostic_messages']:
+                if '🔴' in msg or '⚠️' in msg:
+                    st.warning(msg)
+                else:
+                    st.info(msg)
     
     st.markdown("---")
     
     st.markdown("### Model-Konfiguration")
+    st.markdown('<div class="training-stat-row">', unsafe_allow_html=True)
+    
+    heartbeat_mem = stats.get('heartbeat_memory_count', 0)
+    live_mem = stats.get('memory_count', 0)
+    memory_display = f"{live_mem:,}"
+    if heartbeat_mem > 0 and heartbeat_mem != live_mem:
+        memory_display = f"{live_mem:,} (Training: {heartbeat_mem:,})"
+    
     _render_stat_row([
         ("Modell", stats.get('model', '-'), "🤖"),
         ("Provider", stats.get('provider', '-'), "☁️"),
-        ("Memory", stats.get('memory_count', 0), "🧠"),
+        ("Memory", memory_display, "🧠"),
     ])
+    st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("### Training-Statistiken")
+    st.markdown('<div class="training-stat-row">', unsafe_allow_html=True)
     _render_stat_row([
         ("Loops", stats.get('loops', 0), "🔄"),
         ("Fehler", stats.get('errors', 0), "⚠️"),
         ("Träume", stats.get('dreams', 0), "💭"),
     ])
+    st.markdown('</div>', unsafe_allow_html=True)
     
+    st.markdown('<div class="training-stat-row">', unsafe_allow_html=True)
     _render_stat_row([
         ("Msgs since Dream", stats.get('messages_since_dream', 0), "📊"),
         ("Gestartet", stats.get('start_time', '-')[:16] if stats.get('start_time') else '-', "🕐"),
         ("PID", pid if pid else '-', "🔧"),
     ])
+    st.markdown('</div>', unsafe_allow_html=True)
     
     if stats.get('focus'):
         st.markdown(f"""
