@@ -475,13 +475,15 @@ def process_chat_message(user_input: str, backend):
     formatted_memories = []
     if result.get("rag_memories"):
         for m in result["rag_memories"]:
-             formatted_memories.append({
-                 "content": m.content,
-                 "relevance_score": m.relevance_score,
-                 "role": m.role,
-                 "label": getattr(m, 'label', 'original'),
-                 "id": m.id  # Für Brain Monitor
-             })
+            formatted_memories.append({
+                "content": m.content,
+                "relevance_score": m.relevance_score,
+                "role": m.role,
+                "label": getattr(m, 'label', 'original'),
+                "id": m.id,
+                "timestamp": getattr(m, 'timestamp', ''),
+                "type": getattr(m, 'mem_type', 'interaction'),
+            })
 
     intent_raw = result.get("intent_raw_json", {})
     tool_calls_raw = []
