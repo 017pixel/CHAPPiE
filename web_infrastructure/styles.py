@@ -251,6 +251,38 @@ def inject_modern_css():
             font-weight: 600;
         }
         
+        /* Brain Monitor Expander Styling */
+        .stExpander {
+            background: rgba(22, 27, 34, 0.6);
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            margin: 4px 0;
+        }
+        
+        .stExpander header {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c9d1d9;
+            padding: 8px 12px;
+        }
+        
+        .stExpander content {
+            padding: 8px 12px;
+        }
+        
+        /* JSON Code Blocks in Brain Monitor */
+        .stCodeBlock {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 4px;
+        }
+        
+        .stCodeBlock code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        
         /* ============================================ */
         /* DEEP THINK STYLES */
         /* ============================================ */
@@ -486,6 +518,49 @@ def inject_modern_css():
             div[data-testid="stHorizontalBlock"] > div > div > div {
                 margin-bottom: 8px !important;
             }
+        }
+
+        /* ============================================ */
+        /* TRAINING UI STYLES */
+        /* ============================================ */
+        
+        .training-status-active {
+            background: linear-gradient(90deg, rgba(46, 160, 67, 0.15) 0%, var(--card-bg) 100%);
+            border: 1px solid var(--accent-green-bright);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+        }
+        
+        .training-status-inactive {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+        }
+        
+        .training-info-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-left: 3px solid #58a6ff;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+            margin: 8px 0;
+        }
+        
+        .training-metric-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .training-metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
 
     </style>

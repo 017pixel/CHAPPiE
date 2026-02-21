@@ -396,3 +396,10 @@ def get_intent_processor() -> IntentProcessor:
         if _intent_processor is None:
             _intent_processor = IntentProcessor()
         return _intent_processor
+
+
+def reset_intent_processor():
+    """Setzt den IntentProcessor Singleton zurueck (fuer Modellwechsel)."""
+    global _intent_processor
+    with _intent_processor_lock:
+        _intent_processor = None

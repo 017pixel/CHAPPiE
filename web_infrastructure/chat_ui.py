@@ -126,19 +126,19 @@ def render_chat_interface(backend):
                         render_brain_monitor(meta)
                 else:
                     if meta.get("thought_process"):
-                        with st.expander("Gedankenprozess"):
+                        with st.expander("Gedankenprozess", expanded=False):
                             st.code(meta["thought_process"], language=None)
                     
-                    if meta.get("rag_memories"):
-                        rag_data = meta["rag_memories"]
-                        with st.expander("Relevante Infos"):
-                            if not rag_data:
-                                st.info("Keine Daten.")
-                            else:
-                                for idx, m in enumerate(rag_data):
-                                    render_memory_item(m, idx + 1)
-                                    if idx < len(rag_data) - 1:
-                                        st.divider()
+                    rag_data = meta.get("rag_memories", [])
+                    memory_count = len(rag_data) if rag_data else 0
+                    with st.expander(f"Geladene Memories ({memory_count})", expanded=False):
+                        if not rag_data:
+                            st.info("Keine Memories geladen.")
+                        else:
+                            for idx, m in enumerate(rag_data):
+                                render_memory_item(m, idx + 1)
+                                if idx < len(rag_data) - 1:
+                                    st.divider()
 
     # ==========================================
     # 4. INPUT AREA & RETURN LOGIC

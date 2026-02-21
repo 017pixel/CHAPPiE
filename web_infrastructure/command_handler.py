@@ -483,16 +483,27 @@ def process_chat_message(user_input: str, backend):
                  "id": m.id  # Für Brain Monitor
              })
 
+    intent_raw = result.get("intent_raw_json", {})
+    tool_calls_raw = []
+    if result.get("tool_calls_executed", 0) > 0 and intent_raw.get("tool_calls"):
+        tool_calls_raw = intent_raw.get("tool_calls", [])
+    
     assistant_msg = {
         "role": "assistant",
         "content": result["response_text"],
         "metadata": {
             "thought_process": result.get("thought_process"),
             "rag_memories": formatted_memories,
-            # BRAIN MONITOR Debug-Daten
             "emotions_delta": result.get("emotions_delta", {}),
             "emotions_before": result.get("emotions_before", {}),
-            "input_analysis": result.get("input_analysis", user_input)
+            "input_analysis": result.get("input_analysis", user_input),
+            "intent_type": result.get("intent_type"),
+            "intent_confidence": result.get("intent_confidence"),
+            "tool_calls_executed": result.get("tool_calls_executed", 0),
+            "intent_raw_json": intent_raw,
+            "tool_calls": tool_calls_raw,
+            "short_term_count": result.get("short_term_count", 0),
+            "processing_time_ms": result.get("processing_time_ms", 0),
         }
     }
 

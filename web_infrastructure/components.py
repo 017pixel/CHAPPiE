@@ -1,8 +1,9 @@
 import streamlit as st
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from memory.memory_engine import MemoryEngine
+import json
 
 def render_emotion_metric(label, value, color="#2ea043"):
     st.markdown(f"""
@@ -112,62 +113,177 @@ def render_vital_signs(backend):
 def render_brain_monitor(metadata: Dict[str, Any]):
     """
     Rendert das Brain Monitor Debug-Panel für eine Nachricht.
-    Nutzt Streamlit-native Elemente statt HTML für bessere Kompatibilität.
+    Strukturierte Ansicht mit aufklappbaren Sektionen pro Verarbeitungs-Schritt.
     """
     if not metadata:
         return
     
-    # === INPUT ANALYSE ===
-    st.markdown("**🔵 INPUT ANALYSE**")
-    input_text = metadata.get("input_analysis", "N/A")
-    st.info(input_text)
+    st.markdown("""
+    <style>
+        .bm-header { 
+            font-size: 0.85rem; 
+            font-weight: 600; 
+            color: #c9d1d9; 
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            background: rgba(22, 27, 34, 0.8);
+            border-radius: 4px;
+            border-left: 3px solid #58a6ff;
+        }
+        .bm-section { 
+            margin: 6px 0; 
+            padding: 4px 0;
+        }
+        .bm-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .bm-badge-success { background: #238636; color: #fff; }
+        .bm-badge-info { background: #1f6feb; color: #fff; }
+        .bm-badge-warning { background: #9e6a03; color: #fff; }
+    </style>
+    """, unsafe_allow_html=True)
     
-    # === GEDANKE (Chain of Thought) ===
-    st.markdown("**🟣 GEDANKE (Chain of Thought)**")
+    _render_input_section(metadata)
+    _render_thought_section(metadata)
+    _render_intent_section(metadata)
+    _render_tool_calls_section(metadata)
+    _render_emotions_section(metadata)
+    _render_memories_section(metadata)
+
+
+def _render_input_section(metadata: Dict[str, Any]):
+    """Rendert die Input-Analyse Sektion."""
+    with st.expander("INPUT ANALYSE", expanded=False):
+        input_text = metadata.get("input_analysis", "N/A")
+        st.info(input_text)
+        
+        if metadata.get("intent_type"):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Intent", metadata.get("intent_type", "N/A"))
+            with col2:
+                conf = metadata.get("intent_confidence", 0)
+                st.metric("Confidence", f"{conf:.0%}" if conf else "N/A")
+
+
+def _render_thought_section(metadata: Dict[str, Any]):
+    """Rendert die Chain of Thought Sektion."""
     thought = metadata.get("thought_process", "")
     if thought:
-        st.text_area("Gedankenprozess", thought, height=150, disabled=True, label_visibility="collapsed")
-    else:
-        st.caption("(Kein Chain-of-Thought aktiviert oder vorhanden)")
+        with st.expander("CHAIN OF THOUGHT", expanded=False):
+            st.text_area("Gedankenprozess", thought, height=150, disabled=True, label_visibility="collapsed")
+
+
+def _render_intent_section(metadata: Dict[str, Any]):
+    """Rendert die Intent Analysis JSON Sektion."""
+    raw_json = metadata.get("intent_raw_json", {})
+    if raw_json:
+        with st.expander("INTENT ANALYSIS (JSON)", expanded=False):
+            _render_json_with_highlight(raw_json)
+
+
+def _render_tool_calls_section(metadata: Dict[str, Any]):
+    """Rendert die Tool Calls Sektion."""
+    tool_calls = metadata.get("tool_calls", [])
+    executed = metadata.get("tool_calls_executed", 0)
     
-    # === EMOTIONS-DELTA ===
-    st.markdown("**🔴 EMOTIONS-DELTA**")
-    if metadata.get("emotions_delta"):
-        emotion_names = {
-            "joy": "Freude",
-            "trust": "Vertrauen", 
-            "energy": "Energie",
-            "curiosity": "Neugier",
-            "frustration": "Frustration",
-            "motivation": "Motivation"
-        }
-        
-        cols = st.columns(3)
-        col_idx = 0
-        for emotion, data in metadata["emotions_delta"].items():
-            change = data.get("change", 0)
-            before = data.get("before", 0)
-            after = data.get("after", 0)
-            name = emotion_names.get(emotion, emotion)
+    if executed > 0 or tool_calls:
+        with st.expander(f"TOOL CALLS ({executed})", expanded=False):
+            if not tool_calls:
+                st.info(f"{executed} Tool(s) ausgefuehrt")
+            else:
+                for i, tc in enumerate(tool_calls):
+                    tool_name = tc.get("tool", tc.get("name", "unknown"))
+                    action = tc.get("action", "N/A")
+                    data = tc.get("data", {})
+                    
+                    st.markdown(f"**Tool #{i+1}: `{tool_name}`**")
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        st.caption(f"Action: {action}")
+                    with col2:
+                        if data:
+                            _render_json_mini(data)
+                    if i < len(tool_calls) - 1:
+                        st.divider()
+
+
+def _render_emotions_section(metadata: Dict[str, Any]):
+    """Rendert die Emotions-Delta Sektion."""
+    with st.expander("EMOTIONS-DELTA", expanded=False):
+        if metadata.get("emotions_delta"):
+            emotion_names = {
+                "happiness": "Freude",
+                "joy": "Freude",
+                "trust": "Vertrauen", 
+                "energy": "Energie",
+                "curiosity": "Neugier",
+                "frustration": "Frustration",
+                "motivation": "Motivation"
+            }
             
-            with cols[col_idx % 3]:
-                if change > 0:
-                    st.success(f"{name}: {before}% → {after}% (+{change})")
-                elif change < 0:
-                    st.error(f"{name}: {before}% → {after}% ({change})")
+            cols = st.columns(3)
+            col_idx = 0
+            for emotion, data in metadata["emotions_delta"].items():
+                if isinstance(data, dict):
+                    change = data.get("change", 0)
+                    before = data.get("before", 0)
+                    after = data.get("after", 0)
                 else:
-                    st.info(f"{name}: {before}% (keine Änderung)")
-            col_idx += 1
-    else:
-        st.caption("Keine Emotions-Änderungen")
+                    continue
+                    
+                name = emotion_names.get(emotion, emotion)
+                
+                with cols[col_idx % 3]:
+                    if change > 0:
+                        st.success(f"{name}: {before}% -> {after}% (+{change})")
+                    elif change < 0:
+                        st.error(f"{name}: {before}% -> {after}% ({change})")
+                    else:
+                        st.info(f"{name}: {before}%")
+                col_idx += 1
+        else:
+            st.caption("Keine Emotions-Aenderungen")
+
+
+def _render_memories_section(metadata: Dict[str, Any]):
+    """Rendert die geladenen Memories Sektion."""
+    memories = metadata.get("rag_memories", [])
+    with st.expander(f"GELADENE MEMORIES ({len(memories)})", expanded=False):
+        if not memories:
+            st.info("Keine Memories geladen")
+        else:
+            for i, mem in enumerate(memories):
+                render_memory_item(mem, i + 1)
+                if i < len(memories) - 1:
+                    st.divider()
+
+
+def _render_json_with_highlight(data: Dict[str, Any], max_height: int = 300):
+    """Rendert JSON mit Syntax-Highlighting."""
+    try:
+        json_str = json.dumps(data, indent=2, ensure_ascii=False)
+    except Exception:
+        json_str = str(data)
     
-    # === GELADENE MEMORIES ===
-    st.markdown("**🟢 GELADENE MEMORIES**")
-    if metadata.get("rag_memories"):
-        for i, mem in enumerate(metadata["rag_memories"]):
-            render_memory_item(mem, i + 1)
-    else:
-        st.caption("Keine Memories geladen")
+    st.code(json_str, language="json")
+
+
+def _render_json_mini(data: Dict[str, Any]):
+    """Rendert ein kompaktes JSON."""
+    try:
+        json_str = json.dumps(data, indent=2, ensure_ascii=False)
+        if len(json_str) > 500:
+            json_str = json_str[:500] + "\n..."
+    except Exception:
+        json_str = str(data)[:500]
+    
+    st.code(json_str, language="json")
 
 
 def _format_timestamp_german(timestamp_str: str) -> str:

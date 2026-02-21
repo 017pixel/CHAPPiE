@@ -297,6 +297,8 @@ def get_training_stats() -> Dict[str, Any]:
                     last_save_str = state.get('timestamp', '')
                     if last_save_str:
                         last_save = datetime.fromisoformat(last_save_str.replace('Z', '+00:00'))
+                        if last_save.tzinfo is None:
+                            last_save = last_save.replace(tzinfo=timezone.utc)
                         now = datetime.now(timezone.utc)
                         minutes_ago = (now - last_save).total_seconds() / 60
                         stats['last_activity'] = f"vor {int(minutes_ago)} Min."

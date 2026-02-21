@@ -16,7 +16,7 @@ from memory.short_term_memory_v2 import get_short_term_memory_v2
 from memory.personality_manager import PersonalityManager
 from memory.function_registry import get_function_registry
 from memory.context_files import get_context_files_manager
-from memory.intent_processor import get_intent_processor
+from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
@@ -85,9 +85,9 @@ def init_chappie():
             self.function_registry = get_function_registry()
         
         def reinit_brain_if_needed(self):
-            """Prüfe ob der Provider gewechselt wurde und initialisiere Brain neu."""
+            """Pruefe ob der Provider gewechselt wurde und initialisiere Brain neu."""
             if settings.llm_provider != self._current_provider:
-                print(f"🔄 Provider wechsel erkannt: {self._current_provider} -> {settings.llm_provider}")
+                print(f"Provider wechsel erkannt: {self._current_provider} -> {settings.llm_provider}")
                 self.brain = get_brain()
                 self._current_provider = settings.llm_provider
                 self.deep_think_engine = DeepThinkEngine(
@@ -95,7 +95,7 @@ def init_chappie():
                     emotions_engine=self.emotions,
                     brain=self.brain
                 )
-                # Intent Processor auch neu laden
+                reset_intent_processor()
                 self.intent_processor = get_intent_processor()
                 return True
             return False
@@ -148,9 +148,10 @@ def init_chappie():
             if debug_mode:
                 self.debug_logger.enable()
             else:
-                # Immer an für CLI, standardmäßig aus für Web UI (außer explizit an)
                 if not settings.cli_debug_always_on:
                     self.debug_logger.disable()
+            
+            self._processing_start_time = datetime.now()
 
             # === STEP 1: Intent Analysis (wenn aktiviert) ===
             if settings.enable_two_step_processing:
@@ -231,7 +232,11 @@ def init_chappie():
                 importance="normal"
             )
             
-            # === ERGEBNIS ZUSAMMENSTELLEN ===
+            start_time_dt = datetime.now()
+            processing_time_ms = 0
+            if hasattr(self, '_processing_start_time'):
+                processing_time_ms = (start_time_dt - self._processing_start_time).total_seconds() * 1000
+            
             return {
                 "response_text": response_data["response_text"],
                 "emotions": emotions_after,
@@ -244,6 +249,8 @@ def init_chappie():
                 "tool_calls_executed": len(intent_result.tool_calls),
                 "short_term_count": self.short_term_memory_v2.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+                "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
+                "processing_time_ms": processing_time_ms,
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
