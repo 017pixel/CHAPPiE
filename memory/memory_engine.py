@@ -43,7 +43,7 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
-from config.config import settings, CHROMA_DB_DIR
+from config.config import settings, CHROMA_DB_DIR, LLMProvider
 from brain.base_brain import GenerationConfig, Message
 from config.prompts import format_query_extraction_prompt
 
@@ -378,17 +378,16 @@ class MemoryEngine:
         """
         Extrahiert optimierte Suchbegriffe aus dem User-Input.
 
-        Nutzt Tri-Strategy:
-        1. Priority: Manual (Kurze Inputs < 6 Wörter)
-        2. Priority: Groq API (llama-3.1-8b-instant)
-        3. Fallback: Ollama (qwen2.5:1.5b)
-        4. Silent Fallback: Originaler User-Input bei komplettem Fehler
+        Nutzt Multi-Provider Strategy:
+        1. Manual (Kurze Inputs < 10 Woerter)
+        2. LLM Extraction mit aktivem Provider (Groq/NVIDIA/Cerebras/Ollama)
+        3. Fallback: Zusammenfassung der ersten 200 Zeichen
 
         Args:
             user_input: Der originale User-Input
 
         Returns:
-            Optimierter Such-Query oder Original-Input bei Fehler
+            Optimierter Such-Query oder gekuerzter Input bei Fehler
         """
         if not settings.enable_query_extraction:
             return user_input
@@ -396,22 +395,21 @@ class MemoryEngine:
         if not user_input or not user_input.strip():
             return user_input
 
-        # === 1. Manual Optimization (für kurze Inputs) ===
         words = user_input.split()
-        if len(words) < 6:
-            # Deutsche Stoppwörter (Füllwörter), die ignoriert werden sollen
+        
+        if len(words) < 10:
             stop_words = {
                 "ich", "du", "er", "sie", "es", "wir", "ihr", "sie",
                 "der", "die", "das", "ein", "eine", "einen", "einem", "einer",
                 "und", "oder", "aber", "doch", "als", "wie",
-                "bin", "bist", "ist", "sind", "war", "wäre", "haben", "hat",
+                "bin", "bist", "ist", "sind", "war", "waere", "haben", "hat",
                 "mir", "dir", "ihm", "ihr", "uns", "euch", "ihnen",
                 "mich", "dich", "sich",
                 "hallo", "hi", "hey", "moin", "servus", "guten", "tag", "morgen", "abend",
-                "bitte", "danke", "mal", "halt", "eben", "so", "doch", "ja", "nein"
+                "bitte", "danke", "mal", "halt", "eben", "so", "doch", "ja", "nein",
+                "koennte", "wuerde", "sollte", "moechte", "kannst", "bitte"
             }
             
-            # Filtere Stoppwörter raus (case-insensitive)
             keywords = [w for w in words if w.lower().strip(".,!?") not in stop_words]
             
             if keywords:
@@ -420,10 +418,11 @@ class MemoryEngine:
                     print(f"   Query Extraction (Manual): '{user_input}' -> '{extracted}'")
                 return extracted
             else:
-                # Wenn nur Stoppwörter übrig bleiben (z.B. "Hallo, wie geht es?"), nimm Original
                 return user_input
 
-        prompt = format_query_extraction_prompt(user_input)
+        truncated_input = user_input[:1500] if len(user_input) > 1500 else user_input
+        
+        prompt = format_query_extraction_prompt(truncated_input)
 
         gen_config = GenerationConfig(
             max_tokens=100,
@@ -433,48 +432,88 @@ class MemoryEngine:
 
         messages = [Message(role="user", content=prompt)]
         
-        query_provider = getattr(settings, 'query_extraction_provider', None) or settings.llm_provider
+        query_provider = getattr(settings, 'query_extraction_provider', None)
+        effective_provider = settings.get_effective_provider(query_provider)
+        model = settings.get_query_extraction_model(query_provider)
 
-        if query_provider == LLMProvider.GROQ or settings.llm_provider == LLMProvider.GROQ:
-            try:
-                from brain.groq_brain import GroqBrain
-                groq_brain = GroqBrain(model=settings.query_extraction_groq_model)
-
-                if groq_brain.is_available():
-                    result = groq_brain.generate(messages, config=gen_config)
-
-                    if isinstance(result, str) and result.strip():
-                        extracted = result.strip()
-                        if settings.debug:
-                            print(f"   Query Extraction (Groq): '{user_input}' -> '{extracted}'")
-                        return extracted
-            except Exception as e:
-                if settings.debug:
-                    print(f"   Groq Query Extraction fehlgeschlagen: {e}")
+        if settings.debug:
+            print(f"   Query Extraction: Provider={effective_provider.value}, Model={model}")
 
         try:
-            from brain.ollama_brain import OllamaBrain
-            ollama_brain = OllamaBrain(
-                model=settings.query_extraction_ollama_model,
-                host=settings.ollama_host
-            )
-
-            if ollama_brain.is_available():
-                result = ollama_brain.generate(messages, config=gen_config)
-
+            brain = self._get_brain_for_provider(effective_provider, model)
+            if brain and brain.is_available():
+                result = brain.generate(messages, config=gen_config)
                 if isinstance(result, str) and result.strip():
                     extracted = result.strip()
                     if settings.debug:
-                        print(f"   Query Extraction (Ollama): '{user_input}' -> '{extracted}'")
+                        print(f"   Query Extraction ({effective_provider.value}): '{extracted[:100]}...'")
                     return extracted
         except Exception as e:
             if settings.debug:
-                print(f"   Ollama Query Extraction fehlgeschlagen: {e}")
+                print(f"   Query Extraction ({effective_provider.value}) fehlgeschlagen: {e}")
 
-        # Silent Fallback: Originaler User-Input
+        keywords_fallback = self._extract_keywords_simple(user_input)
+        if keywords_fallback:
+            if settings.debug:
+                print(f"   Query Extraction (Fallback Keywords): '{keywords_fallback[:100]}...'")
+            return keywords_fallback
+
+        truncated_fallback = " ".join(words[:20])
         if settings.debug:
-            print(f"   Query Extraction fehlgeschlagen - nutze Original-Input")
-        return user_input
+            print(f"   Query Extraction (Fallback Truncate): '{truncated_fallback}'")
+        return truncated_fallback
+
+    def _get_brain_for_provider(self, provider, model: str):
+        """Holt die passende Brain-Instanz fuer einen Provider."""
+        try:
+            if provider == LLMProvider.GROQ:
+                from brain.groq_brain import GroqBrain
+                return GroqBrain(model=model)
+            elif provider == LLMProvider.NVIDIA:
+                from brain.nvidia_brain import NVIDIABrain
+                return NVIDIABrain(model=model)
+            elif provider == LLMProvider.CEREBRAS:
+                from brain.cerebras_brain import CerebrasBrain
+                return CerebrasBrain(model=model)
+            elif provider == LLMProvider.OLLAMA:
+                from brain.ollama_brain import OllamaBrain
+                return OllamaBrain(model=model, host=settings.ollama_host)
+        except Exception as e:
+            if settings.debug:
+                print(f"   Brain init failed for {provider}: {e}")
+        return None
+
+    def _extract_keywords_simple(self, text: str) -> str:
+        """Extrahiert einfach Schluesselwoerter ohne LLM."""
+        import re
+        stop_words = {
+            "ich", "du", "er", "sie", "es", "wir", "ihr", "sie", "sich",
+            "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "einen",
+            "und", "oder", "aber", "wenn", "weil", "dass", "ob", "als", "wie",
+            "ist", "sind", "war", "waren", "sein", "haben", "hat", "hatte", "werden", "wird",
+            "mir", "dir", "ihm", "ihnen", "uns", "euch",
+            "mich", "dich",
+            "nicht", "auch", "noch", "schon", "nur", "sehr", "so", "zu", "von", "mit",
+            "fuer", "auf", "an", "in", "im", "am", "bei", "nach", "vor", "ueber", "unter",
+            "diese", "dieser", "diesem", "welche", "welcher", "welchem", "was", "wer", "wen", "wem",
+            "koennen", "kann", "muessen", "muss", "sollen", "soll", "wollen", "will", "duerfen", "darf",
+            "wuerde", "koennte", "sollte", "moechte", "werde", "wurde", "worden",
+            "habe", "haben", "bin", "bist", "ist", "sind", "war", "waren",
+            "mehr", "andere", "anderer", "anderem", "andren",
+            "bitte", "danke", "vielleicht", "vielleicht", "gerade", "wirklich", "ganz", "viel"
+        }
+        
+        words = re.findall(r'\b[A-Za-zAEIOUaeiou]{3,}\b', text.lower())
+        keywords = [w for w in words if w not in stop_words and len(w) > 2]
+        
+        seen = set()
+        unique_keywords = []
+        for w in keywords:
+            if w not in seen:
+                seen.add(w)
+                unique_keywords.append(w)
+        
+        return " ".join(unique_keywords[:15]) if unique_keywords else ""
 
     def search_memory(self, query: str, top_k: Optional[int] = None, min_relevance: float = 0.0) -> list[Memory]:
         """

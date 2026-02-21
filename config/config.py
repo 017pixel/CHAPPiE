@@ -85,6 +85,8 @@ class Settings:
         self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "auto"))
         self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
+        self.query_extraction_nvidia_model = self._get_val("QUERY_EXTRACTION_NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
+        self.query_extraction_cerebras_model = self._get_val("QUERY_EXTRACTION_CEREBRAS_MODEL", "llama-3.3-70b")
         self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
 
         self.emotion_analysis_model = self._get_val("EMOTION_ANALYSIS_MODEL", "qwen2.5:1.5b")
@@ -98,7 +100,7 @@ class Settings:
         self.training_trainer_provider = _parse_provider(self._get_val("TRAINING_TRAINER_PROVIDER", "auto"))
         self.training_trainer_model = self._get_val("TRAINING_TRAINER_MODEL", "")
 
-        self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 5))
+        self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 15))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
 
@@ -145,6 +147,10 @@ class Settings:
         effective = self.get_effective_provider(provider if provider != "auto" else None)
         if effective == LLMProvider.GROQ:
             return self.query_extraction_groq_model
+        elif effective == LLMProvider.NVIDIA:
+            return self.query_extraction_nvidia_model
+        elif effective == LLMProvider.CEREBRAS:
+            return self.query_extraction_cerebras_model
         return self.query_extraction_ollama_model
 
     def update_from_ui(self, **kwargs):
