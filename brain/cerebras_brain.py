@@ -141,16 +141,8 @@ class CerebrasBrain(BaseBrain):
             return f"Cerebras Fehler: {str(e)}"
     
     def is_available(self) -> bool:
-        """Prüft ob Cerebras erreichbar ist."""
-        if not self._is_initialized:
-            return False
-        
-        try:
-            # Kleiner API-Test mit Models-Endpoint
-            self.client.models.list()
-            return True
-        except Exception:
-            return False
+        """Prueft ob Cerebras bereit ist (kein API-Call, nur Initialisierungs-Check)."""
+        return self._is_initialized
     
     def get_model_info(self) -> dict:
         """Gibt Modell-Informationen zurück."""

@@ -13,6 +13,7 @@ from datetime import datetime
 import asyncio
 from dataclasses import dataclass
 
+from config.config import settings
 from .base_agent import AgentResult
 from .sensory_cortex import SensoryCortexAgent
 from .amygdala import AmygdalaAgent
@@ -108,7 +109,8 @@ class BrainOrchestrator:
         if memory_engine and hippocampus_result.data.get("search_query"):
             memories = memory_engine.search_memory(
                 hippocampus_result.data["search_query"],
-                top_k=5
+                top_k=settings.memory_top_k,
+                min_relevance=settings.memory_min_relevance
             )
         
         context = ""

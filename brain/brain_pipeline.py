@@ -106,7 +106,8 @@ class BrainPipeline:
             try:
                 memories = memory_engine.search_memory(
                     hippocampus_result.data["search_query"],
-                    top_k=settings.memory_top_k
+                    top_k=settings.memory_top_k,
+                    min_relevance=settings.memory_min_relevance
                 )
             except Exception as e:
                 print(f"[BrainPipeline] Memory search error: {e}")

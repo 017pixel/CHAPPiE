@@ -151,7 +151,7 @@ class MemoryEngine:
             # Collection erstellen oder laden
             self.collection = self.client.get_or_create_collection(
                 name=settings.chroma_collection_name,
-                metadata={"description": "CHAPiE episodic memory"}
+                metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
             )
             
             # Test-Zugriff um sicherzustellen, dass es funktioniert
@@ -180,7 +180,7 @@ class MemoryEngine:
             
             self.collection = self.client.get_or_create_collection(
                 name=settings.chroma_collection_name,
-                metadata={"description": "CHAPiE episodic memory (in-memory)"}
+                metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory (in-memory)"}
             )
             
             self._is_persistent = False
@@ -441,13 +441,15 @@ class MemoryEngine:
 
         try:
             brain = self._get_brain_for_provider(effective_provider, model)
-            if brain and brain.is_available():
+            if brain:
                 result = brain.generate(messages, config=gen_config)
-                if isinstance(result, str) and result.strip():
+                if isinstance(result, str) and result.strip() and not result.startswith("NVIDIA Fehler") and not result.startswith("Groq Fehler") and not result.startswith("Cerebras Fehler"):
                     extracted = result.strip()
                     if settings.debug:
                         print(f"   Query Extraction ({effective_provider.value}): '{extracted[:100]}...'")
                     return extracted
+                elif settings.debug:
+                    print(f"   Query Extraction ({effective_provider.value}): LLM returned error or empty: {result[:100] if result else 'None'}")
         except Exception as e:
             if settings.debug:
                 print(f"   Query Extraction ({effective_provider.value}) fehlgeschlagen: {e}")
@@ -530,8 +532,10 @@ class MemoryEngine:
         Returns:
             Liste von Memory-Objekten, sortiert nach Relevanz
         """
-        # Prüfe ob Collection verfügbar ist
         if self.collection is None:
+            return []
+        
+        if not query or not query.strip():
             return []
         
         import time

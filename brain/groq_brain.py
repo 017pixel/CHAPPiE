@@ -131,16 +131,8 @@ class GroqBrain(BaseBrain):
             return f"Groq Fehler: {str(e)}"
     
     def is_available(self) -> bool:
-        """Prueft ob Groq erreichbar ist."""
-        if not self._is_initialized:
-            return False
-        
-        try:
-            # Kleiner API-Test
-            self.client.models.list()
-            return True
-        except Exception:
-            return False
+        """Prueft ob Groq bereit ist (kein API-Call, nur Initialisierungs-Check)."""
+        return self._is_initialized
     
     def get_model_info(self) -> dict:
         """Gibt Modell-Informationen zurueck."""

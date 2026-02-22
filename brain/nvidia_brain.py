@@ -201,28 +201,8 @@ class NVIDIABrain(BaseBrain):
             return f"NVIDIA Fehler: {str(e)}"
     
     def is_available(self) -> bool:
-        """Prueft ob NVIDIA NIM erreichbar ist."""
-        if not self._is_initialized:
-            return False
-        
-        try:
-            payload = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": "test"}],
-                "max_tokens": 5,
-                "stream": False,
-            }
-            
-            response = requests.post(
-                self.BASE_URL,
-                headers=self._build_headers(stream=False),
-                json=payload,
-                timeout=10
-            )
-            
-            return response.status_code == 200
-        except Exception:
-            return False
+        """Prueft ob NVIDIA NIM bereit ist (kein API-Call, nur Initialisierungs-Check)."""
+        return self._is_initialized
     
     def get_model_info(self) -> dict:
         """Gibt Modell-Informationen zurueck."""
