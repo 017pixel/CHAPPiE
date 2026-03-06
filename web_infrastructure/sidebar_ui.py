@@ -4,7 +4,7 @@ from web_infrastructure.components import render_vital_signs
 def render_sidebar(backend):
     """Rendert die Sidebar-Navigation und Verlauf."""
     with st.sidebar:
-        st.markdown('<div class="header-logo">CHAPPiE</div>', unsafe_allow_html=True)
+        st.markdown("## CHAPPiE")
 
         if st.button("Neuer Chat", use_container_width=True, key="sidebar_new_chat"):
             st.session_state.session_id = backend.chat_manager.create_session()
@@ -23,64 +23,51 @@ def render_sidebar(backend):
             st.session_state.show_training = False
             st.rerun()
         
-        if st.button("Training", use_container_width=True, key="sidebar_training"):
+        if st.button("Autonomes Training", use_container_width=True, key="sidebar_training"):
             st.session_state.show_training = not st.session_state.show_training
             st.session_state.show_memories = False
             st.session_state.show_settings = False
             st.rerun()
         
-        # === BRAIN MONITOR TOGGLE ===
-        st.markdown("---")
-        debug_label = "DEBUG MODE: ON" if st.session_state.debug_mode else "DEBUG MODE: OFF"
-        if st.button(debug_label, use_container_width=True, key="sidebar_debug_toggle"):
-            st.session_state.debug_mode = not st.session_state.debug_mode
+        st.divider()
+        debug_label = "DEBUG MODE: ON" if getattr(st.session_state, 'debug_mode', False) else "DEBUG MODE: OFF"
+        if st.button(debug_label, use_container_width=True, key="sidebar_debug_toggle", type="primary" if getattr(st.session_state, 'debug_mode', False) else "secondary"):
+            st.session_state.debug_mode = not getattr(st.session_state, 'debug_mode', False)
             st.rerun()
 
-        st.markdown("---")
+        st.divider()
         st.markdown("**VITALZEICHEN**")
         render_vital_signs(backend)
         
-        st.markdown("---")
+        st.divider()
+        st.markdown("**KONTEXT-DATEIEN**")
         
-        # === CONTEXT FILES WIDGETS ===
-        st.markdown("**CONTEXT DATEIEN**")
+        if st.button("soul.md (Selbstwahrnehmung)", key="show_soul", use_container_width=True):
+            st.session_state.show_soul_context = True
+            st.rerun()
         
-        # Clean und simple Anzeige der 3 Context-Dateien (ohne Farben)
-        try:
-            # Soul.md - CHAPPiE's Selbstwahrnehmung
-            st.markdown("**SOUL**")
-            if st.button("soul.md anzeigen", key="show_soul", use_container_width=True):
-                st.session_state.show_soul_context = True
-                st.rerun()
-            
-            # User.md - Benutzerprofil
-            st.markdown("**USER**")
-            if st.button("user.md anzeigen", key="show_user", use_container_width=True):
-                st.session_state.show_user_context = True
-                st.rerun()
-            
-            # Preferences.md - CHAPPiE's Vorlieben
-            st.markdown("**PREFS**")
-            if st.button("CHAPPiEsPreferences.md anzeigen", key="show_prefs", use_container_width=True):
-                st.session_state.show_prefs_context = True
-                st.rerun()
+        if st.button("user.md (Benutzerprofil)", key="show_user", use_container_width=True):
+            st.session_state.show_user_context = True
+            st.rerun()
+        
+        if st.button("CHAPPiEsPreferences", key="show_prefs", use_container_width=True):
+            st.session_state.show_prefs_context = True
+            st.rerun()
                 
-        except Exception as e:
-            st.error(f"Fehler beim Laden: {e}")
-        
-        st.markdown("---")
+        st.divider()
 
         st.markdown("**VERLAUF**")
-        sessions = backend.chat_manager.list_sessions()
-        
-        for s in sessions[:25]:
-            # Highlight current session
-            label = s['title'][:30]
-            if s["id"] == st.session_state.session_id:
-                label = f"> {label}"
-            
-            if st.button(label, key=f"sess_{s['id']}", use_container_width=True):
-                st.session_state.session_id = s["id"]
-                data = backend.chat_manager.load_session(s["id"])
-                st.session_state.messages = data.get("messages", [])
-                st.rerun()
+        try:
+            sessions = backend.chat_manager.list_sessions()
+            for s in sessions[:25]:
+                label = s['title'][:30]
+                if s["id"] == getattr(st.session_state, 'session_id', None):
+                    label = f"• {label}"
+                
+                if st.button(label, key=f"sess_{s['id']}", use_container_width=True):
+                    st.session_state.session_id = s["id"]
+                    data = backend.chat_manager.load_session(s["id"])
+                    st.session_state.messages = data.get("messages", [])
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Fehler: {e}")
