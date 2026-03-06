@@ -23,50 +23,50 @@ class AgentModelConfig:
 
 BRAIN_AGENT_CONFIGS: Dict[str, AgentModelConfig] = {
     "sensory_cortex": AgentModelConfig(
-        model_id="meta/llama-3.3-70b-instruct",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-9B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.1,
         max_tokens=512,
         description="Input classification - fast and accurate"
     ),
     "amygdala": AgentModelConfig(
-        model_id="nvidia/llama-3.1-nemotron-70b",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-9B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.2,
         max_tokens=512,
         description="Emotional analysis - nuanced understanding"
     ),
     "hippocampus": AgentModelConfig(
-        model_id="nvidia/llama-3.1-nemotron-70b",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-122B-A10B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.2,
         max_tokens=768,
         description="Memory operations - careful decision making"
     ),
     "prefrontal_cortex": AgentModelConfig(
-        model_id="z-ai/glm5",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-122B-A10B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.3,
         max_tokens=1024,
         description="Main orchestration - complex reasoning"
     ),
     "basal_ganglia": AgentModelConfig(
-        model_id="meta/llama-3.3-70b-instruct",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-9B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.2,
         max_tokens=512,
         description="Reward evaluation - learning signals"
     ),
     "neocortex": AgentModelConfig(
-        model_id="meta/llama-3.3-70b-instruct",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-122B-A10B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.2,
         max_tokens=768,
         description="Memory consolidation - long-term storage"
     ),
     "memory_agent": AgentModelConfig(
-        model_id="nvidia/llama-3.1-nemotron-70b",
-        provider=LLMProvider.NVIDIA,
+        model_id="Qwen/Qwen3.5-122B-A10B-Instruct",
+        provider=LLMProvider.VLLM,
         temperature=0.2,
         max_tokens=768,
         description="Tool call decisions - context file updates"

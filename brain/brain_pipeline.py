@@ -23,6 +23,7 @@ from brain.agents import (
     MemoryAgent,
 )
 from brain.agents.base_agent import AgentResult
+from brain.agents.steering_manager import get_steering_manager
 from memory.sleep_phase import get_sleep_phase_handler
 from memory.forgetting_curve import get_forgetting_curve, get_decay_manager
 from config.config import settings, LLMProvider
@@ -47,6 +48,7 @@ class BrainPipeline:
         self.basal_ganglia = BasalGangliaAgent()
         self.neocortex = NeocortexAgent()
         self.memory_agent = MemoryAgent()
+        self.steering_manager = get_steering_manager()
         
         self.sleep_handler = get_sleep_phase_handler()
         self.forgetting_curve = get_forgetting_curve()
@@ -134,6 +136,10 @@ class BrainPipeline:
             amygdala_result.data.get("emotions_update", {})
         )
         
+        # Steering: Lokal = Vektor-Steering, Cloud = kein Steering (nur Prompt)
+        steering_payload = self.steering_manager.get_steering_payload(emotions_after)
+        is_local = self.steering_manager.is_local_provider()
+        
         short_term_entries = hippocampus_result.data.get("short_term_entries", [])
         tool_calls = self._convert_to_tool_calls(short_term_entries)
         
@@ -149,6 +155,8 @@ class BrainPipeline:
             "hippocampus": hippocampus_result,
             "prefrontal": prefrontal_result,
             "emotions_after": emotions_after,
+            "steering_payload": steering_payload,  # Nur bei lokalem Provider aktiv
+            "steering_mode": "vector" if is_local and steering_payload else "prompt",
             "tool_calls": tool_calls,
             "memories_found": len(memories),
             "processing_time_ms": total_time,

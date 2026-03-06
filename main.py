@@ -110,9 +110,28 @@ class CHAPPiE:
             mood = state.get_mood_description()
             print_section("EMOTIONAL STATUS", Colors.EMOTION)
             print(f"Stimmung: {mood}")
-            print(f"Freude:     {state.happiness:<3} | Vertrauen:  {state.trust:<3}")
-            print(f"Energie:    {state.energy:<3} | Neugier:    {state.curiosity:<3}")
-            print(f"Motivation: {state.motivation:<3} | Frust:      {state.frustration:<3}")
+            print(f"Freude:       {state.happiness:<3} | Vertrauen:    {state.trust:<3}")
+            print(f"Energie:      {state.energy:<3} | Neugier:      {state.curiosity:<3}")
+            print(f"Motivation:   {state.motivation:<3} | Frust:        {state.frustration:<3}")
+            print(f"Traurigkeit:  {state.sadness:<3}")
+            
+            # Steering-Status
+            if settings.enable_steering:
+                from brain.agents.steering_manager import get_steering_manager
+                sm = get_steering_manager()
+                emotions_dict = state.to_dict()
+                summary = sm.get_emotion_summary(emotions_dict)
+                is_local = sm.is_local_provider()
+                print(f"\nSteering: {'LOKAL (Vektor)' if is_local else 'CLOUD (Prompt)'}")
+                print(f"Aktive Steuerung: {summary}")
+                print(f"Verfuegbare Vektoren: {len(sm.get_available_vectors())}")
+            
+            # Sleep-Status
+            from memory.sleep_phase import get_sleep_phase_handler
+            sleep_status = get_sleep_phase_handler().get_status()
+            print(f"\nSchlaf: {sleep_status['total_sleeps']} Schlafphasen")
+            print(f"Nachrichten seit letztem Schlaf: {sleep_status['interactions_since_sleep']}")
+            print(f"Naechster Schlaf: {sleep_status['next_sleep_trigger']}")
             return True
         
         # Config
@@ -132,10 +151,36 @@ class CHAPPiE:
             else:
                 print_section("SLEEP MODE", Colors.MEMORY)
                 print("Startet Konsolidierung (Traum-Phase)...")
-                result = self.memory.consolidate_memories(self.brain)
-                print(result)
-                self.emotions.restore_energy(30)
-                print_log("SLEEP", "Energie wiederhergestellt.", Colors.EMOTION)
+                
+                # Nutze den neuen SleepPhaseHandler mit Energie-Reset
+                from memory.sleep_phase import get_sleep_phase_handler
+                sleep_handler = get_sleep_phase_handler()
+                result = sleep_handler.execute_sleep_phase(
+                    memory_engine=self.memory,
+                    context_files=None
+                )
+                
+                # Zeige Ergebnisse
+                if result.get("energy_restored"):
+                    energy_val = result.get("energy_value", 100)
+                    print(f"   Energie wiederhergestellt: {energy_val}%")
+                
+                recovery = result.get("emotional_recovery", {})
+                if recovery:
+                    print(f"   Emotionale Regeneration:")
+                    for emotion, delta in recovery.items():
+                        sign = "+" if delta > 0 else ""
+                        print(f"     {emotion}: {sign}{delta}")
+                
+                consolidation = result.get("consolidation", {})
+                if consolidation.get("candidates"):
+                    print(f"   Erinnerungen konsolidiert: {consolidation['consolidated']}")
+                
+                # Lade neuen Status
+                self.emotions = EmotionsEngine()
+                state = self.emotions.get_state()
+                print(f"\n   Neuer Status: H={state.happiness} T={state.trust} E={state.energy} S={state.sadness}")
+                
                 self.is_sleeping = True
             return True
         

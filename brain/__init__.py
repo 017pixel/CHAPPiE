@@ -8,6 +8,7 @@ from .ollama_brain import OllamaBrain
 from .groq_brain import GroqBrain
 from .cerebras_brain import CerebrasBrain
 from .nvidia_brain import NVIDIABrain
+from .vllm_brain import VLLMBrain
 from .deep_think import DeepThinkEngine, DeepThinkStep
 
 from config.config import settings, LLMProvider
@@ -22,6 +23,7 @@ def get_brain() -> BaseBrain:
     - "groq" → GroqBrain (cloud)
     - "cerebras" → CerebrasBrain (cloud, high-speed)
     - "nvidia" → NVIDIABrain (cloud, DeepSeek/GLM/Llama)
+    - "vllm" → VLLMBrain (lokale GPU-Beschleunigung)
     
     Returns:
         Initialisiertes Brain-Objekt
@@ -32,5 +34,7 @@ def get_brain() -> BaseBrain:
         return CerebrasBrain()
     elif settings.llm_provider == LLMProvider.NVIDIA:
         return NVIDIABrain()
+    elif settings.llm_provider == LLMProvider.VLLM:
+        return VLLMBrain()
     else:
         return OllamaBrain()

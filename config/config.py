@@ -20,6 +20,7 @@ class LLMProvider(str, Enum):
     GROQ = "groq"
     CEREBRAS = "cerebras"
     NVIDIA = "nvidia"
+    VLLM = "vllm"
 
 
 try:
@@ -57,14 +58,17 @@ class Settings:
         return default
 
     def _load_from_files(self):
-        provider_str = self._get_val("LLM_PROVIDER", "groq")
+        provider_str = self._get_val("LLM_PROVIDER", "vllm")
         try:
             self.llm_provider = LLMProvider(provider_str.lower())
         except ValueError:
-            self.llm_provider = LLMProvider.GROQ
+            self.llm_provider = LLMProvider.VLLM
 
         self.ollama_host = self._get_val("OLLAMA_HOST", "http://localhost:11434")
-        self.ollama_model = self._get_val("OLLAMA_MODEL", "llama3:8b")
+        self.ollama_model = self._get_val("OLLAMA_MODEL", "qwen2.5:7b")
+        
+        self.vllm_url = self._get_val("VLLM_URL", "http://localhost:8000/v1")
+        self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4")
         
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
         self.groq_model = self._get_val("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
@@ -78,13 +82,15 @@ class Settings:
         self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "auto"))
         self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-120b")
         self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
-        self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "llama3:8b")
+        self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen2.5:7b")
+        self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-122B-A10B-Instruct")
         self.intent_processor_model_nvidia = self._get_val("INTENT_PROCESSOR_MODEL_NVIDIA", "deepseek-ai/deepseek-v3.1-terminus")
         self.enable_two_step_processing = self._get_val("ENABLE_TWO_STEP_PROCESSING", True)
 
         self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "auto"))
         self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
+        self.query_extraction_vllm_model = self._get_val("QUERY_EXTRACTION_VLLM_MODEL", "Qwen/Qwen3.5-9B-Instruct")
         self.query_extraction_nvidia_model = self._get_val("QUERY_EXTRACTION_NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
         self.query_extraction_cerebras_model = self._get_val("QUERY_EXTRACTION_CEREBRAS_MODEL", "llama-3.3-70b")
         self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
@@ -114,6 +120,11 @@ class Settings:
         self.user_path = self._get_val("USER_PATH", str(DATA_DIR / "user.md"))
         self.preferences_path = self._get_val("PREFERENCES_PATH", str(DATA_DIR / "CHAPPiEsPreferences.md"))
 
+        # Neu: Steering-Konfiguration
+        self.enable_steering = self._get_val("ENABLE_STEERING", False)
+        self.steering_provider = _parse_provider(self._get_val("STEERING_PROVIDER", "vllm"))
+        self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3.5-122B-A10B-Instruct")
+
         self.cli_debug_always_on = True
         self.web_debug_default = False
 
@@ -141,6 +152,8 @@ class Settings:
             return self.intent_processor_model_cerebras
         elif effective == LLMProvider.NVIDIA:
             return self.intent_processor_model_nvidia
+        elif effective == LLMProvider.VLLM:
+            return self.intent_processor_model_vllm
         return self.intent_processor_model_ollama
 
     def get_query_extraction_model(self, provider=None):

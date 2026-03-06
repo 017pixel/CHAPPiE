@@ -32,6 +32,7 @@ def render_vital_signs(backend):
     render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#9C27B0")
     render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#FF9800")
     render_emotion_metric("Frustration", emotions_dict.get("frustration", 0), "#F44336")
+    render_emotion_metric("Traurigkeit", emotions_dict.get("sadness", 0), "#607D8B")
 
     st.markdown("---")
     try:

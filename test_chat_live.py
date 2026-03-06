@@ -126,7 +126,8 @@ for i, user_msg in enumerate(test_messages, 1):
         "energy": emotional_state.energy,
         "curiosity": emotional_state.curiosity,
         "frustration": emotional_state.frustration,
-        "motivation": emotional_state.motivation
+        "motivation": emotional_state.motivation,
+        "sadness": emotional_state.sadness
     }
     intent_result = intent_proc.process(user_msg, message_history, current_emotions)
     

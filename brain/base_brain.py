@@ -1,40 +1,41 @@
 """
 CHAPiE - Brain Base Class
 ==========================
-Abstrakte Basisklasse für alle LLM-Backends.
+Abstrakte Basisklasse fuer alle LLM-Backends.
 
-Ermöglicht einfachen Wechsel zwischen verschiedenen Providern
-(Ollama, Groq, etc.) ohne Änderungen am restlichen Code.
+Ermoeglicht einfachen Wechsel zwischen verschiedenen Providern
+(Ollama, Groq, vLLM, etc.) ohne Aenderungen am restlichen Code.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generator, Optional
-from dataclasses import dataclass
+from typing import Generator, Optional, Dict, Any
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Message:
-    """Repräsentiert eine Chat-Nachricht."""
+    """Repraesentiert eine Chat-Nachricht."""
     role: str  # "system", "user", "assistant"
     content: str
 
 
 @dataclass
 class GenerationConfig:
-    """Konfiguration für Text-Generierung."""
+    """Konfiguration fuer Text-Generierung."""
     max_tokens: int = 1024
     temperature: float = 0.7
     stream: bool = True
     stop_sequences: Optional[list[str]] = None
+    extra_body: Optional[Dict[str, Any]] = None  # Fuer Steering-Vektoren und spezifische Parameter
 
 
 class BaseBrain(ABC):
     """
-    Abstrakte Basisklasse für LLM-Backends.
+    Abstrakte Basisklasse fuer LLM-Backends.
     
     Jedes Backend muss diese Methoden implementieren:
     - generate(): Generiert Text (mit oder ohne Streaming)
-    - is_available(): Prüft ob das Backend verfügbar ist
+    - is_available(): Prueft ob das Backend verfuegbar ist
     """
     
     def __init__(self, model: str):
@@ -61,15 +62,15 @@ class BaseBrain(ABC):
             config: Generierungs-Konfiguration
         
         Returns:
-            Bei stream=True: Generator der Token für Token liefert
-            Bei stream=False: Vollständige Antwort als String
+            Bei stream=True: Generator der Token fuer Token liefert
+            Bei stream=False: Vollstaendige Antwort als String
         """
         pass
     
     @abstractmethod
     def is_available(self) -> bool:
         """
-        Prüft ob das Backend verfügbar ist.
+        Prueft ob das Backend verfuegbar ist.
         
         Returns:
             True wenn das Backend erreichbar und funktional ist
@@ -79,7 +80,7 @@ class BaseBrain(ABC):
     @abstractmethod
     def get_model_info(self) -> dict:
         """
-        Gibt Informationen über das aktive Modell zurück.
+        Gibt Informationen ueber das aktive Modell zurueck.
         
         Returns:
             Dict mit Modell-Informationen
@@ -88,10 +89,10 @@ class BaseBrain(ABC):
     
     def build_prompt(self, system: str, memories: str, user_input: str, history: list[dict] = None) -> list[Message]:
         """
-        Baut die Nachrichten-Liste für den Chat-Prompt.
+        Baut die Nachrichten-Liste fuer den Chat-Prompt.
         
         Args:
-            system: System-Prompt (Persönlichkeit)
+            system: System-Prompt (Persoenlichkeit)
             memories: Formatierte Erinnerungen aus dem Memory
             user_input: Aktuelle User-Eingabe
             history: Chat-Verlauf (Liste von Dicts mit 'role' und 'content')
@@ -108,7 +109,7 @@ class BaseBrain(ABC):
         
         messages.append(Message(role="system", content=full_system))
         
-        # Chat-Verlauf hinzufügen (wenn vorhanden)
+        # Chat-Verlauf hinzufuegen (wenn vorhanden)
         if history:
             for msg in history:
                 messages.append(Message(role=msg["role"], content=msg["content"]))

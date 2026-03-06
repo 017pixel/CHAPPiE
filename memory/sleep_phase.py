@@ -96,6 +96,13 @@ class SleepPhaseHandler:
         """
         Execute the sleep phase.
         
+        Waehrend der Schlafphase:
+        1. Memory-Konsolidierung (Hippocampus -> Neocortex)
+        2. Vergessenskurve anwenden
+        3. Context-Dateien aktualisieren
+        4. Energie wiederherstellen (95-100%)
+        5. Emotionale Regeneration (Traurigkeit -20, Frustration -15)
+        
         Args:
             memory_engine: Memory engine instance
             context_files: Context files manager
@@ -110,6 +117,8 @@ class SleepPhaseHandler:
                 "consolidation": {},
                 "forgetting": {},
                 "context_updates": {},
+                "energy_restored": False,
+                "emotional_recovery": {},
                 "errors": []
             }
             
@@ -133,6 +142,15 @@ class SleepPhaseHandler:
                     )
                     results["context_updates"] = context_result
                 
+                # ENERGIE WIEDERHERSTELLEN (95-100%)
+                energy_recovery = self._restore_energy()
+                results["energy_restored"] = True
+                results["energy_value"] = energy_recovery
+                
+                # EMOTIONALE REGENERATION im Schlaf
+                emotional_recovery = self._emotional_sleep_recovery()
+                results["emotional_recovery"] = emotional_recovery
+                
                 self._state["last_sleep_time"] = datetime.now().isoformat()
                 self._state["interaction_count_since_sleep"] = 0
                 self._state["total_sleeps"] = self._state.get("total_sleeps", 0) + 1
@@ -146,6 +164,76 @@ class SleepPhaseHandler:
             results["duration_seconds"] = (end_time - start_time).total_seconds()
             
             return results
+    
+    def _restore_energy(self) -> int:
+        """
+        Stellt die Energie auf 95-100% wieder her.
+        
+        Returns:
+            Der neue Energiewert
+        """
+        import random
+        try:
+            from memory.emotions_engine import EmotionsEngine
+            engine = EmotionsEngine()
+            new_energy = random.randint(95, 100)
+            engine.set_emotion("energy", new_energy)
+            print(f"[SleepPhase] Energie wiederhergestellt: {new_energy}%")
+            return new_energy
+        except Exception as e:
+            print(f"[SleepPhase] Energie-Reset Fehler: {e}")
+            return 100
+    
+    def _emotional_sleep_recovery(self) -> Dict[str, int]:
+        """
+        Emotionale Regeneration waehrend des Schlafs.
+        
+        Wie beim Menschen:
+        - Traurigkeit sinkt um -15 bis -25 (Schlaf hilft bei Trauer)
+        - Frustration sinkt um -10 bis -20 (Abkuehlung)
+        - Happiness steigt um +5 bis +10 (Erholung)
+        - Motivation steigt um +5 bis +15 (neuer Tag, neue Kraft)
+        
+        Returns:
+            Dict mit den Aenderungen
+        """
+        import random
+        recovery = {}
+        try:
+            from memory.emotions_engine import EmotionsEngine
+            engine = EmotionsEngine()
+            state = engine.get_state()
+            
+            # Traurigkeit reduzieren
+            sadness_reduction = random.randint(15, 25)
+            new_sadness = max(0, state.sadness - sadness_reduction)
+            engine.set_emotion("sadness", new_sadness)
+            recovery["sadness"] = -sadness_reduction
+            
+            # Frustration reduzieren
+            frust_reduction = random.randint(10, 20)
+            new_frust = max(0, state.frustration - frust_reduction)
+            engine.set_emotion("frustration", new_frust)
+            recovery["frustration"] = -frust_reduction
+            
+            # Happiness leicht erhoehen
+            happy_boost = random.randint(5, 10)
+            new_happy = min(100, state.happiness + happy_boost)
+            engine.set_emotion("happiness", new_happy)
+            recovery["happiness"] = happy_boost
+            
+            # Motivation erhoehen
+            moti_boost = random.randint(5, 15)
+            new_moti = min(100, state.motivation + moti_boost)
+            engine.set_emotion("motivation", new_moti)
+            recovery["motivation"] = moti_boost
+            
+            print(f"[SleepPhase] Emotionale Regeneration: {recovery}")
+            
+        except Exception as e:
+            print(f"[SleepPhase] Emotionale Regeneration Fehler: {e}")
+            
+        return recovery
     
     def _consolidate_memories(self, memory_engine, config: Dict) -> Dict[str, Any]:
         """

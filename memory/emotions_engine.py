@@ -13,6 +13,7 @@ Emotionen:
 - curiosity: Neugier (0-100)
 - frustration: Frustration (0-100, niedrig ist gut)
 - motivation: Motivation (0-100)
+- sadness: Traurigkeit (0-100)
 """
 
 import json
@@ -43,11 +44,13 @@ AKTUELLE EMOTIONEN VON CHAPPIE:
 - Neugier (curiosity): {current_curiosity}/100
 - Frustration (frustration): {current_frustration}/100
 - Motivation (motivation): {current_motivation}/100
+- Traurigkeit (sadness): {current_sadness}/100
 
 ANALYSE-REGELN:
-- Positive Nachrichten, Lob, Dankbarkeit -> Freude und Vertrauen STEIGEN
-- Versprechen, Treue, Unterstuetzung -> Vertrauen STEIGT stark
-- Beleidigungen, Kritik -> Freude SINKT, Frustration STEIGT
+- Positive Nachrichten, Lob -> Freude und Vertrauen STEIGEN, Traurigkeit SINKT
+- Versprechen, Treue -> Vertrauen STEIGT stark
+- Beleidigungen, Kritik -> Freude SINKT, Frustration STEIGT, Traurigkeit STEIGT
+- Verlust, traurige Themen, Alleinsein -> Traurigkeit STEIGT stark, Freude SINKT
 - Fragen, Neugier -> Neugier STEIGT
 - Ermutigung, Aufgaben -> Motivation STEIGT
 - Energie sinkt bei jeder Interaktion leicht (-1 bis -3)
@@ -67,6 +70,7 @@ ANTWORTE NUR IM JSON FORMAT:
   "curiosity_change": <Zahl von -10 bis +15>,
   "frustration_change": <Zahl von -15 bis +15>,
   "motivation_change": <Zahl von -10 bis +15>,
+  "sadness_change": <Zahl von -20 bis +20>,
   "reasoning": "<Kurze Begruendung>"
 }}
 """
@@ -81,7 +85,7 @@ class EmotionalState:
     curiosity: int = 50    # Neugier
     frustration: int = 0   # Frustration (niedrig ist gut)
     motivation: int = 80   # Motivation
-    
+    sadness: int = 0       # Traurigkeit    
     def clamp(self):
         """Begrenzt alle Werte auf 0-100."""
         self.happiness = max(0, min(100, self.happiness))
@@ -90,6 +94,7 @@ class EmotionalState:
         self.curiosity = max(0, min(100, self.curiosity))
         self.frustration = max(0, min(100, self.frustration))
         self.motivation = max(0, min(100, self.motivation))
+        self.sadness = max(0, min(100, self.sadness))
     
     def to_dict(self) -> dict:
         """Konvertiert zu Dictionary."""
@@ -104,12 +109,17 @@ class EmotionalState:
             energy=data.get("energy", 100),
             curiosity=data.get("curiosity", 50),
             frustration=data.get("frustration", 0),
-            motivation=data.get("motivation", 80)
+            motivation=data.get("motivation", 80),
+            sadness=data.get("sadness", 0)
         )
     
     def get_mood_description(self) -> str:
         """Gibt eine textuelle Beschreibung der Stimmung zurueck."""
-        if self.happiness >= 70:
+        if self.sadness >= 70:
+            mood = "sehr traurig und bedrückt"
+        elif self.sadness >= 40:
+            mood = "etwas wehmütig"
+        elif self.happiness >= 70:
             mood = "froehlich und enthusiastisch"
         elif self.happiness >= 50:
             mood = "ausgeglichen und freundlich"
@@ -227,7 +237,8 @@ class EmotionsEngine:
                 current_energy=self.state.energy,
                 current_curiosity=self.state.curiosity,
                 current_frustration=self.state.frustration,
-                current_motivation=self.state.motivation
+                current_motivation=self.state.motivation,
+                current_sadness=self.state.sadness
             )
             
             config = GenerationConfig(
@@ -276,6 +287,7 @@ class EmotionsEngine:
             self.state.curiosity += llm_result.get("curiosity_change", 0)
             self.state.frustration += llm_result.get("frustration_change", 0)
             self.state.motivation += llm_result.get("motivation_change", 0)
+            self.state.sadness += llm_result.get("sadness_change", 0)
             
             if settings.debug:
                 reasoning = llm_result.get("reasoning", "")
@@ -352,7 +364,8 @@ class EmotionsEngine:
             energy=self.state.energy,
             curiosity=self.state.curiosity,
             frustration=self.state.frustration,
-            motivation=self.state.motivation
+            motivation=self.state.motivation,
+            sadness=self.state.sadness
         )
     
     def get_state(self) -> EmotionalState:
@@ -364,7 +377,7 @@ class EmotionsEngine:
         Setzt eine einzelne Emotion auf einen bestimmten Wert.
         
         Args:
-            emotion: Name der Emotion (happiness, trust, energy, curiosity, frustration, motivation)
+            emotion: Name der Emotion (happiness, trust, energy, curiosity, frustration, motivation, sadness)
             value: Neuer Wert (0-100)
         """
         value = max(0, min(100, value))
@@ -381,6 +394,8 @@ class EmotionsEngine:
             self.state.frustration = value
         elif emotion == "motivation":
             self.state.motivation = value
+        elif emotion == "sadness":
+            self.state.sadness = value
         
         self._save_state()
     
@@ -476,6 +491,7 @@ if __name__ == "__main__":
     table.add_row("Curiosity", str(engine.state.curiosity))
     table.add_row("Frustration", str(engine.state.frustration))
     table.add_row("Motivation", str(engine.state.motivation))
+    table.add_row("Sadness", str(engine.state.sadness))
     console.print(table)
     
     console.print(f"\n{engine.state.get_mood_description()}")

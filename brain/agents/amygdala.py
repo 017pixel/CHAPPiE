@@ -105,7 +105,12 @@ ANTWORTE NUR MIT JSON:
     "energy": {"delta": -10 bis +10, "reason": "Grund"},
     "curiosity": {"delta": -10 bis +10, "reason": "Grund"},
     "frustration": {"delta": -10 bis +10, "reason": "Grund"},
-    "motivation": {"delta": -10 bis +10, "reason": "Grund"}
+    "motivation": {"delta": -10 bis +10, "reason": "Grund"},
+    "sadness": {"delta": -10 bis +10, "reason": "Grund"}
+  },
+  "steering_hints": {
+    "target_emotion": "Wunsch-Emotion für das Modell-Steering",
+    "alpha": 0.0-1.0
   },
   "sentiment": "positive|negative|neutral",
   "personal_relevance": 0.0-1.0,
@@ -154,7 +159,7 @@ Analysiere die emotionalen Aspekte (NUR JSON):"""
         if "emotions_update" not in data:
             data["emotions_update"] = {}
         
-        for emotion in ["happiness", "trust", "energy", "curiosity", "frustration", "motivation"]:
+        for emotion in ["happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness"]:
             if emotion not in data["emotions_update"]:
                 data["emotions_update"][emotion] = {"delta": 0, "reason": ""}
             else:
@@ -176,7 +181,12 @@ Analysiere die emotionalen Aspekte (NUR JSON):"""
                 "energy": {"delta": 0, "reason": ""},
                 "curiosity": {"delta": 0, "reason": ""},
                 "frustration": {"delta": 0, "reason": ""},
-                "motivation": {"delta": 0, "reason": ""}
+                "motivation": {"delta": 0, "reason": ""},
+                "sadness": {"delta": 0, "reason": ""}
+            },
+            "steering_hints": {
+                "target_emotion": "neutral",
+                "alpha": 0.0
             },
             "sentiment": "neutral",
             "personal_relevance": 0.5,

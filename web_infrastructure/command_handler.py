@@ -12,12 +12,33 @@ def process_command(user_input: str, backend) -> bool:
     cmd = user_input.strip().lower()
     
     if cmd == "/sleep":
-        with st.status("System verarbeitet Erinnerungen...", expanded=True):
-            res = backend.memory.consolidate_memories(backend.brain)
-            backend.emotions.restore_energy(30)
+        with st.status("CHAPPiE schlaeft... Traum-Phase aktiv...", expanded=True):
+            from memory.sleep_phase import get_sleep_phase_handler
+            sleep_handler = get_sleep_phase_handler()
+            result = sleep_handler.execute_sleep_phase(
+                memory_engine=backend.memory,
+                context_files=None
+            )
+            
+            # Zeige Ergebnisse
+            if result.get("energy_restored"):
+                st.write(f"Energie wiederhergestellt: {result.get('energy_value', 100)}%")
+            
+            recovery = result.get("emotional_recovery", {})
+            if recovery:
+                st.write("Emotionale Regeneration:")
+                for emotion, delta in recovery.items():
+                    sign = "+" if delta > 0 else ""
+                    st.write(f"  {emotion}: {sign}{delta}")
+        
+        # Baue Zusammenfassung
+        energy_val = result.get("energy_value", 100)
+        recovery_text = ", ".join([f"{k}: {'+' if v > 0 else ''}{v}" for k, v in result.get("emotional_recovery", {}).items()])
+        sleep_summary = f"Schlafzyklus beendet. Energie: {energy_val}%. Emotionale Regeneration: {recovery_text}"
+        
         assistant_msg = {
             "role": "assistant", 
-            "content": f"Schlafzyklus beendet. \n\n{res}", 
+            "content": sleep_summary, 
             "metadata": {"thought_process": "Kommando /sleep ausgefuehrt."}
         }
         st.session_state.messages.append(assistant_msg)
@@ -97,7 +118,8 @@ def process_command(user_input: str, backend) -> bool:
                     "energy": step_result.emotions_after.get("energy", 80),
                     "curiosity": step_result.emotions_after.get("curiosity", 60),
                     "frustration": step_result.emotions_after.get("frustration", 0),
-                    "motivation": step_result.emotions_after.get("motivation", 80)
+                    "motivation": step_result.emotions_after.get("motivation", 80),
+                    "sadness": step_result.emotions_after.get("sadness", 0)
                 }
                 if new_emotions and isinstance(new_emotions, dict):
                     st.session_state.current_emotions = new_emotions
@@ -107,14 +129,15 @@ def process_command(user_input: str, backend) -> bool:
                 st.markdown("**📊 Live-Vitalzeichen:**")
                 cols_vitals = st.columns(3)
                 with cols_vitals[0]:
-                    st.write(f"🟢 Freude: {new_emotions['joy']}%")
-                    st.write(f"🔵 Vertrauen: {new_emotions['trust']}%")
+                    st.write(f"Freude: {new_emotions['joy']}%")
+                    st.write(f"Vertrauen: {new_emotions['trust']}%")
                 with cols_vitals[1]:
-                    st.write(f"⚡ Energie: {new_emotions['energy']}%")
-                    st.write(f"🟣 Neugier: {new_emotions['curiosity']}%")
+                    st.write(f"Energie: {new_emotions['energy']}%")
+                    st.write(f"Neugier: {new_emotions['curiosity']}%")
                 with cols_vitals[2]:
-                    st.write(f"🧡 Motivation: {new_emotions['motivation']}%")
-                    st.write(f"🔴 Frustration: {new_emotions['frustration']}%")
+                    st.write(f"Motivation: {new_emotions['motivation']}%")
+                    st.write(f"Frustration: {new_emotions['frustration']}%")
+                    st.write(f"Traurigkeit: {new_emotions['sadness']}%")
                 st.markdown("---")
                 
                 # Fortschritt ohne HTML anzeigen
@@ -123,7 +146,7 @@ def process_command(user_input: str, backend) -> bool:
                     changes = []
                     # Übersetzung für Delta-Anzeige
                     name_map = {"happiness": "Freude", "trust": "Vertrauen", "energy": "Energie", 
-                               "curiosity": "Neugier", "frustration": "Frust", "motivation": "Motivation"}
+                               "curiosity": "Neugier", "frustration": "Frust", "motivation": "Motivation", "sadness": "Traurigkeit"}
                     for emo_key, delta in step_result.emotions_delta.items():
                         if delta != 0:
                             name = name_map.get(emo_key, emo_key)
@@ -160,7 +183,7 @@ def process_command(user_input: str, backend) -> bool:
         # Formatiere Gedanken OHNE HTML (nur Markdown)
         thoughts_md = ""
         name_map = {"happiness": "Freude", "trust": "Vertrauen", "energy": "Energie", 
-                   "curiosity": "Neugier", "frustration": "Frust", "motivation": "Motivation"}
+                   "curiosity": "Neugier", "frustration": "Frust", "motivation": "Motivation", "sadness": "Traurigkeit"}
         
         for step in current_batch_steps:
             if not step.error:
