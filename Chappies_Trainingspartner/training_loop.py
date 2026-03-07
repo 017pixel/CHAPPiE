@@ -29,6 +29,7 @@ from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.chat_manager import ChatManager
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
+from brain.vllm_brain import VLLMBrain
 from brain.base_brain import GenerationConfig
 from brain.deep_think import DeepThinkEngine
 
@@ -633,29 +634,42 @@ class TrainingLoop:
 
 
     def switch_chappie_to_local(self):
-        """Schaltet Chappie auf das lokale Modell um (z.B. bei API Limit)."""
-        if settings.llm_provider == LLMProvider.OLLAMA:
-            return # Bereits lokal
-            
-        console.print("[bold yellow]Schalte Chappie auf lokales Modell um (Ollama)...[/bold yellow]")
-        log.info("Wechsle Chappie auf lokales Modell (Ollama)")
-        
-        # 1. Globale Settings ändern
-        settings.llm_provider = LLMProvider.OLLAMA
-        settings.ollama_model = settings.ollama_model # Behalte default oder was konfiguriert war
-        
-        # 2. Brain neu initialisieren
-        self.brain = OllamaBrain(model=settings.ollama_model)
-        
-        # 3. DeepThink neu initialisieren (nutzt das Brain)
-        self.deep_think_engine = DeepThinkEngine(
-            memory_engine=self.memory,
-            emotions_engine=self.emotions,
-            brain=self.brain
-        )
-        msg = f"Chappie läuft jetzt lokal mit {settings.ollama_model}"
-        console.print(f"[green]{msg}[/green]")
-        log.info(msg)
+        """Schaltet Chappie auf ein lokales Modell um (vLLM bevorzugt, sonst Ollama)."""
+        if settings.llm_provider in (LLMProvider.VLLM, LLMProvider.OLLAMA):
+            return  # Bereits lokal
+
+        console.print("[bold yellow]Schalte Chappie auf ein lokales Modell um (vLLM → Ollama)...[/bold yellow]")
+        log.info("Wechsle Chappie auf lokales Modell (vLLM bevorzugt)")
+
+        local_candidates = [
+            (LLMProvider.VLLM, settings.vllm_model, VLLMBrain, "vLLM"),
+            (LLMProvider.OLLAMA, settings.ollama_model, OllamaBrain, "Ollama"),
+        ]
+
+        for provider, model_name, brain_cls, label in local_candidates:
+            try:
+                candidate_brain = brain_cls(model=model_name)
+                if not candidate_brain.is_available():
+                    log.warning(f"{label} ist nicht erreichbar - versuche nächsten lokalen Fallback")
+                    continue
+
+                settings.llm_provider = provider
+                self.brain = candidate_brain
+                self.deep_think_engine = DeepThinkEngine(
+                    memory_engine=self.memory,
+                    emotions_engine=self.emotions,
+                    brain=self.brain
+                )
+
+                msg = f"Chappie läuft jetzt lokal mit {label}: {model_name}"
+                console.print(f"[green]{msg}[/green]")
+                log.info(msg)
+                return
+
+            except Exception as e:
+                log.warning(f"Lokaler Wechsel über {label} fehlgeschlagen: {e}")
+
+        log.error("Kein lokaler Provider (vLLM/Ollama) verfügbar")
 
     def save_state(self):
         """Speichert den aktuellen Trainings-Status in eine JSON-Datei."""

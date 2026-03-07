@@ -14,7 +14,6 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from .base_agent import BaseAgent, AgentResult
-from config.config import LLMProvider
 
 
 class MemoryAgent(BaseAgent):
@@ -29,11 +28,7 @@ class MemoryAgent(BaseAgent):
     """
     
     def __init__(self):
-        super().__init__(
-            name="memory_agent",
-            model_id="nvidia/llama-3.1-nemotron-70b",
-            provider=LLMProvider.NVIDIA
-        )
+        super().__init__(name="memory_agent")
     
     def process(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -178,9 +173,6 @@ Entscheide ueber Tool Calls (NUR JSON):"""
         response = self._generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=0.2,
-            max_tokens=768,
-            provider_override=LLMProvider.NVIDIA
         )
         
         return self._parse_tool_calls(response)

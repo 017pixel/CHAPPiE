@@ -164,6 +164,8 @@ class Settings:
             return self.query_extraction_nvidia_model
         elif effective == LLMProvider.CEREBRAS:
             return self.query_extraction_cerebras_model
+        elif effective == LLMProvider.VLLM:
+            return self.query_extraction_vllm_model
         return self.query_extraction_ollama_model
 
     def update_from_ui(self, **kwargs):
@@ -177,20 +179,26 @@ class Settings:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
 
-        for key in ["groq_model", "cerebras_model", "nvidia_model", "ollama_model", "ollama_host"]:
+        for key in ["groq_model", "cerebras_model", "nvidia_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
         if "intent_provider" in kwargs:
             self.intent_provider = _parse_provider(kwargs["intent_provider"])
         for key in ["intent_processor_model_groq", "intent_processor_model_cerebras", 
-                    "intent_processor_model_ollama", "intent_processor_model_nvidia"]:
+                    "intent_processor_model_ollama", "intent_processor_model_vllm", "intent_processor_model_nvidia"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
         if "query_extraction_provider" in kwargs:
             self.query_extraction_provider = _parse_provider(kwargs["query_extraction_provider"])
-        for key in ["query_extraction_groq_model", "query_extraction_ollama_model"]:
+        for key in [
+            "query_extraction_groq_model",
+            "query_extraction_ollama_model",
+            "query_extraction_vllm_model",
+            "query_extraction_nvidia_model",
+            "query_extraction_cerebras_model",
+        ]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
@@ -237,6 +245,8 @@ class Settings:
                 f.write(f"GROQ_MODEL = '{self.groq_model}'\n")
                 f.write(f"CEREBRAS_MODEL = '{self.cerebras_model}'\n")
                 f.write(f"NVIDIA_MODEL = '{self.nvidia_model}'\n")
+                f.write(f"VLLM_MODEL = '{self.vllm_model}'\n")
+                f.write(f"VLLM_URL = '{self.vllm_url}'\n")
                 f.write(f"OLLAMA_MODEL = '{self.ollama_model}'\n")
                 f.write(f"OLLAMA_HOST = '{self.ollama_host}'\n")
 
@@ -246,6 +256,7 @@ class Settings:
                 f.write(f"INTENT_PROCESSOR_MODEL_GROQ = '{self.intent_processor_model_groq}'\n")
                 f.write(f"INTENT_PROCESSOR_MODEL_CEREBRAS = '{self.intent_processor_model_cerebras}'\n")
                 f.write(f"INTENT_PROCESSOR_MODEL_OLLAMA = '{self.intent_processor_model_ollama}'\n")
+                f.write(f"INTENT_PROCESSOR_MODEL_VLLM = '{self.intent_processor_model_vllm}'\n")
                 f.write(f"INTENT_PROCESSOR_MODEL_NVIDIA = '{self.intent_processor_model_nvidia}'\n")
 
                 f.write("\n# === Query Extraction ===\n")
@@ -253,6 +264,9 @@ class Settings:
                     f.write(f"QUERY_EXTRACTION_PROVIDER = '{self.query_extraction_provider.value}'\n")
                 f.write(f"QUERY_EXTRACTION_GROQ_MODEL = '{self.query_extraction_groq_model}'\n")
                 f.write(f"QUERY_EXTRACTION_OLLAMA_MODEL = '{self.query_extraction_ollama_model}'\n")
+                f.write(f"QUERY_EXTRACTION_VLLM_MODEL = '{self.query_extraction_vllm_model}'\n")
+                f.write(f"QUERY_EXTRACTION_NVIDIA_MODEL = '{self.query_extraction_nvidia_model}'\n")
+                f.write(f"QUERY_EXTRACTION_CEREBRAS_MODEL = '{self.query_extraction_cerebras_model}'\n")
 
                 f.write("\n# === Emotion Analysis ===\n")
                 f.write(f"EMOTION_ANALYSIS_MODEL = '{self.emotion_analysis_model}'\n")
@@ -306,6 +320,8 @@ def get_active_model() -> str:
         return settings.cerebras_model
     elif settings.llm_provider == LLMProvider.NVIDIA:
         return settings.nvidia_model
+    elif settings.llm_provider == LLMProvider.VLLM:
+        return settings.vllm_model
     return settings.ollama_model
 
 

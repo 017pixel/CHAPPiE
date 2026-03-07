@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 from config.config import settings, get_active_model, LLMProvider
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
+from brain.vllm_brain import VLLMBrain
 from brain.base_brain import Message, GenerationConfig
 from .repetition_tracker import RepetitionTracker
 
@@ -123,8 +124,14 @@ class TrainerAgent:
         self.MAX_FALLBACK_BEFORE_LOCAL = 3
         
         # Brain initialisieren (eigenes Brain fuer den Trainer)
-        self.brain = get_brain()
-        self._is_local = settings.llm_provider == LLMProvider.OLLAMA
+        trainer_provider = settings.llm_provider
+        trainer_model = None
+        if not settings.training_use_global_settings and settings.training_trainer_provider:
+            trainer_provider = settings.training_trainer_provider
+            trainer_model = settings.training_trainer_model or None
+
+        self.brain = get_brain(provider=trainer_provider, model=trainer_model)
+        self._is_local = trainer_provider in (LLMProvider.OLLAMA, LLMProvider.VLLM)
         
         # Repetition Tracking
         self.repetition_tracker = RepetitionTracker(window_size=30)
@@ -303,7 +310,7 @@ Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer wuerde ich.
     
     def switch_to_local(self) -> bool:
         """
-        Wechselt den Trainer auf ein lokales Modell (Ollama).
+        Wechselt den Trainer auf ein lokales Modell.
         
         Returns:
             True wenn gewechselt wurde, False wenn bereits lokal
@@ -312,20 +319,34 @@ Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer wuerde ich.
             return False
         
         log.info("Trainer wechselt auf lokales Modell...")
-        console.print("[yellow]Trainer wechselt auf lokales Modell (Ollama)...[/yellow]")
-        
-        try:
-            self.brain = OllamaBrain(model=settings.ollama_model)
-            self._is_local = True
-            self._fallback_counter = 0
-            
-            log.info(f"Trainer läuft jetzt lokal mit {settings.ollama_model}")
-            console.print(f"[green]Trainer läuft jetzt lokal mit {settings.ollama_model}[/green]")
-            return True
-            
-        except Exception as e:
-            log.error(f"Fehler beim Wechsel auf lokal: {e}")
-            return False
+
+        local_candidates = [
+            (LLMProvider.VLLM, settings.vllm_model, VLLMBrain, "vLLM"),
+            (LLMProvider.OLLAMA, settings.ollama_model, OllamaBrain, "Ollama"),
+        ]
+
+        for provider, model_name, brain_cls, label in local_candidates:
+            try:
+                candidate_brain = brain_cls(model=model_name)
+                if not candidate_brain.is_available():
+                    log.warning(f"{label} ist nicht erreichbar - versuche nächsten lokalen Fallback")
+                    continue
+
+                self.brain = candidate_brain
+                self._is_local = True
+                self._fallback_counter = 0
+                settings.training_trainer_provider = provider
+                settings.training_trainer_model = model_name
+
+                log.info(f"Trainer läuft jetzt lokal mit {label}: {model_name}")
+                console.print(f"[green]Trainer läuft jetzt lokal mit {label}: {model_name}[/green]")
+                return True
+
+            except Exception as e:
+                log.warning(f"Lokaler Wechsel über {label} fehlgeschlagen: {e}")
+
+        log.error("Kein lokaler Provider (vLLM/Ollama) verfügbar")
+        return False
     
     def reset_fallback_counter(self):
         """Setzt den Fallback-Counter zurück."""

@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from config.config import settings, LLMProvider
+from config.brain_config import get_agent_config
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 
@@ -41,38 +42,41 @@ class BaseAgent(ABC):
             model_id: Specific model to use (optional)
             provider: LLM provider to use (optional, defaults to main provider)
         """
+        agent_config = get_agent_config(name)
+
         self.name = name
-        self.model_id = model_id
-        self.provider = provider or settings.llm_provider
-        self._brain = None
+        self.model_id = model_id or (agent_config.model_id if agent_config else None)
+        self.provider = provider or (agent_config.provider if agent_config else settings.llm_provider)
+        self.default_temperature = agent_config.temperature if agent_config else 0.3
+        self.default_max_tokens = agent_config.max_tokens if agent_config else 1024
+        self._brain_cache: Dict[tuple[str, str], Any] = {}
         
-    def _get_brain(self, force_provider: Optional[LLMProvider] = None):
-        """Get brain instance with optional provider override."""
-        if force_provider:
-            original = settings.llm_provider
-            settings.llm_provider = force_provider
-            brain = get_brain()
-            settings.llm_provider = original
-            return brain
-        
-        if self._brain is None:
-            if self.provider != settings.llm_provider:
-                original = settings.llm_provider
-                settings.llm_provider = self.provider
-                self._brain = get_brain()
-                settings.llm_provider = original
-            else:
-                self._brain = get_brain()
-        
-        return self._brain
+    def _get_brain(
+        self,
+        force_provider: Optional[LLMProvider] = None,
+        force_model: Optional[str] = None,
+    ):
+        """Get brain instance with optional provider/model override."""
+        effective_provider = force_provider or self.provider or settings.llm_provider
+        effective_model = force_model or self.model_id
+
+        cache_key = (effective_provider.value, effective_model or "")
+        if cache_key not in self._brain_cache:
+            self._brain_cache[cache_key] = get_brain(
+                provider=effective_provider,
+                model=effective_model,
+            )
+
+        return self._brain_cache[cache_key]
     
     def _generate(
         self, 
         system_prompt: str, 
         user_prompt: str,
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
-        provider_override: Optional[LLMProvider] = None
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        provider_override: Optional[LLMProvider] = None,
+        model_override: Optional[str] = None,
     ) -> str:
         """
         Generate response from LLM.
@@ -87,7 +91,10 @@ class BaseAgent(ABC):
         Returns:
             Generated text
         """
-        brain = self._get_brain(force_provider=provider_override)
+        brain = self._get_brain(
+            force_provider=provider_override,
+            force_model=model_override,
+        )
         
         messages = [
             Message(role="system", content=system_prompt),
@@ -95,8 +102,8 @@ class BaseAgent(ABC):
         ]
         
         config = GenerationConfig(
-            max_tokens=max_tokens,
-            temperature=temperature,
+            max_tokens=max_tokens if max_tokens is not None else self.default_max_tokens,
+            temperature=temperature if temperature is not None else self.default_temperature,
             stream=False
         )
         

@@ -4,6 +4,7 @@ from config.config import settings, LLMProvider
 
 PROVIDER_OPTIONS = {
     "auto": "Auto (folgt Haupt-Provider)",
+    "vllm": "vLLM (lokal, empfohlen)",
     "groq": "Groq Cloud",
     "cerebras": "Cerebras Cloud",
     "nvidia": "NVIDIA NIM",
@@ -39,6 +40,13 @@ NVIDIA_MODELS = {
     "meta/llama-3.1-405b-instruct": "Llama 3.1 405B",
     "nvidia/llama-3.1-nemotron-70b": "Nemotron 70B",
     "deepseek-ai/deepseek-r1": "DeepSeek R1 (Reasoning)",
+    "custom": "Eigenes Modell..."
+}
+
+VLLM_MODELS = {
+    "Qwen/Qwen3.5-32B-Instruct": "Qwen 3.5 32B Instruct",
+    "Qwen/Qwen3.5-72B-Instruct": "Qwen 3.5 72B Instruct",
+    "Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4": "Qwen 3.5 122B A10B GPTQ Int4",
     "custom": "Eigenes Modell..."
 }
 
@@ -125,20 +133,23 @@ def render_settings_overlay(backend):
     
     with tab_api:
         provider_options_display = [
+            "vLLM (lokal, empfohlen)",
             "Groq Cloud",
             "Cerebras Cloud",
             "NVIDIA NIM",
             "Ollama Lokal"
         ]
         
-        if settings.llm_provider == LLMProvider.GROQ:
+        if settings.llm_provider == LLMProvider.VLLM:
             current_provider_index = 0
-        elif settings.llm_provider == LLMProvider.CEREBRAS:
+        elif settings.llm_provider == LLMProvider.GROQ:
             current_provider_index = 1
-        elif settings.llm_provider == LLMProvider.NVIDIA:
+        elif settings.llm_provider == LLMProvider.CEREBRAS:
             current_provider_index = 2
-        else:
+        elif settings.llm_provider == LLMProvider.NVIDIA:
             current_provider_index = 3
+        else:
+            current_provider_index = 4
             
         selected_provider_display = st.selectbox(
             "KI-Anbieter (Hauptanbieter)",
@@ -147,10 +158,11 @@ def render_settings_overlay(backend):
             key="main_provider_select"
         )
         
+        is_vllm = "vLLM" in selected_provider_display
         is_groq = "Groq" in selected_provider_display
         is_cerebras = "Cerebras" in selected_provider_display
         is_nvidia = "NVIDIA" in selected_provider_display
-        is_ollama = not (is_groq or is_cerebras or is_nvidia)
+        is_ollama = not (is_vllm or is_groq or is_cerebras or is_nvidia)
         
         st.divider()
         update_data = {}
@@ -159,6 +171,9 @@ def render_settings_overlay(backend):
             if is_groq:
                 update_data["groq_api_key"] = st.text_input("Groq API Key", value=settings.groq_api_key or "", type="password", key="groq_api_key_input")
                 update_data["groq_model"] = _render_model_select("Modell", GROQ_MODELS, settings.groq_model, "groq_model")
+            elif is_vllm:
+                update_data["vllm_url"] = st.text_input("vLLM URL", value=settings.vllm_url, key="vllm_url_input")
+                update_data["vllm_model"] = _render_model_select("Modell", VLLM_MODELS, settings.vllm_model, "vllm_model")
             elif is_cerebras:
                 update_data["cerebras_api_key"] = st.text_input("Cerebras API Key", value=settings.cerebras_api_key or "", type="password", key="cerebras_api_key_input")
                 update_data["cerebras_model"] = _render_model_select("Modell", CEREBRAS_MODELS, settings.cerebras_model, "cerebras_model")
@@ -173,6 +188,7 @@ def render_settings_overlay(backend):
             update_data["intent_provider"] = _render_provider_select("Provider", settings.intent_provider, "intent_provider_select", include_auto=True)
             col1, col2 = st.columns(2)
             with col1:
+                update_data["intent_processor_model_vllm"] = _render_model_select("Modell für vLLM", VLLM_MODELS, settings.intent_processor_model_vllm, "intent_vllm")
                 update_data["intent_processor_model_groq"] = _render_model_select("Modell für Groq", GROQ_MODELS, settings.intent_processor_model_groq, "intent_groq")
                 update_data["intent_processor_model_nvidia"] = _render_model_select("Modell für NVIDIA", NVIDIA_MODELS, settings.intent_processor_model_nvidia, "intent_nvidia")
             with col2:
@@ -183,8 +199,11 @@ def render_settings_overlay(backend):
             update_data["query_extraction_provider"] = _render_provider_select("Provider", settings.query_extraction_provider, "query_provider_select", include_auto=True)
             col1, col2 = st.columns(2)
             with col1:
+                update_data["query_extraction_vllm_model"] = _render_model_select("Modell für vLLM", VLLM_MODELS, settings.query_extraction_vllm_model, "query_vllm")
                 update_data["query_extraction_groq_model"] = _render_model_select("Modell für Groq", GROQ_MODELS, settings.query_extraction_groq_model, "query_groq")
+                update_data["query_extraction_nvidia_model"] = _render_model_select("Modell für NVIDIA", NVIDIA_MODELS, settings.query_extraction_nvidia_model, "query_nvidia")
             with col2:
+                update_data["query_extraction_cerebras_model"] = _render_model_select("Modell für Cerebras", CEREBRAS_MODELS, settings.query_extraction_cerebras_model, "query_cerebras")
                 update_data["query_extraction_ollama_model"] = _render_model_select("Modell für Ollama", OLLAMA_MODELS, settings.query_extraction_ollama_model, "query_ollama")
         
         with st.expander("Emotion-Analyse"):
@@ -212,7 +231,7 @@ def render_settings_overlay(backend):
                 with col_t2:
                     update_data["training_trainer_model"] = st.text_input("Modell-ID", value=settings.training_trainer_model or "", key="training_trainer_model_input")
 
-        provider_value = "ollama" if is_ollama else ("groq" if is_groq else ("cerebras" if is_cerebras else "nvidia"))
+        provider_value = "vllm" if is_vllm else ("ollama" if is_ollama else ("groq" if is_groq else ("cerebras" if is_cerebras else "nvidia")))
         update_data["llm_provider"] = provider_value
         
         # AUTO-SAVE LOGIC API TAB

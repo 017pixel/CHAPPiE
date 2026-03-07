@@ -16,7 +16,6 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from .base_agent import BaseAgent, AgentResult
-from config.config import LLMProvider
 
 
 class NeocortexAgent(BaseAgent):
@@ -31,11 +30,7 @@ class NeocortexAgent(BaseAgent):
     """
     
     def __init__(self):
-        super().__init__(
-            name="neocortex",
-            model_id="meta/llama-3.3-70b-instruct",
-            provider=LLMProvider.NVIDIA
-        )
+        super().__init__(name="neocortex")
     
     def process(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -162,9 +157,6 @@ Entscheide ueber Konsolidierung (NUR JSON):"""
         response = self._generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=0.2,
-            max_tokens=768,
-            provider_override=LLMProvider.NVIDIA
         )
         
         return self._parse_consolidation(response)

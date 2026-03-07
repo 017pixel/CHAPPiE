@@ -1,8 +1,11 @@
 """
 CHAPiE Brain Module - LLM Backend Abstraction.
 
-Nutze get_brain() für automatische Backend-Auswahl basierend auf secrets.py.
+Nutze get_brain() für automatische Backend-Auswahl basierend auf settings
+oder für eine gezielte Provider-/Modellauswahl pro Agent.
 """
+from typing import Optional
+
 from .base_brain import BaseBrain, Message, GenerationConfig
 from .ollama_brain import OllamaBrain
 from .groq_brain import GroqBrain
@@ -14,7 +17,7 @@ from .deep_think import DeepThinkEngine, DeepThinkStep
 from config.config import settings, LLMProvider
 
 
-def get_brain() -> BaseBrain:
+def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> BaseBrain:
     """
     Factory-Funktion: Gibt das konfigurierte Brain zurück.
     
@@ -28,13 +31,15 @@ def get_brain() -> BaseBrain:
     Returns:
         Initialisiertes Brain-Objekt
     """
-    if settings.llm_provider == LLMProvider.GROQ:
-        return GroqBrain()
-    elif settings.llm_provider == LLMProvider.CEREBRAS:
-        return CerebrasBrain()
-    elif settings.llm_provider == LLMProvider.NVIDIA:
-        return NVIDIABrain()
-    elif settings.llm_provider == LLMProvider.VLLM:
-        return VLLMBrain()
+    effective_provider = provider or settings.llm_provider
+
+    if effective_provider == LLMProvider.GROQ:
+        return GroqBrain(model=model)
+    elif effective_provider == LLMProvider.CEREBRAS:
+        return CerebrasBrain(model=model)
+    elif effective_provider == LLMProvider.NVIDIA:
+        return NVIDIABrain(model=model)
+    elif effective_provider == LLMProvider.VLLM:
+        return VLLMBrain(model=model)
     else:
-        return OllamaBrain()
+        return OllamaBrain(model=model)

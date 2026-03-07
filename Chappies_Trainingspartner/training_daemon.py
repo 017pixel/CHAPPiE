@@ -274,16 +274,36 @@ Beispiele:
                         settings.cerebras_model = settings.training_chappie_model
                     elif settings.llm_provider == LLMProvider.NVIDIA:
                         settings.nvidia_model = settings.training_chappie_model
+                    elif settings.llm_provider == LLMProvider.VLLM:
+                        settings.vllm_model = settings.training_chappie_model
                     else:
                         settings.ollama_model = settings.training_chappie_model
                 logging.info(f"Training-spezifische Settings: Provider={settings.llm_provider}, Modell={settings.training_chappie_model}")
             else:
-                if provider == "groq":
+                normalized_provider = (provider or "vllm").lower()
+                if normalized_provider == "local":
+                    normalized_provider = "vllm"
+
+                if normalized_provider == "groq":
                     settings.llm_provider = LLMProvider.GROQ
-                    if model_name: settings.groq_model = model_name
-                else:
+                    if model_name:
+                        settings.groq_model = model_name
+                elif normalized_provider == "cerebras":
+                    settings.llm_provider = LLMProvider.CEREBRAS
+                    if model_name:
+                        settings.cerebras_model = model_name
+                elif normalized_provider == "nvidia":
+                    settings.llm_provider = LLMProvider.NVIDIA
+                    if model_name:
+                        settings.nvidia_model = model_name
+                elif normalized_provider == "ollama":
                     settings.llm_provider = LLMProvider.OLLAMA
-                    if model_name: settings.ollama_model = model_name
+                    if model_name:
+                        settings.ollama_model = model_name
+                else:
+                    settings.llm_provider = LLMProvider.VLLM
+                    if model_name:
+                        settings.vllm_model = model_name
                 logging.info(f"Legacy Config Provider={settings.llm_provider}")
               
         logging.info(f"Globale Settings aktualisiert: Provider={settings.llm_provider}")

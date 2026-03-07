@@ -16,7 +16,6 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 from .base_agent import BaseAgent, AgentResult
-from config.config import LLMProvider
 
 
 class PrefrontalCortexAgent(BaseAgent):
@@ -31,11 +30,7 @@ class PrefrontalCortexAgent(BaseAgent):
     """
     
     def __init__(self):
-        super().__init__(
-            name="prefrontal_cortex",
-            model_id="z-ai/glm5",
-            provider=LLMProvider.NVIDIA
-        )
+        super().__init__(name="prefrontal_cortex")
     
     def process(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -163,9 +158,6 @@ Entscheide die Response-Strategie (NUR JSON):"""
         response = self._generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=0.3,
-            max_tokens=768,
-            provider_override=LLMProvider.NVIDIA
         )
         
         return self._parse_orchestration(response)

@@ -16,7 +16,6 @@ from typing import Dict, Any
 from datetime import datetime
 
 from .base_agent import BaseAgent, AgentResult
-from config.config import LLMProvider
 
 
 class BasalGangliaAgent(BaseAgent):
@@ -31,11 +30,7 @@ class BasalGangliaAgent(BaseAgent):
     """
     
     def __init__(self):
-        super().__init__(
-            name="basal_ganglia",
-            model_id="meta/llama-3.3-70b-instruct",
-            provider=LLMProvider.NVIDIA
-        )
+        super().__init__(name="basal_ganglia")
         self._interaction_count = 0
         self._reward_history: list = []
     
@@ -140,9 +135,6 @@ Bewerte die Interaktion (NUR JSON):"""
         response_text = self._generate(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=0.2,
-            max_tokens=512,
-            provider_override=LLMProvider.NVIDIA
         )
         
         return self._parse_reward(response_text)

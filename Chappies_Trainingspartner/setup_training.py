@@ -4,7 +4,7 @@ CHAPPiE Training Setup Wizard
 Interaktiver Setup für das autonome Training von CHAPPiE.
 
 Features:
-- Auswahl des KI-Backends (Groq, Cerebras, Ollama)
+- Auswahl des KI-Backends (vLLM, Ollama, Groq, Cerebras)
 - Modell-Auswahl für jeden Provider
 - Trainer-Persona Konfiguration
 - Curriculum-Erstellung mit mehreren Themen
@@ -53,6 +53,13 @@ OLLAMA_MODELS = {
     "3": ("qwen2.5:72b", "Qwen 2.5 72B - Alternative Power-Modell"),
     "4": ("deepseek-r1:14b", "DeepSeek R1 14B - Reasoning"),
     "5": ("CUSTOM", "Eigenes Modell eingeben..."),
+}
+
+VLLM_MODELS = {
+    "1": ("Qwen/Qwen3.5-32B-Instruct", "Qwen 3.5 32B - Schnell & lokal"),
+    "2": ("Qwen/Qwen3.5-72B-Instruct", "Qwen 3.5 72B - Starkes lokales Modell"),
+    "3": ("Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4", "Qwen 3.5 122B A10B GPTQ - Empfohlen"),
+    "4": ("CUSTOM", "Eigenes Modell eingeben..."),
 }
 
 # === Beispiel-Curricula ===
@@ -105,28 +112,33 @@ def select_provider() -> LLMProvider:
     table.add_column("Provider", style="white")
     table.add_column("Beschreibung", style="dim")
     
-    table.add_row("1", "[API] Groq", "Cloud - Schnell & Gratis Tier")
-    table.add_row("2", "[API] Cerebras", "Cloud - Ultra-High-Speed (2000+ tok/s)")
-    table.add_row("3", "[Lokal] Ollama", "Lokal - Privat & Offline")
+    table.add_row("1", "[Lokal] vLLM", "Lokal - Qwen 3.5 bevorzugt (empfohlen)")
+    table.add_row("2", "[Lokal] Ollama", "Lokal - Privat & Offline")
+    table.add_row("3", "[API] Groq", "Cloud - Schnell & Gratis Tier")
+    table.add_row("4", "[API] Cerebras", "Cloud - Ultra-High-Speed (2000+ tok/s)")
     
     console.print(table)
     console.print()
     
-    choice = Prompt.ask("Provider wählen", choices=["1", "2", "3"], default="1")
+    choice = Prompt.ask("Provider wählen", choices=["1", "2", "3", "4"], default="1")
     
     if choice == "1":
-        return LLMProvider.GROQ
+        return LLMProvider.VLLM
     elif choice == "2":
-        return LLMProvider.CEREBRAS
-    else:
         return LLMProvider.OLLAMA
+    elif choice == "3":
+        return LLMProvider.GROQ
+    else:
+        return LLMProvider.CEREBRAS
 
 
 def select_model(provider: LLMProvider) -> str:
     """Lässt den User das Modell auswählen."""
     console.print(f"\n[bold]Schritt 2: Modell für {provider.value.upper()} auswählen[/bold]\n")
     
-    if provider == LLMProvider.GROQ:
+    if provider == LLMProvider.VLLM:
+        models = VLLM_MODELS
+    elif provider == LLMProvider.GROQ:
         models = GROQ_MODELS
     elif provider == LLMProvider.CEREBRAS:
         models = CEREBRAS_MODELS
@@ -149,16 +161,16 @@ def select_model(provider: LLMProvider) -> str:
     
     model_id, _ = models[choice]
     
-    # Custom Input für Ollama
+    # Custom Input für lokale Modelle / vLLM
     if model_id == "CUSTOM":
-        model_id = Prompt.ask("Modell-Name eingeben (z.B. llama3:latest)")
+        model_id = Prompt.ask("Modell-Name eingeben (z.B. Qwen/Qwen3.5-32B-Instruct)")
     
     return model_id
 
 
 def check_api_key(provider: LLMProvider) -> str:
     """Prüft und fragt ggf. nach dem API Key."""
-    if provider == LLMProvider.OLLAMA:
+    if provider in (LLMProvider.OLLAMA, LLMProvider.VLLM):
         return ""  # Kein API Key nötig
     
     console.print(f"\n[bold]Schritt 3: API Key prüfen[/bold]\n")
@@ -308,7 +320,9 @@ def save_configuration(provider: LLMProvider, model: str, trainer_config: dict):
     # Provider in Settings aktualisieren
     settings.llm_provider = provider
     
-    if provider == LLMProvider.GROQ:
+    if provider == LLMProvider.VLLM:
+        settings.vllm_model = model
+    elif provider == LLMProvider.GROQ:
         settings.groq_model = model
     elif provider == LLMProvider.CEREBRAS:
         settings.cerebras_model = model
