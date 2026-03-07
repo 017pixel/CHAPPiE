@@ -8,6 +8,8 @@ from web_infrastructure.memories_ui import render_memories_overlay
 from web_infrastructure.context_ui import render_context_overlays
 from web_infrastructure.chat_ui import render_chat_interface
 from web_infrastructure.command_handler import process_command, process_chat_message
+from web_infrastructure.growth_dashboard_ui import render_growth_dashboard
+from web_infrastructure.life_dashboard_ui import render_life_dashboard
 from web_infrastructure.training_ui import render_training_ui
 
 # ============================================
@@ -41,6 +43,10 @@ def main():
         render_settings_overlay(backend)
     elif st.session_state.show_training:
         render_training_ui()
+    elif st.session_state.show_life_dashboard:
+        render_life_dashboard(backend)
+    elif st.session_state.show_growth_dashboard:
+        render_growth_dashboard(backend)
     else:
         # Chat Interface & Input Loop
         user_input = render_chat_interface(backend)

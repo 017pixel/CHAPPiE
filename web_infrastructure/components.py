@@ -31,6 +31,21 @@ def render_vital_signs(backend):
     render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#ff6b9d")
     render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#a0a0a0")
 
+    try:
+        life_snapshot = backend.get_status().get("life_snapshot", {})
+        if life_snapshot:
+            goal = life_snapshot.get("active_goal", {})
+            dominant_need = (life_snapshot.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
+            world_model = life_snapshot.get("world_model", {})
+            stage = life_snapshot.get("development", {}).get("stage", "---")
+            horizon = life_snapshot.get("planning_state", {}).get("planning_horizon", "---")
+            st.caption(f"Life: {life_snapshot.get('clock', {}).get('phase_label', '---')}")
+            st.caption(f"Aktivität: {life_snapshot.get('current_activity', '---')}")
+            st.caption(f"Need: {dominant_need} | Ziel: {goal.get('title', '---')} | Stage: {stage} | Plan: {horizon}")
+            st.caption(f"Vorhersage: {world_model.get('predicted_user_need', '---')}")
+    except Exception:
+        pass
+
     st.divider()
     
     try:
@@ -90,6 +105,111 @@ def render_brain_monitor(metadata: Dict[str, Any]):
     tool_calls = metadata.get("tool_calls", [])
     if tool_calls:
         render_section(f"TOOLS ({len(tool_calls)} ausgefuehrt)", f"Tools: {', '.join(t.get('tool', t.get('name', '')) for t in tool_calls)}", "input")
+
+    life_snapshot = metadata.get("life_snapshot", {})
+    if life_snapshot:
+        dominant_need = (life_snapshot.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
+        goal = life_snapshot.get("active_goal", {})
+        world = life_snapshot.get("world_model", {})
+        render_section(
+            "LIFE SIMULATION",
+            f"{life_snapshot.get('clock', {}).get('phase_label', '---')} | {life_snapshot.get('current_activity', '---')} | Need={dominant_need} | Ziel={goal.get('title', '---')} | UserNeed={world.get('predicted_user_need', '---')}",
+            "thought"
+        )
+
+    goal_competition = life_snapshot.get("goal_competition", {}) if life_snapshot else {}
+    if goal_competition:
+        render_section(
+            "GOAL ENGINE",
+            f"Mode: {goal_competition.get('goal_mode', '---')} | Spannung: {goal_competition.get('competition_tension', 0):.2f} | {goal_competition.get('guidance', '---')}",
+            "memory"
+        )
+
+    development = life_snapshot.get("development", {}) if life_snapshot else {}
+    if development:
+        render_section(
+            "DEVELOPMENT",
+            f"Stage: {development.get('stage', '---')} | Next: {development.get('next_stage', '---')} | Progress: {development.get('progress_to_next', 0):.0%}",
+            "memory"
+        )
+
+    attachment = life_snapshot.get("attachment_model", {}) if life_snapshot else {}
+    if attachment:
+        render_section(
+            "ATTACHMENT",
+            f"Bond: {attachment.get('bond_type', '---')} | Security: {attachment.get('attachment_security', 0):.2f} | {attachment.get('guidance', '---')}",
+            "thought"
+        )
+
+    workspace = metadata.get("global_workspace", {})
+    if workspace:
+        focus = workspace.get("dominant_focus", {})
+        render_section(
+            "GLOBAL WORKSPACE",
+            f"Fokus: {focus.get('label', '---')} | Broadcast: {workspace.get('broadcast', '---')}",
+            "input"
+        )
+
+    if life_snapshot and life_snapshot.get("world_model"):
+        world = life_snapshot.get("world_model", {})
+        render_section(
+            "WORLD MODEL",
+            f"Mode: {world.get('interaction_mode', '---')} | Next: {world.get('next_best_action', '---')} | Confidence: {world.get('confidence', 0):.2f}",
+            "input"
+        )
+
+    planning = life_snapshot.get("planning_state", {}) if life_snapshot else {}
+    if planning:
+        render_section(
+            "PLANNING",
+            f"Horizon: {planning.get('planning_horizon', '---')} | Milestone: {planning.get('next_milestone', '---')} | Confidence: {planning.get('plan_confidence', 0):.2f}",
+            "thought"
+        )
+
+    forecast = life_snapshot.get("forecast_state", {}) if life_snapshot else {}
+    if forecast:
+        render_section(
+            "FORECAST",
+            f"Risk: {forecast.get('risk_level', '---')} | Next: {forecast.get('next_turn_outlook', '---')} | Trajectory: {forecast.get('stage_trajectory', '---')}",
+            "input"
+        )
+
+    social_arc = life_snapshot.get("social_arc", {}) if life_snapshot else {}
+    if social_arc:
+        render_section(
+            "SOCIAL ARC",
+            f"Arc: {social_arc.get('arc_name', '---')} | Phase: {social_arc.get('phase', '---')} | Episode: {social_arc.get('current_episode', '---')}",
+            "thought"
+        )
+
+    action_plan = metadata.get("action_plan", {})
+    if action_plan:
+        actions = ", ".join(action_plan.get("recommended_actions", [])[:3])
+        render_section(
+            "ACTION / RESPONSE",
+            f"Strategie: {action_plan.get('strategy', '---')} | Ton: {action_plan.get('tone', '---')} | {actions}",
+            "thought"
+        )
+
+    dreams = metadata.get("dream_fragments", [])
+    if dreams:
+        render_section("DREAM REPLAY", " | ".join(dreams[:2]), "thought")
+
+    replay = life_snapshot.get("replay_state", {}) if life_snapshot else {}
+    if replay:
+        render_section(
+            "REPLAY STATE",
+            f"{replay.get('summary', '---')} | Habit: {replay.get('habit_reinforcement', '---')}",
+            "memory"
+        )
+
+    timeline_summary = life_snapshot.get("timeline_summary", {}) if life_snapshot else {}
+    if timeline_summary:
+        render_section(
+            "TIMELINE",
+            f"Entries: {timeline_summary.get('entries', 0)} | {timeline_summary.get('summary', '---')}",
+            "memory"
+        )
 
 
 def _format_timestamp_german(timestamp_str: str) -> str:

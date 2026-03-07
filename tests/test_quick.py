@@ -134,6 +134,15 @@ def test_forgetting_curve_math():
         
         r_24h = curve.calculate_retention(24.0, 1.0)
         print(f"  [OK] Retention @24h: {r_24h:.2%} (expected ~33%)")
+
+        checks = [
+            (abs(r_20min - 0.58) <= 0.05, "20min-Wert weicht zu stark vom Ebbinghaus-Referenzwert ab"),
+            (abs(r_1h - 0.44) <= 0.05, "1h-Wert weicht zu stark vom Ebbinghaus-Referenzwert ab"),
+            (abs(r_24h - 0.33) <= 0.05, "24h-Wert weicht zu stark vom Ebbinghaus-Referenzwert ab"),
+        ]
+        for ok, message in checks:
+            if not ok:
+                raise AssertionError(message)
         
         boosted = curve.calculate_strength_boost(1.0, 0)
         print(f"  [OK] Strength boost: {boosted:.2f}")
@@ -155,20 +164,17 @@ def test_api_key_format():
         from config.config import settings
         
         if settings.groq_api_key:
-            key = settings.groq_api_key
-            print(f"  [OK] Groq key: {key[:10]}...{key[-4:]}")
+            print("  [OK] Groq key: SET")
         else:
             print("  [INFO] Groq key not set")
         
         if settings.cerebras_api_key:
-            key = settings.cerebras_api_key
-            print(f"  [OK] Cerebras key: {key[:10]}...{key[-4:]}")
+            print("  [OK] Cerebras key: SET")
         else:
             print("  [INFO] Cerebras key not set")
         
         if settings.nvidia_api_key:
-            key = settings.nvidia_api_key
-            print(f"  [OK] NVIDIA key: {key[:10]}...{key[-4:]}")
+            print("  [OK] NVIDIA key: SET")
         else:
             print("  [INFO] NVIDIA key not set")
         

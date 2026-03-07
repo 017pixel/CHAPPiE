@@ -99,7 +99,7 @@ Falls du keinen Systemd-Service nutzen willst oder schnell testen möchtest.
 cd ~/CHAPPiE && source venv/bin/activate
 
 # Mit nohup im Hintergrund starten
-nohup python3 Chappies_Trainingspartner/training_daemon.py > training.log 2>&1 &
+nohup python3 -m Chappies_Trainingspartner.training_daemon > training.log 2>&1 &
 
 # PID merken für später
 echo $! > training.pid
@@ -111,7 +111,7 @@ echo "Training gestartet mit PID: $(cat training.pid)"
 cd ~/CHAPPiE && source venv/bin/activate
 
 # Interaktiver Modus (fragt Konfiguration ab)
-python3 Chappies_Trainingspartner/training_daemon.py --neu
+python3 -m Chappies_Trainingspartner.training_daemon --neu
 ```
 
 ### NEUES Training mit direkten Parametern
@@ -119,7 +119,7 @@ python3 Chappies_Trainingspartner/training_daemon.py --neu
 cd ~/CHAPPiE && source venv/bin/activate
 
 # Fokus, Persona und Start-Prompt direkt angeben
-nohup python3 Chappies_Trainingspartner/training_daemon.py \
+nohup python3 -m Chappies_Trainingspartner.training_daemon \
     --fokus "Philosophie & Ethik" \
     --persona "Ein neugieriger Student" \
     --start "Hallo Chappie, erkläre mir die Welt!" \
@@ -144,7 +144,7 @@ nohup python3 Chappies_Trainingspartner/training_daemon.py \
 sudo systemctl status chappie-training.service
 
 # Bei nohup-Betrieb
-ps aux | grep training_daemon | grep -v grep
+ps aux | grep -E 'Chappies_Trainingspartner.training_daemon|training_daemon.py' | grep -v grep
 
 # Alternativ: Prüfe ob PID noch läuft
 if [ -f training.pid ]; then 
@@ -195,10 +195,10 @@ sudo systemctl stop chappie-training.service
 ### Manuellen Prozess stoppen
 ```bash
 # Sanftes Beenden (gibt dem Prozess Zeit um Daten zu speichern)
-pkill -SIGTERM -f training_daemon.py
+pkill -SIGTERM -f 'Chappies_Trainingspartner.training_daemon|training_daemon.py'
 
 # Falls das nicht funktioniert: Force Kill
-pkill -9 -f training_daemon.py
+pkill -9 -f 'Chappies_Trainingspartner.training_daemon|training_daemon.py'
 
 # Mit PID-Datei
 if [ -f training.pid ]; then kill $(cat training.pid); rm training.pid; fi
@@ -431,8 +431,8 @@ Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONIOENCODING=utf-8"
 
-# Start-Befehl (WICHTIG: Pfad mit Slash, nicht mit Punkt!)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 Chappies_Trainingspartner/training_daemon.py
+# Start-Befehl (WICHTIG: Modul-Start des Daemons nutzen)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
 
 # Restart-Policy
 Restart=always

@@ -30,7 +30,7 @@ ssh -t %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && source venv/bin/activat
 
 REM 3. Daemon im Hintergrund starten
 echo [GREEN]Starte Training-Daemon im Hintergrund...[/GREEN]
-ssh %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && source venv/bin/activate && nohup python Chappies_Trainingspartner/training_daemon.py ^> training_daemon.log 2^>^&1 ^&"
+ssh %SERVER_USER%@%SERVER_HOST% "cd %PROJECT_PATH% && source venv/bin/activate && nohup python -m Chappies_Trainingspartner.training_daemon ^> training_daemon.log 2^>^&1 ^&"
 
 echo [GREEN]Daemon erfolgreich gestartet![/GREEN]
 echo Logs ansehen: deploy_training.bat tail
@@ -38,13 +38,13 @@ goto end
 
 :stop
 echo [YELLOW]Stoppe Training-Daemon...[/YELLOW]
-ssh %SERVER_USER%@%SERVER_HOST% "pkill -f training_daemon.py"
+ssh %SERVER_USER%@%SERVER_HOST% "pkill -f 'Chappies_Trainingspartner.training_daemon|training_daemon.py'"
 echo [GREEN]Daemon gestoppt[/GREEN]
 goto end
 
 :status
 echo [YELLOW]Pruefe Status des Training-Daemons...[/YELLOW]
-ssh %SERVER_USER%@%SERVER_HOST% "ps aux | grep training_daemon.py | grep -v grep && echo RUNNING || echo STOPPED"
+ssh %SERVER_USER%@%SERVER_HOST% "ps aux | grep -E 'Chappies_Trainingspartner.training_daemon|training_daemon.py' | grep -v grep && echo RUNNING || echo STOPPED"
 echo [YELLOW]Letzte Logs:[/YELLOW]
 ssh %SERVER_USER%@%SERVER_HOST% "tail -20 %PROJECT_PATH%/training_daemon.log"
 goto end

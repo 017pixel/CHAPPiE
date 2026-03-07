@@ -53,6 +53,16 @@ class EbbinghausForgettingCurve:
         self.boost_per_recall = 0.5
         self.max_strength = 10.0
         self.min_retention = 0.1
+        self.reference_points = [
+            (0.0, 1.0),
+            (20 / 60, self.EBBINGHAUS_DATA["20min"]),
+            (1.0, self.EBBINGHAUS_DATA["1h"]),
+            (9.0, self.EBBINGHAUS_DATA["9h"]),
+            (24.0, self.EBBINGHAUS_DATA["1day"]),
+            (48.0, self.EBBINGHAUS_DATA["2days"]),
+            (144.0, self.EBBINGHAUS_DATA["6days"]),
+            (31 * 24.0, self.EBBINGHAUS_DATA["31days"]),
+        ]
     
     def calculate_retention(self, time_hours: float, strength: float = 1.0) -> float:
         """
@@ -67,10 +77,9 @@ class EbbinghausForgettingCurve:
         """
         if time_hours <= 0:
             return 1.0
-        
-        adjusted_decay = self.decay_constant / max(strength, 0.1)
-        retention = math.exp(-adjusted_decay * time_hours)
-        
+
+        effective_time = time_hours / max(strength, 0.1)
+        retention = self._interpolated_retention(effective_time)
         return max(self.min_retention, min(1.0, retention))
     
     def calculate_strength_boost(self, current_strength: float, 
@@ -100,13 +109,60 @@ class EbbinghausForgettingCurve:
         if current_strength <= 0:
             return 0
         
-        adjusted_decay = self.decay_constant / current_strength
-        
         if target_retention >= 1.0:
             return 0
-        
-        time_to_target = -math.log(target_retention) / adjusted_decay
-        return max(0, time_to_target)
+
+        upper_bound = max(1.0, 31 * 24.0 * max(current_strength, 1.0))
+        low = 0.0
+        high = upper_bound
+        for _ in range(32):
+            mid = (low + high) / 2
+            if self.calculate_retention(mid, current_strength) > target_retention:
+                low = mid
+            else:
+                high = mid
+        return round((low + high) / 2, 2)
+
+    def _interpolated_retention(self, effective_time: float) -> float:
+        if effective_time <= 0:
+            return 1.0
+
+        points = self.reference_points
+        for index in range(1, len(points)):
+            left_time, left_retention = points[index - 1]
+            right_time, right_retention = points[index]
+            if effective_time <= right_time:
+                return self._interpolate_segment(
+                    effective_time,
+                    left_time,
+                    left_retention,
+                    right_time,
+                    right_retention,
+                )
+
+        prev_time, prev_retention = points[-2]
+        last_time, last_retention = points[-1]
+        slope = (last_retention - prev_retention) / max(math.log(last_time) - math.log(prev_time), 1e-6)
+        extension = last_retention + slope * (math.log(effective_time) - math.log(last_time))
+        return max(self.min_retention, extension)
+
+    def _interpolate_segment(
+        self,
+        current_time: float,
+        left_time: float,
+        left_retention: float,
+        right_time: float,
+        right_retention: float,
+    ) -> float:
+        if left_time <= 0:
+            ratio = current_time / max(right_time, 1e-6)
+            return left_retention + (right_retention - left_retention) * ratio
+
+        left_log = math.log(left_time)
+        right_log = math.log(right_time)
+        current_log = math.log(max(current_time, left_time))
+        ratio = (current_log - left_log) / max(right_log - left_log, 1e-6)
+        return left_retention + (right_retention - left_retention) * ratio
     
     def calculate_relevance_score(self, memory: Dict[str, Any]) -> float:
         """

@@ -18,6 +18,7 @@ import threading
 
 from config.config import DATA_DIR
 from config.brain_config import get_sleep_config, get_forgetting_curve_config
+from life import get_life_simulation_service
 
 
 class SleepPhaseHandler:
@@ -150,6 +151,11 @@ class SleepPhaseHandler:
                 # EMOTIONALE REGENERATION im Schlaf
                 emotional_recovery = self._emotional_sleep_recovery()
                 results["emotional_recovery"] = emotional_recovery
+
+                life_result = get_life_simulation_service().process_sleep_cycle()
+                results["dream_replay"] = life_result.get("dream_replay", [])
+                results["replay_state"] = life_result.get("replay_state", {})
+                results["life_snapshot"] = life_result.get("life_snapshot", {})
                 
                 self._state["last_sleep_time"] = datetime.now().isoformat()
                 self._state["interaction_count_since_sleep"] = 0

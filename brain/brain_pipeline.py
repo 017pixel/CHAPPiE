@@ -24,6 +24,9 @@ from brain.agents import (
 )
 from brain.agents.base_agent import AgentResult
 from brain.agents.steering_manager import get_steering_manager
+from brain.action_response import ActionResponseLayer
+from brain.global_workspace import GlobalWorkspace
+from life import get_life_simulation_service
 from memory.sleep_phase import get_sleep_phase_handler
 from memory.forgetting_curve import get_forgetting_curve, get_decay_manager
 from config.config import settings, LLMProvider
@@ -49,6 +52,9 @@ class BrainPipeline:
         self.neocortex = NeocortexAgent()
         self.memory_agent = MemoryAgent()
         self.steering_manager = get_steering_manager()
+        self.global_workspace = GlobalWorkspace()
+        self.action_response = ActionResponseLayer()
+        self.life_simulation = get_life_simulation_service()
         
         self.sleep_handler = get_sleep_phase_handler()
         self.forgetting_curve = get_forgetting_curve()
@@ -81,11 +87,13 @@ class BrainPipeline:
             Dict with all processing results
         """
         start_time = datetime.now()
+        life_context = self.life_simulation.prepare_turn(user_input, history, current_emotions)
         
         input_data = {
             "user_input": user_input,
             "history": history,
-            "current_emotions": current_emotions
+            "current_emotions": current_emotions,
+            "life_context": life_context,
         }
         
         sensory_result = self.sensory_cortex.process(input_data)
@@ -120,6 +128,14 @@ class BrainPipeline:
                 context_files,
                 hippocampus_result.data.get("context_relevance", {})
             )
+
+        global_workspace = self.global_workspace.build(
+            sensory=sensory_result.data,
+            amygdala=amygdala_result.data,
+            hippocampus=hippocampus_result.data,
+            life_context=life_context,
+            memories=memories,
+        )
         
         prefrontal_input = {
             **input_data,
@@ -127,13 +143,22 @@ class BrainPipeline:
             "amygdala_result": amygdala_result.data,
             "hippocampus_result": hippocampus_result.data,
             "memories": memories,
-            "context": context
+            "context": context,
+            "global_workspace": global_workspace,
         }
         prefrontal_result = self.prefrontal_cortex.process(prefrontal_input)
+        action_plan = self.action_response.build_action_plan(
+            prefrontal_result.data,
+            life_context,
+            global_workspace,
+        )
         
         emotions_after = self._apply_emotion_updates(
             current_emotions,
-            amygdala_result.data.get("emotions_update", {})
+            self._merge_emotion_updates(
+                amygdala_result.data.get("emotions_update", {}),
+                life_context.get("homeostasis", {}).get("emotion_adjustments", {}),
+            )
         )
         
         # Steering: Lokal = Vektor-Steering, Cloud = kein Steering (nur Prompt)
@@ -154,6 +179,9 @@ class BrainPipeline:
             "amygdala": amygdala_result,
             "hippocampus": hippocampus_result,
             "prefrontal": prefrontal_result,
+            "life_context": life_context,
+            "global_workspace": global_workspace,
+            "action_plan": action_plan,
             "emotions_after": emotions_after,
             "steering_payload": steering_payload,  # Nur bei lokalem Provider aktiv
             "steering_mode": "vector" if is_local and steering_payload else "prompt",
@@ -161,19 +189,15 @@ class BrainPipeline:
             "memories_found": len(memories),
             "processing_time_ms": total_time,
             "processing_count": self._processing_count,
+            "response_prompt_suffix": self.action_response.build_prompt_suffix(
+                prefrontal_result.data,
+                life_context,
+                global_workspace,
+            ),
         }
         
         if run_background:
-            self._start_background_processing(
-                user_input=user_input,
-                response="",  # Will be filled by main response
-                emotions_before=current_emotions,
-                emotions_after=emotions_after,
-                context_files=context_files,
-                amygdala_result=amygdala_result,
-                hippocampus_result=hippocampus_result,
-                prefrontal_result=prefrontal_result
-            )
+            result["background_pending"] = True
         
         return result
     
@@ -213,6 +237,13 @@ class BrainPipeline:
                 result[emotion] = max(0, min(100, new_value))
         
         return result
+
+    def _merge_emotion_updates(self, amygdala_updates: Dict[str, Dict], homeostasis_updates: Dict[str, int]) -> Dict[str, Dict]:
+        merged = dict(amygdala_updates or {})
+        for emotion, delta in (homeostasis_updates or {}).items():
+            existing = merged.get(emotion, {})
+            merged[emotion] = {"delta": existing.get("delta", 0) + delta}
+        return merged
     
     def _convert_to_tool_calls(self, entries: List[Dict]) -> List[Dict]:
         """Convert short term entries to tool call format."""
@@ -252,14 +283,16 @@ class BrainPipeline:
                 self.basal_ganglia.process(basal_input)
                 
                 if context_files:
+                    amygdala_result = kwargs.get("amygdala_result") or AgentResult(agent_name="amygdala", success=True, data={})
+                    hippocampus_result = kwargs.get("hippocampus_result") or AgentResult(agent_name="hippocampus", success=True, data={})
                     memory_input = {
                         "user_input": user_input,
                         "chappie_response": response,
                         "current_soul": context_files.get_soul_context(),
                         "current_user": context_files.get_user_context(),
                         "current_preferences": context_files.get_preferences_context(),
-                        "amygdala_result": kwargs.get("amygdala_result", AgentResult("", True)).data,
-                        "hippocampus_result": kwargs.get("hippocampus_result", AgentResult("", True)).data,
+                        "amygdala_result": amygdala_result.data,
+                        "hippocampus_result": hippocampus_result.data,
                         "basal_ganglia_result": {}
                     }
                     self.memory_agent.process(memory_input)
@@ -272,6 +305,37 @@ class BrainPipeline:
         
         thread = threading.Thread(target=background_task, daemon=True)
         thread.start()
+
+    def complete_turn(
+        self,
+        user_input: str,
+        response: str,
+        emotions_before: Dict[str, int],
+        emotions_after: Dict[str, int],
+        context_files=None,
+        amygdala_result: Optional[AgentResult] = None,
+        hippocampus_result: Optional[AgentResult] = None,
+        prefrontal_result: Optional[AgentResult] = None,
+        global_workspace: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        snapshot = self.life_simulation.finalize_turn(
+            user_input=user_input,
+            response_text=response,
+            emotions_after=emotions_after,
+            prefrontal=(prefrontal_result.data if prefrontal_result else {}),
+            global_workspace=global_workspace or {},
+        )
+        self._start_background_processing(
+            user_input=user_input,
+            response=response,
+            emotions_before=emotions_before,
+            emotions_after=emotions_after,
+            context_files=context_files,
+            amygdala_result=amygdala_result,
+            hippocampus_result=hippocampus_result,
+            prefrontal_result=prefrontal_result,
+        )
+        return snapshot
     
     def get_status(self) -> Dict[str, Any]:
         """Get current pipeline status."""
@@ -279,7 +343,8 @@ class BrainPipeline:
             "processing_count": self._processing_count,
             "sleep_status": self.sleep_handler.get_status(),
             "provider": settings.llm_provider.value,
-            "model": settings.nvidia_model if settings.llm_provider == LLMProvider.NVIDIA else "unknown"
+            "model": settings.nvidia_model if settings.llm_provider == LLMProvider.NVIDIA else "unknown",
+            "life_state": self.life_simulation.get_snapshot(),
         }
 
 

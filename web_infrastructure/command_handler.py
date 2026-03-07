@@ -358,6 +358,14 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
         st.rerun()
         return True
+
+    elif cmd in ["/life", "/needs", "/goals", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline"]:
+        response = backend.handle_command(cmd)
+        assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": f"Kommando {cmd} ausgeführt."}}
+        st.session_state.messages.append(assistant_msg)
+        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        st.rerun()
+        return True
     
     elif cmd == "/config":
         st.session_state.show_settings = True
@@ -473,6 +481,10 @@ def process_chat_message(user_input: str, backend):
             st.markdown(result["response_text"])
             if result.get("emotions") and isinstance(result["emotions"], dict):
                 st.session_state.current_emotions = result["emotions"]
+            if result.get("life_snapshot"):
+                st.session_state.current_life_state = result["life_snapshot"]
+            if result.get("global_workspace"):
+                st.session_state.current_workspace = result["global_workspace"]
             
             # Aktualisiere Short-term Memory Count fuer Sidebar
             if result.get("short_term_count") is not None:
@@ -529,6 +541,10 @@ def process_chat_message(user_input: str, backend):
             "tool_calls": tool_calls_raw,
             "short_term_count": result.get("short_term_count", 0),
             "processing_time_ms": result.get("processing_time_ms", 0),
+            "life_snapshot": result.get("life_snapshot", {}),
+            "global_workspace": result.get("global_workspace", {}),
+            "action_plan": result.get("action_plan", {}),
+            "dream_fragments": result.get("dream_fragments", []),
         }
     }
 

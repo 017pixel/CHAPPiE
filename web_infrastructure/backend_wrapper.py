@@ -19,9 +19,12 @@ from memory.context_files import get_context_files_manager
 from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
 from brain import get_brain
+from brain.action_response import ActionResponseLayer
 from brain.base_brain import GenerationConfig, Message
+from brain.global_workspace import GlobalWorkspace
 from brain.response_parser import parse_chain_of_thought
 from brain.deep_think import DeepThinkEngine
+from life import get_life_simulation_service
 
 
 @st.cache_resource
@@ -83,6 +86,9 @@ def init_chappie():
 
             # Function Registry
             self.function_registry = get_function_registry()
+            self.life_simulation = get_life_simulation_service()
+            self.global_workspace = GlobalWorkspace()
+            self.action_response = ActionResponseLayer()
         
         def reinit_brain_if_needed(self):
             """Pruefe ob der Provider gewechselt wurde und initialisiere Brain neu."""
@@ -118,7 +124,22 @@ def init_chappie():
                 },
                 "daily_info_count": self.short_term_memory_v2.get_count(),
                 "two_step_enabled": settings.enable_two_step_processing,
+                "life_snapshot": self.life_simulation.get_snapshot(),
             }
+
+        def _build_workspace_from_intent(self, intent_result, life_context: Dict[str, Any], memories: List[Any] | None = None) -> Dict[str, Any]:
+            sensory = {
+                "input_type": intent_result.intent_type.value,
+                "urgency": "high" if intent_result.confidence > 0.85 else "medium",
+            }
+            emotional_delta = max([abs(getattr(update, "delta", 0)) for update in intent_result.emotions_update.values()] or [0])
+            amygdala = {
+                "primary_emotion": "engaged" if emotional_delta > 0 else "neutral",
+                "emotional_intensity": min(1.0, 0.2 + emotional_delta / 10),
+                "reasoning": f"Intent {intent_result.intent_type.value} mit Konfidenz {intent_result.confidence:.2f}",
+            }
+            hippocampus = {"search_query": " ".join(intent_result.entities[:4])}
+            return self.global_workspace.build(sensory, amygdala, hippocampus, life_context, memories or [])
 
         def _get_emotions_snapshot(self) -> Dict[str, int]:
             """Erstellt einen Snapshot der aktuellen Emotionen."""
@@ -170,6 +191,7 @@ def init_chappie():
             
             # Emotionen Snapshot
             emotions_before = self._get_emotions_snapshot()
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
             
             # === STEP 1: Intent Analysis ===
             intent_result = self.intent_processor.process(
@@ -188,10 +210,11 @@ def init_chappie():
             self._execute_step1_tool_calls(intent_result.tool_calls)
             
             # === AUSFÜHRUNG: Emotions Updates ===
-            emotions_after = self._apply_emotion_updates(
-                emotions_before, 
-                intent_result.emotions_update
-            )
+            combined_updates = dict(intent_result.emotions_update)
+            for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
+                if emotion_name not in combined_updates:
+                    combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
+            emotions_after = self._apply_emotion_updates(emotions_before, combined_updates)
             
             # === AUSFÜHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
@@ -203,6 +226,7 @@ def init_chappie():
             
             # === CONTEXT AUFBAUEN ===
             context = self._build_context(intent_result.context_requirements)
+            workspace = self._build_workspace_from_intent(intent_result, life_context)
             
             # === STEP 2: Response Generation ===
             self.debug_logger.log_step2_start(get_active_model())
@@ -211,7 +235,16 @@ def init_chappie():
                 user_input=user_input,
                 history=history,
                 context=context,
-                emotions=emotions_after
+                emotions=emotions_after,
+                life_context=life_context,
+                global_workspace=workspace
+            )
+            final_life_snapshot = self.life_simulation.finalize_turn(
+                user_input=user_input,
+                response_text=response_data["response_text"],
+                emotions_after=emotions_after,
+                prefrontal=response_data.get("action_plan", {}),
+                global_workspace=workspace,
             )
             
             self.debug_logger.log_step2_complete(
@@ -251,6 +284,10 @@ def init_chappie():
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
                 "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
                 "processing_time_ms": processing_time_ms,
+                "life_snapshot": final_life_snapshot,
+                "global_workspace": workspace,
+                "action_plan": response_data.get("action_plan", {}),
+                "dream_fragments": final_life_snapshot.get("dream_fragments", []),
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
@@ -330,7 +367,7 @@ def init_chappie():
             
             for emotion_name, update_data in emotion_updates.items():
                 if emotion_name in emotions_after:
-                    delta = update_data.delta
+                    delta = getattr(update_data, "delta", update_data.get("delta", 0) if isinstance(update_data, dict) else 0)
                     new_value = emotions_after[emotion_name] + delta
                     # Clamp to 0-100
                     new_value = max(0, min(100, new_value))
@@ -346,7 +383,7 @@ def init_chappie():
                         emotion_name,
                         emotions_before[emotion_name],
                         new_value,
-                        update_data.reason
+                        getattr(update_data, "reason", update_data.get("reason", "") if isinstance(update_data, dict) else "")
                     )
             
             return emotions_after
@@ -399,7 +436,9 @@ def init_chappie():
             return "\\n\\n".join(context_parts)
 
         def _generate_response(self, user_input: str, history: List[Dict], 
-                              context: str, emotions: Dict[str, int]) -> Dict[str, Any]:
+                              context: str, emotions: Dict[str, int],
+                              life_context: Dict[str, Any] | None = None,
+                              global_workspace: Dict[str, Any] | None = None) -> Dict[str, Any]:
             """Generiert die finale Antwort (Step 2)."""
             # RAG Memory Search
             memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
@@ -419,6 +458,16 @@ def init_chappie():
             # Context hinzufügen
             if context:
                 system_prompt += f"\\n\\n{context}"
+
+            system_prompt += "\\n\\n" + self.action_response.build_prompt_suffix(
+                {
+                    "response_strategy": "conversational",
+                    "tone": "friendly",
+                    "response_guidance": "Bleibe hilfreich, kohärent und lebensnah.",
+                },
+                life_context,
+                global_workspace,
+            )
             
             # Memories hinzufügen
             if memories_for_prompt:
@@ -457,6 +506,15 @@ def init_chappie():
                 "response_text": display_response,
                 "thought_process": thought,
                 "rag_memories": memories,
+                "action_plan": self.action_response.build_action_plan(
+                    {
+                        "response_strategy": "conversational",
+                        "tone": "friendly",
+                        "response_guidance": "Erzeuge eine kohärente Antwort, die innere Zustände berücksichtigt.",
+                    },
+                    life_context or {},
+                    global_workspace or {},
+                ),
             }
 
         def _calculate_emotion_delta(self, before: Dict[str, int], 
@@ -476,6 +534,7 @@ def init_chappie():
         def _process_legacy(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
             """Legacy Verarbeitung (altes System als Fallback)."""
             emotions_before = self._get_emotions_snapshot()
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
             
             # Einfache Emotions Analyse
             self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
@@ -490,6 +549,15 @@ def init_chappie():
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 use_chain_of_thought=settings.chain_of_thought
+            )
+            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
+                {
+                    "response_strategy": "conversational",
+                    "tone": "friendly",
+                    "response_guidance": "Bleibe kompatibel mit der Life-Simulation.",
+                },
+                life_context,
+                {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
             )
             
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
@@ -530,6 +598,13 @@ def init_chappie():
                 category="chat",
                 importance="normal"
             )
+            final_life_snapshot = self.life_simulation.finalize_turn(
+                user_input=user_input,
+                response_text=display_response,
+                emotions_after=emotions_after,
+                prefrontal={"response_guidance": "Legacy path mit Life-Simulation"},
+                global_workspace={"dominant_focus": {"label": "Legacy Input"}},
+            )
             
             return {
                 "response_text": display_response,
@@ -543,6 +618,10 @@ def init_chappie():
                 "tool_calls_executed": 0,
                 "short_term_count": self.short_term_memory_v2.get_count(),
                 "debug_log": None,
+                "life_snapshot": final_life_snapshot,
+                "global_workspace": {"broadcast": "legacy-path"},
+                "action_plan": {"strategy": "conversational", "tone": "friendly"},
+                "dream_fragments": final_life_snapshot.get("dream_fragments", []),
             }
 
         # === Command Handler ===
@@ -587,6 +666,142 @@ def init_chappie():
                 funcs = self.function_registry.get_function_names()
                 return "Verfügbare Funktionen:\\n" + "\\n".join(f"- {f}" for f in funcs)
             
+            elif cmd == "/life":
+                snapshot = self.life_simulation.get_snapshot()
+                need_lines = [f"- {item['name']}: {item['value']}" for item in snapshot.get("homeostasis", {}).get("active_needs", [])[:6]]
+                goal = snapshot.get("active_goal", {})
+                world = snapshot.get("world_model", {})
+                development = snapshot.get("development", {})
+                attachment = snapshot.get("attachment_model", {})
+                planning = snapshot.get("planning_state", {})
+                social_arc = snapshot.get("social_arc", {})
+                return (
+                    f"**Life Simulation**\n\n"
+                    f"Phase: {snapshot.get('clock', {}).get('phase_label', 'unbekannt')}\n"
+                    f"Aktivität: {snapshot.get('current_activity', '---')}\n"
+                    f"Modus: {snapshot.get('current_mode', '---')}\n"
+                    f"Fokusziel: {goal.get('title', '---')} ({goal.get('progress', 0):.0%})\n"
+                    f"Entwicklungsphase: {development.get('stage', '---')} -> {development.get('next_stage', '---')}\n"
+                    f"Bindung: {attachment.get('bond_type', '---')} ({attachment.get('attachment_security', 0):.2f})\n"
+                    f"Planung: {planning.get('planning_horizon', '---')} | {planning.get('next_milestone', '---')}\n"
+                    f"Social Arc: {social_arc.get('arc_name', '---')}\n"
+                    f"World Model: {world.get('predicted_user_need', '---')}\n"
+                    f"Next Best Action: {world.get('next_best_action', '---')}\n\n"
+                    + "\n".join(need_lines)
+                )
+
+            elif cmd == "/needs":
+                snapshot = self.life_simulation.get_snapshot()
+                return "\n".join(
+                    f"- {item['name']}: {item['value']} (Druck {item['pressure']})"
+                    for item in snapshot.get("homeostasis", {}).get("active_needs", [])
+                )
+
+            elif cmd == "/goals":
+                snapshot = self.life_simulation.get_snapshot()
+                goal_competition = snapshot.get("goal_competition", {})
+                lines = ["Goal Competition:"]
+                for goal in goal_competition.get("competition_table", [])[:5]:
+                    lines.append(f"- {goal.get('title', '---')}: Score {goal.get('score', 0):.2f} | Progress {goal.get('progress', 0):.0%}")
+                return "\n".join(lines)
+
+            elif cmd == "/habits":
+                snapshot = self.life_simulation.get_snapshot()
+                habits = sorted(snapshot.get("habits", {}).items(), key=lambda item: item[1].get("strength", 0), reverse=True)
+                lines = ["Habit Engine:"]
+                for name, meta in habits[:5]:
+                    lines.append(f"- {meta.get('label', name)}: Stärke {meta.get('strength', 0):.2f} | Count {meta.get('count', 0)} | Trend {meta.get('trend', 'stable')}")
+                return "\n".join(lines)
+
+            elif cmd == "/stage":
+                snapshot = self.life_simulation.get_snapshot()
+                development = snapshot.get("development", {})
+                lines = [
+                    f"Stage: {development.get('stage', '---')}",
+                    f"Next Stage: {development.get('next_stage', '---')}",
+                    f"Development Score: {development.get('development_score', 0):.2f}",
+                    f"Progress To Next: {development.get('progress_to_next', 0):.0%}",
+                ]
+                for item in development.get("milestones", [])[:4]:
+                    lines.append(f"- {item}")
+                return "\n".join(lines)
+
+            elif cmd == "/plan":
+                snapshot = self.life_simulation.get_snapshot()
+                planning = snapshot.get("planning_state", {})
+                lines = [
+                    f"Planning Horizon: {planning.get('planning_horizon', '---')}",
+                    f"Coordination Mode: {planning.get('coordination_mode', '---')}",
+                    f"Milestone: {planning.get('next_milestone', '---')}",
+                    f"Confidence: {planning.get('plan_confidence', 0):.2f}",
+                ]
+                for item in planning.get("immediate_steps", [])[:3]:
+                    lines.append(f"- {item}")
+                for item in planning.get("bottlenecks", [])[:3]:
+                    lines.append(f"! {item}")
+                return "\n".join(lines)
+
+            elif cmd == "/forecast":
+                snapshot = self.life_simulation.get_snapshot()
+                forecast = snapshot.get("forecast_state", {})
+                lines = [
+                    f"Risk Level: {forecast.get('risk_level', '---')}",
+                    f"Next Turn: {forecast.get('next_turn_outlook', '---')}",
+                    f"Daily Outlook: {forecast.get('daily_outlook', '---')}",
+                    f"Stage Trajectory: {forecast.get('stage_trajectory', '---')}",
+                ]
+                for item in forecast.get("protective_factors", [])[:4]:
+                    lines.append(f"- {item}")
+                return "\n".join(lines)
+
+            elif cmd == "/arc":
+                snapshot = self.life_simulation.get_snapshot()
+                social_arc = snapshot.get("social_arc", {})
+                lines = [
+                    f"Arc Name: {social_arc.get('arc_name', '---')}",
+                    f"Phase: {social_arc.get('phase', '---')}",
+                    f"Arc Score: {social_arc.get('arc_score', 0):.2f}",
+                    f"Episode: {social_arc.get('current_episode', '---')}",
+                    f"Guidance: {social_arc.get('guidance', '---')}",
+                ]
+                for item in social_arc.get("recent_episode_titles", [])[:4]:
+                    lines.append(f"- {item}")
+                return "\n".join(lines)
+
+            elif cmd == "/timeline":
+                snapshot = self.life_simulation.get_snapshot()
+                summary = snapshot.get("timeline_summary", {})
+                history = snapshot.get("timeline_history", [])
+                lines = [
+                    f"Entries: {summary.get('entries', 0)}",
+                    f"Summary: {summary.get('summary', '---')}",
+                ]
+                for item in history[-5:]:
+                    lines.append(
+                        f"- {item.get('phase_label', '---')} | {item.get('source', '---')} | Goal={item.get('goal', '---')} | Stage={item.get('stage', '---')}"
+                    )
+                return "\n".join(lines)
+
+            elif cmd == "/world":
+                snapshot = self.life_simulation.get_snapshot()
+                world = snapshot.get("world_model", {})
+                risks = world.get("risk_factors", [])
+                opportunities = world.get("opportunities", [])
+                attachment = snapshot.get("attachment_model", {})
+                lines = [
+                    f"Interaction Mode: {world.get('interaction_mode', '---')}",
+                    f"Predicted User Need: {world.get('predicted_user_need', '---')}",
+                    f"Next Best Action: {world.get('next_best_action', '---')}",
+                    f"Trajectory: {world.get('expected_trajectory', '---')}",
+                    f"Confidence: {world.get('confidence', 0):.2f}",
+                    f"Attachment Guidance: {attachment.get('guidance', '---')}",
+                ]
+                if risks:
+                    lines.append("Risks: " + " | ".join(risks))
+                if opportunities:
+                    lines.append("Opportunities: " + " | ".join(opportunities))
+                return "\n".join(lines)
+
             elif cmd == "/debug":
                 # Toggle Debug Mode
                 if self.debug_logger.enabled:

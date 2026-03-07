@@ -99,18 +99,15 @@ def start_daemon(focus: str = None, new: bool = False) -> Dict[str, Any]:
         }
     
     try:
-        daemon_script = Path(__file__).parent / "training_daemon.py"
-        if not daemon_script.exists():
-            daemon_script = PROJECT_ROOT / "Chappies_Trainingspartner" / "training_daemon.py"
-        
-        if not daemon_script.exists():
+        daemon_module_root = PROJECT_ROOT / "Chappies_Trainingspartner"
+        if not daemon_module_root.exists():
             return {
                 'success': False,
                 'pid': None,
-                'message': 'training_daemon.py nicht gefunden'
+                'message': 'Chappies_Trainingspartner Modul nicht gefunden'
             }
-        
-        cmd = [sys.executable, str(daemon_script)]
+
+        cmd = [sys.executable, '-m', 'Chappies_Trainingspartner.training_daemon']
         
         if new:
             cmd.append('--neu')

@@ -14,7 +14,7 @@ def render_chat_interface(backend):
     # ==========================================
     # 1. COMMANDS MENU
     # ==========================================
-    commands = ["/sleep", "/think", "/deep think", "/help", "/stats", "/clear", "/config"]
+    commands = ["/sleep", "/life", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline", "/think", "/deep think", "/help", "/stats", "/clear", "/config"]
 
     with st.expander("Befehle", expanded=False):
         m_cols = st.columns(len(commands))
@@ -69,6 +69,15 @@ def render_chat_interface(backend):
                 <div class="metric-sub">Aktive Einträge</div>
             </div>
             """, unsafe_allow_html=True)
+
+        life_snapshot = status.get("life_snapshot", {})
+        if life_snapshot:
+            goal = life_snapshot.get("active_goal", {})
+            dominant_need = (life_snapshot.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
+            st.caption(
+                f"Life-Simulation: {life_snapshot.get('clock', {}).get('phase_label', '---')} | "
+                f"{life_snapshot.get('current_activity', '---')} | Need: {dominant_need} | Ziel: {goal.get('title', '---')}"
+            )
         
         st.markdown("<br/>", unsafe_allow_html=True)
 

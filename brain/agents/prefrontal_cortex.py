@@ -86,6 +86,8 @@ class PrefrontalCortexAgent(BaseAgent):
         memories = input_data.get("memories", [])
         context = input_data.get("context", "")
         emotions = input_data.get("current_emotions", {})
+        life_context = input_data.get("life_context", {})
+        global_workspace = input_data.get("global_workspace", {})
         
         system_prompt = """DU BIST DER PREFRONTAL CORTEX VON CHAPPiE.
 
@@ -121,7 +123,11 @@ ANTWORTE NUR MIT JSON:
     "memories": 0.0-1.0
   },
   "response_guidance": "Kurze Anleitung fuer die Antwort",
-  "confidence": 0.0-1.0
+  "confidence": 0.0-1.0,
+  "planning_mode": "stabilizing|explorative|goal_directed|supportive",
+  "life_alignment": "Wie die Antwort zum inneren Zustand passt",
+  "attention_summary": "Was aktuell bewusst priorisiert wird",
+  "response_actions": ["konkrete Aktion 1", "konkrete Aktion 2"]
 }"""
 
         memories_str = "\n".join([f"- {m.get('content', m)[:100]}" for m in memories[:5]]) if memories else "Keine relevanten Memories"
@@ -145,6 +151,12 @@ Context Available:
 
 Aktuelle Emotionen:
 {json.dumps(emotions, indent=2)}
+
+Life Simulation:
+{json.dumps(life_context, indent=2)[:1200] if life_context else 'Keine Life-Simulation aktiv'}
+
+Global Workspace:
+{json.dumps(global_workspace, indent=2)[:1000] if global_workspace else 'Kein Workspace verfügbar'}
 
 Entscheide die Response-Strategie (NUR JSON):"""
 
@@ -182,6 +194,13 @@ Entscheide die Response-Strategie (NUR JSON):"""
             data["tone"] = "friendly"
         
         data["confidence"] = max(0.0, min(1.0, data.get("confidence", 0.5)))
+        valid_modes = ["stabilizing", "explorative", "goal_directed", "supportive"]
+        if data.get("planning_mode") not in valid_modes:
+            data["planning_mode"] = "goal_directed"
+        if not isinstance(data.get("response_actions"), list):
+            data["response_actions"] = []
+        data.setdefault("life_alignment", "Halte innere Konsistenz zwischen Emotion, Aufmerksamkeit und Antwort.")
+        data.setdefault("attention_summary", "Priorisiere den aktuell dominantesten Reiz.")
         
         return data
     
@@ -204,5 +223,9 @@ Entscheide die Response-Strategie (NUR JSON):"""
                 "memories": 0.7
             },
             "response_guidance": "Antworte freundlich und hilfsbereit.",
-            "confidence": 0.5
+            "confidence": 0.5,
+            "planning_mode": "goal_directed",
+            "life_alignment": "Stimme Antwort mit Homeostasis und Zielzustand ab.",
+            "attention_summary": "Fokus auf aktuelle User-Anfrage und innere Stabilität.",
+            "response_actions": ["Antwort klar strukturieren", "Auf innere Konsistenz achten"],
         }

@@ -15,18 +15,40 @@ def render_sidebar(backend):
             st.session_state.show_memories = not st.session_state.show_memories
             st.session_state.show_settings = False
             st.session_state.show_training = False
+            st.session_state.show_life_dashboard = False
+            st.session_state.show_growth_dashboard = False
             st.rerun()
         
         if st.button("Einstellungen", use_container_width=True, key="sidebar_settings"):
             st.session_state.show_settings = not st.session_state.show_settings
             st.session_state.show_memories = False
             st.session_state.show_training = False
+            st.session_state.show_life_dashboard = False
+            st.session_state.show_growth_dashboard = False
             st.rerun()
         
         if st.button("Autonomes Training", use_container_width=True, key="sidebar_training"):
             st.session_state.show_training = not st.session_state.show_training
             st.session_state.show_memories = False
             st.session_state.show_settings = False
+            st.session_state.show_life_dashboard = False
+            st.session_state.show_growth_dashboard = False
+            st.rerun()
+
+        if st.button("Life Dashboard", use_container_width=True, key="sidebar_life_dashboard"):
+            st.session_state.show_life_dashboard = not st.session_state.show_life_dashboard
+            st.session_state.show_memories = False
+            st.session_state.show_settings = False
+            st.session_state.show_training = False
+            st.session_state.show_growth_dashboard = False
+            st.rerun()
+
+        if st.button("Growth Timeline", use_container_width=True, key="sidebar_growth_dashboard"):
+            st.session_state.show_growth_dashboard = not st.session_state.show_growth_dashboard
+            st.session_state.show_memories = False
+            st.session_state.show_settings = False
+            st.session_state.show_training = False
+            st.session_state.show_life_dashboard = False
             st.rerun()
         
         st.divider()

@@ -111,14 +111,14 @@ case "$1" in
     start-manual)
         check_connection
         echo -e "${YELLOW}Starte Training-Daemon manuell (nohup)...${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && source venv/bin/activate && nohup python3 Chappies_Trainingspartner/training_daemon.py > training_daemon.log 2>&1 &"
+        ssh "$SERVER_USER@$SERVER_HOST" "cd $PROJECT_PATH && source venv/bin/activate && nohup python3 -m Chappies_Trainingspartner.training_daemon > training_daemon.log 2>&1 &"
         echo -e "${GREEN}✅ Daemon manuell gestartet${NC}"
         ;;
 
     stop-manual)
         check_connection
         echo -e "${YELLOW}Stoppe manuellen Training-Daemon...${NC}"
-        ssh "$SERVER_USER@$SERVER_HOST" "pkill -f training_daemon.py"
+        ssh "$SERVER_USER@$SERVER_HOST" "pkill -f 'Chappies_Trainingspartner.training_daemon|training_daemon.py'"
         echo -e "${GREEN}✅ Prozess gekillt${NC}"
         ;;
     

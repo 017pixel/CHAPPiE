@@ -1,12 +1,58 @@
 #!/usr/bin/env python3
-"""
-Validierungsskript für CHAPiE Konfiguration und Systeme
-Überprüft alle Komponenten zwischen Training und Web UI
-"""
+"""Validiert Konfiguration, Brain-, Memory- und Training-Kompatibilität."""
 
-from config.config import settings
+import inspect
+import sys
+from pathlib import Path
+
+from config.config import settings, LLMProvider
 from brain import get_brain
 from memory.memory_engine import MemoryEngine
+
+
+def _provider_summary() -> list[str]:
+    provider = settings.llm_provider
+    lines = [f"  LLM Provider: {provider.value}"]
+    if provider == LLMProvider.NVIDIA:
+        lines.extend([
+            f"  NVIDIA API Key: {'JA' if settings.nvidia_api_key else 'NEIN (SETZE KEY!)'}",
+            f"  NVIDIA Model: {settings.nvidia_model}",
+        ])
+    elif provider == LLMProvider.CEREBRAS:
+        lines.extend([
+            f"  Cerebras API Key: {'JA' if settings.cerebras_api_key else 'NEIN (SETZE KEY!)'}",
+            f"  Cerebras Model: {settings.cerebras_model}",
+        ])
+    elif provider == LLMProvider.GROQ:
+        lines.extend([
+            f"  Groq API Key: {'JA' if settings.groq_api_key else 'NEIN (SETZE KEY!)'}",
+            f"  Groq Model: {settings.groq_model}",
+        ])
+    else:
+        lines.extend([
+            f"  Ollama Host: {settings.ollama_host}",
+            f"  Ollama Model: {settings.ollama_model}",
+        ])
+    return lines
+
+
+def _active_provider_has_credentials() -> bool:
+    if settings.llm_provider == LLMProvider.NVIDIA:
+        return bool(settings.nvidia_api_key)
+    if settings.llm_provider == LLMProvider.CEREBRAS:
+        return bool(settings.cerebras_api_key)
+    if settings.llm_provider == LLMProvider.GROQ:
+        return bool(settings.groq_api_key)
+    return True
+
+
+def _training_service_is_valid() -> tuple[bool, str]:
+    service_file = Path(__file__).parent / "chappie-training.service"
+    if not service_file.exists():
+        return False, "Service-Datei fehlt"
+    content = service_file.read_text(encoding="utf-8")
+    valid_target = "Chappies_Trainingspartner.training_daemon" in content or "training_daemon.py" in content
+    return valid_target, "ExecStart zeigt auf training_daemon" if valid_target else "ExecStart zeigt nicht auf training_daemon"
 
 def main():
     print("CHAPiE SYSTEM VALIDIERUNG")
@@ -14,10 +60,8 @@ def main():
 
     # 1. Konfiguration
     print("\nKONFIGURATION:")
-    print("  LLM Provider:", settings.llm_provider)
-    print("  Ollama Model:", settings.ollama_model)
-    print("  Cerebras API Key:", "JA" if settings.cerebras_api_key else "NEIN (SETZE KEY!)")
-    print("  Cerebras Model:", settings.cerebras_model)
+    for line in _provider_summary():
+        print(line)
 
     # 2. Brain System
     print("\nBRAIN SYSTEM:")
@@ -83,17 +127,18 @@ def main():
     print("  Beide verwenden gleiche ChromaDB: JA (selbe Collection)")
     print("  Web UI Memory Live-Updates: JA (nicht gecacht)")
     print("  Training speichert Memories: JA (aktiviert)")
+    signature = inspect.signature(MemoryEngine.add_memory)
+    print("  MemoryEngine.add_memory Signatur:", list(signature.parameters.keys()))
+    service_ok, service_msg = _training_service_is_valid()
+    print("  Service-Datei:", service_msg)
 
     # 6. Zusammenfassung
     print("\nZUSAMMENFASSUNG:")
 
     issues = []
 
-    if str(settings.llm_provider) != "CEREBRAS":
-        issues.append("LLM Provider nicht Cerebras")
-
-    if not settings.cerebras_api_key:
-        issues.append("Cerebras API Key fehlt")
+    if not _active_provider_has_credentials():
+        issues.append(f"API Key für aktiven Provider {settings.llm_provider.value} fehlt")
 
     try:
         brain = get_brain()
@@ -112,6 +157,9 @@ def main():
     except:
         issues.append("Memory System fehlerhaft")
 
+    if not service_ok:
+        issues.append(service_msg)
+
     if issues:
         print("  PROBLEME GEFUNDEN:")
         for issue in issues:
@@ -121,6 +169,7 @@ def main():
         print("  Training <-> Web UI Synchronisation: AKTIV")
 
     print("\n" + "=" * 50)
+    return 1 if issues else 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -17,8 +17,8 @@ Environment="PYTHONIOENCODING=utf-8"
 # WICHTIG: Erzwinge CPU-Nutzung um Segmentation Faults bei NVML-Fehlern zu vermeiden
 Environment="CUDA_VISIBLE_DEVICES=-1"
 
-# Start-Befehl (Direkter Pfad ist robuster auf Linux)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 Chappies_Trainingspartner/training_daemon.py
+# Start-Befehl (Modul-Start ist robuster und nutzt den korrekten Daemon-Entry-Point)
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
 
 # Restart bei Crash (Autonomie ist Key!)
 Restart=always

@@ -18,6 +18,10 @@ def init_session_state():
         st.session_state.show_memories = False
     if "show_training" not in st.session_state:
         st.session_state.show_training = False
+    if "show_life_dashboard" not in st.session_state:
+        st.session_state.show_life_dashboard = False
+    if "show_growth_dashboard" not in st.session_state:
+        st.session_state.show_growth_dashboard = False
     if "debug_mode" not in st.session_state:
         st.session_state.debug_mode = False
     if "deep_think_active" not in st.session_state:
@@ -34,6 +38,10 @@ def init_session_state():
     
     if "short_term_count" not in st.session_state:
         st.session_state.short_term_count = 0
+    if "current_life_state" not in st.session_state:
+        st.session_state.current_life_state = {}
+    if "current_workspace" not in st.session_state:
+        st.session_state.current_workspace = {}
     
     if "show_soul_context" not in st.session_state:
         st.session_state.show_soul_context = False

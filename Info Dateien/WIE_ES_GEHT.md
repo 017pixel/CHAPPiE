@@ -1,5 +1,7 @@
 # WIE ES GEHT - CHAPPiE Projekt-Dokumentation
 
+> Hinweis: Diese Datei ist eine ergänzende technische Deep-Dive-Doku. Für die **aktuellsten Start-, Test- und Deployment-Schritte** bitte zuerst `README.md` und `START_ANLEITUNG.md` verwenden.
+
 Willkommen unter der Haube von **CHAPPiE**! Hier erfährst du, wie der KI-Agent technisch funktioniert, wie die Komponenten zusammenspielen und welche Mechanismen ihn "lebendig" machen.
 
 ---

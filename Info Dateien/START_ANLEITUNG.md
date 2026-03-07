@@ -1,52 +1,70 @@
-# 🚀 CHAPPiE Schnellstart-Anleitung
+# 🚀 CHAPPiE Schnellstart
 
 ## Voraussetzungen
-- Python 3.10 oder neuer
+
+- Python 3.11+
 - Git
+- optional: konfigurierte LLM-Provider oder lokale Modelle
 
 ## 1. Installation
 
 ```bash
-# Repository klonen
 git clone https://github.com/017pixel/CHAPPiE.git
 cd CHAPPiE
-
-# Environment erstellen
 python -m venv venv
-
-# Aktivieren
-# Windows:
-.\venv\Scripts\activate
-# Mac/Linux:
-source venv/bin/activate
-
-# Pakete installieren
+source venv/bin/activate   # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 2. API Keys einrichten
-1. Kopiere `config/secrets_example.py` zu `config/secrets.py`
-2. Öffne die Datei und trage deine API-Keys ein (Groq, Cerebras).
-   - Alternativ: Du kannst Keys auch später in der Web-UI eingeben.
+## 2. Konfiguration
 
-## 3. Starten
+Option A:
 
-**Web-Interface (Empfohlen):**
+1. `config/secrets_example.py` nach `config/secrets.py` kopieren
+2. gewünschten Provider und API-Keys eintragen
+
+Option B:
+
+- CHAPPiE starten und Modelle später in der Web-Oberfläche konfigurieren
+
+## 3. CHAPPiE starten
+
+### Web UI
+
 ```bash
 streamlit run app.py
 ```
-> Öffnet http://localhost:8501
 
-**Training starten (Optional):**
+### CLI
+
+```bash
+python chappie_brain_cli.py
+```
+
+### Training Daemon
+
+```bash
+python -m Chappies_Trainingspartner.training_daemon --neu
+python -m Chappies_Trainingspartner.training_daemon --fokus "Architektur"
+```
+
+Optionaler Setup-Wizard:
+
 ```bash
 python Chappies_Trainingspartner/setup_training.py
 ```
 
 ## 4. Updates holen
+
 ```bash
 git pull
 pip install -r requirements.txt
 ```
 
----
-Viel Spaß mit CHAPPiE! 🤖
+## 5. Wichtige Hinweise
+
+- Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten
+- `training_loop.py` ist kein Service-Entry-Point
+- Laufzeitdateien in `data/` werden lokal erzeugt und gehören nicht ins Repository
+
+Viel Spaß mit CHAPPiE 🤖

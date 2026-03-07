@@ -370,7 +370,7 @@ def run_setup():
         return True
     
     console.print("\n[dim]Setup beendet. Starte das Training später mit:[/dim]")
-    console.print("[cyan]python3 Chappies_Trainingspartner/training_daemon.py[/cyan]")
+    console.print("[cyan]python3 -m Chappies_Trainingspartner.training_daemon[/cyan]")
     return False
 
 

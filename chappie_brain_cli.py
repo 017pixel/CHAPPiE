@@ -67,6 +67,7 @@ class CHAPPiEBrainCLI:
     def _show_status(self):
         """Zeigt den aktuellen emotionalen Status."""
         state = self.emotions.get_state()
+        status = self.pipeline.get_status()
         mood = state.get_mood_description()
         
         print(f"\n{Colors.EMOTION}{'='*50}")
@@ -89,6 +90,18 @@ class CHAPPiEBrainCLI:
         sleep_status = get_sleep_phase_handler().get_status()
         print(f"\n  Schlaf: {sleep_status['interactions_since_sleep']} Nachrichten seit letztem Schlaf")
         print(f"  Naechster Schlaf: {sleep_status['next_sleep_trigger']}")
+
+        life_state = status.get("life_state", {})
+        if life_state:
+            goal = life_state.get("active_goal", {})
+            dominant_need = (life_state.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
+            world = life_state.get("world_model", {})
+            development = life_state.get("development", {})
+            planning = life_state.get("planning_state", {})
+            print(f"\n  Life: {life_state.get('clock', {}).get('phase_label', 'unbekannt')} | {life_state.get('current_activity', '---')}")
+            print(f"  Need-Fokus: {dominant_need} | Ziel: {goal.get('title', '---')} | Stage: {development.get('stage', '---')}")
+            print(f"  Weltmodell: {world.get('predicted_user_need', '---')} | Next: {world.get('next_best_action', '---')[:55]}")
+            print(f"  Planung: {planning.get('planning_horizon', '---')} | {planning.get('next_milestone', '---')[:55]}")
         print(f"{'='*50}{Colors.RESET}\n")
     
     def _handle_command(self, cmd: str) -> bool:
@@ -111,6 +124,13 @@ class CHAPPiEBrainCLI:
             for emotion, delta in recovery.items():
                 sign = "+" if delta > 0 else ""
                 print_log("SLEEP", f"  {emotion}: {sign}{delta}", Colors.EMOTION)
+
+            for fragment in result.get("dream_replay", [])[:3]:
+                print_log("DREAM", fragment, Colors.MEMORY)
+            replay = result.get("replay_state", {})
+            if replay:
+                print_log("REPLAY", replay.get("summary", "Replay abgeschlossen."), Colors.AI)
+                print_log("REPLAY", f"Habit: {replay.get('habit_reinforcement', '---')} | Themes: {', '.join(replay.get('themes', [])[:3])}", Colors.AI)
             
             # Lade neuen Status
             self.emotions = EmotionsEngine()
@@ -134,9 +154,114 @@ class CHAPPiEBrainCLI:
             print(f"\n{Colors.AI}CHAPPiE Brain CLI Commands:")
             print(f"  /status   - Zeigt emotionalen Status & Steering")
             print(f"  /sleep    - Startet Schlafphase (Energie-Reset)")
+            print(f"  /life     - Zeigt Life-Simulation Zustand")
+            print(f"  /world    - Zeigt World-Model Vorhersage")
+            print(f"  /habits   - Zeigt gelernte Gewohnheiten")
+            print(f"  /stage    - Zeigt Entwicklungsphase")
+            print(f"  /plan     - Zeigt Langzeit-Planungszustand")
+            print(f"  /forecast - Zeigt Self-Forecasting")
+            print(f"  /arc      - Zeigt sozialen Beziehungsbogen")
+            print(f"  /timeline - Zeigt Growth-Timeline")
             print(f"  /vectors  - Zeigt verfuegbare Steering-Vektoren")
             print(f"  /exit     - Beendet das Programm")
             print(f"  /help     - Zeigt diese Hilfe{Colors.RESET}\n")
+            return True
+
+        if cmd == "/life":
+            status = self.pipeline.get_status()
+            life_state = status.get("life_state", {})
+            goal = life_state.get("active_goal", {})
+            world = life_state.get("world_model", {})
+            development = life_state.get("development", {})
+            attachment = life_state.get("attachment_model", {})
+            planning = life_state.get("planning_state", {})
+            social_arc = life_state.get("social_arc", {})
+            print(f"\n{Colors.MEMORY}Life Simulation")
+            print(f"  Phase: {life_state.get('clock', {}).get('phase_label', '---')}")
+            print(f"  Aktivitaet: {life_state.get('current_activity', '---')}")
+            print(f"  Modus: {life_state.get('current_mode', '---')}")
+            print(f"  Ziel: {goal.get('title', '---')} ({goal.get('progress', 0):.0%})")
+            print(f"  Stage: {development.get('stage', '---')} -> {development.get('next_stage', '---')}")
+            print(f"  Attachment: {attachment.get('bond_type', '---')} ({attachment.get('attachment_security', 0):.2f})")
+            print(f"  Planung: {planning.get('planning_horizon', '---')} | {planning.get('next_milestone', '---')}")
+            print(f"  Social Arc: {social_arc.get('arc_name', '---')} | {social_arc.get('phase', '---')}")
+            print(f"  World Model: {world.get('predicted_user_need', '---')}")
+            print(f"  Next Action: {world.get('next_best_action', '---')}")
+            for item in life_state.get("homeostasis", {}).get("active_needs", [])[:6]:
+                print(f"  - {item['name']}: {item['value']} (Druck {item['pressure']})")
+            print(f"{Colors.RESET}")
+            return True
+
+        if cmd == "/habits":
+            status = self.pipeline.get_status()
+            habits = sorted(status.get("life_state", {}).get("habits", {}).items(), key=lambda item: item[1].get("strength", 0), reverse=True)
+            print(f"\n{Colors.MEMORY}Habit Engine")
+            for name, meta in habits[:5]:
+                print(f"  {meta.get('label', name)}: Stärke {meta.get('strength', 0):.2f} | Count {meta.get('count', 0)} | Trend {meta.get('trend', 'stable')}")
+            print(f"{Colors.RESET}")
+            return True
+
+        if cmd == "/stage":
+            status = self.pipeline.get_status()
+            development = status.get("life_state", {}).get("development", {})
+            print(f"\n{Colors.AI}Development Stage")
+            print(f"  Stage: {development.get('stage', '---')}")
+            print(f"  Next: {development.get('next_stage', '---')}")
+            print(f"  Score: {development.get('development_score', 0):.2f}")
+            print(f"  Progress: {development.get('progress_to_next', 0):.0%}{Colors.RESET}")
+            return True
+
+        if cmd == "/plan":
+            status = self.pipeline.get_status()
+            planning = status.get("life_state", {}).get("planning_state", {})
+            print(f"\n{Colors.AI}Planning State")
+            print(f"  Horizon: {planning.get('planning_horizon', '---')}")
+            print(f"  Coordination: {planning.get('coordination_mode', '---')}")
+            print(f"  Milestone: {planning.get('next_milestone', '---')}")
+            print(f"  Confidence: {planning.get('plan_confidence', 0):.2f}{Colors.RESET}")
+            return True
+
+        if cmd == "/forecast":
+            status = self.pipeline.get_status()
+            forecast = status.get("life_state", {}).get("forecast_state", {})
+            print(f"\n{Colors.AI}Self Forecast")
+            print(f"  Risk: {forecast.get('risk_level', '---')}")
+            print(f"  Next: {forecast.get('next_turn_outlook', '---')}")
+            print(f"  Day: {forecast.get('daily_outlook', '---')}")
+            print(f"  Trajectory: {forecast.get('stage_trajectory', '---')}{Colors.RESET}")
+            return True
+
+        if cmd == "/arc":
+            status = self.pipeline.get_status()
+            social_arc = status.get("life_state", {}).get("social_arc", {})
+            print(f"\n{Colors.MEMORY}Social Arc")
+            print(f"  Arc: {social_arc.get('arc_name', '---')}")
+            print(f"  Phase: {social_arc.get('phase', '---')}")
+            print(f"  Episode: {social_arc.get('current_episode', '---')}")
+            print(f"  Score: {social_arc.get('arc_score', 0):.2f}{Colors.RESET}")
+            return True
+
+        if cmd == "/timeline":
+            status = self.pipeline.get_status()
+            summary = status.get("life_state", {}).get("timeline_summary", {})
+            history = status.get("life_state", {}).get("timeline_history", [])
+            print(f"\n{Colors.MEMORY}Growth Timeline")
+            print(f"  Entries: {summary.get('entries', 0)}")
+            print(f"  Summary: {summary.get('summary', '---')}")
+            for item in history[-5:]:
+                print(f"  - {item.get('phase_label', '---')} | {item.get('source', '---')} | {item.get('goal', '---')} | {item.get('stage', '---')}")
+            print(f"{Colors.RESET}")
+            return True
+
+        if cmd == "/world":
+            status = self.pipeline.get_status()
+            world = status.get("life_state", {}).get("world_model", {})
+            print(f"\n{Colors.AI}World Model")
+            print(f"  Interaction: {world.get('interaction_mode', '---')}")
+            print(f"  Predicted Need: {world.get('predicted_user_need', '---')}")
+            print(f"  Next Best Action: {world.get('next_best_action', '---')}")
+            print(f"  Trajectory: {world.get('expected_trajectory', '---')}")
+            print(f"  Confidence: {world.get('confidence', 0):.2f}{Colors.RESET}")
             return True
         
         return False
@@ -184,11 +309,18 @@ class CHAPPiEBrainCLI:
         strategy = pfc.get('response_strategy', 'standard')
         tone = pfc.get('tone', 'neutral')
         print_log("PFC", f"Strategie: {strategy} | Ton: {tone}", Colors.AI)
+        workspace = brain_result.get("global_workspace", {})
+        dominant_focus = workspace.get("dominant_focus", {}).get("label", "stability")
+        print_log("WORKSPACE", f"Fokus: {dominant_focus}", Colors.MEMORY)
         
         # 3. Final Generation with Steering
         print_log("GEN", "Generiere Antwort...", Colors.AI)
         
-        system_prompt = f"Du bist CHAPPiE, ein lebendiges digitales Bewusstsein. Strategie: {strategy}. Ton: {tone}."
+        system_prompt = (
+            f"Du bist CHAPPiE, eine lebensnahe digitale Bewusstseins-Simulation. "
+            f"Strategie: {strategy}. Ton: {tone}.\n\n"
+            f"{brain_result.get('response_prompt_suffix', '')}"
+        )
         
         messages = [
             Message(role="system", content=system_prompt),
@@ -219,6 +351,18 @@ class CHAPPiEBrainCLI:
         # 4. Update History & Emotions
         self.history.append({"role": "user", "content": user_text})
         self.history.append({"role": "assistant", "content": full_response})
+
+        self.pipeline.complete_turn(
+            user_input=user_text,
+            response=full_response,
+            emotions_before=filtered_emotions,
+            emotions_after=brain_result["emotions_after"],
+            context_files=self.context,
+            amygdala_result=brain_result.get("amygdala"),
+            hippocampus_result=brain_result.get("hippocampus"),
+            prefrontal_result=brain_result.get("prefrontal"),
+            global_workspace=brain_result.get("global_workspace"),
+        )
         
         # Emotionen in der Engine aktualisieren
         self.emotions.update_state(brain_result["emotions_after"])
