@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List
 
 # CHAPiE imports
-from config.config import settings, get_active_model, PROJECT_ROOT
+from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
@@ -22,7 +22,7 @@ from brain import get_brain
 from brain.action_response import ActionResponseLayer
 from brain.base_brain import GenerationConfig, Message
 from brain.global_workspace import GlobalWorkspace
-from brain.response_parser import parse_chain_of_thought
+from brain.response_parser import parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
 from brain.deep_think import DeepThinkEngine
 from life import get_life_simulation_service
 
@@ -37,6 +37,7 @@ def init_chappie():
             self.emotions = EmotionsEngine()
             self.brain = get_brain()
             self._current_provider = settings.llm_provider
+            self._brain_signature = self._build_brain_signature()
 
             # Chat Manager init
             data_dir = os.path.join(PROJECT_ROOT, "data")
@@ -74,6 +75,7 @@ def init_chappie():
 
             # NEU: Intent Processor (Step 1)
             self.intent_processor = get_intent_processor()
+            self._intent_signature = self._build_intent_signature()
 
             # NEU: Debug Logger
             self.debug_logger = get_debug_logger()
@@ -90,21 +92,75 @@ def init_chappie():
             self.global_workspace = GlobalWorkspace()
             self.action_response = ActionResponseLayer()
         
-        def reinit_brain_if_needed(self):
-            """Pruefe ob der Provider gewechselt wurde und initialisiere Brain neu."""
-            if settings.llm_provider != self._current_provider:
-                print(f"Provider wechsel erkannt: {self._current_provider} -> {settings.llm_provider}")
-                self.brain = get_brain()
+        def _provider_runtime_signature(self, provider: LLMProvider, model: str):
+            if provider == LLMProvider.OLLAMA:
+                return (provider.value, model, settings.ollama_host)
+            if provider == LLMProvider.VLLM:
+                return (provider.value, model, settings.vllm_url)
+            if provider == LLMProvider.GROQ:
+                return (provider.value, model, settings.groq_api_key)
+            if provider == LLMProvider.CEREBRAS:
+                return (provider.value, model, settings.cerebras_api_key)
+            if provider == LLMProvider.NVIDIA:
+                return (provider.value, model, settings.nvidia_api_key)
+            return (provider.value, model)
+
+        def _build_brain_signature(self):
+            return self._provider_runtime_signature(settings.llm_provider, get_active_model())
+
+        def _build_intent_signature(self):
+            provider = settings.get_effective_provider(settings.intent_provider)
+            model = settings.get_intent_model(settings.intent_provider)
+            return (
+                settings.intent_provider.value if settings.intent_provider else "auto",
+                *self._provider_runtime_signature(provider, model),
+            )
+
+        def apply_runtime_settings(self, force: bool = False):
+            changed = False
+            brain_signature = self._build_brain_signature()
+            if force or brain_signature != self._brain_signature:
+                print(f"Runtime-Reload Hauptmodell: {self._brain_signature} -> {brain_signature}")
+                self.brain = get_brain(provider=settings.llm_provider, model=get_active_model())
+                self._brain_signature = brain_signature
                 self._current_provider = settings.llm_provider
                 self.deep_think_engine = DeepThinkEngine(
                     memory_engine=self.memory,
                     emotions_engine=self.emotions,
                     brain=self.brain
                 )
+                changed = True
+
+            intent_signature = self._build_intent_signature()
+            if force or changed or intent_signature != self._intent_signature:
+                print(f"Runtime-Reload Intent: {self._intent_signature} -> {intent_signature}")
                 reset_intent_processor()
                 self.intent_processor = get_intent_processor()
-                return True
-            return False
+                self._intent_signature = intent_signature
+                changed = True
+            return changed
+
+        def reinit_brain_if_needed(self):
+            """Abwärtskompatibler Alias für Runtime-Reload."""
+            return self.apply_runtime_settings()
+
+        def _extract_display_response(self, raw_response: Any):
+            raw_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
+            if not raw_text.strip():
+                return "Ich habe gerade keine verwertbare Modellantwort erhalten. Bitte versuche es erneut oder prüfe den aktiven Provider in den Einstellungen.", ""
+
+            thought = ""
+            if settings.chain_of_thought:
+                parsed = parse_chain_of_thought(raw_text)
+                alt_parsed = parse_thinking_tags(raw_text)
+                display_response = parsed.answer.strip() or alt_parsed.answer.strip() or raw_text.strip()
+                thought = parsed.thought or alt_parsed.thought or ""
+            else:
+                display_response = raw_text.strip()
+
+            if not display_response:
+                display_response = "Ich habe gerade keine verwertbare Modellantwort erhalten. Bitte versuche es erneut oder prüfe den aktiven Provider in den Einstellungen."
+            return display_response, thought
 
         def get_status(self) -> Dict[str, Any]:
             try:
@@ -166,6 +222,8 @@ def init_chappie():
             else:
                 if not settings.cli_debug_always_on:
                     self.debug_logger.disable()
+
+            self.apply_runtime_settings()
             
             self._processing_start_time = datetime.now()
 
@@ -479,19 +537,12 @@ def init_chappie():
             )
             
             raw_response = self.brain.generate(messages, config=gen_config)
-            
-            # Parsing (CoT)
-            thought = ""
-            if settings.chain_of_thought:
-                parsed = parse_chain_of_thought(raw_response)
-                display_response = parsed.answer
-                thought = parsed.thought or ""
-            else:
-                display_response = raw_response
+            display_response, thought = self._extract_display_response(raw_response)
             
             # In Langzeitgedächtnis speichern
             self.memory.add_memory(user_input, role="user")
-            self.memory.add_memory(display_response, role="assistant")
+            if display_response.strip() and not looks_like_model_error(display_response):
+                self.memory.add_memory(display_response, role="assistant")
             
             # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
             
@@ -564,19 +615,12 @@ def init_chappie():
                 stream=False,
             )
             raw_response = self.brain.generate(messages, config=gen_config)
-            
-            # Parsing
-            thought = ""
-            if settings.chain_of_thought:
-                parsed = parse_chain_of_thought(raw_response)
-                display_response = parsed.answer
-                thought = parsed.thought or ""
-            else:
-                display_response = raw_response
+            display_response, thought = self._extract_display_response(raw_response)
             
             # Speichern
             self.memory.add_memory(user_input, role="user")
-            self.memory.add_memory(display_response, role="assistant")
+            if display_response.strip() and not looks_like_model_error(display_response):
+                self.memory.add_memory(display_response, role="assistant")
             
             # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
             

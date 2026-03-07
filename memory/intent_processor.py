@@ -14,6 +14,7 @@ from enum import Enum
 from config.config import settings, LLMProvider
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
+from brain.response_parser import looks_like_model_error
 
 
 class IntentType(str, Enum):
@@ -78,34 +79,9 @@ class IntentProcessor:
     
     def _init_brain(self):
         """Initialisiert das Modell basierend auf Intent-Provider oder Haupt-Provider."""
-        intent_provider = settings.intent_provider or settings.llm_provider
-        original_provider = settings.llm_provider
-        original_models = {
-            LLMProvider.GROQ: settings.groq_model,
-            LLMProvider.CEREBRAS: settings.cerebras_model,
-            LLMProvider.NVIDIA: settings.nvidia_model,
-            LLMProvider.OLLAMA: settings.ollama_model
-        }
-        
-        if intent_provider == LLMProvider.GROQ:
-            settings.groq_model = settings.intent_processor_model_groq
-        elif intent_provider == LLMProvider.CEREBRAS:
-            settings.cerebras_model = settings.intent_processor_model_cerebras
-        elif intent_provider == LLMProvider.NVIDIA:
-            settings.nvidia_model = settings.intent_processor_model_nvidia
-        else:
-            settings.ollama_model = settings.intent_processor_model_ollama
-        
-        original_llm_provider = settings.llm_provider
-        settings.llm_provider = intent_provider
-        
-        self.brain = get_brain()
-        
-        settings.llm_provider = original_llm_provider
-        settings.groq_model = original_models[LLMProvider.GROQ]
-        settings.cerebras_model = original_models[LLMProvider.CEREBRAS]
-        settings.nvidia_model = original_models[LLMProvider.NVIDIA]
-        settings.ollama_model = original_models[LLMProvider.OLLAMA]
+        intent_provider = settings.get_effective_provider(settings.intent_provider)
+        intent_model = settings.get_intent_model(settings.intent_provider)
+        self.brain = get_brain(provider=intent_provider, model=intent_model)
     
     def process(self, user_input: str, history: List[Dict], 
                 current_emotions: Dict[str, int]) -> IntentResult:
@@ -138,6 +114,8 @@ class IntentProcessor:
         
         try:
             raw_response = self.brain.generate(messages, config=gen_config)
+            if looks_like_model_error(raw_response):
+                raise RuntimeError(f"Intent-Modell lieferte Fehler/Leerantwort: {raw_response}")
             
             # Extrahiere JSON
             json_data = self._extract_json(raw_response)

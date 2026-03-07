@@ -87,6 +87,22 @@ def extract_answer_only(response: str) -> str:
     return parse_chain_of_thought(response).answer
 
 
+def looks_like_model_error(response: str) -> bool:
+    """Erkennt typische Backend-Fehlerstrings oder leere Modellantworten."""
+    if not isinstance(response, str) or not response.strip():
+        return True
+    stripped = response.strip()
+    error_prefixes = (
+        "Ollama Fehler",
+        "Groq Fehler",
+        "Cerebras Fehler",
+        "NVIDIA Fehler",
+        "vLLM Fehler",
+        "VLLM Fehler",
+    )
+    return stripped.startswith(error_prefixes)
+
+
 def has_chain_of_thought_format(response: str) -> bool:
     """
     Prueft ob die Antwort das Chain-of-Thought Format enthaelt.

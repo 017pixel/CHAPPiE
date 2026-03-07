@@ -4,6 +4,7 @@ import json
 import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from config.config import DATA_DIR
 from memory.personality_manager import PersonalityManager
@@ -29,6 +30,7 @@ class _NoOpPersonalityManager:
 class LifeSimulationService:
     """Deterministic life-simulation layer for CHAPPiE."""
 
+    BERLIN_TZ = ZoneInfo("Europe/Berlin")
     TURN_MINUTES = 35
     MAX_EVENTS = 18
 
@@ -53,7 +55,7 @@ class LifeSimulationService:
 
     def prepare_turn(self, user_input: str, history: Optional[List[Dict]] = None, emotions: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
         with self._lock:
-            self._advance_clock(self.TURN_MINUTES)
+            self._sync_clock_to_berlin()
             self._apply_baseline_decay()
             self._choose_activity(user_input)
             self._apply_activity_recovery(user_input)
@@ -71,6 +73,7 @@ class LifeSimulationService:
         global_workspace: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         with self._lock:
+            self._sync_clock_to_berlin()
             lower = user_input.lower()
             self._update_goal_progress(lower)
             self._update_relationship(lower)
@@ -90,7 +93,7 @@ class LifeSimulationService:
             )
             if emotions_after and emotions_after.get("trust", 50) >= 65:
                 self._state.relationship["trust"] = min(1.0, self._state.relationship.get("trust", 0.6) + 0.01)
-            self._state.last_updated = datetime.now().isoformat()
+            self._state.last_updated = self._get_berlin_now().isoformat()
             homeostasis = self._refresh_cognitive_state(user_input, [], emotions_after or {}, response_text=response_text)
             self._update_self_model(prefrontal or {}, global_workspace or {})
             self._state.replay_state = self._build_replay_state()
@@ -100,6 +103,7 @@ class LifeSimulationService:
 
     def process_sleep_cycle(self) -> Dict[str, Any]:
         with self._lock:
+            self._sync_clock_to_berlin()
             for key, boost in {"energy": 18, "rest": 24, "stability": 10, "achievement": 4}.items():
                 self._state.needs[key] = min(100, self._state.needs.get(key, 50) + boost)
             self._state.current_phase = "sleep"
@@ -124,6 +128,7 @@ class LifeSimulationService:
 
     def get_snapshot(self) -> Dict[str, Any]:
         with self._lock:
+            self._sync_clock_to_berlin()
             if not self._state.goal_competition or not self._state.world_model or not self._state.development or not self._state.attachment_model or not self._state.planning_state or not self._state.forecast_state or not self._state.social_arc:
                 homeostasis = self._refresh_cognitive_state("system status", [], {}, response_text="")
                 self._state.replay_state = self._build_replay_state()
@@ -186,22 +191,49 @@ class LifeSimulationService:
     def _save_state(self):
         self.state_path.write_text(json.dumps(self._state.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
 
+    def _get_berlin_now(self) -> datetime:
+        return datetime.now(self.BERLIN_TZ)
+
+    def _parse_timestamp(self, timestamp: str) -> Optional[datetime]:
+        if not timestamp:
+            return None
+        try:
+            parsed = datetime.fromisoformat(timestamp)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=self.BERLIN_TZ)
+        return parsed.astimezone(self.BERLIN_TZ)
+
+    def _phase_from_minute(self, minute: int) -> str:
+        if minute < 6 * 60:
+            return "sleep"
+        if minute < 10 * 60:
+            return "morning"
+        if minute < 17 * 60:
+            return "focus"
+        if minute < 21 * 60:
+            return "exploration"
+        return "wind_down"
+
+    def _sync_clock_to_berlin(self):
+        now = self._get_berlin_now()
+        previous = self._parse_timestamp(self._state.last_updated)
+        if previous is not None:
+            day_delta = (now.date() - previous.date()).days
+            if day_delta > 0:
+                self._state.day_index += day_delta
+        self._state.minute_of_day = now.hour * 60 + now.minute
+        self._state.current_phase = self._phase_from_minute(self._state.minute_of_day)
+        self._state.last_updated = now.isoformat()
+
     def _advance_clock(self, minutes: int):
         self._state.minute_of_day += minutes
         while self._state.minute_of_day >= 24 * 60:
             self._state.minute_of_day -= 24 * 60
             self._state.day_index += 1
         minute = self._state.minute_of_day
-        if minute < 6 * 60:
-            self._state.current_phase = "sleep"
-        elif minute < 10 * 60:
-            self._state.current_phase = "morning"
-        elif minute < 17 * 60:
-            self._state.current_phase = "focus"
-        elif minute < 21 * 60:
-            self._state.current_phase = "exploration"
-        else:
-            self._state.current_phase = "wind_down"
+        self._state.current_phase = self._phase_from_minute(minute)
 
     def _apply_baseline_decay(self):
         for key, decay in {"energy": 3, "social": 1, "curiosity": 2, "stability": 1, "achievement": 2, "rest": 3}.items():
@@ -339,9 +371,17 @@ class LifeSimulationService:
     def _build_snapshot(self, homeostasis: Dict[str, Any]) -> Dict[str, Any]:
         goal = (self._state.goal_competition or {}).get("active_goal") or {}
         minute = self._state.minute_of_day
-        phase_label = f"Tag {self._state.day_index}, {minute // 60:02d}:{minute % 60:02d}"
+        berlin_now = self._get_berlin_now()
+        phase_label = f"Tag {self._state.day_index}, {minute // 60:02d}:{minute % 60:02d} Uhr (Berlin)"
         return {
-            "clock": {"day_index": self._state.day_index, "minute_of_day": minute, "phase": self._state.current_phase, "phase_label": phase_label},
+            "clock": {
+                "day_index": self._state.day_index,
+                "minute_of_day": minute,
+                "phase": self._state.current_phase,
+                "phase_label": phase_label,
+                "timezone": "Europe/Berlin",
+                "local_timestamp": berlin_now.isoformat(),
+            },
             "current_activity": self._state.current_activity,
             "current_mode": self._state.current_mode,
             "homeostasis": homeostasis,

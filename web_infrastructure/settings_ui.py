@@ -116,6 +116,10 @@ def _render_provider_select(label, current_provider, key, include_auto=True):
     return selected
 
 
+def _provider_label(provider_value: str) -> str:
+    return PROVIDER_OPTIONS.get(provider_value, provider_value)
+
+
 def render_settings_overlay(backend):
     if not st.session_state.show_settings:
         return
@@ -167,6 +171,16 @@ def render_settings_overlay(backend):
         
         st.divider()
         update_data = {}
+
+        st.caption("Wenn du nur den Hauptanbieter wechselst, lasse **Intent-Analyse** und **Query Extraction** auf **Auto**. Dann folgen sie automatisch dem Hauptanbieter.")
+        if st.button("Step-1 und Query wieder auf Auto / Hauptanbieter setzen", key="reset_auxiliary_providers"):
+            st.session_state.intent_provider_select = "auto"
+            st.session_state.query_provider_select = "auto"
+            settings.update_from_ui(intent_provider="auto", query_extraction_provider="auto")
+            backend.apply_runtime_settings(force=True)
+            st.session_state.last_api_settings_hash = None
+            st.toast("Intent-Analyse und Query Extraction folgen wieder dem Hauptanbieter.")
+            st.rerun()
         
         with st.expander("Chat-Modell (Hauptantwort)", expanded=True):
             if is_groq:
@@ -187,6 +201,7 @@ def render_settings_overlay(backend):
         
         with st.expander("Intent-Analyse (Step 1 - Verstehen)"):
             update_data["intent_provider"] = _render_provider_select("Provider", settings.intent_provider, "intent_provider_select", include_auto=True)
+            st.caption(f"Effektiv aktiv: {_provider_label(settings.get_effective_provider(update_data['intent_provider']).value)}")
             col1, col2 = st.columns(2)
             with col1:
                 update_data["intent_processor_model_vllm"] = _render_model_select("Modell für vLLM", VLLM_MODELS, settings.intent_processor_model_vllm, "intent_vllm")
@@ -198,6 +213,7 @@ def render_settings_overlay(backend):
         
         with st.expander("Query Extraction (Memory-Suche)"):
             update_data["query_extraction_provider"] = _render_provider_select("Provider", settings.query_extraction_provider, "query_provider_select", include_auto=True)
+            st.caption(f"Effektiv aktiv: {_provider_label(settings.get_effective_provider(update_data['query_extraction_provider']).value)}")
             col1, col2 = st.columns(2)
             with col1:
                 update_data["query_extraction_vllm_model"] = _render_model_select("Modell für vLLM", VLLM_MODELS, settings.query_extraction_vllm_model, "query_vllm")
@@ -242,7 +258,7 @@ def render_settings_overlay(backend):
             
         if current_api_hash != st.session_state.last_api_settings_hash:
             settings.update_from_ui(**update_data)
-            backend.reinit_brain_if_needed()
+            backend.apply_runtime_settings()
             st.session_state.last_api_settings_hash = current_api_hash
             st.toast("Modell-Einstellungen automatisch gespeichert 💾")
 

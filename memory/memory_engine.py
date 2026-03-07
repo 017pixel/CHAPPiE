@@ -44,7 +44,9 @@ from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
 from config.config import settings, CHROMA_DB_DIR, LLMProvider
+from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
+from brain.response_parser import looks_like_model_error
 from config.prompts import format_query_extraction_prompt
 
 
@@ -443,7 +445,7 @@ class MemoryEngine:
             brain = self._get_brain_for_provider(effective_provider, model)
             if brain:
                 result = brain.generate(messages, config=gen_config)
-                if isinstance(result, str) and result.strip() and not result.startswith("NVIDIA Fehler") and not result.startswith("Groq Fehler") and not result.startswith("Cerebras Fehler"):
+                if not looks_like_model_error(result):
                     extracted = result.strip()
                     if settings.debug:
                         print(f"   Query Extraction ({effective_provider.value}): '{extracted[:100]}...'")
@@ -468,18 +470,7 @@ class MemoryEngine:
     def _get_brain_for_provider(self, provider, model: str):
         """Holt die passende Brain-Instanz fuer einen Provider."""
         try:
-            if provider == LLMProvider.GROQ:
-                from brain.groq_brain import GroqBrain
-                return GroqBrain(model=model)
-            elif provider == LLMProvider.NVIDIA:
-                from brain.nvidia_brain import NVIDIABrain
-                return NVIDIABrain(model=model)
-            elif provider == LLMProvider.CEREBRAS:
-                from brain.cerebras_brain import CerebrasBrain
-                return CerebrasBrain(model=model)
-            elif provider == LLMProvider.OLLAMA:
-                from brain.ollama_brain import OllamaBrain
-                return OllamaBrain(model=model, host=settings.ollama_host)
+            return get_brain(provider=provider, model=model)
         except Exception as e:
             if settings.debug:
                 print(f"   Brain init failed for {provider}: {e}")
