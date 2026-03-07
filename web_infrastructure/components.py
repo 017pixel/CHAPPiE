@@ -4,6 +4,13 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import json
 
+from web_infrastructure.ui_utils import (
+    EMOTION_COLORS,
+    EMOTION_DISPLAY_ORDER,
+    EMOTION_LABELS,
+    normalize_emotions,
+)
+
 def render_emotion_metric(label, value, color="#81c784"):
     st.markdown(f"""
     <div style="font-size: 0.8rem; color: #a0a0a0; display: flex; justify-content: space-between;">
@@ -25,11 +32,15 @@ def render_vital_signs(backend):
         except:
             emotions_dict = {}
 
-    render_emotion_metric("Freude", emotions_dict.get("joy", 50), "#81c784")
-    render_emotion_metric("Vertrauen", emotions_dict.get("trust", 50), "#00a3cc")
-    render_emotion_metric("Energie", emotions_dict.get("energy", 80), "#f5f5f5")
-    render_emotion_metric("Neugier", emotions_dict.get("curiosity", 60), "#ff6b9d")
-    render_emotion_metric("Motivation", emotions_dict.get("motivation", 80), "#a0a0a0")
+    emotions_dict = normalize_emotions(emotions_dict)
+    st.session_state.current_emotions = emotions_dict
+
+    for emotion_key in EMOTION_DISPLAY_ORDER:
+        render_emotion_metric(
+            EMOTION_LABELS[emotion_key],
+            emotions_dict[emotion_key],
+            EMOTION_COLORS[emotion_key],
+        )
 
     try:
         life_snapshot = backend.get_status().get("life_snapshot", {})

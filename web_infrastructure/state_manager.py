@@ -1,5 +1,6 @@
 import streamlit as st
 from config.config import settings, LLMProvider
+from web_infrastructure.ui_utils import normalize_emotions
 
 def init_session_state():
     """Initialisiert die Streamlit Session States."""
@@ -7,11 +8,7 @@ def init_session_state():
         st.session_state.session_id = None
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    if st.session_state.get("current_emotions") is None:
-        st.session_state.current_emotions = {
-            "joy": 50, "trust": 50, "energy": 80, "curiosity": 60,
-            "frustration": 0, "motivation": 80
-        }
+    st.session_state.current_emotions = normalize_emotions(st.session_state.get("current_emotions"))
     if "show_settings" not in st.session_state:
         st.session_state.show_settings = False
     if "show_memories" not in st.session_state:

@@ -107,7 +107,6 @@ def init_chappie():
             return False
 
         def get_status(self) -> Dict[str, Any]:
-            state = self.emotions.get_state()
             try:
                 brain_ok = self.brain.is_available()
             except:
@@ -116,12 +115,7 @@ def init_chappie():
             return {
                 "brain_available": brain_ok,
                 "model": get_active_model(),
-                "emotions": {
-                    "joy": state.happiness,
-                    "trust": state.trust,
-                    "energy": state.energy,
-                    "curiosity": state.curiosity,
-                },
+                "emotions": self._get_emotions_snapshot(),
                 "daily_info_count": self.short_term_memory_v2.get_count(),
                 "two_step_enabled": settings.enable_two_step_processing,
                 "life_snapshot": self.life_simulation.get_snapshot(),
@@ -150,7 +144,8 @@ def init_chappie():
                 "energy": state.energy,
                 "curiosity": state.curiosity,
                 "frustration": state.frustration,
-                "motivation": state.motivation
+                "motivation": state.motivation,
+                "sadness": state.sadness,
             }
 
         def process(self, user_input: str, history: List[Dict], debug_mode: bool = False) -> Dict[str, Any]:

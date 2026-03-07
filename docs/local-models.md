@@ -44,15 +44,43 @@ So bleiben Dokumentation und tatsächliches Laufzeitverhalten konsistent.
 
 ## Empfohlene lokale Grundidee
 
-### vLLM-Setup
+### vLLM-Setup (bevorzugt)
 
-- `LLM_PROVIDER = "vllm"`
-- `VLLM_URL` auf einen OpenAI-kompatiblen lokalen Endpoint setzen
-- `VLLM_MODEL` auf ein Qwen-3.5-Modell setzen
+Die konkrete Standardrichtung für CHAPPiE ist:
 
-### Ollama-Setup
+```python
+LLM_PROVIDER = "vllm"
+VLLM_URL = "http://localhost:8000/v1"
+VLLM_MODEL = "Qwen/Qwen3.5-32B-Instruct"
+
+INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-32B-Instruct"
+QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-9B-Instruct"
+```
+
+Wichtig dazu:
+
+1. `VLLM_URL` muss auf einen **OpenAI-kompatiblen lokalen Endpoint** zeigen.
+2. `VLLM_MODEL` ist das Hauptmodell für die Antwortgenerierung.
+3. `INTENT_PROCESSOR_MODEL_VLLM` kann für Step-1-Klassifikation separat gesetzt werden.
+4. `QUERY_EXTRACTION_VLLM_MODEL` kann für Memory-Suche kleiner gewählt werden.
+5. Die Streamlit-Einstellungsseite unter [`web_infrastructure/settings_ui.py`](../web_infrastructure/settings_ui.py) kann diese Felder direkt pflegen.
+
+### Empfohlene Qwen-3.5-Profile
+
+| Modell | Einsatzidee |
+|---|---|
+| `Qwen/Qwen3.5-32B-Instruct` | guter Standard für lokale Hauptnutzung |
+| `Qwen/Qwen3.5-72B-Instruct` | höhere Qualität bei stärkerer Hardware |
+| `Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4` | maximale lokale Zielausbaustufe |
+| `Qwen/Qwen3.5-9B-Instruct` | sinnvoll für leichtere Query-/Utility-Aufgaben |
+
+### Ollama-Setup (sekundärer lokaler Fallback)
 
 Geeignet für kleinere lokale Maschinen oder einfachere Entwicklungsumgebungen. Ollama ist praktisch, aber für die vollständige Multi-Agent-Architektur meist nicht die erste Wahl.
+
+### Emotion-Analyse aktuell
+
+Die Emotionsanalyse ist weiterhin separat konfigurierbar und nutzt derzeit den dedizierten `EMOTION_ANALYSIS_MODEL`-/`EMOTION_ANALYSIS_HOST`-Pfad. Für die Kernarchitektur bleibt aber **vLLM + Qwen 3.5** die bevorzugte Hauptrichtung.
 
 ## Wann API-Fallback sinnvoll ist
 

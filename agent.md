@@ -44,6 +44,12 @@ Wenn neue Funktionen, neue Workflows, neue Ordner oder neue Modellpfade hinzugek
 - **vLLM bevorzugt**, Ollama als leichtere lokale Alternative
 - **NVIDIA / Groq / Cerebras nur Fallback**, wenn lokal nicht ausreichend möglich
 
+## Versionsregel
+
+- bei **kleinen Änderungen** wird die **zweite Zahl** erhöht (`13.4` → `13.5`)
+- bei **großen Updates** wird die **erste Zahl** erhöht (`13.4` → `14.0`)
+- wenn sichtbare Versionsanzeigen in UI oder Doku betroffen sind, müssen diese mitgepflegt werden
+
 Bei Änderungen an der Modelllogik immer diese Pfade gemeinsam prüfen:
 
 - `config/config.py`

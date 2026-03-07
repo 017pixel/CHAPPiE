@@ -1,6 +1,26 @@
 import streamlit as st
 import time
 from web_infrastructure.components import render_brain_monitor, render_deep_think_controls
+from web_infrastructure.ui_utils import EMOTION_DISPLAY_ORDER, EMOTION_LABELS, normalize_emotions
+
+
+def _render_live_vital_signs(emotions: dict) -> None:
+    normalized = normalize_emotions(emotions)
+    st.markdown("---")
+    st.markdown("**📊 Live-Vitalzeichen:**")
+    cols_vitals = st.columns(4)
+    for index, emotion_key in enumerate(EMOTION_DISPLAY_ORDER):
+        with cols_vitals[index % 4]:
+            st.write(f"{EMOTION_LABELS[emotion_key]}: {normalized[emotion_key]}%")
+    st.markdown("---")
+
+
+def _format_emotion_list(emotions: dict) -> str:
+    normalized = normalize_emotions(emotions)
+    return "\n".join(
+        f"- {EMOTION_LABELS[emotion_key]}: {normalized[emotion_key]}%"
+        for emotion_key in EMOTION_DISPLAY_ORDER
+    )
 
 def process_command(user_input: str, backend) -> bool:
     """
@@ -112,33 +132,12 @@ def process_command(user_input: str, backend) -> bool:
                 current_batch_steps.append(step_result)
                 
                 # === VITALZEICHEN LIVE UPDATEN ===
-                new_emotions = {
-                    "joy": step_result.emotions_after.get("happiness", 50),
-                    "trust": step_result.emotions_after.get("trust", 50),
-                    "energy": step_result.emotions_after.get("energy", 80),
-                    "curiosity": step_result.emotions_after.get("curiosity", 60),
-                    "frustration": step_result.emotions_after.get("frustration", 0),
-                    "motivation": step_result.emotions_after.get("motivation", 80),
-                    "sadness": step_result.emotions_after.get("sadness", 0)
-                }
+                new_emotions = normalize_emotions(step_result.emotions_after)
                 if new_emotions and isinstance(new_emotions, dict):
                     st.session_state.current_emotions = new_emotions
                 
                 # Zeige Live-Vitalzeichen im Status-Container
-                st.markdown("---")
-                st.markdown("**📊 Live-Vitalzeichen:**")
-                cols_vitals = st.columns(3)
-                with cols_vitals[0]:
-                    st.write(f"Freude: {new_emotions['joy']}%")
-                    st.write(f"Vertrauen: {new_emotions['trust']}%")
-                with cols_vitals[1]:
-                    st.write(f"Energie: {new_emotions['energy']}%")
-                    st.write(f"Neugier: {new_emotions['curiosity']}%")
-                with cols_vitals[2]:
-                    st.write(f"Motivation: {new_emotions['motivation']}%")
-                    st.write(f"Frustration: {new_emotions['frustration']}%")
-                    st.write(f"Traurigkeit: {new_emotions['sadness']}%")
-                st.markdown("---")
+                _render_live_vital_signs(new_emotions)
                 
                 # Fortschritt ohne HTML anzeigen
                 delta_info = ""
@@ -318,6 +317,14 @@ def process_command(user_input: str, backend) -> bool:
 - **/consolidate** - Bereinigt abgelaufene Daily Infos
 - **/reflect** - Zeigt letzte Selbst-Reflexionen
 - **/functions** - Listet verfügbare Funktionen auf
+- **/life** - Öffnet den allgemeinen Life-State mit inneren Zuständen
+- **/world** - Zeigt das aktuelle Weltmodell und antizipierte User-Bedürfnisse
+- **/habits** - Zeigt wiederkehrende Verhaltensmuster und deren Stärke
+- **/stage** - Zeigt Entwicklungsstand, Fortschritt und nächste Stufe
+- **/plan** - Zeigt aktuelle Planung über mehrere Zeithorizonte
+- **/forecast** - Zeigt nächste Prognosen, Risiken und Schutzfaktoren
+- **/arc** - Zeigt Beziehungskurve, Phase und sozialen Verlauf
+- **/timeline** - Zeigt autobiografische Timeline-Einträge und Verlaufsspur
 
 - **/help** - Zeigt diese Hilfe
 
@@ -349,10 +356,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
 **Kurzzeitgedächtnis:** {daily_count} Einträge
 
 **Emotionen:**
-- Freude: {status['emotions']['joy']}%
-- Vertrauen: {status['emotions']['trust']}%
-- Energie: {status['emotions']['energy']}%
-- Neugier: {status['emotions']['curiosity']}%"""
+{_format_emotion_list(status.get('emotions', {}))}"""
         assistant_msg = {"role": "assistant", "content": stats_text, "metadata": {"thought_process": "Kommando /stats ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
         backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
@@ -480,7 +484,7 @@ def process_chat_message(user_input: str, backend):
             result = backend.process(user_input, st.session_state.messages[:-1], debug_mode=debug_mode)
             st.markdown(result["response_text"])
             if result.get("emotions") and isinstance(result["emotions"], dict):
-                st.session_state.current_emotions = result["emotions"]
+                st.session_state.current_emotions = normalize_emotions(result["emotions"])
             if result.get("life_snapshot"):
                 st.session_state.current_life_state = result["life_snapshot"]
             if result.get("global_workspace"):

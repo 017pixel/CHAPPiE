@@ -1,5 +1,13 @@
 import streamlit as st
 from web_infrastructure.components import render_brain_monitor, render_memory_item
+from web_infrastructure.ui_utils import UI_VERSION, chunk_items
+
+COMMANDS = [
+    "/sleep", "/life", "/world", "/habits", "/stage",
+    "/plan", "/forecast", "/arc", "/timeline", "/think",
+    "/deep think", "/help", "/stats", "/clear", "/config",
+]
+COMMANDS_PER_ROW = 5
 
 def render_chat_interface(backend):
     """Rendert die Chat-Oberfläche."""
@@ -8,22 +16,30 @@ def render_chat_interface(backend):
     st.markdown("""
     <style>
         .stChatInputContainer { z-index: 99 !important; }
+        div[data-testid="column"] div[data-testid="stButton"] > button {
+            min-height: 3.2rem;
+            white-space: normal;
+        }
     </style>
     """, unsafe_allow_html=True)
 
     # ==========================================
     # 1. COMMANDS MENU
     # ==========================================
-    commands = ["/sleep", "/life", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline", "/think", "/deep think", "/help", "/stats", "/clear", "/config"]
-
     with st.expander("Befehle", expanded=False):
-        m_cols = st.columns(len(commands))
-        for i, cmd in enumerate(commands):
-            with m_cols[i]:
-                if st.button(cmd, key=f"cmd_{cmd}", use_container_width=True):
-                    st.session_state.messages.append({"role": "user", "content": cmd})
-                    st.session_state.pending_cmd = cmd
-                    st.rerun()
+        st.caption("Schnellzugriff auf Reflexion, Life-Simulation, Timeline und Systemeinstellungen.")
+        for row in chunk_items(COMMANDS, COMMANDS_PER_ROW):
+            row_cols = st.columns(COMMANDS_PER_ROW)
+            for index in range(COMMANDS_PER_ROW):
+                with row_cols[index]:
+                    if index < len(row):
+                        cmd = row[index]
+                        if st.button(cmd, key=f"cmd_{cmd}", use_container_width=True):
+                            st.session_state.messages.append({"role": "user", "content": cmd})
+                            st.session_state.pending_cmd = cmd
+                            st.rerun()
+                    else:
+                        st.empty()
 
     # ==========================================
     # 2. WELCOME SCREEN & STATUS
@@ -32,7 +48,7 @@ def render_chat_interface(backend):
         status = backend.get_status()
         
         # Normale Header-Struktur ohne Hero-Boxen
-        st.markdown("## Hallo Benjamin! CHAPPiE v2.0")
+        st.markdown(f"## Hallo Benjamin! CHAPPiE v {UI_VERSION}")
         st.markdown("Wie kann ich dir helfen?")
         st.divider()
         

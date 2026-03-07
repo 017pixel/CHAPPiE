@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from config.config import settings, LLMProvider
+from web_infrastructure.ui_utils import EMOTION_DEFAULTS, normalize_emotions
 
 PROVIDER_OPTIONS = {
     "auto": "Auto (folgt Haupt-Provider)",
@@ -267,19 +268,25 @@ def render_settings_overlay(backend):
     
     with tab2:
         st.subheader("Emotionen bearbeiten")
-        emo = st.session_state.get("current_emotions") or {"joy": 50, "trust": 50, "energy": 80, "curiosity": 60, "frustration": 0, "motivation": 80}
+        emo = normalize_emotions(st.session_state.get("current_emotions"))
         
-        new_joy = st.slider("Freude", 0, 100, int(emo.get("joy", 50)))
-        new_trust = st.slider("Vertrauen", 0, 100, int(emo.get("trust", 50)))
-        new_energy = st.slider("Energie", 0, 100, int(emo.get("energy", 80)))
-        new_curiosity = st.slider("Neugier", 0, 100, int(emo.get("curiosity", 60)))
-        new_motivation = st.slider("Motivation", 0, 100, int(emo.get("motivation", 80)))
-        new_frustration = st.slider("Frustration", 0, 100, int(emo.get("frustration", 0)))
+        new_happiness = st.slider("Freude", 0, 100, int(emo.get("happiness", EMOTION_DEFAULTS["happiness"])))
+        new_trust = st.slider("Vertrauen", 0, 100, int(emo.get("trust", EMOTION_DEFAULTS["trust"])))
+        new_energy = st.slider("Energie", 0, 100, int(emo.get("energy", EMOTION_DEFAULTS["energy"])))
+        new_curiosity = st.slider("Neugier", 0, 100, int(emo.get("curiosity", EMOTION_DEFAULTS["curiosity"])))
+        new_motivation = st.slider("Motivation", 0, 100, int(emo.get("motivation", EMOTION_DEFAULTS["motivation"])))
+        new_frustration = st.slider("Frustration", 0, 100, int(emo.get("frustration", EMOTION_DEFAULTS["frustration"])))
+        new_sadness = st.slider("Traurigkeit", 0, 100, int(emo.get("sadness", EMOTION_DEFAULTS["sadness"])))
         
-        new_emotions = {
-            "joy": new_joy, "trust": new_trust, "energy": new_energy,
-            "curiosity": new_curiosity, "frustration": new_frustration, "motivation": new_motivation
-        }
+        new_emotions = normalize_emotions({
+            "happiness": new_happiness,
+            "trust": new_trust,
+            "energy": new_energy,
+            "curiosity": new_curiosity,
+            "frustration": new_frustration,
+            "motivation": new_motivation,
+            "sadness": new_sadness,
+        })
         
         # AUTO-SAVE LOGIC EMO TAB
         current_emo_hash = hash(str(new_emotions))
@@ -288,18 +295,19 @@ def render_settings_overlay(backend):
             
         if current_emo_hash != st.session_state.last_emo_settings_hash:
             st.session_state.current_emotions = new_emotions
-            backend.emotions.state.happiness = new_joy
+            backend.emotions.state.happiness = new_happiness
             backend.emotions.state.trust = new_trust
             backend.emotions.state.energy = new_energy
             backend.emotions.state.curiosity = new_curiosity
             backend.emotions.state.frustration = new_frustration
             backend.emotions.state.motivation = new_motivation
+            backend.emotions.state.sadness = new_sadness
             backend.emotions._save_state()
             st.session_state.last_emo_settings_hash = current_emo_hash
             st.toast("Emotionen automatisch aktualisiert 💾")
             
         if st.button("Emotionen auf Standardwerte zurücksetzen", key="reset_settings_emo"):
-            default_emotions = {"joy": 50, "trust": 50, "energy": 80, "curiosity": 60, "frustration": 0, "motivation": 80}
+            default_emotions = dict(EMOTION_DEFAULTS)
             st.session_state.current_emotions = default_emotions
             backend.emotions.reset()
             st.toast("Emotionen zurückgesetzt")

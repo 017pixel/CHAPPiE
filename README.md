@@ -92,6 +92,22 @@ pip install -r requirements.txt
 
 Empfohlene Richtung: **lokale Qwen-3.5-Modelle via vLLM**, API-Provider nur als Fallback. Details: [docs/local-models.md](docs/local-models.md)
 
+### Empfohlenes lokales Setup: vLLM + Qwen 3.5
+
+Für den produktiven lokalen Betrieb ist das Zielbild aktuell:
+
+1. `LLM_PROVIDER = "vllm"`
+2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Endpoint** setzen, z. B. `http://localhost:8000/v1`
+3. `VLLM_MODEL` auf ein Qwen-3.5-Modell setzen, z. B. `Qwen/Qwen3.5-32B-Instruct` oder `Qwen/Qwen3.5-72B-Instruct`
+4. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
+5. Ollama nur als **leichteren lokalen Fallback** weiterverwenden
+
+Praktische Referenzen:
+
+- [`config/secrets_example.py`](config/secrets_example.py)
+- [`config/config.py`](config/config.py)
+- [`web_infrastructure/settings_ui.py`](web_infrastructure/settings_ui.py)
+
 ### 3. Startmodi
 
 #### Web UI
@@ -120,6 +136,56 @@ Wichtig:
 - `Restart=always` und absolute Pfade sind für Service-Dateien Pflicht
 
 Mehr dazu: [docs/deployment.md](docs/deployment.md)
+
+## Web UI, Dashboards und Befehle
+
+### Sidebar und Vitalzeichen
+
+Die Sidebar zeigt CHAPPiEs **7 kanonische Emotionen** aus [`memory/emotions_engine.py`](memory/emotions_engine.py):
+
+- Freude (`happiness`)
+- Vertrauen (`trust`)
+- Energie (`energy`)
+- Neugier (`curiosity`)
+- Motivation (`motivation`)
+- Frustration (`frustration`)
+- Traurigkeit (`sadness`)
+
+### Wichtige Slash-Commands
+
+| Command | Zweck |
+|---|---|
+| `/sleep` | startet die Konsolidierungs-/Traumphase |
+| `/life` | zeigt den aktuellen Life-State kompakt |
+| `/world` | zeigt das aktuelle Weltmodell und antizipierte User-Bedürfnisse |
+| `/habits` | zeigt Gewohnheiten und deren Stärken |
+| `/stage` | zeigt Entwicklungsstufe und Fortschritt |
+| `/plan` | zeigt Multi-Horizon-Planung |
+| `/forecast` | zeigt Prognosen, Risiken und Schutzfaktoren |
+| `/arc` | zeigt die soziale / relationale Entwicklungskurve |
+| `/timeline` | zeigt autobiografische Verlaufseinträge |
+| `/think`, `/deep think` | startet Reflexionsmodi |
+
+### Life Dashboard kurz erklärt
+
+Das **Life Dashboard** erklärt CHAPPiEs inneren Zustand in Echtzeit:
+
+- **Phase**: aktueller Abschnitt im inneren Tages-/Aktivitätszyklus
+- **Aktivität**: was CHAPPiE innerlich gerade priorisiert
+- **Need-Fokus**: welches Bedürfnis im Moment dominiert
+- **Stage**: aktuelle Entwicklungsstufe
+- Tabs wie **Goals**, **World Model**, **Habits & Growth** und **Selbst & Erinnern** zeigen, *warum* CHAPPiE gerade so reagiert
+
+### Growth & Timeline Dashboard kurz erklärt
+
+Das **Growth & Timeline Dashboard** zeigt die Langzeitspur:
+
+- **Planning Horizon**: wie weit CHAPPiE aktuell vorausplant
+- **Forecast Risk**: Einschätzung des momentanen Entwicklungs-/Interaktionsrisikos
+- **Social Arc**: aktueller Beziehungsbogen zwischen User und CHAPPiE
+- **Timeline Entries**: Zahl der bisherigen autobiografischen Verlaufsereignisse
+
+Die ausführliche Erklärung aller Dashboard-Felder und Commands steht in [docs/workflows.md](docs/workflows.md).
 
 ## Dokumentationskarte
 

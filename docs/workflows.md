@@ -99,19 +99,106 @@ Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
 
 ## 6. Wichtige Commands
 
-### Web / Chat
+### Web / Chat: System, Memory und Reflexion
 
-- `/sleep`, `/think`, `/deep think`, `/help`, `/stats`, `/config`
-- `/daily`, `/personality`, `/consolidate`, `/reflect`, `/functions`
-- `/life`, `/needs`, `/goals`, `/world`, `/habits`, `/stage`
-- `/plan`, `/forecast`, `/arc`, `/timeline`
-- `/soul`, `/user`, `/prefs`
+| Command | Bedeutung |
+|---|---|
+| `/sleep` | startet die Schlaf-/Konsolidierungsphase |
+| `/think [thema]` | startet einen einfachen Reflexionszyklus |
+| `/deep think` | startet rekursive Selbstreflexion in Batches mit Human-in-the-Loop |
+| `/help` | zeigt die Command-Hilfe |
+| `/stats` | zeigt Modell-, Memory- und Emotionsstatus |
+| `/config` | öffnet die Einstellungen |
+| `/clear` | startet einen frischen Chat |
+| `/daily` | zeigt Kurzzeitgedächtnis / Daily Info |
+| `/personality` | zeigt aktuelle Persönlichkeits-/Selbstbeschreibung |
+| `/consolidate` | bereinigt und migriert Kurzzeiteinträge |
+| `/reflect` | zeigt letzte Selbstreflexionen |
+| `/functions` | listet verfügbare Tool-/Funktionsaufrufe |
+
+### Web / Chat: Life- und Growth-Commands
+
+| Command | Bedeutung |
+|---|---|
+| `/life` | kompakter Überblick über den aktuellen Life-State |
+| `/needs` | zeigt aktive Bedürfnisse / Homeostasis |
+| `/goals` | zeigt Goal Competition und Prioritäten |
+| `/world` | zeigt das prädiktive Weltmodell |
+| `/habits` | zeigt aktuelle Gewohnheiten und Trends |
+| `/stage` | zeigt Entwicklungsstufe, Score und Fortschritt |
+| `/plan` | zeigt Multi-Horizon-Planung und nächste Meilensteine |
+| `/forecast` | zeigt Prognosen, Risiken und Schutzfaktoren |
+| `/arc` | zeigt den aktuellen Social Arc / Beziehungsbogen |
+| `/timeline` | zeigt autobiografische Verlaufseinträge |
 
 ### CLI
 
-- `/status`, `/sleep`, `/life`, `/world`, `/habits`
-- `/stage`, `/plan`, `/forecast`, `/arc`, `/timeline`
-- `/vectors`, `/help`, `/exit`
+| Command | Bedeutung |
+|---|---|
+| `/status` | technischer Statusüberblick |
+| `/sleep` | Schlafphase |
+| `/life`, `/world`, `/habits` | Life- und Weltzustand |
+| `/stage`, `/plan`, `/forecast`, `/arc`, `/timeline` | Entwicklungs- und Growth-Sicht |
+| `/vectors` | Steering-/Vektorstatus |
+| `/help`, `/exit` | Hilfe und Beenden |
+
+## 7. Life Dashboard lesen
+
+Die Datei [`web_infrastructure/life_dashboard_ui.py`](../web_infrastructure/life_dashboard_ui.py) zeigt CHAPPiEs inneres Leben in fünf Tabs.
+
+### Kopfmetriken
+
+- **Phase** – aktueller Abschnitt im inneren Zeit-/Aktivitätszyklus
+- **Aktivität** – dominierende laufende Aktivität
+- **Need-Fokus** – aktuell stärkstes Bedürfnis aus der Homeostasis
+- **Stage** – aktuelle Entwicklungsstufe
+
+### Tabs im Life Dashboard
+
+| Tab | Was er bedeutet |
+|---|---|
+| `Überblick` | kombinierte Sicht auf Homeostasis, Modus, Ziel, Planung, Forecast und Social Arc |
+| `Goals` | Goal Competition: welches Ziel aktiv ist, welche Konkurrenz besteht und wie hoch die Spannung ist |
+| `World Model` | prädiktives Modell über User-Bedürfnisse, nächste beste Aktion, Risiken und Chancen |
+| `Habits & Growth` | Gewohnheiten, Development Stages und Attachment Model |
+| `Selbst & Erinnern` | autobiografisches Selbstmodell, Beziehung, jüngste Ereignisse und Replay/Konsolidierung |
+
+### Wichtige Begriffe
+
+- **Goal Mode** – welcher Zielmodus die aktuelle Interaktion steuert
+- **Forecast** – erwartete kurzfristige Entwicklung des nächsten Turns
+- **Trajectory** – vermutete längerfristige Richtung der Interaktion
+- **Attachment Security** – wie stabil und sicher die Bindung modelliert wird
+- **Replay / Konsolidierung** – Zusammenfassung dessen, was aus Erlebnissen gefestigt wurde
+
+## 8. Growth & Timeline Dashboard lesen
+
+Die Datei [`web_infrastructure/growth_dashboard_ui.py`](../web_infrastructure/growth_dashboard_ui.py) zeigt die Langzeitspur von CHAPPiEs Entwicklung.
+
+### Kopfmetriken
+
+- **Planning Horizon** – wie weit CHAPPiE aktuell vorausplant
+- **Forecast Risk** – wie riskant oder fragil der nächste Verlauf eingeschätzt wird
+- **Social Arc** – aktueller Beziehungsbogen / soziale Phase
+- **Timeline Entries** – Zahl der autobiografischen Verlaufseinträge
+
+### Tabs im Growth Dashboard
+
+| Tab | Was er bedeutet |
+|---|---|
+| `Planning` | Koordinationsmodus, Confidence, Meilensteine, Bottlenecks und Habit Dynamics |
+| `Forecast & Arc` | kurzfristige Prognose, Protective Factors, Social Arc und Development Trend |
+| `Timeline` | zusammengefasste Verlaufslinie und letzte Timeline-Einträge |
+
+### Wichtige Begriffe
+
+- **Coordination Mode** – wie CHAPPiE gerade unmittelbare vs. langfristige Ziele balanciert
+- **Bottlenecks** – Engstellen, die Entwicklung oder Zielerreichung bremsen
+- **Habit Dynamics** – Balance, Konflikte und Abbau/Aufbau von Gewohnheiten
+- **Protective Factors** – stabilisierende Faktoren gegen negative Entwicklung
+- **Stage Trajectory** – erwartete Richtung der nächsten Entwicklungsstufe
+- **Arc Score** – numerische Einordnung des aktuellen Beziehungsbogens
+- **Timeline Summary** – verdichtete autobiografische Zusammenfassung bisheriger Entwicklung
 
 ## Weiterführend
 

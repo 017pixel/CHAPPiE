@@ -105,7 +105,8 @@ Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
             "energy": state.energy,
             "curiosity": state.curiosity,
             "frustration": state.frustration,
-            "motivation": state.motivation
+            "motivation": state.motivation,
+            "sadness": state.sadness,
         }
     
     def _calculate_delta(self, before: Dict[str, int], after: Dict[str, int]) -> Dict[str, int]:
