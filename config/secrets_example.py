@@ -1,8 +1,8 @@
 """
-CHAPiE - API Keys & Modell-Konfiguration (TEMPLATE)
-====================================================
-Kopiere diese Datei nach 'secrets.py' und trage dort deine Keys ein.
-Die 'secrets.py' wird von Git ignoriert.
+CHAPPiE - API Keys & Modell-Konfiguration (TEMPLATE)
+=====================================================
+Kopiere diese Datei nach 'secrets.py' und trage dort deine Werte ein.
+Bevorzugte Strategie: lokale Qwen-3.5-Modelle zuerst, APIs nur als Fallback.
 """
 
 # ═══════════════════════════════════════════════════════════════════
@@ -22,12 +22,18 @@ NVIDIA_API_KEY = "DEIN_NVIDIA_KEY_HIER"
 # 🤖 MODELL AUSWAHL & PROVIDER
 # ===========================
 
-# Welches Backend soll verwendet werden? ("ollama", "groq", "cerebras", "nvidia")
-LLM_PROVIDER = "nvidia"
+# Welches Backend soll verwendet werden?
+# Empfohlen: "vllm" für lokale Qwen-3.5-Modelle
+# Alternativen: "ollama", "groq", "cerebras", "nvidia"
+LLM_PROVIDER = "vllm"
+
+# --- vLLM Configuration (empfohlen) ---
+VLLM_URL = "http://localhost:8000/v1"
+VLLM_MODEL = "Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4"
 
 # --- Ollama Configuration ---
 OLLAMA_HOST = "http://localhost:11434"
-OLLAMA_MODEL = "llama3:8b"
+OLLAMA_MODEL = "qwen2.5:7b"
 EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b"
 
 # --- Groq Configuration ---
@@ -36,7 +42,7 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 # --- Cerebras Configuration ---
 CEREBRAS_MODEL = "llama-3.3-70b"
 
-# --- NVIDIA NIM Configuration ---
+# --- NVIDIA NIM Configuration (Fallback) ---
 # Verfügbare Modelle: z-ai/glm5, deepseek-ai/deepseek-v3.1-terminus, moonshotai/kimi-k2.5
 NVIDIA_MODEL = "deepseek-ai/deepseek-v3.1-terminus"
 

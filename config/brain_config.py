@@ -3,7 +3,7 @@ CHAPPiE - Brain Configuration
 =============================
 Model configuration for all brain agents.
 
-NVIDIA models are prioritized due to higher free tier limits.
+Documented target strategy: local Qwen-3.5 models first, API providers as fallback.
 """
 
 from dataclasses import dataclass
@@ -73,6 +73,7 @@ BRAIN_AGENT_CONFIGS: Dict[str, AgentModelConfig] = {
     ),
 }
 
+# Cloud/API fallback catalogue for optional remote execution
 NVIDIA_MODEL_CATEGORIES = {
     "flagship_reasoning": [
         ("z-ai/glm5", "GLM 5 - 744B MoE, best for complex reasoning"),

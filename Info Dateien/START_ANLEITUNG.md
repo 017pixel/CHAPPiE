@@ -1,12 +1,15 @@
-# 🚀 CHAPPiE Schnellstart
+# CHAPPiE Schnellstart
 
-## Voraussetzungen
+Diese Datei ist jetzt eine **Legacy-Brücke**. Die aktuelle Einstiegskette ist:
 
-- Python 3.11+
-- Git
-- optional: konfigurierte LLM-Provider oder lokale Modelle
+1. [`README.md`](../README.md)
+2. [`docs/local-models.md`](../docs/local-models.md)
+3. [`docs/deployment.md`](../docs/deployment.md)
+4. [`docs/testing.md`](../docs/testing.md)
 
-## 1. Installation
+## Kurzfassung
+
+### Installation
 
 ```bash
 git clone https://github.com/017pixel/CHAPPiE.git
@@ -16,55 +19,27 @@ source venv/bin/activate   # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## 2. Konfiguration
+### Empfohlene Konfiguration
 
-Option A:
+- lokale **Qwen-3.5-Modelle zuerst**
+- `vLLM` bevorzugen
+- APIs nur als Fallback nutzen
 
-1. `config/secrets_example.py` nach `config/secrets.py` kopieren
-2. gewünschten Provider und API-Keys eintragen
+Vorlagen und Settings:
 
-Option B:
+- [`config/secrets_example.py`](../config/secrets_example.py)
+- [`config/config.py`](../config/config.py)
+- [`config/brain_config.py`](../config/brain_config.py)
 
-- CHAPPiE starten und Modelle später in der Web-Oberfläche konfigurieren
+### Starten
 
-## 3. CHAPPiE starten
+- Web UI: `streamlit run app.py`
+- Brain CLI: `python chappie_brain_cli.py`
+- Training: `python -m Chappies_Trainingspartner.training_daemon --neu`
 
-### Web UI
+## Kritischer Hinweis
 
-```bash
-streamlit run app.py
-```
+Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten, **nicht** `training_loop.py`.
 
-### CLI
+Mehr Details stehen jetzt in [`docs/deployment.md`](../docs/deployment.md).
 
-```bash
-python chappie_brain_cli.py
-```
-
-### Training Daemon
-
-```bash
-python -m Chappies_Trainingspartner.training_daemon --neu
-python -m Chappies_Trainingspartner.training_daemon --fokus "Architektur"
-```
-
-Optionaler Setup-Wizard:
-
-```bash
-python Chappies_Trainingspartner/setup_training.py
-```
-
-## 4. Updates holen
-
-```bash
-git pull
-pip install -r requirements.txt
-```
-
-## 5. Wichtige Hinweise
-
-- Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten
-- `training_loop.py` ist kein Service-Entry-Point
-- Laufzeitdateien in `data/` werden lokal erzeugt und gehören nicht ins Repository
-
-Viel Spaß mit CHAPPiE 🤖

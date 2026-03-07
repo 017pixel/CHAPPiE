@@ -1,28 +1,30 @@
 ═══════════════════════════════════════════════════════════════════
-⚠️  WARNUNG - CHAPiE GEDÄCHTNIS ⚠️
+⚠️  WARNUNG - CHAPPiE GEDÄCHTNIS & LAUFZEITDATEN ⚠️
 ═══════════════════════════════════════════════════════════════════
 
-Dieser Ordner enthält CHAPiE's episodisches Gedächtnis (Vektordatenbank).
+Dieser Ordner enthält zentrale Laufzeit- und Gedächtnisdaten von CHAPPiE.
 
-WICHTIG: Wenn du diesen Ordner löschst, werden ALLE Erinnerungen
-von CHAPiE permanent gelöscht!
+WICHTIG:
+Wenn du Inhalte in `data/` unbedacht löschst, kann CHAPPiE Erinnerungen,
+Zustände, Verlauf oder persönliche Kontextinformationen verlieren.
 
-Das beinhaltet:
-- Persönliche Informationen (Name, Vorlieben, Abneigungen)
-- Gesprächsverläufe
-- Kontext aus vergangenen Interaktionen
+Typische Inhalte sind u. a.:
+- Memory-/Vektordaten
+- `soul.md`, `user.md`, `CHAPPiEsPreferences.md`
+- `life_state.json`, `sleep_state.json`, Training-/Verlaufsdaten
 
-CHAPiE wird sich nach dem Löschen an nichts mehr erinnern!
-
-═══════════════════════════════════════════════════════════════════
+NICHT EINFACH LÖSCHEN, wenn du nicht genau weißt, was du tust.
 
 SICHERER RESET:
-Verwende die Funktion reset_all_memories() in memory_engine.py
-oder führe folgenden Python-Befehl aus:
+Verwende die dafür vorgesehenen Reset-Funktionen im Memory-/State-Code,
+z. B. in `memory/memory_engine.py`, statt den Ordner manuell zu leeren.
 
+Beispiel:
     python -c "from memory.memory_engine import MemoryEngine; engine = MemoryEngine(); engine.reset_all_memories()"
 
-═══════════════════════════════════════════════════════════════════
-Erstellt: 2026-01-11
-CHAPiE - AGI Simulation
+Weitere Einordnung:
+- `README.md`
+- `docs/project-map.md`
+- `docs/testing.md`
+
 ═══════════════════════════════════════════════════════════════════

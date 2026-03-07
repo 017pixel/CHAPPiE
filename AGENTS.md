@@ -1,123 +1,54 @@
-# CHAPPiE Agent Instructions
+# CHAPPiE Agent Entry Point
 
-## Critical Configuration Rules
+Die **kanonische Agent-Datei** dieses Repositorys ist [`agent.md`](agent.md).
 
-### 1. Systemd Service Configuration
-**Strict Requirement:** When configuring the `chappie-training.service` file for background execution, you **MUST** ensure that `ExecStart` points to `training_daemon.py` and **NOT** `training_loop.py`.
+Wenn du als KI-Agent in diesem Projekt arbeitest, lies **immer zuerst**:
 
-- **Correct:** `ExecStart=... -m Chappies_Trainingspartner.training_daemon`
-- **Incorrect:** `ExecStart=... -m Chappies_Trainingspartner.training_loop`
+1. [`agent.md`](agent.md)
+2. [`README.md`](README.md)
+3. je nach Aufgabe die passende Detailseite unter [`docs/`](docs)
 
-`training_daemon.py` contains the necessary entry point and setup for the headless training process. `training_loop.py` is a library module and cannot be executed directly as a service.
+## Unverhandelbare Regeln
 
-### 2. General Service Reliability
-- Ensure `Restart=always` is set to guarantee 24/7 operation.
-- Use absolute paths for all executables and working directories in service files.
+### 1. Training-Service
 
----
+- korrekt: `ExecStart=... -m Chappies_Trainingspartner.training_daemon`
+- falsch: `ExecStart=... -m Chappies_Trainingspartner.training_loop`
 
-## Brain-Inspired Multi-Agent Architecture
+`training_loop.py` ist kein systemd-Entry-Point.
 
-### Overview
-CHAPPiE now features a brain-inspired cognitive architecture with 7 specialized agents:
+### 2. Service-Zuverlässigkeit
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CHAPPiE DIGITAL BRAIN                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │  SENSORY     │    │  AMYGDALA    │    │  HIPPOCAMPUS │      │
-│  │  CORTEX      │    │  Agent       │    │  Agent       │      │
-│  │  (Input)     │    │  (Emotion)   │    │  (Memory)    │      │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘      │
-│         │                   │                   │               │
-│         ▼                   ▼                   ▼               │
-│  ┌─────────────────────────────────────────────────────────┐   │
-│  │                    PREFRONTAL CORTEX                     │   │
-│  │                    (Orchestrator Agent)                  │   │
-│  └──────────────────────────┬──────────────────────────────┘   │
-│                             │                                   │
-│         ┌───────────────────┼───────────────────┐              │
-│         ▼                   ▼                   ▼               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │  BASAL       │    │  NEOCORTEX   │    │  MEMORY      │      │
-│  │  GANGLIA     │    │  Agent       │    │  AGENT       │      │
-│  │  (Reward)    │    │  (LTM Store) │    │  (Tools)     │      │
-│  └──────────────┘    └──────────────┘    └──────────────┘      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+- `Restart=always` beibehalten
+- absolute Pfade in `ExecStart` und `WorkingDirectory`
 
-### Agent Responsibilities
+### 3. Doku-Prüfung vor Pushes
 
-| Agent | Brain Region | Function |
-|-------|--------------|----------|
-| Sensory Cortex | Sensory Areas | Input classification, language detection, urgency assessment |
-| Amygdala | Limbic System | Emotional processing, memory enhancement, trust tracking |
-| Hippocampus | Medial Temporal | Memory encoding, retrieval, consolidation decisions |
-| Prefrontal Cortex | Frontal Lobe | Central orchestration, working memory, response strategy |
-| Basal Ganglia | Basal Ganglia | Reward evaluation, learning signals, habit formation |
-| Neocortex | Neocortex | Long-term memory storage, semantic knowledge |
-| Memory Agent | - | Tool call decisions for soul.md, user.md, preferences.md |
+Vor jedem GitHub-Push-Update muss geprüft werden, ob mindestens eine dieser Dateien angepasst werden muss:
 
-### Processing Pipeline
+- `README.md`
+- `agent.md`
+- `docs/*`
+- `tests/README.md`
+- betroffene Brückendateien in `Info Dateien/`
 
-1. **Input** -> Sensory Cortex (classification)
-2. **Parallel**: Amygdala (emotions) + Hippocampus (memory)
-3. **Orchestration** -> Prefrontal Cortex (response strategy)
-4. **Output** -> Response generation
-5. **Background**: Basal Ganglia (learning) + Neocortex (consolidation)
+### 4. Modellstrategie
 
-### File Locations
+- lokale **Qwen-3.5-Modelle zuerst**
+- `vLLM` bevorzugt
+- APIs nur Fallback, wenn lokal nicht praktikabel
 
-```
-brain/
-├── agents/
-│   ├── __init__.py
-│   ├── base_agent.py           # Base class
-│   ├── sensory_cortex.py       # Input processing
-│   ├── amygdala.py             # Emotional analysis
-│   ├── hippocampus.py          # Memory operations
-│   ├── prefrontal_cortex.py    # Orchestration
-│   ├── basal_ganglia.py        # Reward/learning
-│   ├── neocortex.py            # LTM storage
-│   ├── memory_agent.py         # Tool calls
-│   └── orchestrator.py         # Pipeline coordination
-├── brain_pipeline.py           # Main integration
-└── brain_config.py             # Model configuration
+## Dokumentationskarte
 
-memory/
-├── sleep_phase.py              # Memory consolidation
-├── forgetting_curve.py         # Ebbinghaus implementation
-└── ... (existing files)
-```
+- Projektüberblick: [`README.md`](README.md)
+- Gehirn-Metapher: [`docs/architecture.md`](docs/architecture.md)
+- Workflows: [`docs/workflows.md`](docs/workflows.md)
+- Modellstrategie: [`docs/local-models.md`](docs/local-models.md)
+- Projektstruktur: [`docs/project-map.md`](docs/project-map.md)
+- Tests: [`docs/testing.md`](docs/testing.md), [`tests/README.md`](tests/README.md)
+- Deployment: [`docs/deployment.md`](docs/deployment.md)
 
-### Model Configuration
+## Warum diese Datei kurz bleibt
 
-NVIDIA models are prioritized for higher free limits:
+`AGENTS.md` soll als automatischer Einstieg funktionieren. Die ausführliche Spezifikation, Push-Regeln und Dateimatrix stehen in [`agent.md`](agent.md).
 
-| Agent | Model | Provider |
-|-------|-------|----------|
-| Sensory Cortex | meta/llama-3.3-70b-instruct | NVIDIA |
-| Amygdala | nvidia/llama-3.1-nemotron-70b | NVIDIA |
-| Hippocampus | nvidia/llama-3.1-nemotron-70b | NVIDIA |
-| Prefrontal Cortex | z-ai/glm5 | NVIDIA |
-| Basal Ganglia | meta/llama-3.3-70b-instruct | NVIDIA |
-| Neocortex | meta/llama-3.3-70b-instruct | NVIDIA |
-| Memory Agent | nvidia/llama-3.1-nemotron-70b | NVIDIA |
-
-### Sleep Phase
-
-Memory consolidation runs:
-- Every 24 hours (time-based)
-- Every 100 interactions (interaction-based)
-- Manual trigger: `/sleep` command
-
-### Forgetting Curve
-
-Implements Ebbinghaus forgetting curve:
-- Retention after 20min: ~58%
-- Retention after 1h: ~44%
-- Retention after 24h: ~33%
-- Spaced repetition boosts memory strength

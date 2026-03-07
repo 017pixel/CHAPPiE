@@ -1,64 +1,80 @@
 # CHAPPiE
 
-CHAPPiE ist ein kognitischer KI-Assistent mit brain-inspirierter Multi-Agent-Architektur, episodischem Gedächtnis, autonomem Trainingsmodus und einer erweiterten Life-Simulation für Entwicklung, Gewohnheiten, Planung, Forecasting und Beziehungsdynamik.
+CHAPPiE ist ein brain-inspiriertes KI-System mit **Multi-Agent-Architektur**, **episodischem Gedächtnis**, **Sleep-Phase/Konsolidierung**, **Life-Simulation** und **autonomem Training**.
 
-## Überblick
+Der Fokus des Projekts liegt darauf, eine **verständliche, menschenlesbare und agent-taugliche Architektur** zu bauen: nicht als biologisch exakte Kopie des Gehirns, sondern als technische Simulation von Rollen wie Wahrnehmung, Emotion, Gedächtnis, Planung und Langzeitentwicklung.
 
-CHAPPiE kombiniert mehrere Schichten zu einem zusammenhängenden System:
+## Schnellnavigation
+
+- [Agent-Guide](agent.md)
+- [Dokumentationsindex](docs/README.md)
+- [Architektur & Gehirn-Metapher](docs/architecture.md)
+- [Workflows](docs/workflows.md)
+- [Lokale Modelle & Fallbacks](docs/local-models.md)
+- [Projektkarte / Ordnerstruktur](docs/project-map.md)
+- [Testing](docs/testing.md)
+- [Deployment](docs/deployment.md)
+
+## Was CHAPPiE ausmacht
 
 - **Brain Pipeline** mit spezialisierten Agenten
-- **Memory System** mit ChromaDB, Kurzzeitgedächtnis und Schlafphase
-- **Life Simulation** mit Needs, Goals, Habits, Development und Attachment
-- **Growth Layer** mit Planning, Forecasting, Social Arc und Timeline
-- **Web UI**, **CLI** und **Training Daemon** für interaktiven und autonomen Betrieb
+- **Memory System** mit Retrieval, Kontextdateien, Vergessenskurve und Schlafphase
+- **Life Simulation** mit Needs, Goals, Habits, Development und Beziehungskurve
+- **Growth Layer** mit Planung, Forecasting und Timeline
+- **Web UI**, **CLI** und **Training-Daemon** als verschiedene Betriebsmodi
+- **lokale Modellstrategie** mit Qwen-3.5 als bevorzugtem Zielbild
 
-## Kernfunktionen
+## Gehirn-Metapher auf einen Blick
 
-### Brain-Inspired Multi-Agent Architecture
+```mermaid
+flowchart TD
+    U[User / Input] --> UI[Web UI / CLI / Training]
+    UI --> BP[brain/brain_pipeline.py]
+    BP --> S[Sensory Cortex]
+    BP --> A[Amygdala]
+    BP --> H[Hippocampus]
+    S --> P[Prefrontal Cortex]
+    A --> P
+    H --> P
+    P --> R[Antwort / Handlung]
+    P --> BG[Basal Ganglia]
+    P --> N[Neocortex]
+    P --> MA[Memory Agent]
+    BP --> LIFE[Life Simulation]
+    BP --> MEM[Memory System]
+```
 
-- Sensory Cortex für Input-Klassifikation und Dringlichkeit
-- Amygdala für Emotionsbewertung und Vertrauensdynamik
-- Hippocampus für Memory-Encoding, Retrieval und Query-Extraktion
-- Prefrontal Cortex für Orchestrierung und Antwortstrategie
-- Basal Ganglia für Reward-Feedback
-- Neocortex für Langzeitspeicherung
-- Memory Agent für Kontextdateien und Tool-Entscheidungen
+Mehr dazu: [docs/architecture.md](docs/architecture.md)
 
-### Memory System
+## Für wen diese README gedacht ist
 
-- ChromaDB-basiertes Langzeitgedächtnis
-- JSON-basiertes Kurzzeitgedächtnis
-- Ebbinghaus-Vergessenskurve mit referenznahen Retentionswerten
-- Schlafphase für Konsolidierung, emotionale Regeneration und Replay
-- Kontextdateien in `data/soul.md`, `data/user.md`, `data/CHAPPiEsPreferences.md`
+### Für Menschen
 
-### Life Simulation
+Diese Datei erklärt, **was** CHAPPiE ist, **wo** man weiterlesen sollte und **wie** man das Projekt startet.
 
-CHAPPiE verwaltet einen inneren Zustandsraum mit:
+### Für KI-Agents
 
-- **Homeostasis / Needs**
-- **Goal Competition**
-- **World Model**
-- **Habit Engine** inklusive Decay und Konflikterkennung
-- **Development Engine**
-- **Attachment Model**
-- **Autobiographical Self**
+Die operative Arbeitsdatei ist [agent.md](agent.md). Dort steht insbesondere:
 
-Zusätzliche Growth-Schichten:
+- welche Doku bei Änderungen geprüft werden muss
+- welche Dateien welche Themen erklären
+- welche Regeln vor Pushes gelten
+- welche Infrastrukturregeln nicht verletzt werden dürfen
 
-- **Planning Engine** mit Milestones, Bottlenecks und Planungshorizont
-- **Self Forecast** mit Risiko- und Schutzfaktoren
-- **Social Arc Engine** für Beziehungsbogen und Episoden
-- **History Engine / Timeline** für autobiografische Entwicklung über Zeit
+## Projektprinzipien
 
-### Interfaces
+1. **Lesbarkeit vor Mythenbildung**  
+   Die Gehirn-Metapher dient dem Verstehen und Strukturieren, nicht als pseudo-wissenschaftliche Behauptung.
+2. **Lokale Modelle zuerst**  
+   Qwen-3.5 lokal ist die gewünschte Hauptrichtung; APIs sind sekundär.
+3. **Doku ist Teil der Implementierung**  
+   Wenn Architektur, Workflows, Ordner oder Modelle sich ändern, muss die Doku mitziehen.
+4. **Pfadgenaue Referenzen**  
+   Wichtige Aussagen sollen auf konkrete Dateien verweisen.
 
-- **Web App** via Streamlit
-- **Advanced Brain CLI** mit Status-, Life- und Steering-Kommandos
-- **Autonomer Training Daemon** für 24/7 Training
-- **Life Dashboard** und **Growth Timeline Dashboard** in der Weboberfläche
+## Schnellstart
 
-## Installation
+### 1. Installation
 
 ```bash
 git clone https://github.com/017pixel/CHAPPiE.git
@@ -68,36 +84,29 @@ source venv/bin/activate   # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Konfiguration
+### 2. Konfiguration
 
-- `config/secrets.py` aus dem Beispiel erzeugen und Provider/Keys setzen
-- oder die Modelle später in der Web-UI konfigurieren
-- lokale Provider wie Ollama oder vLLM sind optional
+- Vorlage: [`config/secrets_example.py`](config/secrets_example.py)
+- zentrale Laufzeitsettings: [`config/config.py`](config/config.py)
+- Brain-Modellverteilung: [`config/brain_config.py`](config/brain_config.py)
 
-## Starten
+Empfohlene Richtung: **lokale Qwen-3.5-Modelle via vLLM**, API-Provider nur als Fallback. Details: [docs/local-models.md](docs/local-models.md)
 
-### Web UI
+### 3. Startmodi
+
+#### Web UI
 
 ```bash
 streamlit run app.py
 ```
 
-Wichtige Bereiche in der Sidebar:
-
-- Alle Erinnerungen
-- Einstellungen
-- Autonomes Training
-- Life Dashboard
-- Growth Timeline
-- Kontextdateien (`soul.md`, `user.md`, Preferences)
-
-### CLI
+#### Brain CLI
 
 ```bash
 python chappie_brain_cli.py
 ```
 
-### Training Daemon
+#### Training-Daemon
 
 ```bash
 python -m Chappies_Trainingspartner.training_daemon --neu
@@ -106,142 +115,57 @@ python -m Chappies_Trainingspartner.training_daemon --fokus "Architektur"
 
 Wichtig:
 
-- Der systemd-Service muss auf **`Chappies_Trainingspartner.training_daemon`** zeigen
+- `chappie-training.service` muss auf `Chappies_Trainingspartner.training_daemon` zeigen
 - **nicht** auf `training_loop.py`
-- Für zuverlässigen Dauerbetrieb ist `Restart=always` gesetzt
+- `Restart=always` und absolute Pfade sind für Service-Dateien Pflicht
 
-## Verfügbare Commands
+Mehr dazu: [docs/deployment.md](docs/deployment.md)
 
-### Web / Chat Commands
+## Dokumentationskarte
 
-- `/sleep`
-- `/think [thema]`
-- `/deep think`
-- `/clear`
-- `/help`
-- `/stats`
-- `/config`
-- `/daily`
-- `/personality`
-- `/consolidate`
-- `/reflect`
-- `/functions`
-- `/debug`
-- `/step1`
-- `/soul`
-- `/user`
-- `/prefs` / `/preferences`
-- `/twostep`
-- `/life`
-- `/needs`
-- `/goals`
-- `/world`
-- `/habits`
-- `/stage`
-- `/plan`
-- `/forecast`
-- `/arc`
-- `/timeline`
+| Thema | Datei |
+|---|---|
+| Projektüberblick | [`README.md`](README.md) |
+| Agent-Regeln / Push-Checkliste | [`agent.md`](agent.md) |
+| Gehirn-Analogie & Komponenten | [`docs/architecture.md`](docs/architecture.md) |
+| Anfrage-, Schlaf-, Training- und UI-Workflows | [`docs/workflows.md`](docs/workflows.md) |
+| Modellstrategie lokal vs. API | [`docs/local-models.md`](docs/local-models.md) |
+| Orientierung in der Codebasis | [`docs/project-map.md`](docs/project-map.md) |
+| Teststrategie | [`docs/testing.md`](docs/testing.md) |
+| Konkrete Testdateien | [`tests/README.md`](tests/README.md) |
+| Deployment / Services | [`docs/deployment.md`](docs/deployment.md) |
 
-### CLI Commands
+## Wichtige Projektbereiche
 
-- `/status`
-- `/sleep`
-- `/life`
-- `/world`
-- `/habits`
-- `/stage`
-- `/plan`
-- `/forecast`
-- `/arc`
-- `/timeline`
-- `/vectors`
-- `/help`
-- `/exit`
+- [`brain/`](brain) – Brain-Pipeline, Agenten, Global Workspace, Action Layer
+- [`memory/`](memory) – Memory Engine, Forgetting Curve, Sleep Phase, Kontextdateien
+- [`life/`](life) – Homeostasis, Planning, Forecast, Social Arc, Timeline
+- [`web_infrastructure/`](web_infrastructure) – Streamlit-UI, Dashboards, Command Handling
+- [`Chappies_Trainingspartner/`](Chappies_Trainingspartner) – autonomes Training
+- [`data/`](data) – Kontext- und Laufzeitdaten
 
-## Projektstruktur
+## Tests und sichere Verifikation
 
-```text
-brain/                         Brain-Pipeline, Agenten, Workspace, Action Layer
-life/                          Life Simulation, Planning, Forecast, Social Arc, History
-memory/                        Memory Engine, Forgetting Curve, Sleep Phase
-web_infrastructure/            Streamlit UI, Dashboards, Command Handling
-Chappies_Trainingspartner/     Training Daemon, Training Loop, Daemon Manager
-tests/                         Unit-Tests und manuelle Smoke-/Kompatibilitätstests
-data/                          Kontextdateien und lokale Laufzeitdaten
-```
-
-## Wichtige Zustandsfelder der Life-Simulation
-
-Der Snapshot der Life-Simulation enthält u. a.:
-
-- `homeostasis`
-- `active_goal`
-- `world_model`
-- `habits`
-- `habit_dynamics`
-- `development`
-- `attachment_model`
-- `planning_state`
-- `forecast_state`
-- `social_arc`
-- `timeline_history`
-- `timeline_summary`
-- `replay_state`
-
-## Testing und lokale Verifikation
-
-Empfohlene lokale Checks ohne echte API-Calls:
+Schnelle lokale Checks:
 
 ```bash
-python tests/test_life_simulation.py
-python tests/test_quick.py
 python tests/test_forgetting_curve.py
-python validate_system.py
+python tests/test_life_simulation.py
 python tests/manual/test_compatibility.py
-python tests/manual/test_chappie.py
-```
-
-Zusätzlich hilfreich:
-
-```bash
 python -m Chappies_Trainingspartner.training_daemon --help
 ```
 
-## Deployment-Hinweise
+Mehr Einordnung: [docs/testing.md](docs/testing.md) und [tests/README.md](tests/README.md)
 
-### Linux / systemd
+## Datenhinweis
 
-Die Datei `chappie-training.service` ist auf den Daemon-Modulstart ausgelegt:
+Der Ordner [`data/`](data) enthält sensible lokale Zustände und Gedächtnisdateien. Nicht unbedacht löschen. Siehe [`data/README_GEDAECHTNIS_WARNUNG.txt`](data/README_GEDAECHTNIS_WARNUNG.txt).
 
-```ini
-ExecStart=/home/.../venv/bin/python3 -m Chappies_Trainingspartner.training_daemon
-Restart=always
-```
+## Legacy-Hinweis
 
-Deployment-Helfer:
+Der Ordner [`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken auf die neue Struktur. Die aktuelle Hauptdokumentation ist jetzt:
 
-- `deploy_training.sh`
-- `deploy_training.bat`
+- `README.md`
+- `agent.md`
+- `docs/`
 
-## Daten & Laufzeitdateien
-
-- Persistente Chat-/Memory-Daten liegen unter `data/`
-- Laufzeit-State wie `life_state.json`, `sleep_state.json` und generierte Steering-Vektoren werden lokal erzeugt und sind für Git ignoriert
-- ChromaDB-Datenbankinhalte sollten nicht versehentlich gelöscht werden
-
-## Weitere Doku im Repository
-
-- `Info Dateien/START_ANLEITUNG.md`
-- `Info Dateien/WIE_ES_GEHT.md`
-- `Info Dateien/SSH_Befehle_CHAPPiE.md`
-- `validate_system.py` für schnelle Systemprüfung
-
-## Status dieses Stands
-
-Dieser Stand enthält:
-
-- die integrierte Life- und Growth-Architektur
-- lokale Tests für Forgetting Curve, Life Simulation und Kompatibilität
-- aufgeräumte Teststruktur unter `tests/`
-- konsistenten Training-Daemon-Start per Modulaufruf
