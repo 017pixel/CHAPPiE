@@ -51,17 +51,14 @@ flowchart TD
 6. Web- und Training-Service separat getestet
 7. relevante Doku aktualisiert (`README.md`, `agent.md`, `docs/*`)
 
-## GitHub Actions: CI vs. Deploy
+## GitHub Actions: nur CI / Tests
 
-- `.github/workflows/ci.yml` führt automatische Push-/PR-Checks aus und ist die primäre Statusanzeige für funktionale Regressionen.
-- `.github/workflows/deploy.yml` ist absichtlich als `workflow_dispatch` eingerichtet, damit ein instabiler SSH-Zugriff auf den Server nicht jeden Push rot markiert.
+GitHub Actions wird in diesem Repository nur für automatische Tests genutzt.
 
-Wenn GitHub Actions direkt auf den Server deployen soll, müssen mindestens diese Voraussetzungen erfüllt sein:
+- `.github/workflows/ci.yml` führt automatische Push-/PR-Checks aus.
+- Server-Deployments laufen **nicht** über GitHub Actions.
 
-1. `SERVER_HOST`, `SERVER_USER` und `SERVER_SSH_KEY` sind korrekt in GitHub Secrets hinterlegt.
-2. Der SSH-Key ist gültig formatiert.
-3. Der Server ist von GitHub-hosted Runnern aus auf Port 22 erreichbar.
-4. Der Zielpfad, das virtuelle Environment und der systemd-Service existieren auf dem Server wie im Workflow hinterlegt.
+Produktions- oder Server-Updates müssen bewusst manuell auf dem Zielsystem durchgeführt werden, nachdem die CI grün ist.
 
 ## Server-Kommandos
 
