@@ -101,126 +101,137 @@ def render_vital_signs(backend):
 def render_brain_monitor(metadata: Dict[str, Any]):
     if not metadata:
         return
-        
-    def render_section(title, content, type_class):
-        st.markdown(f'<div class="brain-monitor-section {type_class}"><strong>{title}</strong><br/>{content}</div>', unsafe_allow_html=True)
-    
+
+    def render_json_block(data: Any):
+        st.code(json.dumps(data, indent=2, ensure_ascii=False, default=str), language="json")
+
+    provider = metadata.get("provider", "-")
+    model = metadata.get("model", "-")
+    processing_time = metadata.get("processing_time_ms", 0)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.caption("Provider")
+        st.write(provider or "-")
+    with col2:
+        st.caption("Modell")
+        st.write(model or "-")
+    with col3:
+        st.caption("Laufzeit")
+        st.write(f"{processing_time:.1f} ms")
+
     input_text = metadata.get("input_analysis", "")
-    if input_text:
-        render_section("INPUT ANALYSE", input_text, "input")
-        
+    intent_type = metadata.get("intent_type", "-")
+    intent_confidence = metadata.get("intent_confidence", 0.0)
+    intent_raw = metadata.get("intent_raw_json", {}) if isinstance(metadata.get("intent_raw_json", {}), dict) else {}
+    with st.expander("Phase 1: Input und Intent", expanded=False):
+        st.markdown(f"**Intent:** `{intent_type}` ({intent_confidence:.1%})")
+        if input_text:
+            st.markdown("**Input Analyse:**")
+            st.write(input_text)
+        if intent_raw:
+            st.markdown("**Step-1 Roh-JSON:**")
+            render_json_block(intent_raw)
+
+    available_tools = metadata.get("available_tools", []) or []
+    selected_tools = metadata.get("selected_tools", []) or []
+    unused_tools = metadata.get("unused_tools", []) or []
+    tool_calls = metadata.get("tool_calls", []) or []
+    with st.expander("Phase 2: Tool-Orchestrierung", expanded=False):
+        st.markdown(f"**Verfuegbare Tools:** {', '.join(available_tools) if available_tools else '-'}")
+        st.markdown(f"**Ausgewaehlte Tools:** {', '.join(selected_tools) if selected_tools else 'keine'}")
+        st.markdown(f"**Nicht genutzte Tools:** {', '.join(unused_tools) if unused_tools else 'keine'}")
+        if tool_calls:
+            for idx, call in enumerate(tool_calls, start=1):
+                with st.expander(f"Tool Call #{idx}: {call.get('tool', call.get('name', 'unknown'))}", expanded=False):
+                    render_json_block(call)
+        else:
+            st.info("Keine Tool Calls ausgefuehrt.")
+
+    before = normalize_emotions(metadata.get("emotions_before", {}))
+    delta = metadata.get("emotions_delta", {}) if isinstance(metadata.get("emotions_delta", {}), dict) else {}
+    life_snapshot = metadata.get("life_snapshot", {}) if isinstance(metadata.get("life_snapshot", {}), dict) else {}
+    homeostasis = life_snapshot.get("homeostasis", {}) if isinstance(life_snapshot.get("homeostasis", {}), dict) else {}
+    adjustments = homeostasis.get("emotion_adjustments", {}) if isinstance(homeostasis.get("emotion_adjustments", {}), dict) else {}
+    with st.expander("Phase 3: Emotionen und Homeostasis", expanded=False):
+        rows = []
+        for key in EMOTION_DISPLAY_ORDER:
+            before_val = before.get(key, 0)
+            if key in delta and isinstance(delta[key], dict):
+                after_val = delta[key].get("after", before_val)
+                change = delta[key].get("change", after_val - before_val)
+            else:
+                after_val = before_val
+                change = 0
+            rows.append({
+                "emotion": EMOTION_LABELS.get(key, key),
+                "before": before_val,
+                "after": after_val,
+                "delta": change,
+                "homeostasis_adjustment": adjustments.get(key, 0),
+            })
+        st.dataframe(rows, use_container_width=True)
+        if homeostasis:
+            st.markdown("**Homeostasis Snapshot:**")
+            render_json_block(homeostasis)
+
+    workspace = metadata.get("global_workspace", {}) if isinstance(metadata.get("global_workspace", {}), dict) else {}
+    with st.expander("Phase 4: Layer-Pipeline", expanded=False):
+        layer_blocks = [
+            ("Goal Engine", life_snapshot.get("goal_competition", {})),
+            ("World Model", life_snapshot.get("world_model", {})),
+            ("Planning", life_snapshot.get("planning_state", {})),
+            ("Forecast", life_snapshot.get("forecast_state", {})),
+            ("Social Arc", life_snapshot.get("social_arc", {})),
+            ("Attachment", life_snapshot.get("attachment_model", {})),
+            ("Development", life_snapshot.get("development", {})),
+            ("Habit Dynamics", life_snapshot.get("habit_dynamics", {})),
+        ]
+        for title, block in layer_blocks:
+            with st.expander(title, expanded=False):
+                if block:
+                    render_json_block(block)
+                else:
+                    st.write("Keine Daten")
+
+        with st.expander("Global Workspace", expanded=False):
+            workspace_items = workspace.get("workspace_items", []) if isinstance(workspace.get("workspace_items", []), list) else []
+            if workspace_items:
+                st.dataframe(workspace_items, use_container_width=True)
+            else:
+                st.write("Keine Workspace Items")
+            math_trace = workspace.get("math_trace", []) if isinstance(workspace.get("math_trace", []), list) else []
+            if math_trace:
+                st.markdown("**Mathematische Verarbeitung:**")
+                st.dataframe(math_trace, use_container_width=True)
+            st.markdown("**Broadcast:**")
+            st.write(workspace.get("broadcast", "-"))
+
     thought = metadata.get("thought_process", "")
-    if thought:
-        render_section("GEDANKEN", thought, "thought")
+    action_plan = metadata.get("action_plan", {}) if isinstance(metadata.get("action_plan", {}), dict) else {}
+    with st.expander("Phase 5: Antwortgenerierung", expanded=False):
+        if thought:
+            st.markdown("**Reasoning / Gedankenprozess:**")
+            st.code(thought, language=None)
+        if action_plan:
+            st.markdown("**Action Plan:**")
+            render_json_block(action_plan)
 
-    tool_calls = metadata.get("tool_calls", [])
-    if tool_calls:
-        render_section(f"TOOLS ({len(tool_calls)} ausgefuehrt)", f"Tools: {', '.join(t.get('tool', t.get('name', '')) for t in tool_calls)}", "input")
-
-    life_snapshot = metadata.get("life_snapshot", {})
-    if life_snapshot:
-        dominant_need = (life_snapshot.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
-        goal = life_snapshot.get("active_goal", {})
-        world = life_snapshot.get("world_model", {})
-        render_section(
-            "LIFE SIMULATION",
-            f"{life_snapshot.get('clock', {}).get('phase_label', '---')} | {life_snapshot.get('current_activity', '---')} | Need={dominant_need} | Ziel={goal.get('title', '---')} | UserNeed={world.get('predicted_user_need', '---')}",
-            "thought"
-        )
-
-    goal_competition = life_snapshot.get("goal_competition", {}) if life_snapshot else {}
-    if goal_competition:
-        render_section(
-            "GOAL ENGINE",
-            f"Mode: {goal_competition.get('goal_mode', '---')} | Spannung: {goal_competition.get('competition_tension', 0):.2f} | {goal_competition.get('guidance', '---')}",
-            "memory"
-        )
-
-    development = life_snapshot.get("development", {}) if life_snapshot else {}
-    if development:
-        render_section(
-            "DEVELOPMENT",
-            f"Stage: {development.get('stage', '---')} | Next: {development.get('next_stage', '---')} | Progress: {development.get('progress_to_next', 0):.0%}",
-            "memory"
-        )
-
-    attachment = life_snapshot.get("attachment_model", {}) if life_snapshot else {}
-    if attachment:
-        render_section(
-            "ATTACHMENT",
-            f"Bond: {attachment.get('bond_type', '---')} | Security: {attachment.get('attachment_security', 0):.2f} | {attachment.get('guidance', '---')}",
-            "thought"
-        )
-
-    workspace = metadata.get("global_workspace", {})
-    if workspace:
-        focus = workspace.get("dominant_focus", {})
-        render_section(
-            "GLOBAL WORKSPACE",
-            f"Fokus: {focus.get('label', '---')} | Broadcast: {workspace.get('broadcast', '---')}",
-            "input"
-        )
-
-    if life_snapshot and life_snapshot.get("world_model"):
-        world = life_snapshot.get("world_model", {})
-        render_section(
-            "WORLD MODEL",
-            f"Mode: {world.get('interaction_mode', '---')} | Next: {world.get('next_best_action', '---')} | Confidence: {world.get('confidence', 0):.2f}",
-            "input"
-        )
-
-    planning = life_snapshot.get("planning_state", {}) if life_snapshot else {}
-    if planning:
-        render_section(
-            "PLANNING",
-            f"Horizon: {planning.get('planning_horizon', '---')} | Milestone: {planning.get('next_milestone', '---')} | Confidence: {planning.get('plan_confidence', 0):.2f}",
-            "thought"
-        )
-
-    forecast = life_snapshot.get("forecast_state", {}) if life_snapshot else {}
-    if forecast:
-        render_section(
-            "FORECAST",
-            f"Risk: {forecast.get('risk_level', '---')} | Next: {forecast.get('next_turn_outlook', '---')} | Trajectory: {forecast.get('stage_trajectory', '---')}",
-            "input"
-        )
-
-    social_arc = life_snapshot.get("social_arc", {}) if life_snapshot else {}
-    if social_arc:
-        render_section(
-            "SOCIAL ARC",
-            f"Arc: {social_arc.get('arc_name', '---')} | Phase: {social_arc.get('phase', '---')} | Episode: {social_arc.get('current_episode', '---')}",
-            "thought"
-        )
-
-    action_plan = metadata.get("action_plan", {})
-    if action_plan:
-        actions = ", ".join(action_plan.get("recommended_actions", [])[:3])
-        render_section(
-            "ACTION / RESPONSE",
-            f"Strategie: {action_plan.get('strategy', '---')} | Ton: {action_plan.get('tone', '---')} | {actions}",
-            "thought"
-        )
-
-    dreams = metadata.get("dream_fragments", [])
-    if dreams:
-        render_section("DREAM REPLAY", " | ".join(dreams[:2]), "thought")
-
-    replay = life_snapshot.get("replay_state", {}) if life_snapshot else {}
-    if replay:
-        render_section(
-            "REPLAY STATE",
-            f"{replay.get('summary', '---')} | Habit: {replay.get('habit_reinforcement', '---')}",
-            "memory"
-        )
-
-    timeline_summary = life_snapshot.get("timeline_summary", {}) if life_snapshot else {}
-    if timeline_summary:
-        render_section(
-            "TIMELINE",
-            f"Entries: {timeline_summary.get('entries', 0)} | {timeline_summary.get('summary', '---')}",
-            "memory"
-        )
+    debug_entries = metadata.get("debug_entries", []) if isinstance(metadata.get("debug_entries", []), list) else []
+    debug_log = metadata.get("debug_log", "")
+    with st.expander("Phase 6: Event-Log (alle Schritte)", expanded=False):
+        if debug_entries:
+            for idx, entry in enumerate(debug_entries, start=1):
+                title = f"{entry.get('timestamp', '--:--:--')} | {entry.get('category', '-')}: {entry.get('message', '-')}"
+                with st.expander(f"#{idx} {title}", expanded=False):
+                    st.markdown(f"**Level:** `{entry.get('level', '-')}`")
+                    details = entry.get("details", {})
+                    if details:
+                        render_json_block(details)
+        else:
+            st.write("Keine strukturierten Debug-Events vorhanden.")
+        if debug_log:
+            with st.expander("Raw Debug Log", expanded=False):
+                st.code(debug_log, language=None)
 
 
 def _format_timestamp_german(timestamp_str: str) -> str:

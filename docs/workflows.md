@@ -97,6 +97,19 @@ Datei [`app.py`](../app.py) routet zwischen:
 
 Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
 
+### Debug Mode / Brain Monitor
+
+Im **DEBUG MODE: ON** zeigt der aufklappbare **Brain Monitor** die Laufzeitpipeline in Phasen:
+
+1. Input + Intent (inkl. Step-1-Roh-JSON)
+2. Tool-Orchestrierung (verfügbar, ausgewählt, nicht genutzt, ausgeführt)
+3. Emotionen + Homeostasis (Before/After/Delta + Anpassungen)
+4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development)
+5. Antwortgenerierung (Reasoning/Thought + Action Plan)
+6. Event-Log (strukturierte Debug-Einträge pro Schritt)
+
+Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle.
+
 ## 6. Wichtige Commands
 
 ### Web / Chat: System, Memory und Reflexion
@@ -205,4 +218,3 @@ Die Datei [`web_infrastructure/growth_dashboard_ui.py`](../web_infrastructure/gr
 - [Architektur](architecture.md)
 - [Testing](testing.md)
 - [Deployment](deployment.md)
-

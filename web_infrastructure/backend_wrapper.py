@@ -240,6 +240,14 @@ def init_chappie():
             hippocampus = {"search_query": " ".join(intent_result.entities[:4])}
             return self.global_workspace.build(sensory, amygdala, hippocampus, life_context, memories or [])
 
+        def _get_available_step1_tools(self) -> List[str]:
+            return [
+                "update_user_profile",
+                "update_soul",
+                "update_preferences",
+                "add_short_term_memory",
+            ]
+
         def _get_emotions_snapshot(self) -> Dict[str, int]:
             """Erstellt einen Snapshot der aktuellen Emotionen."""
             state = self.emotions.get_state()
@@ -272,6 +280,18 @@ def init_chappie():
                 if not settings.cli_debug_always_on:
                     self.debug_logger.disable()
 
+            if self.debug_logger.enabled:
+                self.debug_logger.clear()
+                self.debug_logger.log_info(
+                    "TURN",
+                    "Neuer Turn gestartet",
+                    {
+                        "provider": settings.llm_provider.value,
+                        "model": get_active_model(),
+                        "history_messages": len(history or []),
+                    },
+                )
+
             self.apply_runtime_settings()
             
             self._processing_start_time = datetime.now()
@@ -294,6 +314,16 @@ def init_chappie():
             # Emotionen Snapshot
             emotions_before = self._get_emotions_snapshot()
             life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+            self.debug_logger.log_info(
+                "LIFE_PREP",
+                "Life-Kontext vorbereitet",
+                {
+                    "phase": life_context.get("clock", {}).get("phase_label", "---"),
+                    "activity": life_context.get("current_activity", "---"),
+                    "mode": life_context.get("current_mode", "---"),
+                    "dominant_need": (life_context.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability"),
+                },
+            )
             
             # === STEP 1: Intent Analysis ===
             intent_result = self.intent_processor.process(
@@ -307,6 +337,18 @@ def init_chappie():
                 intent_result.confidence
             )
             self.debug_logger.log_step1_json(intent_result.raw_json)
+            available_tools = self._get_available_step1_tools()
+            selected_tool_names = [tc.tool for tc in intent_result.tool_calls]
+            unused_tool_names = [tool for tool in available_tools if tool not in selected_tool_names]
+            self.debug_logger.log_info(
+                "TOOL_DECISION",
+                "Tool-Auswahl aus Step 1 analysiert",
+                {
+                    "available_tools": available_tools,
+                    "selected_tools": selected_tool_names,
+                    "unused_tools": unused_tool_names,
+                },
+            )
             
             # === AUSFÜHRUNG: Tool Calls ===
             self._execute_step1_tool_calls(intent_result.tool_calls)
@@ -329,6 +371,17 @@ def init_chappie():
             # === CONTEXT AUFBAUEN ===
             context = self._build_context(intent_result.context_requirements)
             workspace = self._build_workspace_from_intent(intent_result, life_context)
+            self.debug_logger.log_info(
+                "CONTEXT",
+                "Kontext und Workspace aufgebaut",
+                {
+                    "context_requirements": intent_result.context_requirements,
+                    "context_chars": len(context or ""),
+                    "workspace_focus": (workspace.get("dominant_focus") or {}).get("label", "---"),
+                    "workspace_broadcast": workspace.get("broadcast", "---"),
+                    "workspace_math_steps": len(workspace.get("math_trace", [])),
+                },
+            )
             
             # === STEP 2: Response Generation ===
             self.debug_logger.log_step2_start(get_active_model())
@@ -382,20 +435,34 @@ def init_chappie():
                 "intent_type": intent_result.intent_type.value,
                 "intent_confidence": intent_result.confidence,
                 "tool_calls_executed": len(intent_result.tool_calls),
+                "available_tools": available_tools,
+                "selected_tools": selected_tool_names,
+                "unused_tools": unused_tool_names,
                 "short_term_count": self.short_term_memory_v2.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+                "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
                 "processing_time_ms": processing_time_ms,
                 "life_snapshot": final_life_snapshot,
                 "global_workspace": workspace,
                 "action_plan": response_data.get("action_plan", {}),
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
+                "provider": settings.llm_provider.value,
+                "model": get_active_model(),
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
             """Führt Tool Calls aus Step 1 aus."""
             from memory.context_files import ContextFilesManager
-            
+
+            if not tool_calls:
+                self.debug_logger.log_info(
+                    "TOOL_CALL",
+                    "Keine Tool-Calls auszufuehren",
+                    {"executed": 0},
+                )
+                return
+             
             for tool_call in tool_calls:
                 try:
                     if tool_call.tool == "update_user_profile":
@@ -545,6 +612,15 @@ def init_chappie():
             # RAG Memory Search
             memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            self.debug_logger.log_info(
+                "RAG",
+                "Memory-Retrieval abgeschlossen",
+                {
+                    "top_k": settings.memory_top_k,
+                    "memories_found": len(memories or []),
+                    "memory_ids": [str(getattr(m, "id", ""))[:8] for m in (memories or [])[:8]],
+                },
+            )
             
             # System Prompt bauen
             system_prompt = get_system_prompt_with_emotions(
@@ -587,6 +663,15 @@ def init_chappie():
             
             raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
+            self.debug_logger.log_info(
+                "MODEL_OUTPUT",
+                "Schritt-2-Ausgabe ausgewertet",
+                {
+                    "response_chars": len(display_response or ""),
+                    "thought_chars": len(thought or ""),
+                    "looks_like_error": looks_like_model_error(display_response or ""),
+                },
+            )
             
             # In Langzeitgedächtnis speichern
             self.memory.add_memory(user_input, role="user")
@@ -665,6 +750,15 @@ def init_chappie():
             )
             raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
+            self.debug_logger.log_info(
+                "LEGACY",
+                "Legacy-Antwort generiert",
+                {
+                    "response_chars": len(display_response or ""),
+                    "thought_chars": len(thought or ""),
+                    "memories_found": len(memories or []),
+                },
+            )
             
             # Speichern
             self.memory.add_memory(user_input, role="user")
@@ -704,12 +798,18 @@ def init_chappie():
                 "intent_type": "legacy",
                 "intent_confidence": 1.0,
                 "tool_calls_executed": 0,
+                "available_tools": self._get_available_step1_tools(),
+                "selected_tools": [],
+                "unused_tools": self._get_available_step1_tools(),
                 "short_term_count": self.short_term_memory_v2.get_count(),
-                "debug_log": None,
+                "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+                "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "life_snapshot": final_life_snapshot,
                 "global_workspace": {"broadcast": "legacy-path"},
                 "action_plan": {"strategy": "conversational", "tone": "friendly"},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
+                "provider": settings.llm_provider.value,
+                "model": get_active_model(),
             }
 
         # === Command Handler ===
@@ -917,3 +1017,4 @@ def init_chappie():
             return f"Unbekannter Command: {command}"
 
     return CHAPPiEBackend()
+

@@ -496,7 +496,7 @@ def process_chat_message(user_input: str, backend):
             
             # Zeige Debug Info wenn Debug Mode an
             if debug_mode and result.get("debug_log"):
-                with st.expander("🔍 DEBUG INFO", expanded=False):
+                with st.expander("DEBUG INFO", expanded=False):
                     st.text(result["debug_log"])
                     
                     # Zeige Intent Info
@@ -525,9 +525,7 @@ def process_chat_message(user_input: str, backend):
             })
 
     intent_raw = result.get("intent_raw_json", {})
-    tool_calls_raw = []
-    if result.get("tool_calls_executed", 0) > 0 and intent_raw.get("tool_calls"):
-        tool_calls_raw = intent_raw.get("tool_calls", [])
+    tool_calls_raw = intent_raw.get("tool_calls", []) if isinstance(intent_raw, dict) else []
     
     assistant_msg = {
         "role": "assistant",
@@ -541,6 +539,9 @@ def process_chat_message(user_input: str, backend):
             "intent_type": result.get("intent_type"),
             "intent_confidence": result.get("intent_confidence"),
             "tool_calls_executed": result.get("tool_calls_executed", 0),
+            "available_tools": result.get("available_tools", []),
+            "selected_tools": result.get("selected_tools", []),
+            "unused_tools": result.get("unused_tools", []),
             "intent_raw_json": intent_raw,
             "tool_calls": tool_calls_raw,
             "short_term_count": result.get("short_term_count", 0),
@@ -549,6 +550,10 @@ def process_chat_message(user_input: str, backend):
             "global_workspace": result.get("global_workspace", {}),
             "action_plan": result.get("action_plan", {}),
             "dream_fragments": result.get("dream_fragments", []),
+            "debug_entries": result.get("debug_entries", []),
+            "debug_log": result.get("debug_log"),
+            "provider": result.get("provider", ""),
+            "model": result.get("model", ""),
         }
     }
 

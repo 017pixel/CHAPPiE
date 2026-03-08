@@ -61,6 +61,14 @@ class DebugLogger:
     def log_step1_start(self):
         """Loggt Start von Step 1."""
         self._add_entry(LogLevel.INFO, "STEP1", "Intent Analysis gestartet")
+
+    def log_info(self, category: str, message: str, details: Dict = None):
+        """Loggt einen Info-Eintrag mit optionalen Details."""
+        self._add_entry(
+            LogLevel.INFO, category,
+            message,
+            details or {}
+        )
     
     def log_step1_complete(self, intent_type: str, confidence: float):
         """Loggt Abschluss von Step 1."""
@@ -218,10 +226,14 @@ class DebugLogger:
     def get_entries(self) -> List[DebugEntry]:
         """Gibt alle Einträge zurück."""
         return list(self.entries)
+
+    def get_entries_as_dict(self) -> List[Dict[str, Any]]:
+        """Gibt alle Einträge als serialisierbare Dicts zurück."""
+        return [asdict(entry) for entry in self.entries]
     
     def clear(self):
         """Löscht alle Einträge."""
-        self.entries = []
+        self.entries = deque(maxlen=self.max_entries)
     
     def enable(self):
         """Aktiviert Logging."""
