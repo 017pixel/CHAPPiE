@@ -9,6 +9,44 @@ COMMANDS = [
 ]
 COMMANDS_PER_ROW = 5
 
+
+def _render_assistant_message(msg: dict):
+    meta = msg.get("metadata") or {}
+    rag_data = meta.get("rag_memories", [])
+    memory_count = len(rag_data) if rag_data else 0
+    auto_expand_reasoning = bool(meta.get("reasoning_only"))
+
+    if memory_count > 0:
+        st.caption(f"📎 **{memory_count} Einträge als Kontext geladen**")
+
+    st.markdown(msg["content"])
+
+    if meta.get("pending"):
+        st.caption(meta.get("status_text") or "Nachricht wird im Hintergrund weiter verarbeitet...")
+        return
+
+    if meta.get("reasoning_only"):
+        st.caption("CHAPPiE hat nachgedacht, aber keine finale Antwort formuliert.")
+
+    if meta.get("model_reasoning"):
+        with st.expander("Modell-Reasoning", expanded=auto_expand_reasoning):
+            st.code(meta["model_reasoning"], language=None)
+
+    if meta.get("thought_process"):
+        with st.expander("CHAPPiEs Gedankenprozess", expanded=auto_expand_reasoning):
+            st.code(meta["thought_process"], language=None)
+
+    if st.session_state.debug_mode:
+        with st.expander("BRAIN MONITOR", expanded=False):
+            render_brain_monitor(meta)
+    else:
+        if rag_data:
+            with st.expander("Geladener Kontext", expanded=False):
+                for idx, memory in enumerate(rag_data):
+                    render_memory_item(memory, idx + 1)
+                    if idx < len(rag_data) - 1:
+                        st.divider()
+
 def render_chat_interface(backend):
     """Rendert die Chat-Oberfläche."""
     
@@ -103,37 +141,21 @@ def render_chat_interface(backend):
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             if msg["role"] == "assistant" and msg.get("metadata"):
-                meta = msg["metadata"]
-                rag_data = meta.get("rag_memories", [])
-                memory_count = len(rag_data) if rag_data else 0
-                
-                # Context Files / Memories Info-Leiste vor der Antwort
-                if memory_count > 0:
-                    st.caption(f"📎 **{memory_count} Einträge als Kontext geladen**")
-                
-                st.markdown(msg["content"])
-                
-                if st.session_state.debug_mode:
-                    with st.expander("BRAIN MONITOR", expanded=False):
-                        render_brain_monitor(meta)
-                else:
-                    if meta.get("thought_process"):
-                        with st.expander("Gedankenprozess", expanded=False):
-                            st.code(meta["thought_process"], language=None)
-                    
-                    if rag_data:
-                        with st.expander("Geladener Kontext", expanded=False):
-                            for idx, m in enumerate(rag_data):
-                                render_memory_item(m, idx + 1)
-                                if idx < len(rag_data) - 1:
-                                    st.divider()
+                _render_assistant_message(msg)
             else:
                 st.markdown(msg["content"])
 
     # ==========================================
     # 4. INPUT AREA & RETURN LOGIC
     # ==========================================
-    user_input = st.chat_input("Nachricht an CHAPPiE...")
+    has_pending_response = any(
+        msg.get("role") == "assistant" and (msg.get("metadata") or {}).get("pending")
+        for msg in st.session_state.messages
+    )
+    if has_pending_response:
+        st.caption("CHAPPiE verarbeitet noch eine Nachricht im Hintergrund. Bitte warte kurz.")
+
+    user_input = st.chat_input("Nachricht an CHAPPiE...", disabled=has_pending_response)
     
     if st.session_state.pending_cmd:
         cmd = st.session_state.pending_cmd

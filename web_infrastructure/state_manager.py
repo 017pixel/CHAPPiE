@@ -8,6 +8,8 @@ def init_session_state():
         st.session_state.session_id = None
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "session_updated_at" not in st.session_state:
+        st.session_state.session_updated_at = None
     st.session_state.current_emotions = normalize_emotions(st.session_state.get("current_emotions"))
     if "show_settings" not in st.session_state:
         st.session_state.show_settings = False
@@ -60,3 +62,29 @@ def init_session_state():
         st.session_state.last_filter_label = "Alle"
     if "last_filter_type" not in st.session_state:
         st.session_state.last_filter_type = "Alle"
+
+
+def restore_active_chat_session(backend):
+    """Stellt die zuletzt aktive Chat-Session wieder her oder erzeugt eine neue."""
+    if st.session_state.get("session_id"):
+        return
+
+    session_data = backend.chat_manager.load_active_session()
+    st.session_state.session_id = session_data.get("id")
+    st.session_state.messages = session_data.get("messages", [])
+    st.session_state.session_updated_at = session_data.get("updated_at")
+
+
+def sync_current_chat_session(backend):
+    """Synchronisiert den aktuellen Chat mit dem gespeicherten Stand auf Platte."""
+    session_id = st.session_state.get("session_id")
+    if not session_id:
+        return
+
+    session_data = backend.chat_manager.load_session(session_id)
+    updated_at = session_data.get("updated_at")
+    if updated_at == st.session_state.get("session_updated_at"):
+        return
+
+    st.session_state.messages = session_data.get("messages", [])
+    st.session_state.session_updated_at = updated_at

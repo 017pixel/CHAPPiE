@@ -1,9 +1,11 @@
 import streamlit as st
 import os
 import re
+import time
+import threading
 from datetime import datetime, timezone
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Callable, Optional
 
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
@@ -22,7 +24,7 @@ from brain import get_brain
 from brain.action_response import ActionResponseLayer
 from brain.base_brain import GenerationConfig, Message
 from brain.global_workspace import GlobalWorkspace
-from brain.response_parser import parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
+from brain.response_parser import extract_tagged_block, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
 from brain.deep_think import DeepThinkEngine
 from life import get_life_simulation_service
 
@@ -91,6 +93,88 @@ def init_chappie():
             self.life_simulation = get_life_simulation_service()
             self.global_workspace = GlobalWorkspace()
             self.action_response = ActionResponseLayer()
+            self._chat_jobs: Dict[str, threading.Thread] = {}
+            self._chat_jobs_lock = threading.RLock()
+
+        @staticmethod
+        def _chat_job_key(session_id: str, message_id: str) -> str:
+            return f"{session_id}:{message_id}"
+
+        def _set_last_memory_timestamp(self):
+            try:
+                st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
+            except Exception:
+                return
+
+        @staticmethod
+        def _serialize_rag_memories(memories: List[Any] | None) -> List[Dict[str, Any]]:
+            formatted_memories = []
+            for memory in memories or []:
+                formatted_memories.append({
+                    "content": memory.content,
+                    "relevance_score": memory.relevance_score,
+                    "role": memory.role,
+                    "label": getattr(memory, "label", "original"),
+                    "id": memory.id,
+                    "timestamp": getattr(memory, "timestamp", ""),
+                    "type": getattr(memory, "mem_type", "interaction"),
+                })
+            return formatted_memories
+
+        def _build_assistant_message(self, user_input: str, result: Dict[str, Any], message_id: Optional[str] = None) -> Dict[str, Any]:
+            intent_raw = result.get("intent_raw_json", {})
+            tool_calls_raw = intent_raw.get("tool_calls", []) if isinstance(intent_raw, dict) else []
+            metadata = {
+                "thought_process": result.get("thought_process"),
+                "model_reasoning": result.get("model_reasoning"),
+                "reasoning_only": result.get("reasoning_only", False),
+                "rag_memories": self._serialize_rag_memories(result.get("rag_memories")),
+                "emotions": result.get("emotions", {}),
+                "emotions_delta": result.get("emotions_delta", {}),
+                "emotions_before": result.get("emotions_before", {}),
+                "input_analysis": result.get("input_analysis", user_input),
+                "intent_type": result.get("intent_type"),
+                "intent_confidence": result.get("intent_confidence"),
+                "tool_calls_executed": result.get("tool_calls_executed", 0),
+                "available_tools": result.get("available_tools", []),
+                "selected_tools": result.get("selected_tools", []),
+                "unused_tools": result.get("unused_tools", []),
+                "intent_raw_json": intent_raw,
+                "tool_calls": tool_calls_raw,
+                "short_term_count": result.get("short_term_count", 0),
+                "processing_time_ms": result.get("processing_time_ms", 0),
+                "life_snapshot": result.get("life_snapshot", {}),
+                "global_workspace": result.get("global_workspace", {}),
+                "action_plan": result.get("action_plan", {}),
+                "dream_fragments": result.get("dream_fragments", []),
+                "debug_entries": result.get("debug_entries", []),
+                "debug_log": result.get("debug_log"),
+                "provider": result.get("provider", ""),
+                "model": result.get("model", ""),
+                "pending": False,
+                "status_text": "",
+                "retry_history": result.get("retry_history", []),
+            }
+            assistant_msg = {
+                "role": "assistant",
+                "content": result.get("response_text", ""),
+                "metadata": metadata,
+            }
+            if message_id:
+                assistant_msg["id"] = message_id
+            return assistant_msg
+
+        def _build_pending_message(self, message_id: str) -> Dict[str, Any]:
+            return {
+                "id": message_id,
+                "role": "assistant",
+                "content": "_CHAPPiE denkt nach..._",
+                "metadata": {
+                    "pending": True,
+                    "status_text": "Nachricht wird verarbeitet...",
+                    "retry_history": [],
+                },
+            }
         
         def _provider_runtime_signature(self, provider: LLMProvider, model: str):
             if provider == LLMProvider.OLLAMA:
@@ -193,23 +277,168 @@ def init_chappie():
         def _extract_display_response(self, raw_response: Any, phase: str = "Antwortgenerierung"):
             raw_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
             if not raw_text.strip():
-                return self._format_generation_error(phase), ""
+                return self._format_generation_error(phase), "", ""
 
             if looks_like_model_error(raw_text):
-                return self._format_generation_error(phase, raw_text), ""
+                return self._format_generation_error(phase, raw_text), "", ""
 
-            thought = ""
-            if settings.chain_of_thought:
-                parsed = parse_chain_of_thought(raw_text)
-                alt_parsed = parse_thinking_tags(raw_text)
-                display_response = parsed.answer.strip() or alt_parsed.answer.strip() or raw_text.strip()
-                thought = parsed.thought or alt_parsed.thought or ""
-            else:
-                display_response = raw_text.strip()
+            model_reasoning_block = extract_tagged_block(raw_text, ["model_reasoning", "provider_reasoning"])
+            content_without_model_reasoning = model_reasoning_block.remaining
+
+            parsed = parse_chain_of_thought(content_without_model_reasoning)
+            alt_parsed = parse_thinking_tags(content_without_model_reasoning)
+            display_response = parsed.answer.strip() or alt_parsed.answer.strip() or content_without_model_reasoning.strip()
+            thought = parsed.thought or alt_parsed.thought or ""
+            model_reasoning = model_reasoning_block.content or ""
 
             if not display_response:
-                display_response = self._format_generation_error(phase, raw_text)
-            return display_response, thought
+                display_response = "CHAPPiE schweigt..." if (thought or model_reasoning) else self._format_generation_error(phase, raw_text)
+            return display_response, thought, model_reasoning
+
+        @staticmethod
+        def _is_valid_intent_result(intent_result: Any) -> bool:
+            return intent_result is not None and hasattr(intent_result, "intent_type")
+
+        def _is_valid_generation_result(self, response_data: Dict[str, Any]) -> bool:
+            response_text = str((response_data or {}).get("response_text", "") or "").strip()
+            return bool(response_text and not looks_like_model_error(response_text))
+
+        def _run_with_retries(
+            self,
+            *,
+            step_number: int,
+            step_name: str,
+            action: Callable[[], Any],
+            validator: Callable[[Any], bool],
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            max_attempts: int = 3,
+            retry_delay_seconds: float = 1.0,
+        ) -> Any:
+            last_error = "Leere Modellantwort"
+
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    result = action()
+                    if not validator(result):
+                        response_text = ""
+                        if isinstance(result, dict):
+                            response_text = str(result.get("response_text", "") or "")
+                        last_error = response_text or "Leere Modellantwort"
+                        raise ValueError(last_error)
+                    return result
+                except Exception as exc:
+                    last_error = str(exc) or last_error
+                    if attempt >= max_attempts:
+                        raise ValueError(last_error) from exc
+
+                    retry_text = (
+                        f"Fehler bei Schritt {step_number}: {step_name}. "
+                        f"Erneuter Versuch {attempt + 1}/{max_attempts}."
+                    )
+                    if status_callback:
+                        status_callback(
+                            {
+                                "step": step_number,
+                                "step_name": step_name,
+                                "attempt": attempt,
+                                "max_attempts": max_attempts,
+                                "error": last_error,
+                                "status_text": retry_text,
+                            }
+                        )
+                    time.sleep(retry_delay_seconds)
+
+        def is_chat_job_active(self, session_id: str, message_id: str) -> bool:
+            job_key = self._chat_job_key(session_id, message_id)
+            with self._chat_jobs_lock:
+                job = self._chat_jobs.get(job_key)
+                return bool(job and job.is_alive())
+
+        def start_async_chat(
+            self,
+            *,
+            session_id: str,
+            message_id: str,
+            user_input: str,
+            history: List[Dict[str, Any]],
+            debug_mode: bool = False,
+        ) -> bool:
+            normalized_session_id = self.chat_manager.ensure_session_id(session_id)
+            job_key = self._chat_job_key(normalized_session_id, message_id)
+            with self._chat_jobs_lock:
+                existing_job = self._chat_jobs.get(job_key)
+                if existing_job and existing_job.is_alive():
+                    return False
+
+                worker = threading.Thread(
+                    target=self._run_chat_job,
+                    kwargs={
+                        "session_id": normalized_session_id,
+                        "message_id": message_id,
+                        "user_input": user_input,
+                        "history": history,
+                        "debug_mode": debug_mode,
+                    },
+                    daemon=True,
+                )
+                self._chat_jobs[job_key] = worker
+                worker.start()
+                return True
+
+        def _run_chat_job(
+            self,
+            *,
+            session_id: str,
+            message_id: str,
+            user_input: str,
+            history: List[Dict[str, Any]],
+            debug_mode: bool,
+        ):
+            retry_history: List[Dict[str, Any]] = []
+
+            def status_callback(event: Dict[str, Any]):
+                retry_history.append(dict(event))
+                self.chat_manager.update_message(
+                    session_id,
+                    message_id,
+                    metadata_updates={
+                        "pending": True,
+                        "status_text": event.get("status_text", "Nachricht wird verarbeitet..."),
+                        "retry_history": retry_history,
+                        "current_step": event.get("step"),
+                    },
+                )
+
+            try:
+                result = self.process(user_input, history, debug_mode=debug_mode, status_callback=status_callback)
+                result["retry_history"] = retry_history
+                assistant_msg = self._build_assistant_message(user_input, result, message_id=message_id)
+                self.chat_manager.update_message(
+                    session_id,
+                    message_id,
+                    content=assistant_msg["content"],
+                    role="assistant",
+                    metadata_updates=assistant_msg["metadata"],
+                )
+            except Exception as exc:
+                error_text = self._format_generation_error("Nachricht", str(exc))
+                self.chat_manager.update_message(
+                    session_id,
+                    message_id,
+                    content=error_text,
+                    role="assistant",
+                    metadata_updates={
+                        "pending": False,
+                        "status_text": "",
+                        "retry_history": retry_history,
+                        "provider": settings.llm_provider.value,
+                        "model": get_active_model(),
+                    },
+                )
+            finally:
+                job_key = self._chat_job_key(session_id, message_id)
+                with self._chat_jobs_lock:
+                    self._chat_jobs.pop(job_key, None)
 
         def get_status(self) -> Dict[str, Any]:
             try:
@@ -261,7 +490,13 @@ def init_chappie():
                 "sadness": state.sadness,
             }
 
-        def process(self, user_input: str, history: List[Dict], debug_mode: bool = False) -> Dict[str, Any]:
+        def process(
+            self,
+            user_input: str,
+            history: List[Dict],
+            debug_mode: bool = False,
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Dict[str, Any]:
             """
             Hauptverarbeitung mit Zwei-Schritte System.
             
@@ -298,12 +533,17 @@ def init_chappie():
 
             # === STEP 1: Intent Analysis (wenn aktiviert) ===
             if settings.enable_two_step_processing:
-                return self._process_two_step(user_input, history)
+                return self._process_two_step(user_input, history, status_callback=status_callback)
             else:
                 # Fallback: Altes System
-                return self._process_legacy(user_input, history)
+                return self._process_legacy(user_input, history, status_callback=status_callback)
 
-        def _process_two_step(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
+        def _process_two_step(
+            self,
+            user_input: str,
+            history: List[Dict],
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Dict[str, Any]:
             """
             Zwei-Schritte Verarbeitung.
             Step 1: Intent Analysis mit kleinem Modell
@@ -326,10 +566,16 @@ def init_chappie():
             )
             
             # === STEP 1: Intent Analysis ===
-            intent_result = self.intent_processor.process(
-                user_input=user_input,
-                history=history,
-                current_emotions=emotions_before
+            intent_result = self._run_with_retries(
+                step_number=1,
+                step_name="Intent-Analyse",
+                action=lambda: self.intent_processor.process(
+                    user_input=user_input,
+                    history=history,
+                    current_emotions=emotions_before,
+                ),
+                validator=self._is_valid_intent_result,
+                status_callback=status_callback,
             )
             
             self.debug_logger.log_step1_complete(
@@ -386,13 +632,19 @@ def init_chappie():
             # === STEP 2: Response Generation ===
             self.debug_logger.log_step2_start(get_active_model())
             
-            response_data = self._generate_response(
-                user_input=user_input,
-                history=history,
-                context=context,
-                emotions=emotions_after,
-                life_context=life_context,
-                global_workspace=workspace
+            response_data = self._run_with_retries(
+                step_number=2,
+                step_name="Antwortgenerierung",
+                action=lambda: self._generate_response(
+                    user_input=user_input,
+                    history=history,
+                    context=context,
+                    emotions=emotions_after,
+                    life_context=life_context,
+                    global_workspace=workspace,
+                ),
+                validator=self._is_valid_generation_result,
+                status_callback=status_callback,
             )
             final_life_snapshot = self.life_simulation.finalize_turn(
                 user_input=user_input,
@@ -405,6 +657,11 @@ def init_chappie():
             self.debug_logger.log_step2_complete(
                 len(response_data["response_text"].split())
             )
+
+            self.memory.add_memory(user_input, role="user")
+            if response_data["response_text"].strip() and not looks_like_model_error(response_data["response_text"]):
+                self.memory.add_memory(response_data["response_text"], role="assistant")
+            self._set_last_memory_timestamp()
             
             # === AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN ===
             # User Nachricht
@@ -431,6 +688,8 @@ def init_chappie():
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
                 "thought_process": response_data.get("thought_process", ""),
+                "model_reasoning": response_data.get("model_reasoning", ""),
+                "reasoning_only": response_data.get("reasoning_only", False),
                 "rag_memories": response_data.get("rag_memories", []),
                 "intent_type": intent_result.intent_type.value,
                 "intent_confidence": intent_result.confidence,
@@ -662,29 +921,23 @@ def init_chappie():
             )
             
             raw_response = self.brain.generate(messages, config=gen_config)
-            display_response, thought = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
+            display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
             self.debug_logger.log_info(
                 "MODEL_OUTPUT",
                 "Schritt-2-Ausgabe ausgewertet",
                 {
                     "response_chars": len(display_response or ""),
+                    "model_reasoning_chars": len(model_reasoning or ""),
                     "thought_chars": len(thought or ""),
                     "looks_like_error": looks_like_model_error(display_response or ""),
                 },
             )
             
-            # In Langzeitgedächtnis speichern
-            self.memory.add_memory(user_input, role="user")
-            if display_response.strip() and not looks_like_model_error(display_response):
-                self.memory.add_memory(display_response, role="assistant")
-            
-            # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
-            
-            st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
-            
             return {
                 "response_text": display_response,
                 "thought_process": thought,
+                "model_reasoning": model_reasoning,
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
                 "rag_memories": memories,
                 "action_plan": self.action_response.build_action_plan(
                     {
@@ -695,6 +948,22 @@ def init_chappie():
                     life_context or {},
                     global_workspace or {},
                 ),
+            }
+
+        def _extract_legacy_generation(
+            self,
+            messages: List[Message],
+            gen_config: GenerationConfig,
+            memories: List[Any],
+        ) -> Dict[str, Any]:
+            raw_response = self.brain.generate(messages, config=gen_config)
+            display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
+            return {
+                "response_text": display_response,
+                "thought_process": thought,
+                "model_reasoning": model_reasoning,
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "rag_memories": memories,
             }
 
         def _calculate_emotion_delta(self, before: Dict[str, int], 
@@ -711,7 +980,12 @@ def init_chappie():
                     }
             return delta
 
-        def _process_legacy(self, user_input: str, history: List[Dict]) -> Dict[str, Any]:
+        def _process_legacy(
+            self,
+            user_input: str,
+            history: List[Dict],
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Dict[str, Any]:
             """Legacy Verarbeitung (altes System als Fallback)."""
             emotions_before = self._get_emotions_snapshot()
             life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
@@ -748,15 +1022,22 @@ def init_chappie():
                 temperature=settings.temperature,
                 stream=False,
             )
-            raw_response = self.brain.generate(messages, config=gen_config)
-            display_response, thought = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
+            legacy_response = self._run_with_retries(
+                step_number=2,
+                step_name="Legacy-Antwortgenerierung",
+                action=lambda: self._extract_legacy_generation(messages, gen_config, memories),
+                validator=self._is_valid_generation_result,
+                status_callback=status_callback,
+            )
+            display_response = legacy_response["response_text"]
+            thought = legacy_response.get("thought_process", "")
             self.debug_logger.log_info(
                 "LEGACY",
                 "Legacy-Antwort generiert",
                 {
                     "response_chars": len(display_response or ""),
                     "thought_chars": len(thought or ""),
-                    "memories_found": len(memories or []),
+                    "memories_found": len(legacy_response.get("rag_memories") or []),
                 },
             )
             
@@ -764,10 +1045,7 @@ def init_chappie():
             self.memory.add_memory(user_input, role="user")
             if display_response.strip() and not looks_like_model_error(display_response):
                 self.memory.add_memory(display_response, role="assistant")
-            
-            # Aktualisiere den Zeitstempel der letzten Erinnerung im Session State
-            
-            st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
+            self._set_last_memory_timestamp()
             
             # AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN (Legacy Mode)
             self.short_term_memory_v2.add_entry(
@@ -794,7 +1072,9 @@ def init_chappie():
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
                 "thought_process": thought,
-                "rag_memories": memories,
+                "model_reasoning": legacy_response.get("model_reasoning", ""),
+                "reasoning_only": legacy_response.get("reasoning_only", False),
+                "rag_memories": legacy_response.get("rag_memories", memories),
                 "intent_type": "legacy",
                 "intent_confidence": 1.0,
                 "tool_calls_executed": 0,

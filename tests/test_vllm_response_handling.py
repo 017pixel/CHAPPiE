@@ -69,9 +69,23 @@ def test_sync_generate_reports_reasoning_only_output():
     ])
     brain = _make_brain_with_response(response)
     result = brain._sync_generate([], GenerationConfig(stream=False), {})
-    assert result.startswith("vLLM Fehler:")
-    assert "reasoning_content" in result
-    assert "finish_reason=length" in result
+    assert "CHAPPiE schweigt..." in result
+    assert "<model_reasoning>" in result
+    assert "interner gedanke" in result
+
+
+def test_sync_generate_preserves_answer_and_model_reasoning():
+    response = _FakeResponse([
+        _FakeChoice(
+            _FakeMessage(content="Antwort", reasoning_content="vLLM denkt"),
+            finish_reason="stop",
+        )
+    ])
+    brain = _make_brain_with_response(response)
+    result = brain._sync_generate([], GenerationConfig(stream=False), {})
+    assert "<model_reasoning>" in result
+    assert "vLLM denkt" in result
+    assert result.strip().endswith("Antwort")
 
 
 def test_prepare_extra_body_sets_qwen_thinking_default_false():
@@ -91,6 +105,7 @@ def test_prepare_extra_body_respects_explicit_enable_thinking():
 if __name__ == "__main__":
     test_sync_generate_returns_content_when_present()
     test_sync_generate_reports_reasoning_only_output()
+    test_sync_generate_preserves_answer_and_model_reasoning()
     test_prepare_extra_body_sets_qwen_thinking_default_false()
     test_prepare_extra_body_respects_explicit_enable_thinking()
     print("OK: vLLM response handling")

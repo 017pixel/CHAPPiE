@@ -12,7 +12,10 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_life_simulation.py`
 - `tests/test_local_first_runtime.py`
 - `tests/test_debug_monitor_data.py`
+- `tests/test_ollama_response_handling.py`
+- `tests/test_chat_manager_persistence.py`
 - `tests/test_vllm_response_handling.py`
+- `tests/test_reasoning_layering.py`
 - `tests/test_web_ui_consistency.py`
 - `tests/test_quick.py`
 

@@ -1,7 +1,7 @@
 import streamlit as st
 from web_infrastructure.styles import inject_modern_css
 from web_infrastructure.backend_wrapper import init_chappie
-from web_infrastructure.state_manager import init_session_state
+from web_infrastructure.state_manager import init_session_state, restore_active_chat_session, sync_current_chat_session
 from web_infrastructure.sidebar_ui import render_sidebar
 from web_infrastructure.settings_ui import render_settings_overlay
 from web_infrastructure.memories_ui import render_memories_overlay
@@ -29,6 +29,8 @@ def main():
     
     # 2. Backend Init
     backend = init_chappie()
+    restore_active_chat_session(backend)
+    sync_current_chat_session(backend)
     
     # 3. Sidebar Render
     render_sidebar(backend)

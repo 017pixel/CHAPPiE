@@ -139,6 +139,14 @@ Mehr dazu: [docs/deployment.md](docs/deployment.md)
 
 ## Web UI, Dashboards und Befehle
 
+Der Chat speichert die aktive Session robust weiter, versucht Modellantworten bei Fehlern bis zu drei Mal neu und trennt sichtbar zwischen:
+
+- **Modell-Reasoning**
+- **CHAPPiEs Gedankenprozess**
+- **finaler Antwort**
+
+Wenn keine normale Antwort zustande kommt, erscheint `CHAPPiE schweigt...` und vorhandene Thinking-Bereiche werden automatisch aufgeklappt.
+
 ### Sidebar und Vitalzeichen
 
 Die Sidebar zeigt CHAPPiEs **7 kanonische Emotionen** aus [`memory/emotions_engine.py`](memory/emotions_engine.py):
@@ -217,6 +225,10 @@ Schnelle lokale Checks:
 ```bash
 python tests/test_forgetting_curve.py
 python tests/test_life_simulation.py
+python tests/test_ollama_response_handling.py
+python tests/test_chat_manager_persistence.py
+python tests/test_vllm_response_handling.py
+python tests/test_reasoning_layering.py
 python tests/manual/test_compatibility.py
 python -m Chappies_Trainingspartner.training_daemon --help
 ```

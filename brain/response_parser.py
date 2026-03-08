@@ -22,6 +22,14 @@ class ParsedResponse:
     raw: str                # Originale, ungeparste Antwort
 
 
+@dataclass
+class TaggedBlockExtraction:
+    """Extrahierter Tag-Block plus Resttext."""
+    content: Optional[str]
+    remaining: str
+    raw: str
+
+
 def parse_chain_of_thought(response: str) -> ParsedResponse:
     """
     Extrahiert Gedanken und Antwort aus einer strukturierten LLM-Antwort.
@@ -179,6 +187,22 @@ def parse_thinking_tags(response: str) -> ParsedResponse:
             break
     
     return ParsedResponse(thought=thought, answer=answer, raw=response)
+
+
+def extract_tagged_block(response: str, tag_names: list[str]) -> TaggedBlockExtraction:
+    """Extrahiert den ersten passenden XML-ähnlichen Block und liefert den Rest zurück."""
+    if not isinstance(response, str):
+        return TaggedBlockExtraction(content=None, remaining="", raw=str(response or ""))
+
+    for tag_name in tag_names:
+        pattern = rf'<{tag_name}>(.*?)</{tag_name}>'
+        match = re.search(pattern, response, re.DOTALL | re.IGNORECASE)
+        if match:
+            content = match.group(1).strip()
+            remaining = (response[:match.start()] + response[match.end():]).strip()
+            return TaggedBlockExtraction(content=content, remaining=remaining, raw=response)
+
+    return TaggedBlockExtraction(content=None, remaining=response.strip(), raw=response)
 
 
 # === Test ===

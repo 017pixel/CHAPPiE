@@ -34,7 +34,12 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_forgetting_curve.py`
 - `python tests/test_life_simulation.py`
 - `python tests/test_debug_monitor_data.py`
+- `python tests/test_ollama_response_handling.py`
+- `python tests/test_chat_manager_persistence.py`
 - `python tests/test_vllm_response_handling.py`
+- `python tests/test_reasoning_layering.py`
+- `python tests/test_web_ui_consistency.py`
+- `python -m py_compile app.py web_infrastructure/backend_wrapper.py web_infrastructure/command_handler.py`
 - `python tests/manual/test_compatibility.py`
 
 ## Wenn Doku geändert wurde

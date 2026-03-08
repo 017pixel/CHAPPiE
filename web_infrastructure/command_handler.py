@@ -22,6 +22,16 @@ def _format_emotion_list(emotions: dict) -> str:
         for emotion_key in EMOTION_DISPLAY_ORDER
     )
 
+
+def _persist_current_session(backend) -> str:
+    st.session_state.messages = backend.chat_manager.ensure_message_ids(st.session_state.messages)
+    session_id = backend.chat_manager.save_session(st.session_state.get("session_id"), st.session_state.messages)
+    st.session_state.session_id = session_id
+    backend.chat_manager.set_active_session(session_id)
+    session_data = backend.chat_manager.load_session(session_id)
+    st.session_state.session_updated_at = session_data.get("updated_at")
+    return session_id
+
 def process_command(user_input: str, backend) -> bool:
     """
     Verarbeitet Slash-Commands wie /sleep, /think, /deep think.
@@ -62,7 +72,7 @@ def process_command(user_input: str, backend) -> bool:
             "metadata": {"thought_process": "Kommando /sleep ausgefuehrt."}
         }
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -99,7 +109,7 @@ def process_command(user_input: str, backend) -> bool:
             "metadata": {"thought_process": f"Think-Modus mit Thema: {topic if topic else 'Allgemeine Selbstreflexion'}"}
         }
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -252,7 +262,7 @@ def process_command(user_input: str, backend) -> bool:
             }
         }
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         
         # Human-in-the-Loop: Zeige Buttons via Component
         action = render_deep_think_controls(st.session_state.deep_think_total_done)
@@ -274,7 +284,7 @@ def process_command(user_input: str, backend) -> bool:
 """
                 final_msg = {"role": "assistant", "content": final_summary, "metadata": {"thought_process": "Deep Think Session beendet"}}
                 st.session_state.messages.append(final_msg)
-                backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+                _persist_current_session(backend)
                 
                 st.session_state.pending_cmd = "/sleep"
                 st.rerun()
@@ -299,6 +309,8 @@ def process_command(user_input: str, backend) -> bool:
     elif cmd == "/clear":
          st.session_state.messages = []
          st.session_state.session_id = backend.chat_manager.create_session()
+         backend.chat_manager.set_active_session(st.session_state.session_id)
+         st.session_state.session_updated_at = None
          st.rerun()
          return True
     
@@ -340,7 +352,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
 **Tipp:** Klicke auf die Buttons oben fuer schnellen Zugriff!"""
         assistant_msg = {"role": "assistant", "content": help_text, "metadata": {"thought_process": "Kommando /help ausgefuehrt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -359,7 +371,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
 {_format_emotion_list(status.get('emotions', {}))}"""
         assistant_msg = {"role": "assistant", "content": stats_text, "metadata": {"thought_process": "Kommando /stats ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
 
@@ -367,7 +379,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": f"Kommando {cmd} ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -381,7 +393,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /daily ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -389,7 +401,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /personality ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -401,7 +413,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
             st.session_state.short_term_count = backend.short_term_memory_v2.get_count()
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /consolidate ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -409,7 +421,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /reflect ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -417,7 +429,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /functions ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -428,7 +440,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         st.session_state.debug_mode = not st.session_state.get("debug_mode", False)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /debug ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -436,7 +448,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /step1 ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -444,7 +456,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /soul ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -452,7 +464,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /user ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -460,7 +472,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /prefs ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -468,7 +480,7 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
         response = backend.handle_command(cmd)
         assistant_msg = {"role": "assistant", "content": response, "metadata": {"thought_process": "Kommando /twostep ausgeführt."}}
         st.session_state.messages.append(assistant_msg)
-        backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+        _persist_current_session(backend)
         st.rerun()
         return True
     
@@ -476,87 +488,68 @@ Aktiviere den DEBUG MODE Button in der Sidebar fuer das Brain Monitor Panel.
 
 def process_chat_message(user_input: str, backend):
     """Verarbeitet eine normale Chat-Nachricht."""
-    # Debug Mode aus Session State holen
     debug_mode = st.session_state.get("debug_mode", False)
-    
+    st.session_state.messages = backend.chat_manager.ensure_message_ids(st.session_state.messages)
+    history = st.session_state.messages[:-1]
+    st.session_state.session_id = backend.chat_manager.ensure_session_id(st.session_state.get("session_id"))
+    backend.chat_manager.set_active_session(st.session_state.session_id)
+
+    pending_message_id = backend.chat_manager.create_message_id()
+    st.session_state.messages.append(backend._build_pending_message(pending_message_id))
+    _persist_current_session(backend)
+
+    backend.start_async_chat(
+        session_id=st.session_state.session_id,
+        message_id=pending_message_id,
+        user_input=user_input,
+        history=history,
+        debug_mode=debug_mode,
+    )
+
     with st.chat_message("assistant"):
-        with st.spinner("CHAPPiE denkt nach..."):
-            result = backend.process(user_input, st.session_state.messages[:-1], debug_mode=debug_mode)
-            st.markdown(result["response_text"])
-            if result.get("emotions") and isinstance(result["emotions"], dict):
-                st.session_state.current_emotions = normalize_emotions(result["emotions"])
-            if result.get("life_snapshot"):
-                st.session_state.current_life_state = result["life_snapshot"]
-            if result.get("global_workspace"):
-                st.session_state.current_workspace = result["global_workspace"]
-            
-            # Aktualisiere Short-term Memory Count fuer Sidebar
-            if result.get("short_term_count") is not None:
-                st.session_state.short_term_count = result["short_term_count"]
-            
-            # Zeige Debug Info wenn Debug Mode an
-            if debug_mode and result.get("debug_log"):
-                with st.expander("DEBUG INFO", expanded=False):
-                    st.text(result["debug_log"])
-                    
-                    # Zeige Intent Info
-                    if result.get("intent_type"):
-                        st.markdown(f"**Intent:** {result['intent_type']} ({result.get('intent_confidence', 0):.0%})")
-                    
-                    # Zeige Tool Calls
-                    if result.get("tool_calls_executed", 0) > 0:
-                        st.markdown(f"**Tool Calls:** {result['tool_calls_executed']} ausgeführt")
-                    
-                    # Zeige Short Term Count
-                    st.markdown(f"**Short-Term Entries:** {result.get('short_term_count', 0)}")
-    
-    # Helper to serialize memories for JSON storage (Memory objects are not JSON serializable by default)
-    formatted_memories = []
-    if result.get("rag_memories"):
-        for m in result["rag_memories"]:
-            formatted_memories.append({
-                "content": m.content,
-                "relevance_score": m.relevance_score,
-                "role": m.role,
-                "label": getattr(m, 'label', 'original'),
-                "id": m.id,
-                "timestamp": getattr(m, 'timestamp', ''),
-                "type": getattr(m, 'mem_type', 'interaction'),
-            })
+        content_placeholder = st.empty()
+        status_placeholder = st.empty()
+        final_message = None
 
-    intent_raw = result.get("intent_raw_json", {})
-    tool_calls_raw = intent_raw.get("tool_calls", []) if isinstance(intent_raw, dict) else []
-    
-    assistant_msg = {
-        "role": "assistant",
-        "content": result["response_text"],
-        "metadata": {
-            "thought_process": result.get("thought_process"),
-            "rag_memories": formatted_memories,
-            "emotions_delta": result.get("emotions_delta", {}),
-            "emotions_before": result.get("emotions_before", {}),
-            "input_analysis": result.get("input_analysis", user_input),
-            "intent_type": result.get("intent_type"),
-            "intent_confidence": result.get("intent_confidence"),
-            "tool_calls_executed": result.get("tool_calls_executed", 0),
-            "available_tools": result.get("available_tools", []),
-            "selected_tools": result.get("selected_tools", []),
-            "unused_tools": result.get("unused_tools", []),
-            "intent_raw_json": intent_raw,
-            "tool_calls": tool_calls_raw,
-            "short_term_count": result.get("short_term_count", 0),
-            "processing_time_ms": result.get("processing_time_ms", 0),
-            "life_snapshot": result.get("life_snapshot", {}),
-            "global_workspace": result.get("global_workspace", {}),
-            "action_plan": result.get("action_plan", {}),
-            "dream_fragments": result.get("dream_fragments", []),
-            "debug_entries": result.get("debug_entries", []),
-            "debug_log": result.get("debug_log"),
-            "provider": result.get("provider", ""),
-            "model": result.get("model", ""),
-        }
-    }
+        while True:
+            session_data = backend.chat_manager.load_session(st.session_state.session_id)
+            st.session_state.messages = session_data.get("messages", st.session_state.messages)
+            st.session_state.session_updated_at = session_data.get("updated_at")
 
-    st.session_state.messages.append(assistant_msg)
-    backend.chat_manager.save_session(st.session_state.session_id, st.session_state.messages)
+            final_message = next(
+                (msg for msg in st.session_state.messages if msg.get("id") == pending_message_id),
+                None,
+            )
+
+            if final_message:
+                final_meta = final_message.get("metadata") or {}
+                content_placeholder.markdown(final_message.get("content", ""))
+                if final_meta.get("status_text"):
+                    status_placeholder.caption(final_meta.get("status_text"))
+                else:
+                    status_placeholder.empty()
+
+                if not final_meta.get("pending"):
+                    if final_meta.get("emotions") and isinstance(final_meta["emotions"], dict):
+                        st.session_state.current_emotions = normalize_emotions(final_meta["emotions"])
+                    if final_meta.get("life_snapshot"):
+                        st.session_state.current_life_state = final_meta["life_snapshot"]
+                    if final_meta.get("global_workspace"):
+                        st.session_state.current_workspace = final_meta["global_workspace"]
+                    if final_meta.get("short_term_count") is not None:
+                        st.session_state.short_term_count = final_meta["short_term_count"]
+                    break
+
+            time.sleep(0.4)
+
+        final_meta = (final_message or {}).get("metadata") or {}
+        if debug_mode and final_meta.get("debug_log"):
+            with st.expander("DEBUG INFO", expanded=False):
+                st.text(final_meta["debug_log"])
+                if final_meta.get("intent_type"):
+                    st.markdown(f"**Intent:** {final_meta['intent_type']} ({final_meta.get('intent_confidence', 0):.0%})")
+                if final_meta.get("tool_calls_executed", 0) > 0:
+                    st.markdown(f"**Tool Calls:** {final_meta['tool_calls_executed']} ausgeführt")
+                st.markdown(f"**Short-Term Entries:** {final_meta.get('short_term_count', 0)}")
+
     st.rerun()

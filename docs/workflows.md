@@ -95,6 +95,16 @@ Datei [`app.py`](../app.py) routet zwischen:
 - Life Dashboard
 - Growth Dashboard
 
+Der Chat-Flow stellt die zuletzt aktive Session automatisch wieder her. Laufende Antworten werden zuerst als pending gespeichert und können im Hintergrund weiterlaufen, sodass ein kurzes Schließen/Neuladen der UI den Chat nicht mehr verwerfen soll.
+
+Im Chat werden Antwortschichten getrennt behandelt:
+
+- **Modell-Reasoning**: echtes Provider-/Modell-Denken, z. B. von Qwen über Ollama oder vLLM
+- **CHAPPiEs Gedankenprozess**: interne `<thinking>` / `<gedanke>`-Tags
+- **Antwort**: finaler sichtbarer Antworttext
+
+Wenn keine finale Antwort vorliegt, wird stattdessen `CHAPPiE schweigt...` angezeigt und die vorhandenen Thinking-Bereiche werden automatisch aufgeklappt.
+
 Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
 
 ### Debug Mode / Brain Monitor
@@ -105,7 +115,7 @@ Im **DEBUG MODE: ON** zeigt der aufklappbare **Brain Monitor** die Laufzeitpipel
 2. Tool-Orchestrierung (verfügbar, ausgewählt, nicht genutzt, ausgeführt)
 3. Emotionen + Homeostasis (Before/After/Delta + Anpassungen)
 4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development)
-5. Antwortgenerierung (Reasoning/Thought + Action Plan)
+5. Antwortgenerierung (Modell-Reasoning + CHAPPiE-Thought + Action Plan)
 6. Event-Log (strukturierte Debug-Einträge pro Schritt)
 
 Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle.

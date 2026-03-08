@@ -11,7 +11,7 @@ Perfekt fuer:
 Voraussetzung: Ollama muss laufen (https://ollama.ai)
 """
 
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 import ollama
 from ollama import Client
 
@@ -45,6 +45,107 @@ class OllamaBrain(BaseBrain):
         print(f"Ollama Brain initialisiert")
         print(f"   Host: {self.host}")
         print(f"   Modell: {self.model}")
+
+    def _supports_thinking_toggle(self) -> bool:
+        model_name = self.model.lower()
+        return any(name in model_name for name in ("qwen3", "qwen3.5", "deepseek", "gpt-oss"))
+
+    def _build_chat_kwargs(
+        self,
+        messages: list[dict],
+        options: dict,
+        stream: bool,
+        think_override: Optional[bool] = None,
+    ) -> dict:
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "options": options,
+            "stream": stream,
+        }
+        if think_override is not None:
+            kwargs["think"] = think_override
+        elif self._supports_thinking_toggle():
+            kwargs["think"] = False
+        return kwargs
+
+    def _chat(
+        self,
+        messages: list[dict],
+        options: dict,
+        stream: bool,
+        think_override: Optional[bool] = None,
+    ):
+        kwargs = self._build_chat_kwargs(messages, options, stream, think_override=think_override)
+        try:
+            return self.client.chat(**kwargs)
+        except TypeError:
+            kwargs.pop("think", None)
+            return self.client.chat(**kwargs)
+        except Exception as exc:
+            error_text = str(exc).lower()
+            if "think" in error_text and ("unexpected" in error_text or "unknown" in error_text):
+                kwargs.pop("think", None)
+                return self.client.chat(**kwargs)
+            raise
+
+    @staticmethod
+    def _message_content(message: Any) -> str:
+        if isinstance(message, dict):
+            return str(message.get("content", "") or "")
+        return str(getattr(message, "content", "") or "")
+
+    @staticmethod
+    def _message_thinking(message: Any) -> str:
+        if isinstance(message, dict):
+            return str(message.get("thinking", "") or "")
+        return str(getattr(message, "thinking", "") or "")
+
+    @staticmethod
+    def _response_message(response: Any) -> Any:
+        if isinstance(response, dict):
+            return response.get("message", {})
+        return getattr(response, "message", {})
+
+    @staticmethod
+    def _response_done_reason(response: Any) -> str:
+        if isinstance(response, dict):
+            return str(response.get("done_reason", "") or "")
+        return str(getattr(response, "done_reason", "") or "")
+
+    def _empty_response_error(self, thinking: str = "", done_reason: str = "") -> str:
+        details = []
+        if thinking:
+            details.append("nur Thinking/Reasoning ohne finalen Antworttext")
+        if done_reason:
+            details.append(f"done_reason={done_reason}")
+        detail_suffix = f" ({', '.join(details)})" if details else ""
+        return f"Ollama Fehler: Leere Modellantwort{detail_suffix}"
+
+    @staticmethod
+    def _format_reasoning_response(thinking: str, answer: str = "CHAPPiE schweigt...") -> str:
+        cleaned_thinking = (thinking or "").strip()
+        cleaned_answer = (answer or "CHAPPiE schweigt...").strip()
+        return f"<model_reasoning>\n{cleaned_thinking}\n</model_reasoning>\n\n{cleaned_answer}"
+
+    def _recover_reasoning_only_response(self, messages: list[dict], options: dict) -> str:
+        if not self._supports_thinking_toggle():
+            return self._empty_response_error()
+
+        try:
+            response = self._chat(messages=messages, options=options, stream=False, think_override=True)
+            message = self._response_message(response)
+            content = self._message_content(message).strip()
+            thinking = self._message_thinking(message).strip()
+            if content and thinking:
+                return self._format_reasoning_response(thinking, answer=content)
+            if thinking:
+                return self._format_reasoning_response(thinking)
+            if content:
+                return content
+            return self._empty_response_error(done_reason=self._response_done_reason(response).strip())
+        except Exception:
+            return self._empty_response_error()
     
     def generate(
         self,
@@ -92,18 +193,22 @@ class OllamaBrain(BaseBrain):
     ) -> Generator[str, None, None]:
         """Streaming-Generierung - Token fuer Token."""
         try:
-            stream = self.client.chat(
-                model=self.model,
-                messages=messages,
-                options=options,
-                stream=True
-            )
+            stream = self._chat(messages=messages, options=options, stream=True)
+            saw_thinking = False
+            saw_content = False
             
             for chunk in stream:
-                if chunk and "message" in chunk:
-                    content = chunk["message"].get("content", "")
-                    if content:
-                        yield content
+                message = self._response_message(chunk)
+                content = self._message_content(message)
+                thinking = self._message_thinking(message)
+                if thinking:
+                    saw_thinking = True
+                if content:
+                    saw_content = True
+                    yield content
+
+            if not saw_content:
+                yield self._empty_response_error(thinking="1" if saw_thinking else "")
                         
         except Exception as e:
             yield f"\nOllama Fehler: {str(e)}"
@@ -111,13 +216,22 @@ class OllamaBrain(BaseBrain):
     def _sync_generate(self, messages: list[dict], options: dict) -> str:
         """Synchrone Generierung - komplette Antwort auf einmal."""
         try:
-            response = self.client.chat(
-                model=self.model,
-                messages=messages,
-                options=options,
-                stream=False
-            )
-            return response["message"]["content"]
+            response = self._chat(messages=messages, options=options, stream=False)
+            message = self._response_message(response)
+            content = self._message_content(message).strip()
+            thinking = self._message_thinking(message).strip()
+            done_reason = self._response_done_reason(response).strip()
+
+            if content and thinking:
+                return self._format_reasoning_response(thinking, answer=content)
+            if content:
+                return content
+            if thinking:
+                return self._format_reasoning_response(thinking)
+            recovered = self._recover_reasoning_only_response(messages, options)
+            if recovered and not recovered.startswith("Ollama Fehler"):
+                return recovered
+            return self._empty_response_error(thinking=thinking, done_reason=done_reason)
             
         except Exception as e:
             return f"Ollama Fehler: {str(e)}"

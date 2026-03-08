@@ -8,7 +8,9 @@ def render_sidebar(backend):
 
         if st.button("Neuer Chat", use_container_width=True, key="sidebar_new_chat"):
             st.session_state.session_id = backend.chat_manager.create_session()
+            backend.chat_manager.set_active_session(st.session_state.session_id)
             st.session_state.messages = []
+            st.session_state.session_updated_at = None
             st.rerun()
 
         if st.button("Alle Erinnerungen", use_container_width=True, key="sidebar_memories"):
@@ -89,7 +91,9 @@ def render_sidebar(backend):
                 if st.button(label, key=f"sess_{s['id']}", use_container_width=True):
                     st.session_state.session_id = s["id"]
                     data = backend.chat_manager.load_session(s["id"])
+                    backend.chat_manager.set_active_session(s["id"])
                     st.session_state.messages = data.get("messages", [])
+                    st.session_state.session_updated_at = data.get("updated_at")
                     st.rerun()
         except Exception as e:
             st.error(f"Fehler: {e}")

@@ -147,17 +147,15 @@ class VLLMBrain(BaseBrain):
             first_choice = choices[0]
             message = getattr(first_choice, "message", None)
             content = self._normalize_content(getattr(message, "content", None))
+            reasoning = self._extract_reasoning_content(message)
+            if content and reasoning:
+                return self._format_reasoning_response(reasoning, answer=content)
             if content:
                 return content
 
             finish_reason = getattr(first_choice, "finish_reason", "unknown")
-            reasoning = self._extract_reasoning_content(message)
             if reasoning:
-                return (
-                    "vLLM Fehler: Modell lieferte nur reasoning_content ohne finale Antwort "
-                    f"(finish_reason={finish_reason}, reasoning_chars={len(reasoning)}). "
-                    "Setze chat_template_kwargs.enable_thinking=false oder erhoehe MAX_TOKENS."
-                )
+                return self._format_reasoning_response(reasoning, answer="CHAPPiE schweigt...")
 
             tool_calls = getattr(message, "tool_calls", None)
             if tool_calls:
@@ -185,6 +183,12 @@ class VLLMBrain(BaseBrain):
             payload["chat_template_kwargs"] = chat_kwargs
 
         return payload
+
+    @staticmethod
+    def _format_reasoning_response(reasoning: str, answer: str) -> str:
+        cleaned_reasoning = (reasoning or "").strip()
+        cleaned_answer = (answer or "CHAPPiE schweigt...").strip()
+        return f"<model_reasoning>\n{cleaned_reasoning}\n</model_reasoning>\n\n{cleaned_answer}"
 
     @staticmethod
     def _normalize_content(value: Any) -> str:
