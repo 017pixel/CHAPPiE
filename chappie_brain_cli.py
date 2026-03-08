@@ -115,7 +115,7 @@ class CHAPPiEBrainCLI:
             print_log("SLEEP", "Starte Schlafphase...", Colors.MEMORY)
             from memory.sleep_phase import get_sleep_phase_handler
             handler = get_sleep_phase_handler()
-            result = handler.execute_sleep_phase(memory_engine=self.memory)
+            result = handler.execute_sleep_phase(memory_engine=self.memory, context_files=self.context)
             
             if result.get("energy_restored"):
                 print_log("SLEEP", f"Energie wiederhergestellt: {result.get('energy_value', 100)}%", Colors.SUCCESS)
@@ -357,6 +357,7 @@ class CHAPPiEBrainCLI:
             response=full_response,
             emotions_before=filtered_emotions,
             emotions_after=brain_result["emotions_after"],
+            memory_engine=self.memory,
             context_files=self.context,
             amygdala_result=brain_result.get("amygdala"),
             hippocampus_result=brain_result.get("hippocampus"),

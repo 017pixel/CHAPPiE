@@ -14,7 +14,9 @@ import sys
 import os
 import logging
 import argparse
+import signal
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 import json
 
@@ -41,32 +43,55 @@ def setup_logging():
     """Setup logging to file for headless operation."""
     log_file = os.path.join(PROJECT_ROOT, 'training_daemon.log')
 
-    # Remove default handlers
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
+    root_logger = logging.getLogger('')
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    root_logger.setLevel(logging.DEBUG)
 
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.DEBUG,  # DEBUG fuer detailliertere Logs
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=5 * 1024 * 1024,
+        backupCount=3,
+        encoding='utf-8',
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
 
     # Also log to console for systemd (simple format)
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+    console.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(console)
     
     # Rich console output auch enable (falls verfügbar)
     try:
         from rich.logging import RichHandler
         rich_handler = RichHandler(rich_tracebacks=True, show_time=False, show_path=False)
         rich_handler.setLevel(logging.INFO)
-        logging.getLogger('').addHandler(rich_handler)
+        root_logger.addHandler(rich_handler)
     except ImportError:
         logging.warning("Rich nicht installiert - verwende Standard-Console-Output")
+
+
+def install_signal_handlers(loop_holder: dict):
+    """Installiert Signal-Handler für graceful shutdown."""
+
+    def _handle_shutdown(signum, _frame):
+        logging.warning(f"Shutdown-Signal empfangen: {signum}")
+        loop = loop_holder.get("loop")
+        if loop is not None:
+            loop.stop()
+
+    for signal_name in ("SIGTERM", "SIGINT"):
+        sig = getattr(signal, signal_name, None)
+        if sig is not None:
+            signal.signal(sig, _handle_shutdown)
 
 
 def get_interactive_config() -> dict:
@@ -216,13 +241,10 @@ Beispiele:
             clear_training_state()
             save_config(config_dict, config_path)
             
-            config = TrainerConfig(
-                persona=config_dict["persona"],
-                focus_area=config_dict["focus_area"]
-            )
-            start_prompt = config_dict.get("start_prompt", "Hallo Chappie!")
-            provider = config_dict["provider"]
-            model_name = config_dict.get("model_name")
+            config = TrainerConfig.from_dict(config_dict)
+            start_prompt = config.start_prompt
+            provider = config.provider
+            model_name = config.model_name
 
             print("\n" + "=" * 60)
             print("    TRAINING KONFIGURATION")
@@ -240,13 +262,10 @@ Beispiele:
                 with open(config_path, 'r', encoding='utf-8') as f:
                     saved_config = json.load(f)
                     
-                config = TrainerConfig(
-                    persona=saved_config.get("persona", "Ein kritischer User"),
-                    focus_area=saved_config.get("focus_area", "Logikfehler")
-                )
-                provider = saved_config.get("provider", "local")
-                model_name = saved_config.get("model_name")
-                start_prompt = saved_config.get("start_prompt", "Hallo Chappie!")
+                config = TrainerConfig.from_dict(saved_config)
+                provider = config.provider
+                model_name = config.model_name
+                start_prompt = config.start_prompt
             else:
                 logging.warning("Keine training_config.json gefunden! Nutze Defaults.")
                 # Fallback configuration
@@ -254,11 +273,11 @@ Beispiele:
                     persona="Ein kritischer User, der versucht Fehler zu finden",
                     focus_area="Logikfehler und Konsistenz im Gedaechtnis"
                 )
-                provider = "local"
-                model_name = None
-                start_prompt = "Hallo Chappie! Lass uns ein Gespraech fuehren."
+                provider = config.provider
+                model_name = config.model_name
+                start_prompt = config.start_prompt
         
-        logging.info(f"Aktive Konfiguration: {config.__dict__}")
+        logging.info(f"Aktive Konfiguration: {config.to_dict()}")
         
         from config.config import settings, LLMProvider
         
@@ -310,6 +329,8 @@ Beispiele:
         
         trainer = TrainerAgent(config)
         loop = TrainingLoop(trainer)
+        loop_holder = {"loop": loop}
+        install_signal_handlers(loop_holder)
         
         # Bei neuem Training: Start-Prompt uebergeben
         if args.neu or args.fokus:

@@ -20,6 +20,7 @@ from memory.function_registry import get_function_registry
 from memory.context_files import get_context_files_manager
 from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
+from memory.sleep_phase import get_sleep_phase_handler
 from brain import get_brain
 from brain.action_response import ActionResponseLayer
 from brain.agents.steering_manager import get_steering_manager
@@ -55,6 +56,8 @@ def init_chappie():
 
             # NEU: Context Files Manager (soul.md, user.md, CHAPPiEsPreferences.md)
             self.context_files = get_context_files_manager()
+            self.sleep_handler = get_sleep_phase_handler()
+            self._sleep_job_lock = threading.Lock()
 
             # NEU: Short-Term Memory V2 (JSON-basiert mit Timestamps)
             self.short_term_memory_v2 = get_short_term_memory_v2(memory_engine=self.memory)
@@ -108,6 +111,42 @@ def init_chappie():
             except Exception:
                 return
 
+        def _run_sleep_phase_job(self):
+            try:
+                result = self.sleep_handler.execute_sleep_phase(
+                    memory_engine=self.memory,
+                    context_files=self.context_files,
+                )
+                self.debug_logger.log_info(
+                    "SLEEP",
+                    "Automatische Schlafphase abgeschlossen",
+                    {
+                        "context_updates": result.get("context_updates", {}),
+                        "duration_seconds": result.get("duration_seconds", 0),
+                        "dream_fragments": len(result.get("dream_replay", [])),
+                    },
+                )
+            except Exception as exc:
+                self.debug_logger.log_error("SLEEP", f"Automatische Schlafphase fehlgeschlagen: {exc}")
+            finally:
+                try:
+                    self._sleep_job_lock.release()
+                except RuntimeError:
+                    pass
+
+        def _schedule_sleep_phase_if_due(self) -> Dict[str, Any]:
+            self.sleep_handler.increment_interaction()
+            status = self.sleep_handler.get_status()
+            if not self.sleep_handler.should_run_sleep():
+                return {"triggered": False, "status": status}
+
+            if not self._sleep_job_lock.acquire(blocking=False):
+                return {"triggered": False, "status": status, "already_running": True}
+
+            worker = threading.Thread(target=self._run_sleep_phase_job, daemon=True, name="chappie-sleep-phase")
+            worker.start()
+            return {"triggered": True, "status": self.sleep_handler.get_status()}
+
         @staticmethod
         def _serialize_rag_memories(memories: List[Any] | None) -> List[Dict[str, Any]]:
             formatted_memories = []
@@ -155,6 +194,8 @@ def init_chappie():
                 "debug_log": result.get("debug_log"),
                 "provider": result.get("provider", ""),
                 "model": result.get("model", ""),
+                "auto_sleep_triggered": result.get("auto_sleep_triggered", False),
+                "sleep_status": result.get("sleep_status", {}),
                 "pending": False,
                 "status_text": "",
                 "retry_history": result.get("retry_history", []),
@@ -716,6 +757,7 @@ def init_chappie():
                 category="chat",
                 importance="normal"
             )
+            sleep_result = self._schedule_sleep_phase_if_due()
             
             start_time_dt = datetime.now()
             processing_time_ms = 0
@@ -750,6 +792,8 @@ def init_chappie():
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
                 "provider": settings.llm_provider.value,
                 "model": get_active_model(),
+                "auto_sleep_triggered": sleep_result.get("triggered", False),
+                "sleep_status": sleep_result.get("status", {}),
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
@@ -1135,6 +1179,7 @@ def init_chappie():
                 prefrontal={"response_guidance": "Legacy path mit Life-Simulation"},
                 global_workspace={"dominant_focus": {"label": "Legacy Input"}},
             )
+            sleep_result = self._schedule_sleep_phase_if_due()
             
             return {
                 "response_text": display_response,
@@ -1162,6 +1207,8 @@ def init_chappie():
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
                 "provider": settings.llm_provider.value,
                 "model": get_active_model(),
+                "auto_sleep_triggered": sleep_result.get("triggered", False),
+                "sleep_status": sleep_result.get("status", {}),
             }
 
         # === Command Handler ===

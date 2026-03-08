@@ -135,14 +135,7 @@ class SleepPhaseHandler:
                 
                 forgetting_result = self._apply_forgetting_curve(memory_engine)
                 results["forgetting"] = forgetting_result
-                
-                if context_files:
-                    context_result = self._update_context_files(
-                        context_files,
-                        results.get("consolidation", {})
-                    )
-                    results["context_updates"] = context_result
-                
+
                 # ENERGIE WIEDERHERSTELLEN (95-100%)
                 energy_recovery = self._restore_energy()
                 results["energy_restored"] = True
@@ -156,10 +149,15 @@ class SleepPhaseHandler:
                 results["dream_replay"] = life_result.get("dream_replay", [])
                 results["replay_state"] = life_result.get("replay_state", {})
                 results["life_snapshot"] = life_result.get("life_snapshot", {})
+
+                if context_files:
+                    context_result = self._update_context_files(context_files, results)
+                    results["context_updates"] = context_result
                 
                 self._state["last_sleep_time"] = datetime.now().isoformat()
                 self._state["interaction_count_since_sleep"] = 0
                 self._state["total_sleeps"] = self._state.get("total_sleeps", 0) + 1
+                self._state["last_consolidation_count"] = results.get("consolidation", {}).get("consolidated", 0)
                 self._save_state()
                 
             except Exception as e:
@@ -299,14 +297,113 @@ class SleepPhaseHandler:
         
         return result
     
-    def _update_context_files(self, context_files, consolidation_data: Dict) -> Dict[str, Any]:
-        """Update context files based on consolidated memories."""
+    def _update_context_files(self, context_files, sleep_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update context files based on sleep, replay and life-snapshot data."""
         result = {
             "soul_updated": False,
             "user_updated": False,
-            "preferences_updated": False
+            "preferences_updated": False,
+            "notes": []
         }
-        
+
+        consolidation = sleep_data.get("consolidation", {}) or {}
+        life_snapshot = sleep_data.get("life_snapshot", {}) or {}
+        replay_state = sleep_data.get("replay_state", {}) or {}
+        dream_replay = sleep_data.get("dream_replay", []) or []
+
+        active_goal = life_snapshot.get("active_goal", {}) or {}
+        self_model = life_snapshot.get("self_model", {}) or {}
+        relationship = life_snapshot.get("relationship", {}) or {}
+        attachment = life_snapshot.get("attachment_model", {}) or {}
+        world_model = life_snapshot.get("world_model", {}) or {}
+        dominant_need = (life_snapshot.get("homeostasis", {}).get("dominant_need") or {}).get("name")
+
+        try:
+            soul_updates: Dict[str, Any] = {}
+            if self_model.get("narrative"):
+                soul_updates["self_perception"] = self_model["narrative"]
+
+            trust_value = relationship.get("trust")
+            if isinstance(trust_value, (int, float)):
+                soul_updates["trust_level"] = max(0, min(100, int(round(float(trust_value) * 100))))
+
+            bond_type = attachment.get("bond_type")
+            if bond_type:
+                soul_updates["connection"] = str(bond_type).replace("_", " ")
+
+            if active_goal.get("title"):
+                soul_updates["current_goal"] = active_goal.get("title")
+            if life_snapshot.get("current_mode"):
+                soul_updates["current_mode"] = life_snapshot.get("current_mode")
+            if life_snapshot.get("current_activity") or dominant_need:
+                soul_updates["current_focus"] = life_snapshot.get("current_activity") or dominant_need
+
+            evolution_notes: List[str] = []
+            if consolidation.get("consolidated"):
+                evolution_notes.append(f"Sleep consolidated {consolidation['consolidated']} memories into longer-term context.")
+            replay_summary = replay_state.get("summary")
+            if replay_summary:
+                evolution_notes.append(str(replay_summary))
+            for fragment in dream_replay[:2]:
+                evolution_notes.append(str(fragment)[:180])
+            if evolution_notes:
+                soul_updates["evolution_notes"] = evolution_notes
+
+            if soul_updates:
+                context_files.update_soul(soul_updates)
+                result["soul_updated"] = True
+                result["notes"].append("soul")
+        except Exception as exc:
+            result["soul_error"] = str(exc)
+
+        try:
+            user_updates: Dict[str, Any] = {}
+            predicted_need = world_model.get("predicted_user_need")
+            if predicted_need:
+                user_updates["notes"] = [f"Aktuell vermutetes User-Beduerfnis: {predicted_need}"]
+
+            social_arc = life_snapshot.get("social_arc", {}) or {}
+            arc_name = social_arc.get("arc_name")
+            if arc_name:
+                user_updates.setdefault("key_moments", []).append(
+                    f"Relationship arc currently trends toward {str(arc_name).replace('_', ' ')}."
+                )
+
+            if user_updates:
+                context_files.update_user(user_updates)
+                result["user_updated"] = True
+                result["notes"].append("user")
+        except Exception as exc:
+            result["user_error"] = str(exc)
+
+        try:
+            preference_updates: Dict[str, Any] = {}
+            if active_goal.get("title"):
+                preference_updates["self_development_goal"] = active_goal.get("title")
+
+            topics = replay_state.get("themes") or []
+            if topics:
+                preference_updates["topics_of_interest"] = [str(topic).replace("_", " ") for topic in topics[:4]]
+
+            reflections = []
+            chapter = self_model.get("current_chapter")
+            if chapter:
+                reflections.append(f"Current chapter: {chapter}")
+            last_reflection = self_model.get("last_reflection")
+            if last_reflection:
+                reflections.append(str(last_reflection))
+            if dominant_need:
+                reflections.append(f"Dominant internal need after sleep: {dominant_need}")
+            if reflections:
+                preference_updates["reflections"] = reflections[:3]
+
+            if preference_updates:
+                context_files.update_preferences(preference_updates)
+                result["preferences_updated"] = True
+                result["notes"].append("preferences")
+        except Exception as exc:
+            result["preferences_error"] = str(exc)
+
         return result
     
     def get_status(self) -> Dict[str, Any]:

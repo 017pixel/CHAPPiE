@@ -100,7 +100,7 @@ SLEEP_PHASE_CONFIG = {
         },
         "interaction_based": {
             "enabled": True,
-            "interval_interactions": 100
+            "interval_interactions": 25
         },
         "idle_based": {
             "enabled": False,

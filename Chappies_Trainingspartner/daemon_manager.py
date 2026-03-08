@@ -21,6 +21,63 @@ LOG_FILE = PROJECT_ROOT / "training_daemon.log"
 STATE_FILE = PROJECT_ROOT / "training_state.json"
 CONFIG_FILE = PROJECT_ROOT / "training_config.json"
 
+DEFAULT_TRAINING_CONFIG = {
+    "persona": "Ein kritischer aber fairer Nutzer",
+    "focus_area": "Allgemeines Wissen und Konversation",
+    "curriculum": [{"topic": "Allgemeines Wissen und Konversation", "duration_minutes": "infinite"}],
+    "timeout_seconds": 60,
+    "start_prompt": "Hallo Chappie! Lass uns ein Gespraech fuehren.",
+    "provider": "local",
+    "model_name": None,
+    "sleep_interval_messages": 25,
+    "loop_pause_seconds": 0.5,
+    "request_pause_seconds": 2.5,
+}
+
+
+def _normalize_training_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    merged = {**DEFAULT_TRAINING_CONFIG, **(config or {})}
+    curriculum = merged.get("curriculum") or []
+
+    normalized_curriculum = []
+    for item in curriculum:
+        topic = str((item or {}).get("topic", "")).strip()
+        duration = (item or {}).get("duration_minutes", "infinite")
+        if not topic:
+            continue
+        normalized_curriculum.append({"topic": topic, "duration_minutes": duration})
+
+    focus = str(merged.get("focus_area") or "").strip()
+    if not normalized_curriculum and focus:
+        normalized_curriculum = [{"topic": focus, "duration_minutes": "infinite"}]
+    if not normalized_curriculum:
+        normalized_curriculum = list(DEFAULT_TRAINING_CONFIG["curriculum"])
+
+    merged["curriculum"] = normalized_curriculum
+    merged["focus_area"] = focus or normalized_curriculum[0]["topic"]
+    merged["sleep_interval_messages"] = max(5, int(merged.get("sleep_interval_messages", 25)))
+    merged["timeout_seconds"] = max(10, int(merged.get("timeout_seconds", 60)))
+    merged["loop_pause_seconds"] = max(0.0, float(merged.get("loop_pause_seconds", 0.5)))
+    merged["request_pause_seconds"] = max(0.5, float(merged.get("request_pause_seconds", 2.5)))
+    return merged
+
+
+def load_training_config() -> Dict[str, Any]:
+    if not CONFIG_FILE.exists():
+        return _normalize_training_config()
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            return _normalize_training_config(json.load(f))
+    except Exception:
+        return _normalize_training_config()
+
+
+def save_training_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = _normalize_training_config(config)
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(normalized, f, ensure_ascii=False, indent=2)
+    return normalized
+
 
 def is_daemon_running() -> Optional[int]:
     """
@@ -79,7 +136,7 @@ def is_daemon_running() -> Optional[int]:
         return None
 
 
-def start_daemon(focus: str = None, new: bool = False) -> Dict[str, Any]:
+def start_daemon(focus: str = None, new: bool = False, config_overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Startet den Training-Daemon als Hintergrundprozess.
     
@@ -107,13 +164,20 @@ def start_daemon(focus: str = None, new: bool = False) -> Dict[str, Any]:
                 'message': 'Chappies_Trainingspartner Modul nicht gefunden'
             }
 
-        cmd = [sys.executable, '-m', 'Chappies_Trainingspartner.training_daemon']
-        
+        if config_overrides or focus:
+            config = load_training_config()
+            if config_overrides:
+                config.update(config_overrides)
+            if focus:
+                config['focus_area'] = focus
+                if not config.get('curriculum'):
+                    config['curriculum'] = [{"topic": focus, "duration_minutes": "infinite"}]
+            save_training_config(config)
+
         if new:
-            cmd.append('--neu')
-        
-        if focus:
-            cmd.extend(['--fokus', focus])
+            STATE_FILE.unlink(missing_ok=True)
+
+        cmd = [sys.executable, '-m', 'Chappies_Trainingspartner.training_daemon']
         
         if os.name == 'nt':
             DETACHED_PROCESS = 0x00000008
@@ -268,7 +332,16 @@ def get_training_stats() -> Dict[str, Any]:
         'daemon_healthy': False,
         'diagnostic_messages': [],
         'heartbeat_memory_count': 0,
-        'total_exchanges': 0
+        'total_exchanges': 0,
+        'curriculum': [],
+        'start_prompt': None,
+        'sleep_interval_messages': 25,
+        'loop_pause_seconds': 0.5,
+        'request_pause_seconds': 2.5,
+        'current_topic': None,
+        'current_topic_index': 0,
+        'topic_started_at': None,
+        'topics_completed': 0,
     }
     
     pid = is_daemon_running()
@@ -279,10 +352,16 @@ def get_training_stats() -> Dict[str, Any]:
         try:
             with open(STATE_FILE, 'r', encoding='utf-8') as f:
                 state = json.load(f)
-                stats['loops'] = len(state.get('history', []))
+                stats['loops'] = state.get('heartbeat', {}).get('loop_count', len(state.get('history', [])))
                 stats['messages_since_dream'] = state.get('messages_since_dream', 0)
+                stats['current_topic'] = state.get('current_topic')
+                stats['current_topic_index'] = state.get('current_topic_index', 0)
+                stats['topic_started_at'] = state.get('topic_started_at')
+                stats['topics_completed'] = state.get('stats', {}).get('topics_completed', 0)
                 
-                if 'timestamp' in state:
+                if 'start_time' in state:
+                    stats['start_time'] = state['start_time']
+                elif 'timestamp' in state:
                     stats['start_time'] = state['timestamp']
                     
                 heartbeat = state.get('heartbeat', {})
@@ -317,9 +396,14 @@ def get_training_stats() -> Dict[str, Any]:
     if CONFIG_FILE.exists():
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                config = json.load(f)
+                config = _normalize_training_config(json.load(f))
                 stats['focus'] = config.get('focus_area', None)
                 stats['persona'] = config.get('persona', None)
+                stats['curriculum'] = config.get('curriculum', [])
+                stats['start_prompt'] = config.get('start_prompt')
+                stats['sleep_interval_messages'] = config.get('sleep_interval_messages', 25)
+                stats['loop_pause_seconds'] = config.get('loop_pause_seconds', 0.5)
+                stats['request_pause_seconds'] = config.get('request_pause_seconds', 2.5)
         except Exception as e:
             stats['diagnostic_messages'].append(f"Config-Datei Fehler: {str(e)[:50]}")
     

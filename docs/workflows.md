@@ -59,8 +59,9 @@ flowchart LR
 ### Trigger der Schlafphase
 
 - zeitbasiert: alle **24 Stunden**
-- interaktionsbasiert: alle **100 Interaktionen**
+- interaktionsbasiert: alle **25 Interaktionen**
 - manuell: Command **`/sleep`**
+- im Web-Chat wird die Schlafphase nach Erreichen des Intervalls im Hintergrund gestartet, inklusive Kontextdatei-Pflege
 
 Quelle:
 - `memory/sleep_phase.py`
@@ -83,6 +84,8 @@ flowchart TD
 - Der **Service-Entry-Point ist `training_daemon.py`**.
 - `training_loop.py` ist **kein** systemd-Entry-Point.
 - Trainingslogik liegt unter [`Chappies_Trainingspartner/`](../Chappies_Trainingspartner).
+- `training_config.json` enthält Persona, Curriculum, Sleep-Intervall und Laufzeitparameter für den 24/7-Betrieb.
+- `training_loop.py` führt regelmäßige Sleep-/Traumzyklen aus und schreibt erweiterten Heartbeat / Topic-Fortschritt in `training_state.json`.
 
 ## 5. Web-UI-Workflow
 
@@ -96,6 +99,11 @@ Datei [`app.py`](../app.py) routet zwischen:
 - Growth Dashboard
 
 Der Chat-Flow stellt die zuletzt aktive Session automatisch wieder her. Laufende Antworten werden zuerst als pending gespeichert und können im Hintergrund weiterlaufen, sodass ein kurzes Schließen/Neuladen der UI den Chat nicht mehr verwerfen soll.
+
+Die Chat-Pipeline pflegt außerdem die Kontextdateien `soul.md`, `user.md` und `CHAPPiEsPreferences.md` an zwei Stellen:
+
+- direkt über Tool-Calls wie `update_soul`, `update_user_profile` und `update_preferences`
+- indirekt über die Schlafphase, die Replay-/Life-Snapshot-Daten in diese Dateien verdichtet
 
 Im Chat werden Antwortschichten getrennt behandelt:
 

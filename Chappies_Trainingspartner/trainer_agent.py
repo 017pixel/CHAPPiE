@@ -59,6 +59,14 @@ class TrainerConfig:
     
     # Timeout nach X Sekunden ohne Antwort
     timeout_seconds: int = 60
+
+    # Laufzeit-/Daemon-Konfiguration
+    start_prompt: str = "Hallo Chappie! Lass uns ein Gespraech fuehren."
+    provider: str = "local"
+    model_name: Optional[str] = None
+    sleep_interval_messages: int = 25
+    loop_pause_seconds: float = 0.5
+    request_pause_seconds: float = 2.5
     
     def __post_init__(self):
         """Konvertiert focus_area zu curriculum falls nötig."""
@@ -81,18 +89,31 @@ class TrainerConfig:
             persona=data.get("persona", "Kritischer User"),
             curriculum=curriculum,
             focus_area=data.get("focus_area", ""),
-            timeout_seconds=data.get("timeout_seconds", 60)
+            timeout_seconds=data.get("timeout_seconds", 60),
+            start_prompt=data.get("start_prompt", "Hallo Chappie! Lass uns ein Gespraech fuehren."),
+            provider=data.get("provider", "local"),
+            model_name=data.get("model_name"),
+            sleep_interval_messages=max(5, int(data.get("sleep_interval_messages", 25))),
+            loop_pause_seconds=float(data.get("loop_pause_seconds", 0.5)),
+            request_pause_seconds=float(data.get("request_pause_seconds", 2.5)),
         )
     
     def to_dict(self) -> Dict[str, Any]:
         """Konvertiert zu Dictionary für JSON-Speicherung."""
         return {
             "persona": self.persona,
+            "focus_area": self.focus_area,
             "curriculum": [
                 {"topic": item.topic, "duration_minutes": item.duration_minutes}
                 for item in self.curriculum
             ],
-            "timeout_seconds": self.timeout_seconds
+            "timeout_seconds": self.timeout_seconds,
+            "start_prompt": self.start_prompt,
+            "provider": self.provider,
+            "model_name": self.model_name,
+            "sleep_interval_messages": self.sleep_interval_messages,
+            "loop_pause_seconds": self.loop_pause_seconds,
+            "request_pause_seconds": self.request_pause_seconds,
         }
 
 

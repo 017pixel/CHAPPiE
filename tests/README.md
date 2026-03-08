@@ -19,6 +19,9 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_reasoning_layering.py`
 - `tests/test_web_ui_consistency.py`
 - `tests/test_quick.py`
+- `tests/test_context_files_manager.py`
+- `tests/test_sleep_phase_context_updates.py`
+- `tests/test_training_config_ui.py`
 
 ### 2. Live-/Integrationsnahe Tests
 

@@ -298,7 +298,10 @@ class BrainPipeline:
                     self.memory_agent.process(memory_input)
                 
                 if self.sleep_handler.should_run_sleep():
-                    self.sleep_handler.execute_sleep_phase()
+                    self.sleep_handler.execute_sleep_phase(
+                        memory_engine=kwargs.get("memory_engine"),
+                        context_files=context_files,
+                    )
                     
             except Exception as e:
                 print(f"[BrainPipeline] Background processing error: {e}")
@@ -312,6 +315,7 @@ class BrainPipeline:
         response: str,
         emotions_before: Dict[str, int],
         emotions_after: Dict[str, int],
+        memory_engine=None,
         context_files=None,
         amygdala_result: Optional[AgentResult] = None,
         hippocampus_result: Optional[AgentResult] = None,
@@ -330,6 +334,7 @@ class BrainPipeline:
             response=response,
             emotions_before=emotions_before,
             emotions_after=emotions_after,
+            memory_engine=memory_engine,
             context_files=context_files,
             amygdala_result=amygdala_result,
             hippocampus_result=hippocampus_result,

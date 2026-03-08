@@ -11,7 +11,7 @@ import sys
 import os
 import json
 from datetime import datetime, timezone
-from typing import Optional, Callable
+from typing import Optional, Callable, Any, Dict
 import traceback
 
 from rich.console import Console
@@ -27,11 +27,13 @@ from config.prompts import get_system_prompt_with_emotions
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.chat_manager import ChatManager
+from memory.context_files import get_context_files_manager
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from brain.base_brain import GenerationConfig
 from brain.deep_think import DeepThinkEngine
+from memory.sleep_phase import get_sleep_phase_handler
 
 from .trainer_agent import TrainerAgent
 from .repetition_tracker import RepetitionTracker
@@ -80,6 +82,8 @@ class TrainingLoop:
         self.memory = MemoryEngine()
         self.emotions = EmotionsEngine()
         self.brain = get_brain()
+        self.context_files = get_context_files_manager()
+        self.sleep_handler = get_sleep_phase_handler()
         data_dir = os.path.join(PROJECT_ROOT, "data")
         self.chat_manager = ChatManager(data_dir)
         self.deep_think_engine = DeepThinkEngine(
@@ -87,6 +91,9 @@ class TrainingLoop:
             emotions_engine=self.emotions,
             brain=self.brain
         )
+        self.sleep_interval_messages = max(5, int(getattr(self.trainer.config, "sleep_interval_messages", 25)))
+        self.loop_pause_seconds = max(0.0, float(getattr(self.trainer.config, "loop_pause_seconds", 0.5)))
+        self.request_pause_seconds = max(0.5, float(getattr(self.trainer.config, "request_pause_seconds", 2.5)))
         
         # Provider Info loggen
         provider_name = settings.llm_provider.value.upper()
@@ -98,6 +105,59 @@ class TrainingLoop:
         # Initial Memory Count
         initial_memories = self.memory.get_memory_count()
         log.info(f"Geladene Erinnerungen: {initial_memories}")
+
+    def _append_history_message(self, role: str, content: str, count_towards_sleep: bool = True):
+        self.conversation_history.append({"role": role, "content": content})
+        if count_towards_sleep and role in {"user", "assistant"}:
+            self.messages_since_dream += 1
+
+    def _compact_history_after_sleep(self, summary_result: str):
+        new_history = []
+        for msg in self.conversation_history:
+            if msg["role"] == "system" and "[TRAUM-ZUSAMMENFASSUNG]" in msg["content"]:
+                new_history.append(msg)
+
+        short_summary = str(summary_result).split("Verlauf:")[0].strip()
+        new_history.append({
+            "role": "system",
+            "content": f"[TRAUM-ZUSAMMENFASSUNG]: {short_summary}\nAlle Details wurden als Fakten im Gedächtnis gespeichert."
+        })
+        self.conversation_history = new_history
+
+    def _run_sleep_cycle(self) -> bool:
+        log.info("=== SLEEP-/TRAUM-PHASE EINGELEITET ===")
+        console.print(
+            Panel(
+                "[bold magenta]🌙 SLEEP-/TRAUM-PHASE EINGELEITET[/bold magenta]\n"
+                "Konsolidiere neue Nachrichten, aktualisiere Kontextdateien und Langzeitgedaechtnis...",
+                border_style="magenta"
+            )
+        )
+
+        summary_result = self._safe_execute(self.memory.consolidate_memories, self.brain)
+        sleep_result = self.sleep_handler.execute_sleep_phase(
+            memory_engine=self.memory,
+            context_files=self.context_files,
+        )
+
+        if summary_result:
+            log.info(f"Traum-Phase erfolgreich: {str(summary_result)[:200]}...")
+            console.print(f"[dim]{summary_result}[/dim]")
+            self._compact_history_after_sleep(str(summary_result))
+            console.print("[bold green]✅ Kontext wurde konsolidiert und kompaktiert.[/bold green]")
+        else:
+            log.warning("Sleep-Phase lief ohne Text-Zusammenfassung weiter")
+
+        consolidated_count = int((sleep_result.get("consolidation", {}) or {}).get("consolidated", 0) or 0)
+        self.messages_since_dream = 0
+        self.total_dreams += 1
+        self.stats["memories_consolidated"] += consolidated_count
+        log.info(
+            "Sleep-Phase abgeschlossen | context_updates=%s | consolidated=%s",
+            sleep_result.get("context_updates", {}),
+            consolidated_count,
+        )
+        return True
 
 
     def _safe_execute(self, func: Callable, *args, **kwargs) -> Optional[str]:
@@ -125,7 +185,7 @@ class TrainingLoop:
                 console.print("[green]Versuche es erneut nach langer Pause...[/green]")
                 log.info("Versuche es erneut nach langer Pause")
             
-            time.sleep(2.5)
+            time.sleep(self.request_pause_seconds)
             
             try:
                 response = func(*args, **kwargs)
@@ -308,7 +368,7 @@ class TrainingLoop:
             
             
             # Zur History hinzufuegen (User Role fuer Chappie)
-            self.conversation_history.append({"role": "user", "content": current_input})
+            self._append_history_message("user", current_input)
         else:
             # Wiederaufnahme: Letzte Nachricht ermitteln
             last_msg = self.conversation_history[-1]
@@ -423,7 +483,7 @@ class TrainingLoop:
                     console.print(Panel(f"[bold green]CHAPPIE:[/bold green] {chappie_response}", border_style="green"))
                     
                     # History Update (nur valide Antworten!)
-                    self.conversation_history.append({"role": "assistant", "content": chappie_response})
+                    self._append_history_message("assistant", chappie_response)
                     self.save_state()
                     log.info(f"State gespeichert: {len(self.conversation_history)} Nachrichten")
                 else:
@@ -464,8 +524,7 @@ class TrainingLoop:
                 console.print(Panel(f"[bold blue]TRAINER (User):[/bold blue] {trainer_response}", border_style="blue"))
                 
                 # History Update (nur valide Antworten!)
-                self.conversation_history.append({"role": "user", "content": trainer_response})
-                self.messages_since_dream += 2
+                self._append_history_message("user", trainer_response)
                 
                 # === STATISTIK TRACKING ===
                 self.total_exchanges += 1
@@ -473,50 +532,9 @@ class TrainingLoop:
                 self.stats["memories_created"] += 2  # User + Assistant
 
                 
-                # === TRAUM-PHASE CHECK (alle 24 Nachrichten / 12 Paare) ===
-                if self.messages_since_dream >= 24:
-                    log.info("=== TRAUM-PHASE EINGELEITET ===")
-                    console.print(Panel("[bold magenta]🌙 TRAUM-PHASE EINGELEITET[/bold magenta]\nKonsolidiere neue Nachrichten und aktualisiere Langzeit-Kontext...", border_style="magenta"))
-                    
-                    # 1. Erinnerungen konsolidieren (via Memory Engine)
-                    # Dies speichert die Fakten einzeln in ChromaDB
-                    summary_result = self._safe_execute(self.memory.consolidate_memories, self.brain)
-                    
-                    if summary_result:
-                        log.info(f"Traum-Phase erfolgreich: {summary_result[:200]}...")
-                        # Extrahiere die reine Zusammenfassung für den Kontext (aus dem Log-String falls möglich, 
-                        # oder wir nutzen eine saubere Methode)
-                        console.print(f"[dim]{summary_result}[/dim]")
-                        
-                        # 2. Kontext-Management: Ersetze nur die letzen 24 Nachrichten durch die Zusammenfassung
-                        # Wir behalten alte Zusammenfassungen, entfernen aber die rohen Interaktionen
-                        new_history = []
-                        # Behalte nur bestehende Zusammenfassungen (Anker)
-                        for msg in self.conversation_history:
-                            if msg["role"] == "system" and "[TRAUM-ZUSAMMENFASSUNG]" in msg["content"]:
-                                new_history.append(msg)
-                        
-                        # Neue Zusammenfassung als System-Nachricht hinzufügen
-                        # Wir kürzen den Report für den Kontext auf das Wesentliche
-                        short_summary = summary_result.split("Verlauf:")[0].strip()
-                        
-                        new_history.append({
-                            "role": "system", 
-                            "content": f"[TRAUM-ZUSAMMENFASSUNG]: {short_summary}\nAlle Details wurden als Fakten im Gedächtnis gespeichert."
-                        })
-                        
-                        self.conversation_history = new_history
-                        self.messages_since_dream = 0 # Reset Counter
-                        
-                        # Statistik Update
-                        self.total_dreams += 1
-                        self.stats["memories_consolidated"] += summary_result.count("Fakten extrahiert") * 5 # Schätzung oder Parsen
-                        
-                        log.info("Kontext konsolidiert, Traum-Phase abgeschlossen")
-                        console.print("[bold green]✅ Kontext wurde konsolidiert und kompaktiert.[/bold green]")
-                    else:
-                        log.error("Traum-Phase fehlgeschlagen")
-                        console.print("[red]❌ Traum-Phase fehlgeschlagen. Mache normal weiter.[/red]")
+                # === SLEEP-/TRAUM-PHASE CHECK (standardmaessig alle 25 Nachrichten) ===
+                if self.messages_since_dream >= self.sleep_interval_messages:
+                    self._run_sleep_cycle()
 
                 self.save_state() # SAVE
                 log.info(f"State gespeichert: {len(self.conversation_history)} Nachrichten, messages_since_dream={self.messages_since_dream}")
@@ -525,7 +543,7 @@ class TrainingLoop:
                 
                 # Zusaetzliche Pause nicht mehr noetig, da safe_execute schon 2.5s hat
                 # Aber fuer Lesbarkeit schadet eine kleine Pause nicht
-                time.sleep(0.5)
+                time.sleep(self.loop_pause_seconds)
                 
             except Exception as e:
                 console.print(f"[bold red]Kritischer Fehler im Loop:[/bold red] {e}")
@@ -675,14 +693,21 @@ class TrainingLoop:
         """Speichert den aktuellen Trainings-Status in eine JSON-Datei."""
         state = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "start_time": self.start_time.isoformat(),
             "history": self.conversation_history,
             "messages_since_dream": self.messages_since_dream,
+            "total_dreams": self.total_dreams,
+            "current_topic": self.trainer.get_current_focus(),
+            "current_topic_index": self.trainer.current_topic_index,
+            "topic_started_at": self.trainer.topic_start_time.isoformat() if self.trainer.topic_start_time else None,
+            "stats": self.stats,
             "heartbeat": {
                 "last_exchange": self.last_successful_exchange.isoformat() if self.last_successful_exchange else None,
                 "total_exchanges": self.total_exchanges,
                 "total_errors": self.total_errors,
                 "memory_count": self.memory.get_memory_count(),
-                "loop_count": self.loop_count
+                "loop_count": self.loop_count,
+                "sleep_interval_messages": self.sleep_interval_messages,
             }
         }
         try:
@@ -706,6 +731,25 @@ class TrainingLoop:
                 
             self.conversation_history = state.get("history", [])
             self.messages_since_dream = state.get("messages_since_dream", 0)
+            self.total_dreams = state.get("total_dreams", self.total_dreams)
+            self.stats.update(state.get("stats", {}))
+
+            if state.get("start_time"):
+                self.start_time = datetime.fromisoformat(state["start_time"])
+
+            heartbeat = state.get("heartbeat", {}) or {}
+            self.total_exchanges = heartbeat.get("total_exchanges", self.total_exchanges)
+            self.total_errors = heartbeat.get("total_errors", self.total_errors)
+            self.loop_count = heartbeat.get("loop_count", self.loop_count)
+
+            if heartbeat.get("last_exchange"):
+                self.last_successful_exchange = datetime.fromisoformat(heartbeat["last_exchange"])
+
+            if state.get("current_topic_index") is not None:
+                self.trainer.current_topic_index = int(state.get("current_topic_index", 0))
+            if state.get("topic_started_at"):
+                self.trainer.topic_start_time = datetime.fromisoformat(state["topic_started_at"])
+
             last_save = state.get("timestamp", "Unbekannt")
             msg = f"Status geladen ({len(self.conversation_history)} Nachrichten). Letztes Save: {last_save}"
             console.print(f"[green]{msg}[/green]")

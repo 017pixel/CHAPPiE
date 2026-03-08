@@ -47,7 +47,7 @@ def process_command(user_input: str, backend) -> bool:
             sleep_handler = get_sleep_phase_handler()
             result = sleep_handler.execute_sleep_phase(
                 memory_engine=backend.memory,
-                context_files=None
+                context_files=backend.context_files
             )
             
             # Zeige Ergebnisse

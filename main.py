@@ -19,6 +19,7 @@ colorama.init(autoreset=True)
 from config.config import settings, get_active_model
 from config.prompts import SYSTEM_PROMPT, get_system_prompt_with_emotions
 from memory import MemoryEngine
+from memory.context_files import get_context_files_manager
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from brain import get_brain, Message
 
@@ -74,6 +75,7 @@ class CHAPPiE:
         
         print_log("INIT", f"Verbinde mit Brain ({get_active_model()})...", Colors.AI)
         self.brain = get_brain()
+        self.context_files = get_context_files_manager()
         
         self.current_thought: str = ""
         self.is_sleeping = False
@@ -157,7 +159,7 @@ class CHAPPiE:
                 sleep_handler = get_sleep_phase_handler()
                 result = sleep_handler.execute_sleep_phase(
                     memory_engine=self.memory,
-                    context_files=None
+                    context_files=self.context_files
                 )
                 
                 # Zeige Ergebnisse
