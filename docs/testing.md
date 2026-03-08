@@ -13,6 +13,17 @@ CHAPPiE enthält sowohl **sichere lokale Prüfungen** als auch **live-/manuelle 
 | Live-/Provider-Tests | Verhalten mit echten Modellen/APIs prüfen | `tests/test_brain_agents.py`, `tests/test_nvidia_api.py`, `tests/test_integration.py` |
 | Interaktive Smoke-Tests | UI oder Chat manuell antesten | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
 
+## GitHub Actions / CI
+
+Bei Pushes und Pull Requests auf `main`/`master` läuft der Workflow `.github/workflows/ci.yml`.
+
+Er führt die sicheren lokalen Prüfungen automatisiert aus:
+
+- schnelle Python-Tests aus `tests/`
+- den Kompatibilitätscheck
+- `py_compile` für die zentralen App-/UI-Dateien
+- einen headless Streamlit-Smoke-Test mit HTTP-Check
+
 ## Wichtige Regel
 
 Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests können:

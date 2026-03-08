@@ -1,14 +1,26 @@
 name: Deploy to Server
 
 on:
-  push:
-    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
+    - name: Validate deployment secrets
+      shell: bash
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      run: |
+        set -euo pipefail
+        test -n "$SERVER_HOST"
+        test -n "$SERVER_USER"
+        test -n "$SERVER_SSH_KEY"
+
     - name: Checkout code
       uses: actions/checkout@v4
 

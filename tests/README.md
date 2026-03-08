@@ -38,8 +38,9 @@ Diese Tests können echte Modelle, Provider oder Kontextdateien berühren:
 
 1. zuerst lokale Logiktests
 2. dann Kompatibilitätscheck
-3. Live-/API-Tests nur bei Bedarf
+3. auf GitHub die automatische `CI`-Pipeline prüfen
 4. interaktive Tests nur bewusst und mit Kontextwissen
+5. Live-/API-Tests nur bei Bedarf
 
 ## Warum diese Trennung wichtig ist
 

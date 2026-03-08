@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install CI dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip setuptools wheel
+          python - <<'PY' > /tmp/ci-requirements.txt
+          from pathlib import Path
+          skip = {"vllm"}
+          for raw in Path("requirements.txt").read_text(encoding="utf-8").splitlines():
+              line = raw.split("#", 1)[0].strip()
+              if not line:
+                  continue
+              name = line.replace(" ", "").split(">=", 1)[0].split("==", 1)[0].split("<=", 1)[0]
+              if name in skip:
+                  continue
+              print(line)
+          PY
+          python -m pip install -r /tmp/ci-requirements.txt
+
+      - name: Run fast local verification suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tests/test_forgetting_curve.py
+          python tests/test_life_simulation.py
+          python tests/test_debug_monitor_data.py
+          python tests/test_local_first_runtime.py
+          python tests/test_ollama_response_handling.py
+          python tests/test_chat_manager_persistence.py
+          python tests/test_vllm_response_handling.py
+          python tests/test_web_ui_consistency.py
+          python tests/test_reasoning_layering.py
+          python tests/manual/test_compatibility.py
+
+      - name: Run syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            app.py \
+            brain/response_parser.py \
+            brain/ollama_brain.py \
+            brain/vllm_brain.py \
+            memory/chat_manager.py \
+            web_infrastructure/backend_wrapper.py \
+            web_infrastructure/chat_ui.py \
+            web_infrastructure/command_handler.py \
+            web_infrastructure/sidebar_ui.py \
+            web_infrastructure/state_manager.py
+
+      - name: Smoke-test Streamlit startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m streamlit run app.py --server.headless true --server.port 8505 >/tmp/chappie-streamlit.log 2>&1 &
+          STREAMLIT_PID=$!
+          trap 'kill ${STREAMLIT_PID} || true' EXIT
+          sleep 20
+          curl --fail --silent http://127.0.0.1:8505 >/dev/null
