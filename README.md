@@ -98,7 +98,7 @@ Für den produktiven lokalen Betrieb ist das Zielbild aktuell:
 
 1. `LLM_PROVIDER = "vllm"`
 2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Endpoint** setzen, z. B. `http://localhost:8000/v1`
-3. `VLLM_MODEL` auf ein Qwen-3.5-Modell setzen, z. B. `Qwen/Qwen3.5-32B-Instruct` oder `Qwen/Qwen3.5-72B-Instruct`
+3. `VLLM_MODEL` auf ein Qwen-3.5-Modell setzen, z. B. `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` oder `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4`
 4. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
 5. Ollama nur als **leichteren lokalen Fallback** weiterverwenden
 
@@ -234,4 +234,3 @@ Der Ordner [`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken au
 - `README.md`
 - `agent.md`
 - `docs/`
-

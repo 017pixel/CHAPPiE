@@ -29,7 +29,7 @@ LLM_PROVIDER = "vllm"
 
 # --- vLLM Configuration (empfohlen) ---
 VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4"
+VLLM_MODEL = "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4"
 
 # --- Ollama Configuration ---
 OLLAMA_HOST = "http://localhost:11434"

@@ -56,10 +56,11 @@ OLLAMA_MODELS = {
 }
 
 VLLM_MODELS = {
-    "1": ("Qwen/Qwen3.5-32B-Instruct", "Qwen 3.5 32B - Schnell & lokal"),
-    "2": ("Qwen/Qwen3.5-72B-Instruct", "Qwen 3.5 72B - Starkes lokales Modell"),
-    "3": ("Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4", "Qwen 3.5 122B A10B GPTQ - Empfohlen"),
-    "4": ("CUSTOM", "Eigenes Modell eingeben..."),
+    "1": ("Qwen/Qwen3.5-9B", "Qwen 3.5 9B - Schnell und effizient"),
+    "2": ("Qwen/Qwen3.5-35B-A3B", "Qwen 3.5 35B A3B - Gute Qualitaet lokal"),
+    "3": ("Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "Qwen 3.5 35B A3B GPTQ - Empfohlen"),
+    "4": ("Qwen/Qwen3.5-122B-A10B-GPTQ-Int4", "Qwen 3.5 122B A10B GPTQ - High-End"),
+    "5": ("CUSTOM", "Eigenes Modell eingeben..."),
 }
 
 # === Beispiel-Curricula ===
@@ -163,7 +164,7 @@ def select_model(provider: LLMProvider) -> str:
     
     # Custom Input für lokale Modelle / vLLM
     if model_id == "CUSTOM":
-        model_id = Prompt.ask("Modell-Name eingeben (z.B. Qwen/Qwen3.5-32B-Instruct)")
+        model_id = Prompt.ask("Modell-Name eingeben (z.B. Qwen/Qwen3.5-35B-A3B)")
     
     return model_id
 

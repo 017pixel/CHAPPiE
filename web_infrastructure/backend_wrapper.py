@@ -144,10 +144,59 @@ def init_chappie():
             """Abwärtskompatibler Alias für Runtime-Reload."""
             return self.apply_runtime_settings()
 
-        def _extract_display_response(self, raw_response: Any):
+        def _error_prefix_for_active_provider(self) -> str:
+            if settings.llm_provider == LLMProvider.OLLAMA:
+                return "Ollama Fehler"
+            if settings.llm_provider == LLMProvider.GROQ:
+                return "Groq Fehler"
+            if settings.llm_provider == LLMProvider.CEREBRAS:
+                return "Cerebras Fehler"
+            if settings.llm_provider == LLMProvider.NVIDIA:
+                return "NVIDIA Fehler"
+            if settings.llm_provider == LLMProvider.VLLM:
+                return "vLLM Fehler"
+            return "LLM Fehler"
+
+        def _format_generation_error(self, phase: str, raw_error: str = "") -> str:
+            prefix = self._error_prefix_for_active_provider()
+            provider = settings.llm_provider.value
+            model = get_active_model()
+            stage = phase or "Antwortgenerierung"
+            detail = (raw_error or "").strip()
+            detail_lower = detail.lower()
+
+            cause = "Unbekannter Laufzeitfehler"
+            if not detail:
+                cause = "Leere Modellantwort"
+            elif "timeout" in detail_lower:
+                cause = "Timeout"
+            elif "connection" in detail_lower or "verbind" in detail_lower:
+                cause = "Verbindungsfehler"
+            elif "reasoning_content" in detail_lower:
+                cause = "Nur Reasoning-Ausgabe ohne finalen Antworttext"
+            elif "tool-call" in detail_lower or "tool_calls" in detail_lower:
+                cause = "Nur Tool-Calls ohne Textantwort"
+            elif "http" in detail_lower:
+                cause = "HTTP-Fehler"
+
+            if detail:
+                trimmed_detail = detail if len(detail) <= 320 else detail[:317] + "..."
+                return (
+                    f"{prefix}: {stage} fehlgeschlagen ({cause}) "
+                    f"[Provider={provider}, Modell={model}]. Detail: {trimmed_detail}"
+                )
+            return (
+                f"{prefix}: {stage} fehlgeschlagen ({cause}) "
+                f"[Provider={provider}, Modell={model}]."
+            )
+
+        def _extract_display_response(self, raw_response: Any, phase: str = "Antwortgenerierung"):
             raw_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
             if not raw_text.strip():
-                return "Ich habe gerade keine verwertbare Modellantwort erhalten. Bitte versuche es erneut oder prüfe den aktiven Provider in den Einstellungen.", ""
+                return self._format_generation_error(phase), ""
+
+            if looks_like_model_error(raw_text):
+                return self._format_generation_error(phase, raw_text), ""
 
             thought = ""
             if settings.chain_of_thought:
@@ -159,7 +208,7 @@ def init_chappie():
                 display_response = raw_text.strip()
 
             if not display_response:
-                display_response = "Ich habe gerade keine verwertbare Modellantwort erhalten. Bitte versuche es erneut oder prüfe den aktiven Provider in den Einstellungen."
+                display_response = self._format_generation_error(phase, raw_text)
             return display_response, thought
 
         def get_status(self) -> Dict[str, Any]:
@@ -537,7 +586,7 @@ def init_chappie():
             )
             
             raw_response = self.brain.generate(messages, config=gen_config)
-            display_response, thought = self._extract_display_response(raw_response)
+            display_response, thought = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
             
             # In Langzeitgedächtnis speichern
             self.memory.add_memory(user_input, role="user")
@@ -615,7 +664,7 @@ def init_chappie():
                 stream=False,
             )
             raw_response = self.brain.generate(messages, config=gen_config)
-            display_response, thought = self._extract_display_response(raw_response)
+            display_response, thought = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
             
             # Speichern
             self.memory.add_memory(user_input, role="user")

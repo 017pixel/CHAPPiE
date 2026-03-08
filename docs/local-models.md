@@ -51,10 +51,10 @@ Die konkrete Standardrichtung für CHAPPiE ist:
 ```python
 LLM_PROVIDER = "vllm"
 VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-32B-Instruct"
+VLLM_MODEL = "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4"
 
-INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-32B-Instruct"
-QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-9B-Instruct"
+INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-9B"
+QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-4B"
 ```
 
 Wichtig dazu:
@@ -64,15 +64,16 @@ Wichtig dazu:
 3. `INTENT_PROCESSOR_MODEL_VLLM` kann für Step-1-Klassifikation separat gesetzt werden.
 4. `QUERY_EXTRACTION_VLLM_MODEL` kann für Memory-Suche kleiner gewählt werden.
 5. Die Streamlit-Einstellungsseite unter [`web_infrastructure/settings_ui.py`](../web_infrastructure/settings_ui.py) kann diese Felder direkt pflegen.
+6. Für Qwen-3.5 auf vLLM sollte `chat_template_kwargs.enable_thinking=false` gesetzt sein, wenn du direkt verwertbaren Antworttext priorisierst.
 
 ### Empfohlene Qwen-3.5-Profile
 
 | Modell | Einsatzidee |
 |---|---|
-| `Qwen/Qwen3.5-32B-Instruct` | guter Standard für lokale Hauptnutzung |
-| `Qwen/Qwen3.5-72B-Instruct` | höhere Qualität bei stärkerer Hardware |
-| `Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4` | maximale lokale Zielausbaustufe |
-| `Qwen/Qwen3.5-9B-Instruct` | sinnvoll für leichtere Query-/Utility-Aufgaben |
+| `Qwen/Qwen3.5-9B` | kompakt für Step-1/Intent und Utility-Aufgaben |
+| `Qwen/Qwen3.5-35B-A3B` | guter Qualitäts-/Latenz-Kompromiss lokal |
+| `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | empfohlen für lokale GPUs mit VRAM-Limit |
+| `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4` | maximale lokale Zielausbaustufe |
 
 ### Ollama-Setup (sekundärer lokaler Fallback)
 
@@ -104,4 +105,3 @@ Wenn sich Modellstrategie, Provider-Priorität oder Konfigurationsdateien änder
 - [Architektur](architecture.md)
 - [Projektkarte](project-map.md)
 - [Agent-Anleitung](../agent.md)
-
