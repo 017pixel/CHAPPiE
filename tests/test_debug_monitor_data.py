@@ -44,7 +44,28 @@ def test_debug_logger_clear_and_dict_output():
     assert logger.get_entries() == []
 
 
+def test_debug_logger_keeps_emotion_steering_details():
+    logger = DebugLogger(max_entries=5)
+    logger.log_info(
+        "EMOTION_STEERING",
+        "Layer-Manipulation vorbereitet",
+        {
+            "prompt_emotion_mode": "local_layer_only",
+            "forced_local_qwen_steering": True,
+            "active_vectors": [
+                {"name": "frustration", "strength": 1.02},
+                {"name": "crashout", "strength": 0.88},
+            ],
+        },
+    )
+    entries = logger.get_entries_as_dict()
+    assert entries[0]["category"] == "EMOTION_STEERING"
+    assert entries[0]["details"]["prompt_emotion_mode"] == "local_layer_only"
+    assert entries[0]["details"]["active_vectors"][1]["name"] == "crashout"
+
+
 if __name__ == "__main__":
     test_global_workspace_exposes_math_trace()
     test_debug_logger_clear_and_dict_output()
+    test_debug_logger_keeps_emotion_steering_details()
     print("OK: debug monitor data")

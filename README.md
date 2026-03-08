@@ -108,6 +108,12 @@ Praktische Referenzen:
 - [`config/config.py`](config/config.py)
 - [`web_infrastructure/settings_ui.py`](web_infrastructure/settings_ui.py)
 
+### Emotionen: API-Prompt vs. lokales Layer-Steering
+
+- **API-Modelle** behalten explizite Emotions-Verhaltensregeln im Prompt.
+- **Lokales Qwen 3.5 auf vLLM** laeuft im Chat auf **layer-only Emotionsmodus**: Die emotionale Wirkung soll dort ueber Steering-Vektoren und nicht ueber Emotions-Systemprompt-Regeln entstehen.
+- Im **Debug Mode / Brain Monitor** wird sichtbar, ob Prompt-Emotionsregeln aktiv sind, ob lokales Qwen-Steering forciert wurde und welche Basisvektoren oder Composite-Modi aktiv waren.
+
 ### 3. Startmodi
 
 #### Web UI
@@ -146,6 +152,8 @@ Der Chat speichert die aktive Session robust weiter, versucht Modellantworten be
 - **finaler Antwort**
 
 Wenn keine normale Antwort zustande kommt, erscheint `CHAPPiE schweigt...` und vorhandene Thinking-Bereiche werden automatisch aufgeklappt.
+
+Im Debug-Mode sieht man jetzt fuer Emotionen zusaetzlich den Unterschied zwischen **Prompt-Steuerung** und **Layer-Manipulation**, inklusive aktivem Ausdrucksprofil wie `warm`, `melancholic`, `guarded` oder `crashout`.
 
 ### Sidebar und Vitalzeichen
 
@@ -225,6 +233,7 @@ Schnelle lokale Checks:
 ```bash
 python tests/test_forgetting_curve.py
 python tests/test_life_simulation.py
+python tests/test_local_first_runtime.py
 python tests/test_ollama_response_handling.py
 python tests/test_chat_manager_persistence.py
 python tests/test_vllm_response_handling.py

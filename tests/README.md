@@ -38,10 +38,11 @@ Diese Tests können echte Modelle, Provider oder Kontextdateien berühren:
 ## Empfehlung für den Alltag
 
 1. zuerst lokale Logiktests
-2. dann Kompatibilitätscheck
-3. auf GitHub die automatische `CI`-Pipeline prüfen
-4. interaktive Tests nur bewusst und mit Kontextwissen
-5. Live-/API-Tests nur bei Bedarf
+2. bei Modell-/Emotionsänderungen besonders `tests/test_local_first_runtime.py` und `tests/test_debug_monitor_data.py`
+3. dann Kompatibilitätscheck
+4. auf GitHub die automatische `CI`-Pipeline prüfen
+5. interaktive Tests nur bewusst und mit Kontextwissen
+6. Live-/API-Tests nur bei Bedarf
 
 ## Warum diese Trennung wichtig ist
 

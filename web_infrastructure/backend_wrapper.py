@@ -22,6 +22,7 @@ from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
 from brain import get_brain
 from brain.action_response import ActionResponseLayer
+from brain.agents.steering_manager import get_steering_manager
 from brain.base_brain import GenerationConfig, Message
 from brain.global_workspace import GlobalWorkspace
 from brain.response_parser import extract_tagged_block, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
@@ -93,6 +94,7 @@ def init_chappie():
             self.life_simulation = get_life_simulation_service()
             self.global_workspace = GlobalWorkspace()
             self.action_response = ActionResponseLayer()
+            self.steering_manager = get_steering_manager()
             self._chat_jobs: Dict[str, threading.Thread] = {}
             self._chat_jobs_lock = threading.RLock()
 
@@ -146,6 +148,8 @@ def init_chappie():
                 "life_snapshot": result.get("life_snapshot", {}),
                 "global_workspace": result.get("global_workspace", {}),
                 "action_plan": result.get("action_plan", {}),
+                "emotion_steering": result.get("emotion_steering", {}),
+                "prompt_emotion_mode": result.get("prompt_emotion_mode", ""),
                 "dream_fragments": result.get("dream_fragments", []),
                 "debug_entries": result.get("debug_entries", []),
                 "debug_log": result.get("debug_log"),
@@ -213,6 +217,7 @@ def init_chappie():
                     emotions_engine=self.emotions,
                     brain=self.brain
                 )
+                self.steering_manager.refresh_runtime_profile(get_active_model())
                 changed = True
 
             intent_signature = self._build_intent_signature()
@@ -294,6 +299,41 @@ def init_chappie():
             if not display_response:
                 display_response = "CHAPPiE schweigt..." if (thought or model_reasoning) else self._format_generation_error(phase, raw_text)
             return display_response, thought, model_reasoning
+
+        def _build_prompt_runtime(self, emotions: Dict[str, int]) -> Dict[str, Any]:
+            model_name = get_active_model()
+            force_steering = self.steering_manager.should_force_local_emotion_steering(
+                settings.llm_provider,
+                model_name,
+            )
+            steering_payload = self.steering_manager.get_steering_payload(emotions, force=force_steering)
+            use_prompt_emotions = self.steering_manager.should_use_prompt_emotions(
+                settings.llm_provider,
+                model_name,
+            )
+            emotion_steering = self.steering_manager.build_debug_report(
+                emotions,
+                steering_payload=steering_payload,
+                force=force_steering,
+            )
+            response_plan = {
+                "response_strategy": "conversational",
+                "response_guidance": "Bleibe hilfreich, kohärent und lebensnah.",
+            }
+            if use_prompt_emotions:
+                response_plan["tone"] = "friendly"
+            else:
+                response_plan["response_guidance"] = "Beantworte die konkrete Anfrage direkt, kohärent und ohne kuenstliche Gefuehlsansagen."
+
+            return {
+                "model_name": model_name,
+                "force_steering": force_steering,
+                "steering_payload": steering_payload,
+                "use_prompt_emotions": use_prompt_emotions,
+                "emotion_steering": emotion_steering,
+                "prompt_emotion_mode": "api_prompt_rules" if use_prompt_emotions else "local_layer_only",
+                "response_plan": response_plan,
+            }
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -691,6 +731,8 @@ def init_chappie():
                 "model_reasoning": response_data.get("model_reasoning", ""),
                 "reasoning_only": response_data.get("reasoning_only", False),
                 "rag_memories": response_data.get("rag_memories", []),
+                "emotion_steering": response_data.get("emotion_steering", {}),
+                "prompt_emotion_mode": response_data.get("prompt_emotion_mode", ""),
                 "intent_type": intent_result.intent_type.value,
                 "intent_confidence": intent_result.confidence,
                 "tool_calls_executed": len(intent_result.tool_calls),
@@ -880,6 +922,22 @@ def init_chappie():
                     "memory_ids": [str(getattr(m, "id", ""))[:8] for m in (memories or [])[:8]],
                 },
             )
+
+            prompt_runtime = self._build_prompt_runtime(emotions)
+            self.debug_logger.log_info(
+                "EMOTION_STEERING",
+                "Emotionssteuerung fuer Schritt 2 vorbereitet",
+                {
+                    "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                    "forced_local_qwen_steering": prompt_runtime["force_steering"],
+                    "steering_active": prompt_runtime["emotion_steering"].get("steering_active", False),
+                    "dominant_vector": prompt_runtime["emotion_steering"].get("dominant_vector", "neutral"),
+                    "dominant_strength": prompt_runtime["emotion_steering"].get("dominant_strength", 0.0),
+                    "summary": prompt_runtime["emotion_steering"].get("summary", ""),
+                    "active_vectors": prompt_runtime["emotion_steering"].get("active_vectors", []),
+                    "composite_modes": prompt_runtime["emotion_steering"].get("composite_modes", []),
+                },
+            )
             
             # System Prompt bauen
             system_prompt = get_system_prompt_with_emotions(
@@ -889,6 +947,8 @@ def init_chappie():
                 curiosity=emotions["curiosity"],
                 frustration=emotions["frustration"],
                 motivation=emotions["motivation"],
+                sadness=emotions["sadness"],
+                include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=settings.chain_of_thought
             )
             
@@ -897,11 +957,7 @@ def init_chappie():
                 system_prompt += f"\\n\\n{context}"
 
             system_prompt += "\\n\\n" + self.action_response.build_prompt_suffix(
-                {
-                    "response_strategy": "conversational",
-                    "tone": "friendly",
-                    "response_guidance": "Bleibe hilfreich, kohärent und lebensnah.",
-                },
+                prompt_runtime["response_plan"],
                 life_context,
                 global_workspace,
             )
@@ -918,6 +974,7 @@ def init_chappie():
                 max_tokens=settings.max_tokens,
                 temperature=settings.temperature,
                 stream=False,
+                extra_body=prompt_runtime["steering_payload"] or None,
             )
             
             raw_response = self.brain.generate(messages, config=gen_config)
@@ -939,10 +996,12 @@ def init_chappie():
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
                 "rag_memories": memories,
+                "emotion_steering": prompt_runtime["emotion_steering"],
+                "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "action_plan": self.action_response.build_action_plan(
                     {
                         "response_strategy": "conversational",
-                        "tone": "friendly",
+                        "tone": prompt_runtime["response_plan"].get("tone", "state_driven"),
                         "response_guidance": "Erzeuge eine kohärente Antwort, die innere Zustände berücksichtigt.",
                     },
                     life_context or {},
@@ -1000,16 +1059,26 @@ def init_chappie():
             
             # Prompt
             state = self.emotions.get_state()
+            prompt_runtime = self._build_prompt_runtime(state.__dict__)
+            self.debug_logger.log_info(
+                "EMOTION_STEERING",
+                "Legacy-Emotionssteuerung vorbereitet",
+                {
+                    "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                    "forced_local_qwen_steering": prompt_runtime["force_steering"],
+                    "steering_active": prompt_runtime["emotion_steering"].get("steering_active", False),
+                    "dominant_vector": prompt_runtime["emotion_steering"].get("dominant_vector", "neutral"),
+                    "dominant_strength": prompt_runtime["emotion_steering"].get("dominant_strength", 0.0),
+                    "summary": prompt_runtime["emotion_steering"].get("summary", ""),
+                },
+            )
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
+                include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=settings.chain_of_thought
             )
             system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
-                {
-                    "response_strategy": "conversational",
-                    "tone": "friendly",
-                    "response_guidance": "Bleibe kompatibel mit der Life-Simulation.",
-                },
+                prompt_runtime["response_plan"],
                 life_context,
                 {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
             )
@@ -1021,6 +1090,7 @@ def init_chappie():
                 max_tokens=settings.max_tokens,
                 temperature=settings.temperature,
                 stream=False,
+                extra_body=prompt_runtime["steering_payload"] or None,
             )
             legacy_response = self._run_with_retries(
                 step_number=2,
@@ -1075,6 +1145,8 @@ def init_chappie():
                 "model_reasoning": legacy_response.get("model_reasoning", ""),
                 "reasoning_only": legacy_response.get("reasoning_only", False),
                 "rag_memories": legacy_response.get("rag_memories", memories),
+                "emotion_steering": prompt_runtime["emotion_steering"],
+                "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "intent_type": "legacy",
                 "intent_confidence": 1.0,
                 "tool_calls_executed": 0,
@@ -1086,7 +1158,7 @@ def init_chappie():
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "life_snapshot": final_life_snapshot,
                 "global_workspace": {"broadcast": "legacy-path"},
-                "action_plan": {"strategy": "conversational", "tone": "friendly"},
+                "action_plan": {"strategy": "conversational", "tone": prompt_runtime["response_plan"].get("tone", "state_driven")},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
                 "provider": settings.llm_provider.value,
                 "model": get_active_model(),

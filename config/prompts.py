@@ -198,7 +198,7 @@ MEMORY_ITEM_TEMPLATE = """
 # HELPER FUNCTIONS
 # =============================================================================
 
-def get_system_prompt_with_emotions(
+def build_system_prompt(
     happiness: int = 50, 
     trust: int = 50, 
     energy: int = 100,
@@ -206,6 +206,7 @@ def get_system_prompt_with_emotions(
     frustration: int = 0,
     motivation: int = 80,
     sadness: int = 0,
+    include_emotion_status: bool = True,
     use_chain_of_thought: bool = True
 ) -> str:
     """
@@ -219,27 +220,55 @@ def get_system_prompt_with_emotions(
         frustration: Frustrations-Level (0-100)
         motivation: Motivations-Level (0-100)
         sadness: Traurigkeits-Level (0-100)
+        include_emotion_status: Ob die expliziten Emotions-Verhaltensregeln injiziert werden sollen
         use_chain_of_thought: Ob Chain-of-Thought Format genutzt werden soll
     
     Returns:
-        Kompletter System-Prompt mit Emotions-Kontext und optional CoT
+        Kompletter System-Prompt mit optionalem Emotions-Kontext und optional CoT
     """
-    emotion_status = EMOTION_STATUS_TEMPLATE.format(
+    prompt = SYSTEM_PROMPT
+
+    if include_emotion_status:
+        emotion_status = EMOTION_STATUS_TEMPLATE.format(
+            happiness=happiness,
+            trust=trust,
+            energy=energy,
+            curiosity=curiosity,
+            frustration=frustration,
+            motivation=motivation,
+            sadness=sadness
+        )
+        prompt += emotion_status
+
+    if use_chain_of_thought:
+        prompt += CHAIN_OF_THOUGHT_INSTRUCTION
+
+    return prompt
+
+
+def get_system_prompt_with_emotions(
+    happiness: int = 50,
+    trust: int = 50,
+    energy: int = 100,
+    curiosity: int = 50,
+    frustration: int = 0,
+    motivation: int = 80,
+    sadness: int = 0,
+    include_emotion_status: bool = True,
+    use_chain_of_thought: bool = True
+) -> str:
+    """Rueckwaertskompatibler Alias fuer build_system_prompt()."""
+    return build_system_prompt(
         happiness=happiness,
         trust=trust,
         energy=energy,
         curiosity=curiosity,
         frustration=frustration,
         motivation=motivation,
-        sadness=sadness
+        sadness=sadness,
+        include_emotion_status=include_emotion_status,
+        use_chain_of_thought=use_chain_of_thought,
     )
-    
-    prompt = SYSTEM_PROMPT + emotion_status
-    
-    if use_chain_of_thought:
-        prompt += CHAIN_OF_THOUGHT_INSTRUCTION
-    
-    return prompt
 
 
 def get_chain_of_thought_prompt() -> str:

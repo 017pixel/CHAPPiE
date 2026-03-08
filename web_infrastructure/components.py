@@ -175,6 +175,7 @@ def render_brain_monitor(metadata: Dict[str, Any]):
             render_json_block(homeostasis)
 
     workspace = metadata.get("global_workspace", {}) if isinstance(metadata.get("global_workspace", {}), dict) else {}
+    emotion_steering = metadata.get("emotion_steering", {}) if isinstance(metadata.get("emotion_steering", {}), dict) else {}
     with st.expander("Phase 4: Layer-Pipeline", expanded=False):
         layer_blocks = [
             ("Goal Engine", life_snapshot.get("goal_competition", {})),
@@ -193,6 +194,33 @@ def render_brain_monitor(metadata: Dict[str, Any]):
                 else:
                     st.write("Keine Daten")
 
+        with st.expander("Emotion Steering / Layer-Manipulation", expanded=False):
+            if emotion_steering:
+                st.markdown(f"**Modus:** `{emotion_steering.get('mode', '-')}`")
+                st.markdown(f"**Prompt-Emotionsregeln aktiv:** `{emotion_steering.get('prompt_emotions_enabled', False)}`")
+                st.markdown(f"**Activation Steering verfuegbar:** `{emotion_steering.get('supports_activation_steering', False)}`")
+                st.markdown(f"**Forciertes Local-Qwen-Steering:** `{emotion_steering.get('forced_local_qwen_steering', False)}`")
+                st.markdown(f"**Dominanter Vektor:** `{emotion_steering.get('dominant_vector', 'neutral')}` ({emotion_steering.get('dominant_strength', 0.0):.3f})")
+                if emotion_steering.get("summary"):
+                    st.markdown(f"**Erwartbarer Ausdruck:** {emotion_steering.get('summary')}")
+                intensities = emotion_steering.get("intensities", {}) if isinstance(emotion_steering.get("intensities", {}), dict) else {}
+                if intensities:
+                    st.markdown("**Basis-Intensitaeten:**")
+                    st.dataframe(
+                        [{"emotion": key, "alpha": value} for key, value in intensities.items()],
+                        use_container_width=True,
+                    )
+                active_vectors = emotion_steering.get("active_vectors", []) if isinstance(emotion_steering.get("active_vectors", []), list) else []
+                if active_vectors:
+                    st.markdown("**Aktive Vektoren / Composite-Modes:**")
+                    st.dataframe(active_vectors, use_container_width=True)
+                composite_modes = emotion_steering.get("composite_modes", []) if isinstance(emotion_steering.get("composite_modes", []), list) else []
+                if composite_modes:
+                    st.markdown("**Abgeleitete Verhaltensmodi:**")
+                    st.dataframe(composite_modes, use_container_width=True)
+            else:
+                st.write("Keine Steering-Daten vorhanden")
+
         with st.expander("Global Workspace", expanded=False):
             workspace_items = workspace.get("workspace_items", []) if isinstance(workspace.get("workspace_items", []), list) else []
             if workspace_items:
@@ -207,8 +235,12 @@ def render_brain_monitor(metadata: Dict[str, Any]):
             st.write(workspace.get("broadcast", "-"))
 
     thought = metadata.get("thought_process", "")
+    model_reasoning = metadata.get("model_reasoning", "")
     action_plan = metadata.get("action_plan", {}) if isinstance(metadata.get("action_plan", {}), dict) else {}
     with st.expander("Phase 5: Antwortgenerierung", expanded=False):
+        if model_reasoning:
+            st.markdown("**Modell-Reasoning:**")
+            st.code(model_reasoning, language=None)
         if thought:
             st.markdown("**Reasoning / Gedankenprozess:**")
             st.code(thought, language=None)

@@ -44,6 +44,7 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 
 - `python tests/test_forgetting_curve.py`
 - `python tests/test_life_simulation.py`
+- `python tests/test_local_first_runtime.py`
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_ollama_response_handling.py`
 - `python tests/test_chat_manager_persistence.py`
@@ -69,6 +70,8 @@ Dann zusätzlich prüfen:
 - `config/config.py`
 - `config/brain_config.py`
 - `brain/agents/*.py`
+- lokale/API-Unterscheidung im Prompt- und Steering-Pfad
+- Debug-Monitor-Metadaten fuer Emotions-/Layer-Steuerung
 - betroffene Live-/Agent-Tests
 
 ## Testkarte

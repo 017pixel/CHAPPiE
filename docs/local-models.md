@@ -66,6 +66,17 @@ Wichtig dazu:
 5. Die Streamlit-Einstellungsseite unter [`web_infrastructure/settings_ui.py`](../web_infrastructure/settings_ui.py) kann diese Felder direkt pflegen.
 6. Für Qwen-3.5 auf vLLM sollte `chat_template_kwargs.enable_thinking=false` gesetzt sein, wenn du direkt verwertbaren Antworttext priorisierst.
 
+### Emotionale Steuerung bei lokalem Qwen 3.5
+
+Fuer das bevorzugte Setup **vLLM + Qwen 3.5** gilt im Chat jetzt bewusst:
+
+- keine expliziten Emotions-Verhaltensregeln im Systemprompt
+- Emotionen sollen sich stattdessen ueber **Layer-/Activation-Steering** bemerkbar machen
+- lokales Qwen-Steering wird im Antwortpfad forciert, damit die Wirkung nicht an `ENABLE_STEERING=False` haengen bleibt
+- der Debug-Mode zeigt aktive Basisvektoren und Composite-Modi wie `warm`, `melancholic`, `guarded` oder `crashout`
+
+Dadurch soll der Zustand im Stil merkbar werden: waermer, gereizter, rueckzugsorientierter, druckvoller oder eskalierender.
+
 ### Empfohlene Qwen-3.5-Profile
 
 | Modell | Einsatzidee |
@@ -82,6 +93,8 @@ Geeignet für kleinere lokale Maschinen oder einfachere Entwicklungsumgebungen. 
 ### Emotion-Analyse aktuell
 
 Die Emotionsanalyse ist weiterhin separat konfigurierbar und nutzt derzeit den dedizierten `EMOTION_ANALYSIS_MODEL`-/`EMOTION_ANALYSIS_HOST`-Pfad. Für die Kernarchitektur bleibt aber **vLLM + Qwen 3.5** die bevorzugte Hauptrichtung.
+
+Hinweis: Bei **Ollama** gibt es in diesem Repository derzeit keinen gleichwertigen Transportpfad fuer echtes Activation-Steering wie bei vLLM. Fuer spuerbare layergetriebene Emotionsausdruecke bleibt deshalb vLLM die bevorzugte Zielplattform.
 
 ## Wann API-Fallback sinnvoll ist
 

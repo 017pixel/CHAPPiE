@@ -16,12 +16,15 @@ class ActionResponseLayer:
     ) -> str:
         sections = []
         if prefrontal:
-            sections.append(
-                "Response Plan:\n"
-                f"- Strategie: {prefrontal.get('response_strategy', 'conversational')}\n"
-                f"- Ton: {prefrontal.get('tone', 'friendly')}\n"
-                f"- Guidance: {prefrontal.get('response_guidance', 'Antworte klar, warm und zielorientiert.')}"
-            )
+            response_plan_lines = [
+                "Response Plan:",
+                f"- Strategie: {prefrontal.get('response_strategy', 'conversational')}",
+            ]
+            if prefrontal.get("tone"):
+                response_plan_lines.append(f"- Ton: {prefrontal['tone']}")
+            if prefrontal.get("response_guidance"):
+                response_plan_lines.append(f"- Guidance: {prefrontal['response_guidance']}")
+            sections.append("\n".join(response_plan_lines))
         if life_context:
             need = (life_context.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
             goal = life_context.get("active_goal", {}).get("title", "Selbstkonsistenz")

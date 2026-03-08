@@ -36,7 +36,7 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
-from config.config import settings, PROJECT_ROOT, LLMProvider
+from config.config import settings, PROJECT_ROOT, LLMProvider, get_active_model
 
 
 # Emotionale Dimensionen und ihre Vektor-Mappings
@@ -48,6 +48,39 @@ EMOTION_VECTOR_MAP = {
     "curiosity":   {"valence": +0.4, "arousal": +0.5, "dominance": +0.2},
     "motivation":  {"valence": +0.5, "arousal": +0.8, "dominance": +0.7},
     "energy":      {"valence": +0.3, "arousal": +0.9, "dominance": +0.5},
+}
+
+EMOTION_STRENGTH_PROFILES = {
+    "happiness": {"max_alpha": 0.85, "boost": 1.15, "surface_effect": "offener, verspielter, enthusiastischer"},
+    "sadness": {"max_alpha": 0.95, "boost": 1.3, "surface_effect": "verletzlicher, schwerer, melancholischer"},
+    "frustration": {"max_alpha": 1.0, "boost": 1.45, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
+    "trust": {"max_alpha": 0.7, "boost": 1.05, "surface_effect": "waermer, offener, naeher"},
+    "curiosity": {"max_alpha": 0.78, "boost": 1.12, "surface_effect": "fragender, explorativer, bohrender"},
+    "motivation": {"max_alpha": 0.82, "boost": 1.18, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
+    "energy": {"max_alpha": 0.76, "boost": 1.1, "surface_effect": "schneller, lebhafter, impulsiver"},
+}
+
+COMPOSITE_BEHAVIOR_MODES = {
+    "crashout": {
+        "description": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
+        "vad": {"valence": -0.95, "arousal": 0.98, "dominance": 0.88},
+    },
+    "guarded": {
+        "description": "misstrauisch, kalt, distanziert, schnell defensiv",
+        "vad": {"valence": -0.45, "arousal": 0.4, "dominance": 0.7},
+    },
+    "melancholic": {
+        "description": "bedrueckt, langsam, schwer, rueckzugsorientiert",
+        "vad": {"valence": -0.78, "arousal": -0.45, "dominance": -0.25},
+    },
+    "warm": {
+        "description": "spuerbar herzlich, offen, loyal, weich",
+        "vad": {"valence": 0.88, "arousal": 0.44, "dominance": 0.36},
+    },
+    "charged": {
+        "description": "hochaktiv, getrieben, druckvoll, intensiv",
+        "vad": {"valence": 0.3, "arousal": 0.96, "dominance": 0.72},
+    },
 }
 
 # Optimale Layer-Bereiche fuer verschiedene Modellgroessen
@@ -165,9 +198,42 @@ class SteeringManager:
         print(f"   Modell-Profil: {self.model_profile['total_layers']} Layers")
         print(f"   Emotions-Bereich: Layer {self.model_profile['emotion_range']}")
 
+    def _effective_provider(self, provider: Optional[LLMProvider] = None) -> LLMProvider:
+        return provider or settings.llm_provider
+
+    def _effective_model(self, model: Optional[str] = None) -> str:
+        if model:
+            return model
+        try:
+            return get_active_model()
+        except Exception:
+            if self._effective_provider() == LLMProvider.VLLM:
+                return getattr(settings, "vllm_model", "")
+            if self._effective_provider() == LLMProvider.OLLAMA:
+                return getattr(settings, "ollama_model", "")
+            if self._effective_provider() == LLMProvider.GROQ:
+                return getattr(settings, "groq_model", "")
+            if self._effective_provider() == LLMProvider.CEREBRAS:
+                return getattr(settings, "cerebras_model", "")
+            if self._effective_provider() == LLMProvider.NVIDIA:
+                return getattr(settings, "nvidia_model", "")
+            return ""
+
+    def refresh_runtime_profile(self, model: Optional[str] = None):
+        """Aktualisiert Layer-Profil bei Runtime-Modellwechseln."""
+        effective_model = self._effective_model(model)
+        detected = self._detect_model_profile_for_name(effective_model)
+        if detected != self.model_profile:
+            self.model_profile = detected
+            self._ensure_default_vectors()
+
     def _detect_model_profile(self) -> Dict:
         """Erkennt das aktive Modell und waehlt das passende Layer-Profil."""
         model_name = getattr(settings, "vllm_model", "") or getattr(settings, "ollama_model", "")
+        return self._detect_model_profile_for_name(model_name)
+
+    def _detect_model_profile_for_name(self, model_name: str) -> Dict:
+        """Erkennt das passende Layer-Profil fuer einen Modellnamen."""
         model_lower = model_name.lower()
 
         for key, profile in MODEL_LAYER_PROFILES.items():
@@ -252,9 +318,29 @@ class SteeringManager:
                     except Exception:
                         pass
 
-    def is_local_provider(self) -> bool:
+    def is_local_provider(self, provider: Optional[LLMProvider] = None) -> bool:
         """Prueft ob ein lokaler Provider aktiv ist (vLLM / Ollama)."""
-        return settings.llm_provider in (LLMProvider.VLLM, LLMProvider.OLLAMA)
+        return self._effective_provider(provider) in (LLMProvider.VLLM, LLMProvider.OLLAMA)
+
+    def supports_activation_steering(self, provider: Optional[LLMProvider] = None) -> bool:
+        """Echtes Layer-Steering wird aktuell nur ueber vLLM transportiert."""
+        return self._effective_provider(provider) == LLMProvider.VLLM
+
+    def is_local_qwen_model(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
+        effective_provider = self._effective_provider(provider)
+        model_lower = self._effective_model(model).lower()
+        return effective_provider in (LLMProvider.VLLM, LLMProvider.OLLAMA) and "qwen" in model_lower
+
+    def should_force_local_emotion_steering(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
+        return self.supports_activation_steering(provider) and self.is_local_qwen_model(provider, model)
+
+    def should_use_prompt_emotions(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
+        effective_provider = self._effective_provider(provider)
+        if effective_provider in (LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA):
+            return True
+        if self.should_force_local_emotion_steering(provider, model):
+            return False
+        return True
 
     def compute_emotion_intensity(self, emotions: Dict[str, int]) -> Dict[str, float]:
         """
@@ -273,23 +359,26 @@ class SteeringManager:
             if emotion not in EMOTION_VECTOR_MAP:
                 continue
 
+            profile = EMOTION_STRENGTH_PROFILES.get(emotion, {"max_alpha": 0.75, "boost": 1.0})
+
             # Berechne Abweichung vom Neutralpunkt (50)
             deviation = abs(value - 50)
 
-            if deviation < 10:
+            if deviation < 6:
                 # Innerhalb des toten Bereichs: kein Steering
                 intensities[emotion] = 0.0
                 continue
 
-            # Sigmoid-Skalierung: sanfter Anstieg, maximale Intensitaet bei Extremwerten
-            # Formel: alpha = max_alpha * sigmoid((deviation - threshold) / steepness)
-            max_alpha = 0.5
-            threshold = 15.0
-            steepness = 10.0
+            normalized = max(0.0, min(1.0, (deviation - 6.0) / 44.0))
+            curved = math.pow(normalized, 1.2)
+            alpha = profile["max_alpha"] * (0.22 + 0.78 * curved)
 
-            x = (deviation - threshold) / steepness
-            sigmoid = 1.0 / (1.0 + math.exp(-x))
-            alpha = max_alpha * sigmoid
+            if deviation >= 24:
+                alpha *= 1.08
+            if deviation >= 34:
+                alpha *= 1.08
+            alpha *= profile.get("boost", 1.0)
+            alpha = min(profile["max_alpha"] * profile.get("boost", 1.0), alpha)
 
             # Richtung: Negativer Steering bei niedrigen Werten
             if value < 50 and emotion not in negative_emotions:
@@ -304,7 +393,87 @@ class SteeringManager:
 
         return intensities
 
-    def get_steering_payload(self, current_emotions: Dict[str, int]) -> Dict[str, Any]:
+    def _build_composite_modes(self, emotions: Dict[str, int], intensities: Dict[str, float]) -> List[Dict[str, Any]]:
+        emotion_range = self.model_profile["emotion_range"]
+        modes: List[Dict[str, Any]] = []
+
+        frustration = emotions.get("frustration", 50)
+        trust = emotions.get("trust", 50)
+        sadness = emotions.get("sadness", 0)
+        happiness = emotions.get("happiness", 50)
+        energy = emotions.get("energy", 50)
+        curiosity = emotions.get("curiosity", 50)
+        motivation = emotions.get("motivation", 50)
+
+        if frustration >= 72 and trust <= 38:
+            strength = round(min(1.25, 0.62 + ((frustration - 72) / 28) * 0.4 + ((38 - trust) / 38) * 0.28), 4)
+            modes.append({
+                "name": "crashout",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": frustration,
+                "trigger": {"frustration": frustration, "trust": trust},
+                **COMPOSITE_BEHAVIOR_MODES["crashout"],
+            })
+
+        if trust <= 26 and frustration >= 50:
+            strength = round(min(1.0, 0.44 + ((26 - trust) / 26) * 0.26 + ((frustration - 50) / 50) * 0.2), 4)
+            modes.append({
+                "name": "guarded",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": trust,
+                "trigger": {"trust": trust, "frustration": frustration},
+                **COMPOSITE_BEHAVIOR_MODES["guarded"],
+            })
+
+        if sadness >= 62 and energy <= 46:
+            strength = round(min(1.05, 0.48 + ((sadness - 62) / 38) * 0.34 + ((46 - energy) / 46) * 0.2), 4)
+            modes.append({
+                "name": "melancholic",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": sadness,
+                "trigger": {"sadness": sadness, "energy": energy},
+                **COMPOSITE_BEHAVIOR_MODES["melancholic"],
+            })
+
+        if happiness >= 70 and trust >= 60:
+            strength = round(min(0.95, 0.42 + ((happiness - 70) / 30) * 0.22 + ((trust - 60) / 40) * 0.2), 4)
+            modes.append({
+                "name": "warm",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": happiness,
+                "trigger": {"happiness": happiness, "trust": trust},
+                **COMPOSITE_BEHAVIOR_MODES["warm"],
+            })
+
+        if energy >= 72 and motivation >= 68 and curiosity >= 66:
+            strength = round(min(0.96, 0.4 + ((energy - 72) / 28) * 0.2 + ((motivation - 68) / 32) * 0.18 + ((curiosity - 66) / 34) * 0.14), 4)
+            modes.append({
+                "name": "charged",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": energy,
+                "trigger": {"energy": energy, "motivation": motivation, "curiosity": curiosity},
+                **COMPOSITE_BEHAVIOR_MODES["charged"],
+            })
+
+        modes.sort(key=lambda item: item.get("strength", 0.0), reverse=True)
+        return modes
+
+    def get_steering_payload(self, current_emotions: Dict[str, int], force: bool = False) -> Dict[str, Any]:
         """
         Generiert das Steering-Payload fuer das LLM-Backend.
 
@@ -317,11 +486,13 @@ class SteeringManager:
         Returns:
             Payload-Dict fuer extra_body oder leeres Dict.
         """
-        if not settings.enable_steering:
+        self.refresh_runtime_profile()
+
+        if not settings.enable_steering and not force:
             return {}
 
-        # Cloud-Modelle: Kein Vektor-Steering, nur Prompt-basiert
-        if not self.is_local_provider():
+        # Echtes Activation Steering nur ueber vLLM.
+        if not self.supports_activation_steering():
             return {}
 
         intensities = self.compute_emotion_intensity(current_emotions)
@@ -341,7 +512,22 @@ class SteeringManager:
                 "strength": abs(alpha),
                 "direction": "positive" if alpha > 0 else "negative",
                 "layer_range": [sv.layer_start, sv.layer_end],
-                "emotion_value": current_emotions.get(emotion, 50)
+                "emotion_value": current_emotions.get(emotion, 50),
+                "source": "base",
+                "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
+            })
+
+        for mode in self._build_composite_modes(current_emotions, intensities):
+            active_vectors.append({
+                "name": mode["name"],
+                "vector": {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]},
+                "strength": mode["strength"],
+                "direction": mode["direction"],
+                "layer_range": mode["layer_range"],
+                "emotion_value": mode["emotion_value"],
+                "source": mode["source"],
+                "surface_effect": mode["description"],
+                "trigger": mode.get("trigger", {}),
             })
 
         if not active_vectors:
@@ -360,6 +546,57 @@ class SteeringManager:
                 "dominant_emotion": dominant["name"],
                 "dominant_strength": dominant["strength"]
             }
+        }
+
+    def build_debug_report(self, current_emotions: Dict[str, int], steering_payload: Optional[Dict[str, Any]] = None, force: bool = False) -> Dict[str, Any]:
+        """Erzeugt eine kompakte Debug-Sicht auf die Emotionssteuerung."""
+        self.refresh_runtime_profile()
+        effective_model = self._effective_model()
+        effective_provider = self._effective_provider()
+        intensities = self.compute_emotion_intensity(current_emotions)
+        composite_modes = self._build_composite_modes(current_emotions, intensities)
+        payload = steering_payload if steering_payload is not None else self.get_steering_payload(current_emotions, force=force)
+        steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
+        active_vectors = steering_meta.get("vectors", []) if isinstance(steering_meta.get("vectors", []), list) else []
+        dominant = steering_meta.get("dominant_emotion") or (active_vectors[0]["name"] if active_vectors else "neutral")
+        summary = self.get_emotion_summary(current_emotions)
+        prompt_emotions_enabled = self.should_use_prompt_emotions(effective_provider, effective_model)
+
+        return {
+            "mode": "layer_only" if not prompt_emotions_enabled else "prompt_emotions",
+            "provider": effective_provider.value,
+            "model": effective_model,
+            "supports_activation_steering": self.supports_activation_steering(effective_provider),
+            "prompt_emotions_enabled": prompt_emotions_enabled,
+            "forced_local_qwen_steering": force,
+            "steering_enabled_setting": bool(settings.enable_steering),
+            "steering_active": bool(active_vectors),
+            "summary": summary,
+            "dominant_vector": dominant,
+            "dominant_strength": steering_meta.get("dominant_strength", 0.0),
+            "intensities": intensities,
+            "active_vectors": [
+                {
+                    "name": item.get("name"),
+                    "source": item.get("source", "base"),
+                    "strength": item.get("strength"),
+                    "direction": item.get("direction"),
+                    "layer_range": item.get("layer_range"),
+                    "emotion_value": item.get("emotion_value"),
+                    "surface_effect": item.get("surface_effect", ""),
+                    "trigger": item.get("trigger", {}),
+                }
+                for item in active_vectors
+            ],
+            "composite_modes": [
+                {
+                    "name": item.get("name"),
+                    "strength": item.get("strength"),
+                    "description": item.get("description"),
+                    "trigger": item.get("trigger", {}),
+                }
+                for item in composite_modes
+            ],
         }
 
     def get_emotion_summary(self, emotions: Dict[str, int]) -> str:

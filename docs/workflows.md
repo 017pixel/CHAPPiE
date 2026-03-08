@@ -105,6 +105,12 @@ Im Chat werden Antwortschichten getrennt behandelt:
 
 Wenn keine finale Antwort vorliegt, wird stattdessen `CHAPPiE schweigt...` angezeigt und die vorhandenen Thinking-Bereiche werden automatisch aufgeklappt.
 
+Fuer Emotionen gilt ausserdem:
+
+- **API-Modelle** bekommen explizite Emotionsregeln ueber den Prompt.
+- **Lokales Qwen 3.5 auf vLLM** soll Emotionen primär ueber Layer-/Activation-Steering spueren und ausdruecken.
+- Feste Stilvorgaben wie dauerhaft `friendly` werden im lokalen Qwen-Pfad reduziert, damit die Layer-Manipulation wirklich durchkommt.
+
 Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
 
 ### Debug Mode / Brain Monitor
@@ -114,11 +120,11 @@ Im **DEBUG MODE: ON** zeigt der aufklappbare **Brain Monitor** die Laufzeitpipel
 1. Input + Intent (inkl. Step-1-Roh-JSON)
 2. Tool-Orchestrierung (verfügbar, ausgewählt, nicht genutzt, ausgeführt)
 3. Emotionen + Homeostasis (Before/After/Delta + Anpassungen)
-4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development)
+4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development, Emotion-Steering)
 5. Antwortgenerierung (Modell-Reasoning + CHAPPiE-Thought + Action Plan)
 6. Event-Log (strukturierte Debug-Einträge pro Schritt)
 
-Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle.
+Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle. Im Emotion-Steering-Bereich sieht man ausserdem Prompt-Modus, aktive Vektoren, Composite-Modi und den erwartbaren Ausdruck des Zustands.
 
 ## 6. Wichtige Commands
 
