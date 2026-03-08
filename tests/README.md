@@ -14,6 +14,7 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_debug_monitor_data.py`
 - `tests/test_ollama_response_handling.py`
 - `tests/test_chat_manager_persistence.py`
+- `tests/test_config_package_import.py`
 - `tests/test_vllm_response_handling.py`
 - `tests/test_reasoning_layering.py`
 - `tests/test_web_ui_consistency.py`

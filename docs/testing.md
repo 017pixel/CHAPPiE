@@ -47,6 +47,7 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_ollama_response_handling.py`
 - `python tests/test_chat_manager_persistence.py`
+- `python tests/test_config_package_import.py`
 - `python tests/test_vllm_response_handling.py`
 - `python tests/test_reasoning_layering.py`
 - `python tests/test_web_ui_consistency.py`

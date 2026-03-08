@@ -54,6 +54,7 @@ jobs:
           python tests/test_local_first_runtime.py
           python tests/test_ollama_response_handling.py
           python tests/test_chat_manager_persistence.py
+          python tests/test_config_package_import.py
           python tests/test_vllm_response_handling.py
           python tests/test_web_ui_consistency.py
           python tests/test_reasoning_layering.py
