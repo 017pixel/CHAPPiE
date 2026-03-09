@@ -9,6 +9,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 - [Architektur & Gehirn-Metapher](architecture.md)
 - [Workflows](workflows.md)
 - [Lokale Modelle & Fallbacks](local-models.md)
+- [vLLM-Setup Schritt für Schritt](vLLM-Setup.md)
 - [Projektkarte / Ordnerstruktur](project-map.md)
 - [Testing](testing.md)
 - [Deployment & Serverbetrieb](deployment.md)
@@ -44,6 +45,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 | `docs/architecture.md` | Gehirn-Metapher, Systemschichten, Quellpfade |
 | `docs/workflows.md` | Ablauf einer Anfrage, Schlafphase, Training, UI-Flows |
 | `docs/local-models.md` | Qwen-3.5-Strategie, vLLM/Ollama/API-Rollen |
+| `docs/vLLM-Setup.md` | konkretes Setup fuer vLLM + Qwen 3.5 + Layer Editing |
 | `docs/project-map.md` | Orientierung in der Codebasis |
 | `docs/testing.md` | Teststrategie, sichere Checks, manuelle Smoke-Tests |
 | `docs/deployment.md` | systemd, Services, Deploy-Skripte, Serverbetrieb |

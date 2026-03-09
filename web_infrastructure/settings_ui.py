@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from config.config import settings, LLMProvider
-from web_infrastructure.ui_utils import EMOTION_DEFAULTS, normalize_emotions
+from web_infrastructure.ui_utils import EMOTION_DEFAULTS, EMOTION_DISPLAY_ORDER, EMOTION_LABELS, normalize_emotions
 
 PROVIDER_OPTIONS = {
     "auto": "Auto (folgt Haupt-Provider)",
@@ -118,6 +118,13 @@ def _render_provider_select(label, current_provider, key, include_auto=True):
         key=key
     )
     return selected
+
+
+def _build_emotion_runtime_report(backend, emotions):
+    manager = backend.steering_manager
+    model_name = getattr(backend.brain, "model", "")
+    force_steering = manager.should_force_local_emotion_steering(settings.llm_provider, model_name)
+    return manager.build_debug_report(emotions, force=force_steering)
 
 
 def _provider_label(provider_value: str) -> str:
@@ -307,6 +314,103 @@ def render_settings_overlay(backend):
             "motivation": new_motivation,
             "sadness": new_sadness,
         })
+
+        runtime_report = _build_emotion_runtime_report(backend, new_emotions)
+        layer_rows = backend.get_emotion_layer_config(new_emotions)
+        max_layer_index = max(0, backend.steering_manager.model_profile.get("total_layers", 1) - 1)
+
+        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+        with col_r1:
+            st.metric("Modus", runtime_report.get("mode", "-"))
+        with col_r2:
+            st.metric("Prompt-Emotionen", "Ja" if runtime_report.get("prompt_emotions_enabled") else "Nein")
+        with col_r3:
+            st.metric("Aktive Vektoren", len(runtime_report.get("active_vectors", [])))
+        with col_r4:
+            st.metric("Dominant", runtime_report.get("dominant_vector", "neutral"))
+
+        if runtime_report.get("prompt_emotions_enabled"):
+            st.info("API-Modell aktiv: Emotionsregeln duerfen im Systemprompt erscheinen. Layer Editing bleibt als Vorschau sichtbar, wird aber erst mit lokalem vLLM-Steering wirksam.")
+        elif runtime_report.get("supports_activation_steering"):
+            st.success("Lokales Modell aktiv: Emotionen werden nicht an den Systemprompt angehaengt, sondern nur ueber Layer Editing / Activation Steering weitergegeben.")
+        else:
+            st.warning("Lokales Modell ohne Activation Steering: Emotions-Systemprompt bleibt aus. Fuer echtes Layer Editing bitte vLLM mit einem lokalen Qwen-3.5-Modell verwenden.")
+
+        if runtime_report.get("summary"):
+            st.caption(f"Aktuelle Layer-Wirkung: {runtime_report.get('summary')}")
+
+        with st.expander("Layer Editing pro Emotion", expanded=True):
+            st.caption("Hier definierst du pro Basis-Emotion Staerke und Layer-Bereich des Steering-Vektors. Diese Werte beeinflussen lokale vLLM-Steuerung direkt.")
+            draft_layer_config = {}
+            for emotion_key in EMOTION_DISPLAY_ORDER:
+                row = next((item for item in layer_rows if item.get("emotion") == emotion_key), None)
+                if not row:
+                    continue
+
+                label = EMOTION_LABELS.get(emotion_key, emotion_key)
+                with st.expander(f"{label} · Wert {row.get('current_value', 0)} · Aktiv {row.get('active_alpha', 0.0):+.3f}", expanded=False):
+                    st.caption(row.get("surface_effect", ""))
+                    alpha_value = st.slider(
+                        f"Steering-Staerke ({label})",
+                        min_value=0.0,
+                        max_value=1.5,
+                        value=float(row.get("default_alpha", 0.3)),
+                        step=0.05,
+                        key=f"layer_alpha_{emotion_key}",
+                    )
+                    col_ls, col_le = st.columns(2)
+                    with col_ls:
+                        start_layer = st.number_input(
+                            f"Start-Layer ({label})",
+                            min_value=0,
+                            max_value=max_layer_index,
+                            value=int(row.get("layer_start", 0)),
+                            step=1,
+                            key=f"layer_start_{emotion_key}",
+                        )
+                    with col_le:
+                        end_layer = st.number_input(
+                            f"End-Layer ({label})",
+                            min_value=0,
+                            max_value=max_layer_index,
+                            value=int(row.get("layer_end", max_layer_index)),
+                            step=1,
+                            key=f"layer_end_{emotion_key}",
+                        )
+
+                    normalized_start = int(min(start_layer, end_layer))
+                    normalized_end = int(max(start_layer, end_layer))
+                    st.caption(f"Vektor-Typ: {row.get('vector_type', 'synthetic')} | Effekt: {row.get('surface_effect', '-')}")
+                    draft_layer_config[emotion_key] = {
+                        "layer_start": normalized_start,
+                        "layer_end": normalized_end,
+                        "default_alpha": round(float(alpha_value), 3),
+                    }
+
+            current_layer_hash = hash(str(draft_layer_config))
+            if "last_layer_settings_hash" not in st.session_state:
+                st.session_state.last_layer_settings_hash = current_layer_hash
+
+            if current_layer_hash != st.session_state.last_layer_settings_hash:
+                for emotion_key, config in draft_layer_config.items():
+                    backend.update_emotion_layer_config(
+                        emotion_key,
+                        config["layer_start"],
+                        config["layer_end"],
+                        config["default_alpha"],
+                    )
+                st.session_state.last_layer_settings_hash = current_layer_hash
+                st.toast("Layer Editing automatisch aktualisiert 💾")
+
+        active_vectors = runtime_report.get("active_vectors", [])
+        if active_vectors:
+            st.markdown("**Aktive Layer-Vektoren / Composite-Modes**")
+            st.dataframe(active_vectors, use_container_width=True)
+
+        composite_modes = runtime_report.get("composite_modes", [])
+        if composite_modes:
+            st.markdown("**Abgeleitete Verhaltensmodi**")
+            st.dataframe(composite_modes, use_container_width=True)
         
         # AUTO-SAVE LOGIC EMO TAB
         current_emo_hash = hash(str(new_emotions))

@@ -32,6 +32,7 @@ from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from brain.base_brain import GenerationConfig
+from brain.agents.steering_manager import get_steering_manager
 from brain.deep_think import DeepThinkEngine
 from memory.sleep_phase import get_sleep_phase_handler
 
@@ -82,6 +83,7 @@ class TrainingLoop:
         self.memory = MemoryEngine()
         self.emotions = EmotionsEngine()
         self.brain = get_brain()
+        self.steering_manager = get_steering_manager()
         self.context_files = get_context_files_manager()
         self.sleep_handler = get_sleep_phase_handler()
         data_dir = os.path.join(PROJECT_ROOT, "data")
@@ -306,8 +308,14 @@ class TrainingLoop:
         
         # 3. Prompt Building
         state = self.emotions.get_state()
+        current_emotions = state.__dict__
+        model_name = get_active_model()
+        use_prompt_emotions = self.steering_manager.should_use_prompt_emotions(settings.llm_provider, model_name)
+        force_steering = self.steering_manager.should_force_local_emotion_steering(settings.llm_provider, model_name)
+        steering_payload = self.steering_manager.get_steering_payload(current_emotions, force=force_steering)
         system_prompt = get_system_prompt_with_emotions(
-            **state.__dict__,
+            **current_emotions,
+            include_emotion_status=use_prompt_emotions,
             use_chain_of_thought=False # CoT fuer Training ggf. zu verbose, wir wollen Interaktion
         )
         
@@ -323,6 +331,7 @@ class TrainingLoop:
             max_tokens=200,  # REDUZIERT um 60% (von 500 auf 200) für effizienteres Training
             temperature=settings.temperature,
             stream=False,
+            extra_body=steering_payload or None,
         )
         
         response = self.brain.generate(messages, config=gen_config)

@@ -4,7 +4,7 @@ from typing import Mapping, Sequence, TypeVar
 
 T = TypeVar("T")
 
-UI_VERSION = "13.4"
+UI_VERSION = "13.5"
 
 EMOTION_DEFAULTS = {
     "happiness": 50,

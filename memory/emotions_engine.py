@@ -17,15 +17,82 @@ Emotionen:
 """
 
 import json
+import math
 from pathlib import Path
 from dataclasses import dataclass, asdict
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 from config.config import PROJECT_ROOT, settings
 
 
 # Status-Datei Pfad
 STATUS_FILE = PROJECT_ROOT / "data" / "status.json"
+
+DEFAULT_EMOTION_TRANSITION_RULE = {"scale": 0.55, "max_increase": 8, "max_decrease": 8}
+EMOTION_TRANSITION_RULES = {
+    "happiness": {"scale": 0.55, "max_increase": 8, "max_decrease": 8},
+    "trust": {"scale": 0.55, "max_increase": 7, "max_decrease": 8},
+    "energy": {"scale": 0.50, "max_increase": 6, "max_decrease": 7},
+    "curiosity": {"scale": 0.55, "max_increase": 6, "max_decrease": 6},
+    "frustration": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
+    "motivation": {"scale": 0.55, "max_increase": 7, "max_decrease": 7},
+    "sadness": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
+}
+
+
+def _clamp_emotion_value(value: int) -> int:
+    return max(0, min(100, int(value)))
+
+
+def calculate_emotion_transition(emotion: str, current_value: int, raw_delta: int | float) -> Dict[str, Any]:
+    """Glaettet starke Emotionsspruenge pro Turn und liefert Debug-Metadaten."""
+    rule = EMOTION_TRANSITION_RULES.get(emotion, DEFAULT_EMOTION_TRANSITION_RULE)
+
+    try:
+        raw_value = int(round(float(raw_delta)))
+    except Exception:
+        raw_value = 0
+
+    if raw_value == 0:
+        applied_delta = 0
+        softened = False
+        limit = 0
+    elif abs(raw_value) <= 2:
+        applied_delta = raw_value
+        softened = False
+        limit = abs(raw_value)
+    else:
+        limit = rule["max_increase"] if raw_value > 0 else rule["max_decrease"]
+        scaled = max(1, int(math.ceil(abs(raw_value) * rule["scale"])))
+        applied_delta = min(limit, scaled)
+        if raw_value < 0:
+            applied_delta *= -1
+        softened = applied_delta != raw_value
+
+    after = _clamp_emotion_value(current_value + applied_delta)
+    clamped_delta = after - current_value
+
+    return {
+        "before": _clamp_emotion_value(current_value),
+        "after": after,
+        "raw_delta": raw_value,
+        "applied_delta": clamped_delta,
+        "change": clamped_delta,
+        "softened": softened or clamped_delta != applied_delta,
+        "limit": limit,
+        "scale": rule["scale"],
+    }
+
+
+def apply_emotion_delta(state: "EmotionalState", emotion: str, raw_delta: int | float) -> Dict[str, Any]:
+    """Wendet ein geglaettetes Delta auf einen EmotionalState an."""
+    if not hasattr(state, emotion):
+        return calculate_emotion_transition(emotion, 50, 0)
+
+    before = getattr(state, emotion)
+    transition = calculate_emotion_transition(emotion, before, raw_delta)
+    setattr(state, emotion, transition["after"])
+    return transition
 
 
 # ============================================
@@ -281,13 +348,17 @@ class EmotionsEngine:
         
         if llm_result:
             # LLM-basierte Aenderungen anwenden
-            self.state.happiness += llm_result.get("happiness_change", 0)
-            self.state.trust += llm_result.get("trust_change", 0)
-            self.state.energy += llm_result.get("energy_change", -1)
-            self.state.curiosity += llm_result.get("curiosity_change", 0)
-            self.state.frustration += llm_result.get("frustration_change", 0)
-            self.state.motivation += llm_result.get("motivation_change", 0)
-            self.state.sadness += llm_result.get("sadness_change", 0)
+            llm_changes = {
+                "happiness": llm_result.get("happiness_change", 0),
+                "trust": llm_result.get("trust_change", 0),
+                "energy": llm_result.get("energy_change", -1),
+                "curiosity": llm_result.get("curiosity_change", 0),
+                "frustration": llm_result.get("frustration_change", 0),
+                "motivation": llm_result.get("motivation_change", 0),
+                "sadness": llm_result.get("sadness_change", 0),
+            }
+            for emotion_name, raw_delta in llm_changes.items():
+                apply_emotion_delta(self.state, emotion_name, raw_delta)
             
             if settings.debug:
                 reasoning = llm_result.get("reasoning", "")
@@ -306,25 +377,35 @@ class EmotionsEngine:
     
     def _apply_simple_sentiment(self, sentiment: str):
         """Wendet einfache Sentiment-basierte Aenderungen an (Fallback)."""
+        changes = {
+            "happiness": 0,
+            "trust": 0,
+            "energy": -1,
+            "curiosity": 0,
+            "frustration": 0,
+            "motivation": 0,
+            "sadness": 0,
+        }
+
         if sentiment == "POSITIV":
-            self.state.happiness += 3
-            self.state.trust += 1
-            self.state.motivation += 2
-            self.state.frustration -= 3
+            changes["happiness"] = 3
+            changes["trust"] = 1
+            changes["motivation"] = 2
+            changes["frustration"] = -3
         elif sentiment == "NEGATIV":
-            self.state.happiness -= 5
-            self.state.frustration += 8
+            changes["happiness"] = -5
+            changes["frustration"] = 8
         elif sentiment == "NEUGIERIG":
-            self.state.curiosity += 8
-            self.state.motivation += 2
+            changes["curiosity"] = 8
+            changes["motivation"] = 2
         elif sentiment == "VERTRAUEN":
-            self.state.trust += 10
-            self.state.happiness += 3
+            changes["trust"] = 10
+            changes["happiness"] = 3
         else:  # NEUTRAL
-            self.state.frustration -= 1
-        
-        # Energie sinkt immer leicht
-        self.state.energy -= 1
+            changes["frustration"] = -1
+
+        for emotion_name, raw_delta in changes.items():
+            apply_emotion_delta(self.state, emotion_name, raw_delta)
     
     def update_from_sentiment(self, sentiment: str):
         """

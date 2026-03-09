@@ -22,6 +22,8 @@ from memory import MemoryEngine
 from memory.context_files import get_context_files_manager
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from brain import get_brain, Message
+from brain.base_brain import GenerationConfig
+from brain.agents.steering_manager import get_steering_manager
 
 # --- COLORS ---
 class Colors:
@@ -75,6 +77,7 @@ class CHAPPiE:
         
         print_log("INIT", f"Verbinde mit Brain ({get_active_model()})...", Colors.AI)
         self.brain = get_brain()
+        self.steering_manager = get_steering_manager()
         self.context_files = get_context_files_manager()
         
         self.current_thought: str = ""
@@ -290,8 +293,13 @@ class CHAPPiE:
         memories_text = self.memory.format_memories_for_prompt(memories)
 
         # 4. Prompt Building
+        current_emotions = state.__dict__
+        use_prompt_emotions = self.steering_manager.should_use_prompt_emotions(settings.llm_provider, get_active_model())
+        force_steering = self.steering_manager.should_force_local_emotion_steering(settings.llm_provider, get_active_model())
+        steering_payload = self.steering_manager.get_steering_payload(current_emotions, force=force_steering)
         system_prompt = get_system_prompt_with_emotions(
-            **state.__dict__, 
+            **current_emotions,
+            include_emotion_status=use_prompt_emotions,
             use_chain_of_thought=settings.chain_of_thought
         )
         
@@ -303,14 +311,21 @@ class CHAPPiE:
         
         messages = self.brain.build_prompt(system_prompt, memories_text, user_text)
  
-       # 5. Generation
+        # 5. Generation
         print_section("GENERATION STREAM", Colors.AI)
         
         full_response = ""
         is_in_thought = False
         
         # Stream output
-        for token in self.brain.generate(messages):
+        gen_config = GenerationConfig(
+            max_tokens=settings.max_tokens,
+            temperature=settings.temperature,
+            stream=True,
+            extra_body=steering_payload or None,
+        )
+
+        for token in self.brain.generate(messages, config=gen_config):
             full_response += token
             
             # Thought Parsing & Display

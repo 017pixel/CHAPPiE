@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Callable, Optional
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction
 from memory.memory_engine import MemoryEngine
-from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
+from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
 from memory.chat_manager import ChatManager
 from memory.short_term_memory import ShortTermMemory
 from memory.short_term_memory_v2 import get_short_term_memory_v2
@@ -536,6 +536,18 @@ def init_chappie():
                 "life_snapshot": self.life_simulation.get_snapshot(),
             }
 
+        def get_emotion_layer_config(self, current_emotions: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
+            snapshot = current_emotions or self._get_emotions_snapshot()
+            return self.steering_manager.get_emotion_layer_config(snapshot)
+
+        def update_emotion_layer_config(self, emotion_name: str, layer_start: int, layer_end: int, default_alpha: float) -> Optional[Dict[str, Any]]:
+            return self.steering_manager.update_vector_config(
+                emotion_name,
+                layer_start=layer_start,
+                layer_end=layer_end,
+                default_alpha=default_alpha,
+            )
+
         def _build_workspace_from_intent(self, intent_result, life_context: Dict[str, Any], memories: List[Any] | None = None) -> Dict[str, Any]:
             sensory = {
                 "input_type": intent_result.intent_type.value,
@@ -685,7 +697,7 @@ def init_chappie():
             for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
-            emotions_after = self._apply_emotion_updates(emotions_before, combined_updates)
+            emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
             
             # === AUSFÜHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
@@ -768,7 +780,7 @@ def init_chappie():
                 "response_text": response_data["response_text"],
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
-                "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
+                "emotions_delta": emotion_transitions,
                 "thought_process": response_data.get("thought_process", ""),
                 "model_reasoning": response_data.get("model_reasoning", ""),
                 "reasoning_only": response_data.get("reasoning_only", False),
@@ -875,32 +887,46 @@ def init_chappie():
                     )
 
         def _apply_emotion_updates(self, emotions_before: Dict[str, int], 
-                                   emotion_updates: Dict[str, Any]) -> Dict[str, int]:
+                                   emotion_updates: Dict[str, Any]) -> tuple[Dict[str, int], Dict[str, Any]]:
             """Wendet Emotions Updates an."""
             emotions_after = emotions_before.copy()
+            transition_meta: Dict[str, Any] = {}
             
             for emotion_name, update_data in emotion_updates.items():
                 if emotion_name in emotions_after:
                     delta = getattr(update_data, "delta", update_data.get("delta", 0) if isinstance(update_data, dict) else 0)
-                    new_value = emotions_after[emotion_name] + delta
-                    # Clamp to 0-100
-                    new_value = max(0, min(100, new_value))
+                    reason = getattr(update_data, "reason", update_data.get("reason", "") if isinstance(update_data, dict) else "")
+                    transition = calculate_emotion_transition(emotion_name, emotions_after[emotion_name], delta)
+                    new_value = transition["after"]
                     
                     emotions_after[emotion_name] = new_value
+                    transition_meta[emotion_name] = {
+                        **transition,
+                        "reason": reason,
+                    }
                     
                     # Update im EmotionsEngine
                     if hasattr(self.emotions.state, emotion_name):
                         setattr(self.emotions.state, emotion_name, new_value)
                     
                     # Log
+                    reason_text = reason or "intent/homeostasis"
+                    if transition["softened"]:
+                        reason_text = f"{reason_text} | raw {transition['raw_delta']:+d} -> angewendet {transition['applied_delta']:+d}"
                     self.debug_logger.log_emotion_update(
                         emotion_name,
                         emotions_before[emotion_name],
                         new_value,
-                        getattr(update_data, "reason", update_data.get("reason", "") if isinstance(update_data, dict) else "")
+                        reason_text
                     )
+
+            if transition_meta:
+                try:
+                    self.emotions._save_state()
+                except Exception:
+                    pass
             
-            return emotions_after
+            return emotions_after, transition_meta
 
         def _add_short_term_entries(self, entries: List[Any]):
             """Fügt Short-Term Einträge hinzu."""

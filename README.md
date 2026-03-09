@@ -11,6 +11,7 @@ Der Fokus des Projekts liegt darauf, eine **verständliche, menschenlesbare und 
 - [Architektur & Gehirn-Metapher](docs/architecture.md)
 - [Workflows](docs/workflows.md)
 - [Lokale Modelle & Fallbacks](docs/local-models.md)
+- [vLLM-Setup Schritt für Schritt](docs/vLLM-Setup.md)
 - [Projektkarte / Ordnerstruktur](docs/project-map.md)
 - [Testing](docs/testing.md)
 - [Deployment](docs/deployment.md)
@@ -107,12 +108,14 @@ Praktische Referenzen:
 - [`config/secrets_example.py`](config/secrets_example.py)
 - [`config/config.py`](config/config.py)
 - [`web_infrastructure/settings_ui.py`](web_infrastructure/settings_ui.py)
+- [`docs/vLLM-Setup.md`](docs/vLLM-Setup.md)
 
 ### Emotionen: API-Prompt vs. lokales Layer-Steering
 
-- **API-Modelle** behalten explizite Emotions-Verhaltensregeln im Prompt.
-- **Lokales Qwen 3.5 auf vLLM** laeuft im Chat auf **layer-only Emotionsmodus**: Die emotionale Wirkung soll dort ueber Steering-Vektoren und nicht ueber Emotions-Systemprompt-Regeln entstehen.
-- Im **Debug Mode / Brain Monitor** wird sichtbar, ob Prompt-Emotionsregeln aktiv sind, ob lokales Qwen-Steering forciert wurde und welche Basisvektoren oder Composite-Modi aktiv waren.
+- **Nur API-Modelle** behalten explizite Emotions-Verhaltensregeln im Prompt.
+- **Alle lokalen Modelle** bekommen keine Emotions-Vitalwerte im Systemprompt; fuer den gewuenschten Hauptpfad **vLLM + Qwen 3.5** entsteht der Emotionsausdruck stattdessen ueber **Layer-/Activation-Steering**.
+- Im **Emotionen-Tab** der Streamlit-UI sieht und aendert man jetzt pro Emotion die Layer-Range und Steering-Staerke.
+- Im **Debug Mode / Brain Monitor** werden jetzt rohe Agent-Deltas, geglaettete angewandte Deltas, Gruende sowie Basisvektoren und Composite-Modi angezeigt.
 
 ### 3. Startmodi
 

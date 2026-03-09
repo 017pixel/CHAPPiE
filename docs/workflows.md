@@ -115,8 +115,9 @@ Wenn keine finale Antwort vorliegt, wird stattdessen `CHAPPiE schweigt...` angez
 
 Fuer Emotionen gilt ausserdem:
 
-- **API-Modelle** bekommen explizite Emotionsregeln ueber den Prompt.
+- **Nur API-Modelle** bekommen explizite Emotionsregeln ueber den Prompt.
 - **Lokales Qwen 3.5 auf vLLM** soll Emotionen primär ueber Layer-/Activation-Steering spueren und ausdruecken.
+- Der **Emotionen-Tab** der Streamlit-UI erlaubt jetzt das direkte Einsehen und Aendern der Layer-Range sowie der Steering-Staerke pro Basis-Emotion.
 - Feste Stilvorgaben wie dauerhaft `friendly` werden im lokalen Qwen-Pfad reduziert, damit die Layer-Manipulation wirklich durchkommt.
 
 Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
@@ -127,12 +128,12 @@ Im **DEBUG MODE: ON** zeigt der aufklappbare **Brain Monitor** die Laufzeitpipel
 
 1. Input + Intent (inkl. Step-1-Roh-JSON)
 2. Tool-Orchestrierung (verfügbar, ausgewählt, nicht genutzt, ausgeführt)
-3. Emotionen + Homeostasis (Before/After/Delta + Anpassungen)
+3. Emotionen + Homeostasis (Before/After/Raw Delta/Applied Delta + Anpassungen)
 4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development, Emotion-Steering)
 5. Antwortgenerierung (Modell-Reasoning + CHAPPiE-Thought + Action Plan)
 6. Event-Log (strukturierte Debug-Einträge pro Schritt)
 
-Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle. Im Emotion-Steering-Bereich sieht man ausserdem Prompt-Modus, aktive Vektoren, Composite-Modi und den erwartbaren Ausdruck des Zustands.
+Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle. Im Emotion-Steering-Bereich sieht man ausserdem Prompt-Modus, aktive Vektoren, Composite-Modi, Basis-Konfigurationen pro Emotion und den erwartbaren Ausdruck des Zustands. In Phase 3 werden rohe und geglaettete Deltas getrennt dargestellt.
 
 ## 6. Wichtige Commands
 

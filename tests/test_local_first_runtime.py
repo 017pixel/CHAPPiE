@@ -116,6 +116,65 @@ def test_api_models_keep_prompt_emotion_rules():
         settings.groq_model = original_model
 
 
+def test_local_ollama_models_do_not_use_prompt_emotions_anymore():
+    original_provider = settings.llm_provider
+    original_model = settings.ollama_model
+    try:
+        settings.llm_provider = LLMProvider.OLLAMA
+        settings.ollama_model = "qwen2.5:7b"
+        manager = SteeringManager()
+
+        assert manager.should_force_local_emotion_steering() is False
+        assert manager.should_use_prompt_emotions() is False
+    finally:
+        settings.llm_provider = original_provider
+        settings.ollama_model = original_model
+
+
+def test_layer_config_exposes_per_emotion_alpha_and_layers():
+    original_provider = settings.llm_provider
+    original_model = settings.vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_model = "Qwen/Qwen3.5-35B-A3B"
+        manager = SteeringManager()
+        emotions = {
+            "happiness": 90,
+            "trust": 58,
+            "energy": 64,
+            "curiosity": 53,
+            "frustration": 10,
+            "motivation": 71,
+            "sadness": 12,
+        }
+
+        vector = manager.vectors["happiness"]
+        original_alpha = vector.default_alpha
+        original_start = vector.layer_start
+        original_end = vector.layer_end
+        baseline = manager.compute_emotion_intensity(emotions)["happiness"]
+
+        vector.default_alpha = 0.6
+        vector.layer_start = 14
+        vector.layer_end = 20
+
+        boosted = manager.compute_emotion_intensity(emotions)["happiness"]
+        row = next(item for item in manager.get_emotion_layer_config(emotions) if item["emotion"] == "happiness")
+
+        assert boosted > baseline
+        assert row["default_alpha"] == 0.6
+        assert row["layer_start"] == 14
+        assert row["layer_end"] == 20
+        assert row["active_alpha"] == boosted
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_model = original_model
+        if 'manager' in locals() and "happiness" in manager.vectors:
+            manager.vectors["happiness"].default_alpha = original_alpha
+            manager.vectors["happiness"].layer_start = original_start
+            manager.vectors["happiness"].layer_end = original_end
+
+
 def test_action_response_suffix_can_skip_fixed_tone_directives():
     suffix = ActionResponseLayer().build_prompt_suffix(
         {"response_strategy": "conversational", "response_guidance": "Antworte direkt."},
@@ -133,5 +192,7 @@ if __name__ == "__main__":
     test_get_brain_can_target_provider_and_model()
     test_local_qwen_prefers_layer_only_emotion_mode()
     test_api_models_keep_prompt_emotion_rules()
+    test_local_ollama_models_do_not_use_prompt_emotions_anymore()
+    test_layer_config_exposes_per_emotion_alpha_and_layers()
     test_action_response_suffix_can_skip_fixed_tone_directives()
     print("OK: local-first runtime configuration is consistent")

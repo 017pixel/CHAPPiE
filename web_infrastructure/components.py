@@ -157,16 +157,22 @@ def render_brain_monitor(metadata: Dict[str, Any]):
         for key in EMOTION_DISPLAY_ORDER:
             before_val = before.get(key, 0)
             if key in delta and isinstance(delta[key], dict):
-                after_val = delta[key].get("after", before_val)
-                change = delta[key].get("change", after_val - before_val)
+                delta_entry = delta[key]
+                after_val = delta_entry.get("after", before_val)
+                change = delta_entry.get("applied_delta", delta_entry.get("change", after_val - before_val))
+                raw_change = delta_entry.get("raw_delta", change)
             else:
                 after_val = before_val
                 change = 0
+                raw_change = 0
             rows.append({
                 "emotion": EMOTION_LABELS.get(key, key),
                 "before": before_val,
                 "after": after_val,
-                "delta": change,
+                "raw_delta": raw_change,
+                "angewandt": change,
+                "geglättet": bool(key in delta and isinstance(delta[key], dict) and delta[key].get("softened", False)),
+                "grund": delta[key].get("reason", "") if key in delta and isinstance(delta[key], dict) else "",
                 "homeostasis_adjustment": adjustments.get(key, 0),
             })
         st.dataframe(rows, use_container_width=True)
@@ -218,6 +224,10 @@ def render_brain_monitor(metadata: Dict[str, Any]):
                 if composite_modes:
                     st.markdown("**Abgeleitete Verhaltensmodi:**")
                     st.dataframe(composite_modes, use_container_width=True)
+                base_vector_config = emotion_steering.get("base_vector_config", []) if isinstance(emotion_steering.get("base_vector_config", []), list) else []
+                if base_vector_config:
+                    st.markdown("**Basis-Konfiguration pro Emotion:**")
+                    st.dataframe(base_vector_config, use_container_width=True)
             else:
                 st.write("Keine Steering-Daten vorhanden")
 

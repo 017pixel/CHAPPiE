@@ -11,6 +11,7 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_forgetting_curve.py`
 - `tests/test_life_simulation.py`
 - `tests/test_local_first_runtime.py`
+- `tests/test_emotion_transition_rules.py`
 - `tests/test_debug_monitor_data.py`
 - `tests/test_ollama_response_handling.py`
 - `tests/test_chat_manager_persistence.py`
@@ -41,7 +42,7 @@ Diese Tests können echte Modelle, Provider oder Kontextdateien berühren:
 ## Empfehlung für den Alltag
 
 1. zuerst lokale Logiktests
-2. bei Modell-/Emotionsänderungen besonders `tests/test_local_first_runtime.py` und `tests/test_debug_monitor_data.py`
+2. bei Modell-/Emotionsänderungen besonders `tests/test_local_first_runtime.py`, `tests/test_emotion_transition_rules.py` und `tests/test_debug_monitor_data.py`
 3. dann Kompatibilitätscheck
 4. auf GitHub die automatische `CI`-Pipeline prüfen
 5. interaktive Tests nur bewusst und mit Kontextwissen

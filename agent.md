@@ -33,7 +33,7 @@ Wenn neue Funktionen, neue Workflows, neue Ordner oder neue Modellpfade hinzugek
 | Worum geht es im Projekt? | `README.md` |
 | Wie ist das Gehirnmodell gemeint? | `docs/architecture.md` |
 | Wie laufen Anfrage, Schlafphase, Training und UI ab? | `docs/workflows.md` |
-| Welche Modelle sind bevorzugt? | `docs/local-models.md` |
+| Welche Modelle sind bevorzugt? | `docs/local-models.md`, `docs/vLLM-Setup.md` |
 | Wo liegt was im Projekt? | `docs/project-map.md` |
 | Welche Tests sind sicher oder teuer? | `docs/testing.md`, `tests/README.md` |
 | Wie laufen Services und Deployment? | `docs/deployment.md` |

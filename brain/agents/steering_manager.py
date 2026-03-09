@@ -60,6 +60,9 @@ EMOTION_STRENGTH_PROFILES = {
     "energy": {"max_alpha": 0.76, "boost": 1.1, "surface_effect": "schneller, lebhafter, impulsiver"},
 }
 
+BASE_VECTOR_DEFAULT_ALPHA = 0.3
+MAX_VECTOR_DEFAULT_ALPHA = 1.5
+
 COMPOSITE_BEHAVIOR_MODES = {
     "crashout": {
         "description": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
@@ -318,6 +321,11 @@ class SteeringManager:
                     except Exception:
                         pass
 
+    def _persist_vector(self, steering_vector: SteeringVector):
+        save_path = self.vectors_dir / f"{steering_vector.name}.json"
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(steering_vector.to_dict(), f, indent=2, ensure_ascii=False)
+
     def is_local_provider(self, provider: Optional[LLMProvider] = None) -> bool:
         """Prueft ob ein lokaler Provider aktiv ist (vLLM / Ollama)."""
         return self._effective_provider(provider) in (LLMProvider.VLLM, LLMProvider.OLLAMA)
@@ -336,11 +344,15 @@ class SteeringManager:
 
     def should_use_prompt_emotions(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
         effective_provider = self._effective_provider(provider)
-        if effective_provider in (LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA):
-            return True
-        if self.should_force_local_emotion_steering(provider, model):
-            return False
-        return True
+        return effective_provider in (LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA)
+
+    def _get_vector_alpha_scale(self, emotion: str) -> float:
+        sv = self.vectors.get(emotion)
+        if sv is None:
+            return 1.0
+        if sv.default_alpha <= 0:
+            return 0.0
+        return max(0.05, min(MAX_VECTOR_DEFAULT_ALPHA / BASE_VECTOR_DEFAULT_ALPHA, sv.default_alpha / BASE_VECTOR_DEFAULT_ALPHA))
 
     def compute_emotion_intensity(self, emotions: Dict[str, int]) -> Dict[str, float]:
         """
@@ -360,6 +372,11 @@ class SteeringManager:
                 continue
 
             profile = EMOTION_STRENGTH_PROFILES.get(emotion, {"max_alpha": 0.75, "boost": 1.0})
+            vector_scale = self._get_vector_alpha_scale(emotion)
+
+            if vector_scale <= 0:
+                intensities[emotion] = 0.0
+                continue
 
             # Berechne Abweichung vom Neutralpunkt (50)
             deviation = abs(value - 50)
@@ -371,14 +388,15 @@ class SteeringManager:
 
             normalized = max(0.0, min(1.0, (deviation - 6.0) / 44.0))
             curved = math.pow(normalized, 1.2)
-            alpha = profile["max_alpha"] * (0.22 + 0.78 * curved)
+            max_alpha = profile["max_alpha"] * vector_scale
+            alpha = max_alpha * (0.22 + 0.78 * curved)
 
             if deviation >= 24:
                 alpha *= 1.08
             if deviation >= 34:
                 alpha *= 1.08
             alpha *= profile.get("boost", 1.0)
-            alpha = min(profile["max_alpha"] * profile.get("boost", 1.0), alpha)
+            alpha = min(1.35, max_alpha * profile.get("boost", 1.0), alpha)
 
             # Richtung: Negativer Steering bei niedrigen Werten
             if value < 50 and emotion not in negative_emotions:
@@ -561,9 +579,15 @@ class SteeringManager:
         dominant = steering_meta.get("dominant_emotion") or (active_vectors[0]["name"] if active_vectors else "neutral")
         summary = self.get_emotion_summary(current_emotions)
         prompt_emotions_enabled = self.should_use_prompt_emotions(effective_provider, effective_model)
+        if prompt_emotions_enabled:
+            mode = "api_prompt_emotions"
+        elif self.supports_activation_steering(effective_provider):
+            mode = "local_layer_only"
+        else:
+            mode = "local_without_prompt_emotions"
 
         return {
-            "mode": "layer_only" if not prompt_emotions_enabled else "prompt_emotions",
+            "mode": mode,
             "provider": effective_provider.value,
             "model": effective_model,
             "supports_activation_steering": self.supports_activation_steering(effective_provider),
@@ -597,6 +621,7 @@ class SteeringManager:
                 }
                 for item in composite_modes
             ],
+            "base_vector_config": self.get_emotion_layer_config(current_emotions),
         }
 
     def get_emotion_summary(self, emotions: Dict[str, int]) -> str:
@@ -628,12 +653,65 @@ class SteeringManager:
         )
         self.vectors[name] = sv
 
-        save_path = self.vectors_dir / f"{name}.json"
         try:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(sv.to_dict(), f, indent=2, ensure_ascii=False)
+            self._persist_vector(sv)
         except Exception as e:
             print(f"[SteeringManager] Fehler beim Speichern von {name}: {e}")
+
+    def update_vector_config(
+        self,
+        name: str,
+        *,
+        layer_start: Optional[int] = None,
+        layer_end: Optional[int] = None,
+        default_alpha: Optional[float] = None,
+        description: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Aktualisiert eine bestehende Vektor-Konfiguration und speichert sie."""
+        self.refresh_runtime_profile()
+        sv = self.vectors.get(name)
+        if sv is None:
+            return None
+
+        max_layer = max(0, self.model_profile["total_layers"] - 1)
+        if layer_start is not None:
+            sv.layer_start = max(0, min(max_layer, int(layer_start)))
+        if layer_end is not None:
+            sv.layer_end = max(sv.layer_start, min(max_layer, int(layer_end)))
+        if default_alpha is not None:
+            sv.default_alpha = max(0.0, min(MAX_VECTOR_DEFAULT_ALPHA, float(default_alpha)))
+        if description is not None:
+            sv.description = description
+
+        self._persist_vector(sv)
+        return sv.to_dict()
+
+    def get_emotion_layer_config(self, current_emotions: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
+        """Liefert eine UI-freundliche Sicht auf das Layer Editing pro Basis-Emotion."""
+        emotions = current_emotions or {}
+        intensities = self.compute_emotion_intensity(emotions)
+        rows: List[Dict[str, Any]] = []
+
+        for emotion in EMOTION_VECTOR_MAP:
+            sv = self.vectors.get(emotion)
+            profile = EMOTION_STRENGTH_PROFILES.get(emotion, {})
+            vector_type = "synthetic"
+            if sv and isinstance(sv.vector_data, dict):
+                vector_type = str(sv.vector_data.get("type", "synthetic"))
+
+            rows.append({
+                "emotion": emotion,
+                "current_value": int(emotions.get(emotion, 50)),
+                "layer_start": getattr(sv, "layer_start", self.model_profile["emotion_range"][0]),
+                "layer_end": getattr(sv, "layer_end", self.model_profile["emotion_range"][1]),
+                "default_alpha": round(float(getattr(sv, "default_alpha", BASE_VECTOR_DEFAULT_ALPHA)), 3),
+                "active_alpha": round(float(intensities.get(emotion, 0.0)), 4),
+                "surface_effect": profile.get("surface_effect", ""),
+                "description": getattr(sv, "description", ""),
+                "vector_type": vector_type,
+            })
+
+        return rows
 
     def get_available_vectors(self) -> List[str]:
         """Gibt die Namen aller verfuegbaren Vektoren zurueck."""
