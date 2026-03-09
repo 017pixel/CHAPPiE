@@ -45,6 +45,7 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_forgetting_curve.py`
 - `python tests/test_life_simulation.py`
 - `python tests/test_local_first_runtime.py`
+- `python tests/test_steering_backend.py`
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_ollama_response_handling.py`
 - `python tests/test_chat_manager_persistence.py`
@@ -54,6 +55,7 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_web_ui_consistency.py`
 - `python -m py_compile app.py web_infrastructure/backend_wrapper.py web_infrastructure/command_handler.py`
 - `python tests/manual/test_compatibility.py`
+- `python validate_system.py`
 
 ## Wenn Doku geändert wurde
 
@@ -71,6 +73,7 @@ Dann zusätzlich prüfen:
 - `config/brain_config.py`
 - `brain/agents/*.py`
 - lokale/API-Unterscheidung im Prompt- und Steering-Pfad
+- lokaler Steering-Endpoint (`brain/steering_api_server.py`, `brain/steering_backend.py`)
 - Debug-Monitor-Metadaten fuer Emotions-/Layer-Steuerung
 - betroffene Live-/Agent-Tests
 

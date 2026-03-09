@@ -58,7 +58,7 @@ class Settings:
         return default
 
     def _load_from_files(self):
-        provider_str = self._get_val("LLM_PROVIDER", "ollama")
+        provider_str = self._get_val("LLM_PROVIDER", "vllm")
         try:
             self.llm_provider = LLMProvider(provider_str.lower())
         except ValueError:
@@ -68,7 +68,8 @@ class Settings:
         self.ollama_model = self._get_val("OLLAMA_MODEL", "qwen3.5:9b")
         
         self.vllm_url = self._get_val("VLLM_URL", "http://localhost:8000/v1")
-        self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-122B-A10B-Instruct-GPTQ-Int4")
+        self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3-4B-Instruct-2507")
+        self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
         self.groq_model = self._get_val("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
         
@@ -82,7 +83,7 @@ class Settings:
         self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-120b")
         self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen3.5:9b")
-        self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-122B-A10B-Instruct")
+        self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-4B")
         self.intent_processor_model_nvidia = self._get_val("INTENT_PROCESSOR_MODEL_NVIDIA", "deepseek-ai/deepseek-v3.1-terminus")
         self.enable_two_step_processing = self._get_val("ENABLE_TWO_STEP_PROCESSING", True)
 
@@ -122,7 +123,7 @@ class Settings:
         # Neu: Steering-Konfiguration
         self.enable_steering = self._get_val("ENABLE_STEERING", False)
         self.steering_provider = _parse_provider(self._get_val("STEERING_PROVIDER", "vllm"))
-        self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3.5-35B-A3B")
+        self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3-4B-Instruct-2507")
 
         self.cli_debug_always_on = True
         self.web_debug_default = False
@@ -143,6 +144,12 @@ class Settings:
         except (ValueError, AttributeError):
             return self.llm_provider
 
+    def resolve_vllm_runtime_model(self, requested_model=None):
+        """Resolve the effective model name for single-endpoint vLLM deployments."""
+        if self.vllm_force_single_model:
+            return self.vllm_model
+        return requested_model or self.vllm_model
+
     def get_intent_model(self, provider=None):
         effective = self.get_effective_provider(provider if provider != "auto" else None)
         if effective == LLMProvider.GROQ:
@@ -152,7 +159,7 @@ class Settings:
         elif effective == LLMProvider.NVIDIA:
             return self.intent_processor_model_nvidia
         elif effective == LLMProvider.VLLM:
-            return self.intent_processor_model_vllm
+            return self.resolve_vllm_runtime_model(self.intent_processor_model_vllm)
         return self.intent_processor_model_ollama
 
     def get_query_extraction_model(self, provider=None):
@@ -164,7 +171,7 @@ class Settings:
         elif effective == LLMProvider.CEREBRAS:
             return self.query_extraction_cerebras_model
         elif effective == LLMProvider.VLLM:
-            return self.query_extraction_vllm_model
+            return self.resolve_vllm_runtime_model(self.query_extraction_vllm_model)
         return self.query_extraction_ollama_model
 
     def update_from_ui(self, **kwargs):
@@ -181,6 +188,8 @@ class Settings:
         for key in ["groq_model", "cerebras_model", "nvidia_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
+        if "vllm_force_single_model" in kwargs:
+            self.vllm_force_single_model = bool(kwargs["vllm_force_single_model"])
 
         if "intent_provider" in kwargs:
             self.intent_provider = _parse_provider(kwargs["intent_provider"])
@@ -204,6 +213,13 @@ class Settings:
         for key in ["emotion_analysis_model", "emotion_analysis_host", "embedding_model"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
+
+        if "enable_steering" in kwargs:
+            self.enable_steering = bool(kwargs["enable_steering"])
+        if "steering_provider" in kwargs:
+            self.steering_provider = _parse_provider(kwargs["steering_provider"])
+        if "steering_model" in kwargs and kwargs["steering_model"]:
+            self.steering_model = kwargs["steering_model"]
 
         if "training_use_global_settings" in kwargs:
             self.training_use_global_settings = kwargs["training_use_global_settings"]
@@ -246,6 +262,7 @@ class Settings:
                 f.write(f"NVIDIA_MODEL = '{self.nvidia_model}'\n")
                 f.write(f"VLLM_MODEL = '{self.vllm_model}'\n")
                 f.write(f"VLLM_URL = '{self.vllm_url}'\n")
+                f.write(f"VLLM_FORCE_SINGLE_MODEL = {self.vllm_force_single_model}\n")
                 f.write(f"OLLAMA_MODEL = '{self.ollama_model}'\n")
                 f.write(f"OLLAMA_HOST = '{self.ollama_host}'\n")
 
@@ -304,6 +321,12 @@ class Settings:
                 f.write(f"SHORT_TERM_TTL_HOURS = {self.short_term_ttl_hours}\n")
                 f.write(f"ENABLE_FUNCTIONS = {self.enable_functions}\n")
                 f.write(f"AUTO_CONSOLIDATE = {self.auto_consolidate}\n")
+
+                f.write("\n# === Layer Editing / Steering ===\n")
+                f.write(f"ENABLE_STEERING = {self.enable_steering}\n")
+                if self.steering_provider:
+                    f.write(f"STEERING_PROVIDER = '{self.steering_provider.value}'\n")
+                f.write(f"STEERING_MODEL = '{self.steering_model}'\n")
 
         except Exception as e:
             print(f"Warnung: Konnte addSecrets.py nicht schreiben: {e}")

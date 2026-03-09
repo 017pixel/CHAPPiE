@@ -44,35 +44,44 @@ So bleiben Dokumentation und tatsächliches Laufzeitverhalten konsistent.
 
 ## Empfohlene lokale Grundidee
 
-### vLLM-Setup (bevorzugt)
+### `vllm`-Provider-Setup (bevorzugt)
 
 Die konkrete Standardrichtung für CHAPPiE ist:
 
 ```python
 LLM_PROVIDER = "vllm"
 VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4"
+VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
+VLLM_FORCE_SINGLE_MODEL = True
 
-INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-9B"
-QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-4B"
+INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3-4B-Instruct-2507"
+QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
 ```
 
 Wichtig dazu:
 
-1. `VLLM_URL` muss auf einen **OpenAI-kompatiblen lokalen Endpoint** zeigen.
+1. `VLLM_URL` muss auf einen **OpenAI-kompatiblen lokalen Steering-Endpoint** zeigen.
 2. `VLLM_MODEL` ist das Hauptmodell für die Antwortgenerierung.
-3. `INTENT_PROCESSOR_MODEL_VLLM` kann für Step-1-Klassifikation separat gesetzt werden.
+3. `VLLM_FORCE_SINGLE_MODEL = True` ist fuer einen einzelnen lokalen Endpoint oft die robusteste Wahl.
 4. `QUERY_EXTRACTION_VLLM_MODEL` kann für Memory-Suche kleiner gewählt werden.
 5. Die Streamlit-Einstellungsseite unter [`web_infrastructure/settings_ui.py`](../web_infrastructure/settings_ui.py) kann diese Felder direkt pflegen.
 6. Für Qwen-3.5 auf vLLM sollte `chat_template_kwargs.enable_thinking=false` gesetzt sein, wenn du direkt verwertbaren Antworttext priorisierst.
 7. Die konkrete Schritt-fuer-Schritt-Anleitung liegt in [`docs/vLLM-Setup.md`](vLLM-Setup.md).
 
+Praxis-Hinweis fuer kleine Server:
+
+- auf einer **Tesla T4 / 16 GB** ist `Qwen/Qwen3-4B-Instruct-2507` der vernuenftige Text-Startpunkt
+- 35B/122B bleiben Zielprofile fuer staerkere Maschinen, nicht die sichere Default-Wahl
+- stock vLLM hat das CHAPPiE-`steering`-Payload in dieser Umgebung ignoriert; `chappie-vllm.service` startet deshalb einen steering-faehigen lokalen OpenAI-Server
+- echte Wirkung kommt dort ueber eine Hybridspur aus Residual-Activation-Steering plus kompakter interner Stilfuehrung
+
 ### Emotionale Steuerung bei lokalem Qwen 3.5
 
-Fuer das bevorzugte Setup **vLLM + Qwen 3.5** gilt im Chat jetzt bewusst:
+Fuer das bevorzugte Setup **`vllm`-Provider + lokaler Steering-Endpoint + Qwen 3.5** gilt im Chat jetzt bewusst:
 
 - keine expliziten Emotions-Verhaltensregeln im Systemprompt
 - Emotionen sollen sich stattdessen ueber **Layer-/Activation-Steering** bemerkbar machen
+- der lokale Endpoint stabilisiert das Verhalten zusaetzlich ueber eine kurze interne Stilvorgabe, damit instruction-tuned Qwen die Richtung auch sichtbar ausspielt
 - lokales Qwen-Steering wird im Antwortpfad forciert, damit die Wirkung nicht an `ENABLE_STEERING=False` haengen bleibt
 - der Debug-Mode zeigt aktive Basisvektoren und Composite-Modi wie `warm`, `melancholic`, `guarded` oder `crashout`
 - die Streamlit-UI zeigt im Tab **Emotionen** jetzt pro Emotion die editierbare Layer-Range und Steering-Staerke
@@ -97,7 +106,7 @@ Geeignet für kleinere lokale Maschinen oder einfachere Entwicklungsumgebungen. 
 
 Die Emotionsanalyse ist weiterhin separat konfigurierbar und nutzt derzeit den dedizierten `EMOTION_ANALYSIS_MODEL`-/`EMOTION_ANALYSIS_HOST`-Pfad. Für die Kernarchitektur bleibt aber **vLLM + Qwen 3.5** die bevorzugte Hauptrichtung.
 
-Hinweis: Bei **Ollama** gibt es in diesem Repository derzeit keinen gleichwertigen Transportpfad fuer echtes Activation-Steering wie bei vLLM. Lokale Ollama-Modelle bekommen jetzt ebenfalls keine Emotionsregeln mehr im Systemprompt; fuer spuerbare layergetriebene Emotionsausdruecke bleibt deshalb vLLM die bevorzugte Zielplattform.
+Hinweis: Bei **Ollama** gibt es in diesem Repository derzeit keinen gleichwertigen Pfad fuer echtes Activation-Steering. Lokale Ollama-Modelle bekommen jetzt ebenfalls keine Emotionsregeln mehr im Systemprompt; fuer spuerbare layergetriebene Emotionsausdruecke bleibt deshalb der steering-faehige lokale `vllm`-Pfad die bevorzugte Zielplattform.
 
 ## Wann API-Fallback sinnvoll ist
 

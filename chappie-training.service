@@ -1,6 +1,7 @@
 [Unit]
 Description=CHAPPiE Autonomous Training Service
-After=network.target
+After=network.target chappie-vllm.service
+Wants=chappie-vllm.service
 
 [Service]
 # User unter dem es laufen soll (Anpassen falls nötig!)

@@ -51,13 +51,13 @@ case "$1" in
         echo -e "${YELLOW}Installiere Systemd Services...${NC}"
         
         if [ "$IS_LOCAL" = true ]; then
-            sudo cp chappie-training.service chappie-web.service /etc/systemd/system/
+            sudo cp chappie-training.service chappie-web.service chappie-vllm.service /etc/systemd/system/
         else
-            scp chappie-training.service chappie-web.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
-            ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service $PROJECT_PATH/chappie-web.service /etc/systemd/system/"
+            scp chappie-training.service chappie-web.service chappie-vllm.service "$SERVER_USER@$SERVER_HOST:$PROJECT_PATH/"
+            ssh -t "$SERVER_USER@$SERVER_HOST" "sudo cp $PROJECT_PATH/chappie-training.service $PROJECT_PATH/chappie-web.service $PROJECT_PATH/chappie-vllm.service /etc/systemd/system/"
         fi
         
-        run_cmd "sudo systemctl daemon-reload && sudo systemctl enable chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl daemon-reload && sudo systemctl enable chappie-vllm.service chappie-training.service chappie-web.service"
         
         echo -e "${GREEN}✅ Services installiert und enabled.${NC}"
         echo -e "${YELLOW}Starte mit: ./deploy_training.sh service-start${NC}"
@@ -66,28 +66,28 @@ case "$1" in
     service-start)
         check_connection
         echo -e "${GREEN}Starte CHAPPiE Services via Systemd...${NC}"
-        run_cmd "sudo systemctl start chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl start chappie-vllm.service chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Start-Befehl gesendet.${NC}"
         ;;
 
     service-stop)
         check_connection
         echo -e "${YELLOW}Stoppe CHAPPiE Services...${NC}"
-        run_cmd "sudo systemctl stop chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl stop chappie-web.service chappie-training.service chappie-vllm.service"
         echo -e "${GREEN}✅ Stop-Befehl gesendet.${NC}"
         ;;
 
     service-restart)
         check_connection
         echo -e "${YELLOW}Starte CHAPPiE Services neu...${NC}"
-        run_cmd "sudo systemctl restart chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl restart chappie-vllm.service chappie-training.service chappie-web.service"
         echo -e "${GREEN}✅ Restart-Befehl gesendet.${NC}"
         ;;
 
     service-status)
         check_connection
         echo -e "${YELLOW}Prüfe Systemd Service Status...${NC}"
-        run_cmd "sudo systemctl status chappie-training.service chappie-web.service"
+        run_cmd "sudo systemctl status chappie-vllm.service chappie-training.service chappie-web.service"
         ;;
         
     # === LOGGING ===
@@ -105,6 +105,12 @@ case "$1" in
         check_connection
         echo -e "${YELLOW}Live-Logs vom Web-UI (Ctrl+C zum Beenden):${NC}"
         run_cmd "sudo journalctl -u chappie-web.service -f"
+        ;;
+
+    tail-vllm)
+        check_connection
+        echo -e "${YELLOW}Live-Logs vom vLLM-Service (Ctrl+C zum Beenden):${NC}"
+        run_cmd "sudo journalctl -u chappie-vllm.service -f"
         ;;
 
     # === MANUAL COMMANDS (LEGACY) ===
@@ -135,15 +141,16 @@ case "$1" in
         echo "Usage: $0 {COMMAND}"
         echo ""
         echo "Service Commands (Empfohlen):"
-        echo "  install-service  - Installiert systemd Services auf dem Server"
-        echo "  service-start    - Startet Training & Web-UI"
-        echo "  service-stop     - Stoppt Training & Web-UI"
+        echo "  install-service  - Installiert vLLM-, Training- und Web-Service auf dem Server"
+        echo "  service-start    - Startet vLLM, Training & Web-UI"
+        echo "  service-stop     - Stoppt Web-UI, Training & vLLM"
         echo "  service-restart  - Startet alles neu (z.B. nach Config-Änderung)"
         echo "  service-status   - Zeigt Status aller Services"
         echo ""
         echo "Monitoring:"
         echo "  tail             - Live-Logs vom Training"
         echo "  tail-web         - Live-Logs vom Web-UI"
+        echo "  tail-vllm        - Live-Logs vom vLLM-Service"
         echo ""
         echo "Maintenance:"
         echo "  update           - Git Pull & Pip Install auf dem Server"

@@ -107,7 +107,7 @@ Die Chat-Pipeline pflegt außerdem die Kontextdateien `soul.md`, `user.md` und `
 
 Im Chat werden Antwortschichten getrennt behandelt:
 
-- **Modell-Reasoning**: echtes Provider-/Modell-Denken, z. B. von Qwen über Ollama oder vLLM
+- **Modell-Reasoning**: echtes Provider-/Modell-Denken, z. B. von Qwen über Ollama oder den lokalen steering-faehigen `vllm`-Endpoint
 - **CHAPPiEs Gedankenprozess**: interne `<thinking>` / `<gedanke>`-Tags
 - **Antwort**: finaler sichtbarer Antworttext
 
@@ -116,7 +116,7 @@ Wenn keine finale Antwort vorliegt, wird stattdessen `CHAPPiE schweigt...` angez
 Fuer Emotionen gilt ausserdem:
 
 - **Nur API-Modelle** bekommen explizite Emotionsregeln ueber den Prompt.
-- **Lokales Qwen 3.5 auf vLLM** soll Emotionen primär ueber Layer-/Activation-Steering spueren und ausdruecken.
+- **Lokales Qwen 3.5 im `vllm`-Modus** soll Emotionen primär ueber Layer-/Activation-Steering ausdruecken; der lokale Endpoint stabilisiert das Verhalten zusaetzlich ueber eine interne Stilvorgabe.
 - Der **Emotionen-Tab** der Streamlit-UI erlaubt jetzt das direkte Einsehen und Aendern der Layer-Range sowie der Steering-Staerke pro Basis-Emotion.
 - Feste Stilvorgaben wie dauerhaft `friendly` werden im lokalen Qwen-Pfad reduziert, damit die Layer-Manipulation wirklich durchkommt.
 

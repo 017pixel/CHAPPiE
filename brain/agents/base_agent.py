@@ -59,6 +59,8 @@ class BaseAgent(ABC):
         """Get brain instance with optional provider/model override."""
         effective_provider = force_provider or self.provider or settings.llm_provider
         effective_model = force_model or self.model_id
+        if effective_provider == LLMProvider.VLLM:
+            effective_model = settings.resolve_vllm_runtime_model(effective_model)
 
         cache_key = (effective_provider.value, effective_model or "")
         if cache_key not in self._brain_cache:

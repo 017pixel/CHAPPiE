@@ -91,17 +91,18 @@ pip install -r requirements.txt
 - zentrale Laufzeitsettings: [`config/config.py`](config/config.py)
 - Brain-Modellverteilung: [`config/brain_config.py`](config/brain_config.py)
 
-Empfohlene Richtung: **lokale Qwen-3.5-Modelle via vLLM**, API-Provider nur als Fallback. Details: [docs/local-models.md](docs/local-models.md)
+Empfohlene Richtung: **lokale Qwen-3.5-Modelle im `vllm`-Modus über einen steering-faehigen OpenAI-kompatiblen Endpoint**, API-Provider nur als Fallback. Details: [docs/local-models.md](docs/local-models.md)
 
-### Empfohlenes lokales Setup: vLLM + Qwen 3.5
+### Empfohlenes lokales Setup: `vllm`-Provider + lokaler Steering-Endpoint
 
 Für den produktiven lokalen Betrieb ist das Zielbild aktuell:
 
 1. `LLM_PROVIDER = "vllm"`
-2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Endpoint** setzen, z. B. `http://localhost:8000/v1`
-3. `VLLM_MODEL` auf ein Qwen-3.5-Modell setzen, z. B. `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` oder `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4`
-4. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
-5. Ollama nur als **leichteren lokalen Fallback** weiterverwenden
+2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Steering-Endpoint** setzen, z. B. `http://localhost:8000/v1`
+3. auf Einzel-GPU-Servern zuerst ein startbares Textmodell nutzen, z. B. `Qwen/Qwen3-4B-Instruct-2507`
+4. `VLLM_FORCE_SINGLE_MODEL = True` setzen, wenn ein einzelner vLLM-Endpoint alle CHAPPiE-Aufrufe bedienen soll
+5. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
+6. Ollama nur als **leichteren lokalen Fallback** weiterverwenden
 
 Praktische Referenzen:
 
@@ -110,10 +111,12 @@ Praktische Referenzen:
 - [`web_infrastructure/settings_ui.py`](web_infrastructure/settings_ui.py)
 - [`docs/vLLM-Setup.md`](docs/vLLM-Setup.md)
 
+Wichtiger Praxis-Hinweis: `chappie-vllm.service` startet im Repository inzwischen einen **steering-faehigen lokalen OpenAI-Server**. Ein reiner Standard-vLLM-Server hat das `steering`-Payload in dieser Umgebung ignoriert.
+
 ### Emotionen: API-Prompt vs. lokales Layer-Steering
 
 - **Nur API-Modelle** behalten explizite Emotions-Verhaltensregeln im Prompt.
-- **Alle lokalen Modelle** bekommen keine Emotions-Vitalwerte im Systemprompt; fuer den gewuenschten Hauptpfad **vLLM + Qwen 3.5** entsteht der Emotionsausdruck stattdessen ueber **Layer-/Activation-Steering**.
+- **Alle lokalen Modelle** bekommen keine Emotions-Vitalwerte im Systemprompt; fuer den gewuenschten Hauptpfad entsteht der Emotionsausdruck stattdessen ueber **Layer-/Activation-Steering** plus eine kompakte interne Stilfuehrung am lokalen Endpoint.
 - Im **Emotionen-Tab** der Streamlit-UI sieht und aendert man jetzt pro Emotion die Layer-Range und Steering-Staerke.
 - Im **Debug Mode / Brain Monitor** werden jetzt rohe Agent-Deltas, geglaettete angewandte Deltas, Gruende sowie Basisvektoren und Composite-Modi angezeigt.
 
@@ -140,6 +143,7 @@ python -m Chappies_Trainingspartner.training_daemon --fokus "Architektur"
 
 Wichtig:
 
+- für lokalen Steering-Betrieb ist `chappie-vllm.service` der zentrale Modellservice auf `:8000`
 - `chappie-training.service` muss auf `Chappies_Trainingspartner.training_daemon` zeigen
 - **nicht** auf `training_loop.py`
 - `Restart=always` und absolute Pfade sind für Service-Dateien Pflicht
@@ -237,6 +241,7 @@ Schnelle lokale Checks:
 python tests/test_forgetting_curve.py
 python tests/test_life_simulation.py
 python tests/test_local_first_runtime.py
+python tests/test_steering_backend.py
 python tests/test_ollama_response_handling.py
 python tests/test_chat_manager_persistence.py
 python tests/test_vllm_response_handling.py

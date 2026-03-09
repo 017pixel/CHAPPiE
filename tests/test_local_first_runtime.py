@@ -64,6 +64,53 @@ def test_get_brain_can_target_provider_and_model():
     assert ollama_brain.model == "qwen2.5:7b"
 
 
+def test_vllm_single_model_mode_unifies_runtime_models():
+    original_provider = settings.llm_provider
+    original_vllm_model = settings.vllm_model
+    original_force_single = settings.vllm_force_single_model
+    original_intent = settings.intent_processor_model_vllm
+    original_query = settings.query_extraction_vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_model = "Qwen/Main-4B"
+        settings.vllm_force_single_model = True
+        settings.intent_processor_model_vllm = "Qwen/Intent-9B"
+        settings.query_extraction_vllm_model = "Qwen/Query-4B"
+
+        assert settings.get_intent_model() == "Qwen/Main-4B"
+        assert settings.get_query_extraction_model() == "Qwen/Main-4B"
+        assert SensoryCortexAgent()._get_brain().model == "Qwen/Main-4B"
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_model = original_vllm_model
+        settings.vllm_force_single_model = original_force_single
+        settings.intent_processor_model_vllm = original_intent
+        settings.query_extraction_vllm_model = original_query
+
+
+def test_vllm_multi_model_mode_keeps_requested_runtime_models():
+    original_provider = settings.llm_provider
+    original_vllm_model = settings.vllm_model
+    original_force_single = settings.vllm_force_single_model
+    original_intent = settings.intent_processor_model_vllm
+    original_query = settings.query_extraction_vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_model = "Qwen/Main-4B"
+        settings.vllm_force_single_model = False
+        settings.intent_processor_model_vllm = "Qwen/Intent-9B"
+        settings.query_extraction_vllm_model = "Qwen/Query-4B"
+
+        assert settings.get_intent_model() == "Qwen/Intent-9B"
+        assert settings.get_query_extraction_model() == "Qwen/Query-4B"
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_model = original_vllm_model
+        settings.vllm_force_single_model = original_force_single
+        settings.intent_processor_model_vllm = original_intent
+        settings.query_extraction_vllm_model = original_query
+
+
 def test_local_qwen_prefers_layer_only_emotion_mode():
     original_provider = settings.llm_provider
     original_model = settings.vllm_model
@@ -225,6 +272,8 @@ if __name__ == "__main__":
     test_agents_use_brain_config_defaults()
     test_get_active_model_supports_vllm()
     test_get_brain_can_target_provider_and_model()
+    test_vllm_single_model_mode_unifies_runtime_models()
+    test_vllm_multi_model_mode_keeps_requested_runtime_models()
     test_local_qwen_prefers_layer_only_emotion_mode()
     test_api_models_keep_prompt_emotion_rules()
     test_local_ollama_models_do_not_use_prompt_emotions_anymore()

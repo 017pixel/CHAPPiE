@@ -148,8 +148,12 @@ data/life_state.json
 data/sleep_state.json
 data/settings_overrides.json
 data/steering_vectors/
+data/steering_cache/
+data/active_chat_session.json
 training_state.json
 training_config.json
+training.pid
+training_daemon.log.*
 *.log
 
 # Secrets and User Overrides (CRITICAL)

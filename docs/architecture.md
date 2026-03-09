@@ -57,6 +57,7 @@ flowchart TD
 | Brain Pipeline | `brain/brain_pipeline.py` | Verbindet Agenten, Memory und Life-Simulation |
 | Global Workspace | `brain/global_workspace.py` | Bündelt priorisierte Signale für die Antwortphase |
 | Action Response Layer | `brain/action_response.py` | Leitet aus Strategie konkrete Antwortaktionen ab |
+| Lokaler Steering-Endpoint | `brain/steering_api_server.py`, `brain/steering_backend.py` | Setzt lokales OpenAI-kompatibles Serving, Activation-Steering und stilstabilisierte Antwortführung um |
 | Life Simulation | `life/service.py` | Simuliert Bedürfnisse, Ziele, Entwicklung und Beziehung |
 | Memory Engine | `memory/memory_engine.py` | Episodisches Gedächtnis und Suche |
 | Sleep Phase | `memory/sleep_phase.py` | Konsolidierung, Replay, Schlaflogik |

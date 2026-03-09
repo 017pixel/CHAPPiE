@@ -23,6 +23,7 @@ Die Datei [`chappie-training.service`](../chappie-training.service) muss für de
 
 | Datei | Zweck |
 |---|---|
+| `chappie-vllm.service` | steering-faehiger lokaler OpenAI-kompatibler Modellserver auf `:8000` |
 | `chappie-training.service` | Hintergrund-Training / Lernprozess |
 | `chappie-web.service` | Streamlit-Weboberfläche |
 | `deploy_training.sh` | Linux-Setup / Deployment-Helfer |
@@ -32,8 +33,11 @@ Die Datei [`chappie-training.service`](../chappie-training.service) muss für de
 
 ```mermaid
 flowchart TD
+    SYS[systemd / Betriebssystem] --> VLLM[chappie-vllm.service / Steering-Endpoint]
     SYS[systemd / Betriebssystem] --> WEB[chappie-web.service]
     SYS --> TRAIN[chappie-training.service]
+    WEB --> VLLM
+    TRAIN --> VLLM
     WEB --> APP[app.py]
     TRAIN --> TD[training_daemon.py]
     TD --> LOOP[training_loop.py]
@@ -48,8 +52,14 @@ flowchart TD
 3. Kontextdateien in `data/` gesichert
 4. `chappie-training.service` auf `training_daemon.py` geprüft
 5. `Restart=always` und absolute Pfade geprüft
-6. Web- und Training-Service separat getestet
+6. Steering-, Web- und Training-Service separat getestet
 7. relevante Doku aktualisiert (`README.md`, `agent.md`, `docs/*`)
+
+## Steering-Service konkret
+
+- `chappie-vllm.service` ist der historische Dateiname, startet aber jetzt den steering-faehigen lokalen OpenAI-Server aus `brain/steering_api_server.py`
+- `LLM_PROVIDER = "vllm"` bleibt bewusst erhalten, weil CHAPPiE weiterhin ueber das OpenAI-kompatible Endpoint-Schema auf `http://localhost:8000/v1` spricht
+- Web UI, CLI und Training muessen alle auf denselben Endpoint zeigen, damit Steering, Debugdaten und Single-Model-Routing konsistent bleiben
 
 ## GitHub Actions: nur CI / Tests
 

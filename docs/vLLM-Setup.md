@@ -1,11 +1,11 @@
-# vLLM-Setup fuer CHAPPiE mit Qwen 3.5 und Layer Editing
+# vLLM-Modus / Steering-Endpoint fuer CHAPPiE mit Qwen 3.5
 
 ## Zielbild
 
-Dieses Repository soll bevorzugt mit **lokalem vLLM + Qwen 3.5** laufen.
+Dieses Repository soll bevorzugt mit **lokalem Qwen 3.5 im `vllm`-Provider-Modus** laufen.
 
 - **lokal**: Emotionen **nicht** im Systemprompt anhängen
-- **lokal + vLLM + Qwen 3.5**: Emotionen über **Layer Editing / Activation Steering** ausdrücken
+- **lokal + steering-faehiger Endpoint + Qwen 3.5**: Emotionen über **Layer Editing / Activation Steering** ausdrücken
 - **API-Modelle**: Emotionsregeln dürfen zusätzlich im Prompt bleiben
 
 ## 1. Voraussetzungen
@@ -14,18 +14,26 @@ Du brauchst:
 
 1. eine funktionierende Python-Umgebung fuer CHAPPiE
 2. ein lokales Qwen-3.5-Modell oder einen Pfad/Checkpoint dafuer
-3. einen laufenden **OpenAI-kompatiblen vLLM-Endpunkt**
+3. einen laufenden **OpenAI-kompatiblen lokalen Steering-Endpunkt**
 4. genug GPU-/RAM-Ressourcen fuer das gewaehlte Modell
 
-## 2. vLLM starten
+## 2. Steering-Endpoint starten
 
-Starte vLLM mit deinem Qwen-3.5-Modell und einem OpenAI-kompatiblen Endpoint, typischerweise auf `http://localhost:8000/v1`.
+Starte den steering-faehigen lokalen Endpoint mit deinem Qwen-3.5-Modell, typischerweise auf `http://localhost:8000/v1`.
 
 Wichtig fuer CHAPPiE:
 
 - nutze ein **Qwen-3.5-Modell** als Hauptmodell
+- auf kleineren Einzel-GPU-Servern ist `Qwen/Qwen3-4B-Instruct-2507` der sichere Text-Startpunkt
 - wenn moeglich `chat_template_kwargs.enable_thinking=false`
 - der Endpunkt muss Chat-Completions kompatibel sein
+
+Optional produktionsnah per `systemd`:
+
+- `chappie-vllm.service` aus dem Repo installieren
+- danach `sudo systemctl enable --now chappie-vllm.service`
+- der Service startet den Endpoint aus `brain/steering_api_server.py`
+- der Dateiname bleibt historisch `chappie-vllm.service`, obwohl der Prozess nicht mehr der rohe Standard-vLLM-Server ist
 
 ## 3. CHAPPiE konfigurieren
 
@@ -33,7 +41,8 @@ Setze in deiner Konfiguration bzw. UI mindestens:
 
 - `LLM_PROVIDER = "vllm"`
 - `VLLM_URL = "http://localhost:8000/v1"`
-- `VLLM_MODEL = "Qwen/..."`
+- `VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"`
+- `VLLM_FORCE_SINGLE_MODEL = True` fuer einen einzelnen vLLM-Endpoint
 
 Optional sinnvoll:
 
@@ -74,12 +83,18 @@ Nur bei **API-Modellen** bleiben Emotionsregeln im Prompt aktiv.
 
 ## 6. Wie die Emotionen transportiert werden
 
-Fuer lokales vLLM + Qwen 3.5 gilt:
+Fuer den lokalen Steering-Endpoint + Qwen 3.5 gilt:
 
 1. CHAPPiE berechnet aktuelle 7 Emotionen
 2. daraus werden Basisvektoren und Composite-Modi abgeleitet
-3. daraus wird ein Steering-Payload fuer vLLM gebaut
-4. Qwen bekommt die Wirkung ueber Layer-/Activation-Steering statt ueber eine Prompt-Liste der Vitalwerte
+3. daraus wird ein Steering-Payload fuer den lokalen Endpoint gebaut
+4. Qwen bekommt die Wirkung ueber Residual-/Activation-Steering plus eine kurze interne Stilfuehrung statt ueber eine Prompt-Liste der Vitalwerte
+
+Wichtiger Realitaetscheck:
+
+- CHAPPiE baut und sendet das `steering`-Payload
+- der Repo-Service auf `:8000` wendet dieses Payload serverseitig an
+- ein reiner Standard-vLLM-Server war dafuer in dieser Umgebung **nicht** ausreichend, weil er `steering` ignorierte
 
 ## 7. Sichtbarkeit und Debugging
 
@@ -116,12 +131,13 @@ Ohne `pytest` kannst du direkt ausfuehren:
 - `python tests/test_emotion_transition_rules.py`
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_vllm_response_handling.py`
+- `python tests/test_steering_backend.py`
 
 ## 10. Wenn es lokal nicht wie erwartet wirkt
 
 Pruefe in dieser Reihenfolge:
 
-1. laeuft wirklich `vLLM` und nicht Ollama/API?
+1. laeuft wirklich `chappie-vllm.service` / der lokale Steering-Endpoint und nicht Ollama/API?
 2. zeigt die UI `local_layer_only`?
 3. ist ein **Qwen-3.5-Modell** aktiv?
 4. ist die Steering-Staerke pro Emotion groesser als `0.0`?

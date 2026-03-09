@@ -43,6 +43,7 @@ Wenn neue Funktionen, neue Workflows, neue Ordner oder neue Modellpfade hinzugek
 - **lokale Qwen-3.5-Modelle zuerst**
 - **vLLM bevorzugt**, Ollama als leichtere lokale Alternative
 - **NVIDIA / Groq / Cerebras nur Fallback**, wenn lokal nicht ausreichend möglich
+- fuer echtes Steering pruefen, ob `chappie-vllm.service` einen steering-faehigen OpenAI-Endpunkt startet; stock vLLM ist dafuer nicht automatisch ausreichend
 
 ## Versionsregel
 

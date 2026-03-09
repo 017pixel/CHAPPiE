@@ -1,14 +1,14 @@
 """
 CHAPiE - vLLM Brain
 ===================
-LLM-Backend fuer vLLM (lokale GPU-Beschleunigung).
+LLM-Backend fuer einen OpenAI-kompatiblen lokalen GPU-Server.
 
 Perfekt fuer:
-- Lokales Hosting von massiven Modellen (z.B. Qwen 3.5 122B)
+- Lokales Hosting von Qwen-Modellen
 - Geringe Latenz bei lokaler GPU
-- Volle Kontrolle ueber Steering-Vektoren
+- Lokalen Steering-/OpenAI-kompatiblen Transport
 
-Benoetigt: vLLM Server laufend (Standard: http://localhost:8000/v1)
+Benoetigt: lokaler OpenAI-kompatibler Server laufend (Standard: http://localhost:8000/v1)
 """
 
 from typing import Generator, Optional, Any, Dict
@@ -20,32 +20,31 @@ from config.config import settings
 
 class VLLMBrain(BaseBrain):
     """
-    LLM-Backend fuer vLLM Server.
+    LLM-Backend fuer einen OpenAI-kompatiblen lokalen Server.
 
-    Nutzt das OpenAI-kompatible API-Interface von vLLM.
+    Nutzt ein OpenAI-kompatibles API-Interface.
     Unterstuetzt Activation Steering ueber 'extra_body'.
     """
 
     def __init__(self, model: Optional[str] = None, url: Optional[str] = None):
         """
-        Initialisiert das vLLM-Backend.
+        Initialisiert das lokale OpenAI-kompatible Backend.
 
         Args:
             model: Modellname (default: aus config.py)
-            url: vLLM Server URL (default: aus config.py)
+            url: Server URL (default: aus config.py)
         """
         self.url = url or settings.vllm_url
         model_name = model or settings.vllm_model
         super().__init__(model_name)
 
-        # OpenAI Client fuer vLLM (lokal, meist kein Key noetig)
+        # OpenAI Client fuer den lokalen Server (meist kein Key noetig)
         self.client = OpenAI(
             base_url=self.url,
-            api_key="none"  # vLLM braucht meist keinen echten Key
+            api_key="none"  # lokaler Server braucht keinen echten Key
         )
         self._is_initialized = True
-
-        print("vLLM Brain initialisiert")
+        print("Lokales OpenAI-Brain initialisiert")
         print(f"   Lokal verbunden: {self.url}")
         print(f"   Modell: {self.model}")
 

@@ -4,7 +4,7 @@
 
 | Pfad | Inhalt | Wichtige Dateien |
 |---|---|---|
-| `brain/` | Kernlogik für Brain-Pipeline und Agenten | `brain_pipeline.py`, `global_workspace.py`, `action_response.py` |
+| `brain/` | Kernlogik für Brain-Pipeline, Agenten und lokalen Steering-Endpoint | `brain_pipeline.py`, `global_workspace.py`, `action_response.py`, `steering_api_server.py`, `steering_backend.py` |
 | `brain/agents/` | Spezialisierte Gehirn-Agenten | `sensory_cortex.py`, `amygdala.py`, `hippocampus.py`, `prefrontal_cortex.py` |
 | `memory/` | Gedächtnis, Kontextdateien, Vergessenslogik | `memory_engine.py`, `sleep_phase.py`, `forgetting_curve.py`, `context_files.py` |
 | `life/` | Inneres Zustandsmodell und Entwicklung | `service.py`, `goal_engine.py`, `planning_engine.py`, `social_arc.py` |
@@ -23,8 +23,10 @@
 | Klassische Debug-CLI | `main.py` |
 | Brain-CLI | `chappie_brain_cli.py` |
 | Training-Daemon | `Chappies_Trainingspartner/training_daemon.py` |
+| Lokaler Steering-Endpoint | `brain/steering_api_server.py` |
 | Linux Training Service | `chappie-training.service` |
 | Linux Web Service | `chappie-web.service` |
+| Linux Modellservice | `chappie-vllm.service` |
 
 ## Besonders wichtige Codepfade
 
@@ -33,6 +35,8 @@
 - [`brain/agents/`](../brain/agents)
 - [`brain/action_response.py`](../brain/action_response.py)
 - [`brain/global_workspace.py`](../brain/global_workspace.py)
+- [`brain/steering_api_server.py`](../brain/steering_api_server.py)
+- [`brain/steering_backend.py`](../brain/steering_backend.py)
 
 ### Memory / Konsolidierung
 - [`memory/memory_engine.py`](../memory/memory_engine.py)

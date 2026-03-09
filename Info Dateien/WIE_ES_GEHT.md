@@ -7,6 +7,7 @@ Diese Datei ist jetzt eine **kurze Brücke** auf die neue, fachlich sauberere Do
 - Gehirn-Metapher und Komponenten: [`docs/architecture.md`](../docs/architecture.md)
 - Anfrage-, Schlaf- und Trainingsabläufe: [`docs/workflows.md`](../docs/workflows.md)
 - lokale Qwen-3.5-Strategie und API-Fallbacks: [`docs/local-models.md`](../docs/local-models.md)
+- lokaler Steering-Endpoint und Layer-Editing: [`docs/vLLM-Setup.md`](../docs/vLLM-Setup.md)
 - Orientierung in der Codebasis: [`docs/project-map.md`](../docs/project-map.md)
 
 ## Kurz erklärt
@@ -30,7 +31,7 @@ Die Hauptschichten sind:
 
 ## Wichtigster Modellhinweis
 
-Die Projektdokumentation priorisiert jetzt **lokale Qwen-3.5-Modelle**. APIs sind als Fallback dokumentiert, nicht als erste Wahl.
+Die Projektdokumentation priorisiert jetzt **lokale Qwen-3.5-Modelle**. APIs sind als Fallback dokumentiert, nicht als erste Wahl. Fuer echtes Emotion-Steering laeuft CHAPPiE ueber einen steering-faehigen lokalen OpenAI-Endpoint.
 
 Details: [`docs/local-models.md`](../docs/local-models.md)
 

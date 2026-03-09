@@ -24,6 +24,7 @@ pip install -r requirements.txt
 - lokale **Qwen-3.5-Modelle zuerst**
 - `vLLM` bevorzugen
 - APIs nur als Fallback nutzen
+- fuer echtes Steering den lokalen Endpoint aus `chappie-vllm.service` / `brain/steering_api_server.py` nutzen
 
 Vorlagen und Settings:
 
@@ -42,4 +43,6 @@ Vorlagen und Settings:
 Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten, **nicht** `training_loop.py`.
 
 Mehr Details stehen jetzt in [`docs/deployment.md`](../docs/deployment.md).
+
+Steering-Details: [`docs/vLLM-Setup.md`](../docs/vLLM-Setup.md)
 

@@ -29,12 +29,18 @@ LLM_PROVIDER = "vllm"
 
 # --- vLLM Configuration (empfohlen) ---
 VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-35B-A3B-GPTQ-Int4"
+VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
+VLLM_FORCE_SINGLE_MODEL = True
 
 # --- Ollama Configuration ---
 OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_MODEL = "qwen2.5:7b"
 EMOTION_ANALYSIS_MODEL = "qwen2.5:1.5b"
+
+# --- Steering Configuration (lokal via vLLM) ---
+ENABLE_STEERING = True
+STEERING_PROVIDER = "vllm"
+STEERING_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
 
 # --- Groq Configuration ---
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -64,6 +70,7 @@ STREAM = True
 # 🔎 SMART QUERY EXTRACTION
 # =========================
 ENABLE_QUERY_EXTRACTION = True
+QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"
 QUERY_EXTRACTION_GROQ_MODEL = "llama-3.1-8b-instant"
 QUERY_EXTRACTION_OLLAMA_MODEL = "qwen2.5:1.5b"
 
@@ -72,6 +79,7 @@ QUERY_EXTRACTION_OLLAMA_MODEL = "qwen2.5:1.5b"
 # ============================
 INTENT_PROCESSOR_MODEL_GROQ = "openai/gpt-oss-120b"
 INTENT_PROCESSOR_MODEL_CEREBRAS = "qwen-3-235b-a22b-instruct-2507"
+INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3-4B-Instruct-2507"
 INTENT_PROCESSOR_MODEL_OLLAMA = "gpt-oss-20b"
 INTENT_PROCESSOR_MODEL_NVIDIA = "deepseek-ai/deepseek-v3.1-terminus"
 

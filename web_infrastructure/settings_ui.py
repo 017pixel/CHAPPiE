@@ -45,6 +45,7 @@ NVIDIA_MODELS = {
 }
 
 VLLM_MODELS = {
+    "Qwen/Qwen3-4B-Instruct-2507": "Qwen 3 4B Instruct 2507 (Text, stabil)",
     "Qwen/Qwen3.5-4B": "Qwen 3.5 4B (Schnell)",
     "Qwen/Qwen3.5-9B": "Qwen 3.5 9B (Kompakt)",
     "Qwen/Qwen3.5-27B": "Qwen 3.5 27B",

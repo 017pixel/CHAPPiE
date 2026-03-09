@@ -28,6 +28,12 @@ def _provider_summary() -> list[str]:
             f"  Groq API Key: {'JA' if settings.groq_api_key else 'NEIN (SETZE KEY!)'}",
             f"  Groq Model: {settings.groq_model}",
         ])
+    elif provider == LLMProvider.VLLM:
+        lines.extend([
+            f"  vLLM URL: {settings.vllm_url}",
+            f"  vLLM Model: {settings.vllm_model}",
+            f"  vLLM Single-Model-Modus: {settings.vllm_force_single_model}",
+        ])
     else:
         lines.extend([
             f"  Ollama Host: {settings.ollama_host}",

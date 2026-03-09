@@ -1,6 +1,7 @@
 [Unit]
 Description=CHAPPiE Web Interface (Streamlit)
-After=network.target
+After=network.target chappie-vllm.service
+Wants=chappie-vllm.service
 
 [Service]
 User=bbecker
