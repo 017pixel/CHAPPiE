@@ -85,7 +85,8 @@ Fuer das bevorzugte Setup **`vllm`-Provider + lokaler Steering-Endpoint + Qwen 3
 - der lokale Endpoint stabilisiert das Verhalten zusaetzlich ueber eine kurze interne Stilvorgabe, damit instruction-tuned Qwen die Richtung auch sichtbar ausspielt
 - lokales Qwen-Steering wird im Antwortpfad forciert, damit die Wirkung nicht an `ENABLE_STEERING=False` haengen bleibt
 - der Debug-Mode zeigt aktive Basisvektoren aller 7 Vitalzeichen und zusaetzliche Composite-Modi wie `warm`, `melancholic`, `guarded` oder `crashout`
-- die Streamlit-UI zeigt im Tab **Emotionen** jetzt pro Emotion die editierbare Layer-Range und Steering-Staerke
+- die Streamlit-UI zeigt im Tab **Emotionen** jetzt pro Emotion die editierbare Layer-Range und Steering-Staerke sowie eine Tabelle mit `emotion_state`, `emotion_intensities`, Basisvektoren und Composite-Zusatzmustern
+- der **Brain Monitor** trennt sichtbar zwischen Gehirnstruktur (Kontext, Tool-Pfad, Global Workspace) und dem Endausgabe-Steering in Schritt 2
 - starke Emotionsspruenge werden pro Turn geglaettet, damit Zustandswechsel sichtbarer und plausibler bleiben
 
 Dadurch soll der Zustand im Stil merkbar werden: waermer, gereizter, rueckzugsorientierter, druckvoller oder eskalierender.

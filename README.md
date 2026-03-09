@@ -118,8 +118,8 @@ Wichtiger Praxis-Hinweis: `chappie-vllm.service` startet im Repository inzwische
 - **Nur API-Modelle** behalten explizite Emotions-Verhaltensregeln im Prompt.
 - **Alle lokalen Modelle** bekommen keine Emotions-Vitalwerte im Systemprompt; fuer den gewuenschten Hauptpfad entsteht der Emotionsausdruck stattdessen ueber **Layer-/Activation-Steering** plus eine kompakte interne Stilfuehrung am lokalen Endpoint.
 - Dabei werden die **7 Vitalzeichen gleichzeitig** als Basis-Signale verwendet: Freude, Traurigkeit, Frustration, Vertrauen, Neugier, Motivation und Energie.
-- Im **Emotionen-Tab** der Streamlit-UI sieht und aendert man jetzt pro Emotion die Layer-Range und Steering-Staerke.
-- Im **Debug Mode / Brain Monitor** werden jetzt rohe Agent-Deltas, geglaettete angewandte Deltas, Gruende sowie Basisvektoren und Composite-Modi angezeigt.
+- Im **Emotionen-Tab** der Streamlit-UI sieht und aendert man jetzt pro Emotion die Layer-Range und Steering-Staerke sowie die 7 Vitalzeichen im Live-Steering.
+- Im **Debug Mode / Brain Monitor** werden jetzt rohe Agent-Deltas, geglaettete angewandte Deltas, Gruende sowie getrennt **Basisvektoren**, **Composite-Zusatzmuster**, `emotion_state` und `emotion_intensities` angezeigt.
 
 ### 3. Startmodi
 
@@ -161,7 +161,9 @@ Der Chat speichert die aktive Session robust weiter, versucht Modellantworten be
 
 Wenn keine normale Antwort zustande kommt, erscheint `CHAPPiE schweigt...` und vorhandene Thinking-Bereiche werden automatisch aufgeklappt.
 
-Im Debug-Mode sieht man jetzt fuer Emotionen zusaetzlich den Unterschied zwischen **Prompt-Steuerung** und **Layer-Manipulation**, inklusive der 7 Basis-Vitalzeichen und zusaetzlicher Ausdrucksprofile wie `warm`, `melancholic`, `guarded` oder `crashout`.
+Im Debug-Mode sieht man jetzt fuer Emotionen zusaetzlich den Unterschied zwischen **Prompt-Steuerung** und **Layer-Manipulation**, inklusive der 7 Basis-Vitalzeichen, `emotion_state`, `emotion_intensities` und zusaetzlicher Ausdrucksprofile wie `warm`, `melancholic`, `guarded` oder `crashout`.
+
+Wichtig fuer das Verstaendnis: **Kontextaufbau, Tool-Orchestrierung und Global Workspace bleiben Teil der Gehirnstruktur**; das Emotions-Steering greift erst in der finalen Modellgenerierung fuer die Endantwort.
 
 ### Sidebar und Vitalzeichen
 
@@ -244,6 +246,8 @@ python tests/test_life_simulation.py
 python tests/test_local_first_runtime.py
 python tests/test_steering_backend.py
 python tests/test_brain_pipeline_steering_integration.py
+python tests/test_debug_monitor_data.py
+python tests/test_web_ui_consistency.py
 python tests/test_ollama_response_handling.py
 python tests/test_chat_manager_persistence.py
 python tests/test_vllm_response_handling.py

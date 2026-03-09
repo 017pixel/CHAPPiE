@@ -46,6 +46,7 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_life_simulation.py`
 - `python tests/test_local_first_runtime.py`
 - `python tests/test_steering_backend.py`
+- `python tests/test_brain_pipeline_steering_integration.py`
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_ollama_response_handling.py`
 - `python tests/test_chat_manager_persistence.py`
@@ -55,6 +56,13 @@ Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests k
 - `python tests/test_web_ui_consistency.py`
 - `python -m py_compile app.py web_infrastructure/backend_wrapper.py web_infrastructure/command_handler.py`
 - `python tests/manual/test_compatibility.py`
+- `python validate_system.py`
+
+Fuer UI-/Debug-Aenderungen rund um Emotions-Steering sind besonders wichtig:
+
+- `python tests/test_debug_monitor_data.py`
+- `python tests/test_web_ui_consistency.py`
+- `python tests/test_steering_backend.py`
 - `python validate_system.py`
 
 ## Wenn Doku geändert wurde
@@ -75,6 +83,7 @@ Dann zusätzlich prüfen:
 - lokale/API-Unterscheidung im Prompt- und Steering-Pfad
 - lokaler Steering-Endpoint (`brain/steering_api_server.py`, `brain/steering_backend.py`)
 - Debug-Monitor-Metadaten fuer Emotions-/Layer-Steuerung
+- Streamlit-Sichtbarkeit fuer `emotion_state`, `emotion_intensities`, Basisvektoren und Composite-Zusatzmuster
 - betroffene Live-/Agent-Tests
 
 ## Testkarte

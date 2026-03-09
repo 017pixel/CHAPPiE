@@ -1004,7 +1004,11 @@ def init_chappie():
                     "dominant_vector": prompt_runtime["emotion_steering"].get("dominant_vector", "neutral"),
                     "dominant_strength": prompt_runtime["emotion_steering"].get("dominant_strength", 0.0),
                     "summary": prompt_runtime["emotion_steering"].get("summary", ""),
+                    "emotion_state": prompt_runtime["emotion_steering"].get("emotion_state", {}),
+                    "emotion_intensities": prompt_runtime["emotion_steering"].get("emotion_intensities", {}),
+                    "base_vectors": prompt_runtime["emotion_steering"].get("base_vectors", []),
                     "active_vectors": prompt_runtime["emotion_steering"].get("active_vectors", []),
+                    "composite_vectors": prompt_runtime["emotion_steering"].get("composite_vectors", []),
                     "composite_modes": prompt_runtime["emotion_steering"].get("composite_modes", []),
                 },
             )
@@ -1140,6 +1144,10 @@ def init_chappie():
                     "dominant_vector": prompt_runtime["emotion_steering"].get("dominant_vector", "neutral"),
                     "dominant_strength": prompt_runtime["emotion_steering"].get("dominant_strength", 0.0),
                     "summary": prompt_runtime["emotion_steering"].get("summary", ""),
+                    "emotion_state": prompt_runtime["emotion_steering"].get("emotion_state", {}),
+                    "emotion_intensities": prompt_runtime["emotion_steering"].get("emotion_intensities", {}),
+                    "base_vectors": prompt_runtime["emotion_steering"].get("base_vectors", []),
+                    "composite_vectors": prompt_runtime["emotion_steering"].get("composite_vectors", []),
                 },
             )
             system_prompt = get_system_prompt_with_emotions(

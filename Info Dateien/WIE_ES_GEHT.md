@@ -33,5 +33,11 @@ Die Hauptschichten sind:
 
 Die Projektdokumentation priorisiert jetzt **lokale Qwen-3.5-Modelle**. APIs sind als Fallback dokumentiert, nicht als erste Wahl. Fuer echtes Emotion-Steering laeuft CHAPPiE ueber einen steering-faehigen lokalen OpenAI-Endpoint.
 
+In der Streamlit-UI sieht man das jetzt explizit:
+
+- 7 Vitalzeichen als Basis fuer das Endausgabe-Steering
+- Basisvektoren und Composite-Zusatzmuster getrennt
+- Brain Monitor mit sichtbarer Trennung zwischen Gehirnstruktur und finaler Modellsteuerung
+
 Details: [`docs/local-models.md`](../docs/local-models.md)
 

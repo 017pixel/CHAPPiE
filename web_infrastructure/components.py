@@ -8,7 +8,9 @@ from web_infrastructure.ui_utils import (
     EMOTION_COLORS,
     EMOTION_DISPLAY_ORDER,
     EMOTION_LABELS,
+    build_steering_state_rows,
     normalize_emotions,
+    split_steering_vectors,
 )
 
 def render_emotion_metric(label, value, color="#81c784"):
@@ -202,24 +204,33 @@ def render_brain_monitor(metadata: Dict[str, Any]):
 
         with st.expander("Emotion Steering / Layer-Manipulation", expanded=False):
             if emotion_steering:
-                st.markdown(f"**Modus:** `{emotion_steering.get('mode', '-')}`")
+                base_vectors, composite_vectors = split_steering_vectors(emotion_steering)
+                state_rows = build_steering_state_rows(emotion_steering)
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                with col_s1:
+                    st.metric("Modus", emotion_steering.get("mode", "-"))
+                with col_s2:
+                    st.metric("Basisvektoren", len(base_vectors))
+                with col_s3:
+                    st.metric("Composite", len(composite_vectors))
+                with col_s4:
+                    st.metric("Dominant", emotion_steering.get("dominant_vector", "neutral"))
                 st.markdown(f"**Prompt-Emotionsregeln aktiv:** `{emotion_steering.get('prompt_emotions_enabled', False)}`")
                 st.markdown(f"**Activation Steering verfuegbar:** `{emotion_steering.get('supports_activation_steering', False)}`")
                 st.markdown(f"**Forciertes Local-Qwen-Steering:** `{emotion_steering.get('forced_local_qwen_steering', False)}`")
                 st.markdown(f"**Dominanter Vektor:** `{emotion_steering.get('dominant_vector', 'neutral')}` ({emotion_steering.get('dominant_strength', 0.0):.3f})")
+                st.caption("Kontext, Tool-Orchestrierung und Global Workspace bleiben im Gehirnpfad erhalten; Steering praegt erst die finale Modellgenerierung in Schritt 2.")
                 if emotion_steering.get("summary"):
                     st.markdown(f"**Erwartbarer Ausdruck:** {emotion_steering.get('summary')}")
-                intensities = emotion_steering.get("intensities", {}) if isinstance(emotion_steering.get("intensities", {}), dict) else {}
-                if intensities:
-                    st.markdown("**Basis-Intensitaeten:**")
-                    st.dataframe(
-                        [{"emotion": key, "alpha": value} for key, value in intensities.items()],
-                        use_container_width=True,
-                    )
-                active_vectors = emotion_steering.get("active_vectors", []) if isinstance(emotion_steering.get("active_vectors", []), list) else []
-                if active_vectors:
-                    st.markdown("**Aktive Vektoren / Composite-Modes:**")
-                    st.dataframe(active_vectors, use_container_width=True)
+                if state_rows:
+                    st.markdown("**7 Vitalzeichen im Endausgabe-Steering:**")
+                    st.dataframe(state_rows, use_container_width=True)
+                if base_vectors:
+                    st.markdown("**Basisvektoren im Request-Payload:**")
+                    st.dataframe(base_vectors, use_container_width=True)
+                if composite_vectors:
+                    st.markdown("**Composite-Zusatzmuster im Payload:**")
+                    st.dataframe(composite_vectors, use_container_width=True)
                 composite_modes = emotion_steering.get("composite_modes", []) if isinstance(emotion_steering.get("composite_modes", []), list) else []
                 if composite_modes:
                     st.markdown("**Abgeleitete Verhaltensmodi:**")

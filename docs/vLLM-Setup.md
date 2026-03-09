@@ -104,6 +104,7 @@ Du kannst das Verhalten an zwei Stellen sehen:
 ### Emotionen-Tab
 
 - aktueller Modus (`api_prompt_emotions`, `local_layer_only`, ...)
+- Tabelle mit allen 7 Vitalzeichen inkl. `emotion_state`, `emotion_intensities`, Richtung und `layer_range`
 - aktive Basisvektoren aller 7 Vitalzeichen / Composite-Modi
 - editierbare Basis-Konfiguration pro Emotion
 
@@ -113,6 +114,8 @@ Du kannst das Verhalten an zwei Stellen sehen:
 - angewandte geglaettete Deltas
 - Gruende aus Intent/Homeostasis
 - aktive Layer-Vektoren und Basis-Konfiguration
+- getrennte Anzeige von Basisvektoren und Composite-Zusatzmustern im Payload
+- sichtbare Trennung zwischen Gehirnstruktur (Kontext, Tool-Pfad, Global Workspace) und Endausgabe-Steering
 
 ## 8. Warum die Emotionsspruenge jetzt sanfter sind
 
@@ -133,6 +136,8 @@ Ohne `pytest` kannst du direkt ausfuehren:
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_vllm_response_handling.py`
 - `python tests/test_steering_backend.py`
+- `python tests/test_web_ui_consistency.py`
+- `python tests/test_brain_pipeline_steering_integration.py`
 
 ## 10. Wenn es lokal nicht wie erwartet wirkt
 

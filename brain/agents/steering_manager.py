@@ -676,6 +676,14 @@ class SteeringManager:
             "dominant_vector": dominant,
             "dominant_strength": steering_meta.get("dominant_strength", 0.0),
             "intensities": intensities,
+            "emotion_state": {
+                emotion: int((steering_meta.get("emotion_state", {}) or {}).get(emotion, current_emotions.get(emotion, 50)))
+                for emotion in EMOTION_VECTOR_MAP
+            },
+            "emotion_intensities": {
+                emotion: round(float((steering_meta.get("emotion_intensities", {}) or {}).get(emotion, intensities.get(emotion, 0.0))), 4)
+                for emotion in EMOTION_VECTOR_MAP
+            },
             "active_vectors": [
                 {
                     "name": item.get("name"),
@@ -688,6 +696,31 @@ class SteeringManager:
                     "trigger": item.get("trigger", {}),
                 }
                 for item in active_vectors
+            ],
+            "base_vectors": [
+                {
+                    "name": item.get("name"),
+                    "source": item.get("source", "base"),
+                    "strength": item.get("strength"),
+                    "direction": item.get("direction"),
+                    "layer_range": item.get("layer_range"),
+                    "emotion_value": item.get("emotion_value"),
+                    "surface_effect": item.get("surface_effect", ""),
+                }
+                for item in (steering_meta.get("base_vectors", []) if isinstance(steering_meta.get("base_vectors", []), list) else [])
+            ],
+            "composite_vectors": [
+                {
+                    "name": item.get("name"),
+                    "source": item.get("source", "composite"),
+                    "strength": item.get("strength"),
+                    "direction": item.get("direction"),
+                    "layer_range": item.get("layer_range"),
+                    "emotion_value": item.get("emotion_value"),
+                    "surface_effect": item.get("surface_effect", ""),
+                    "trigger": item.get("trigger", {}),
+                }
+                for item in (steering_meta.get("composite_vectors", []) if isinstance(steering_meta.get("composite_vectors", []), list) else [])
             ],
             "composite_modes": [
                 {

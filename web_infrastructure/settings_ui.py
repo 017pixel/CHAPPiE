@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from config.config import settings, LLMProvider
-from web_infrastructure.ui_utils import EMOTION_DEFAULTS, EMOTION_DISPLAY_ORDER, EMOTION_LABELS, clamp_numeric_value, normalize_emotions
+from web_infrastructure.ui_utils import EMOTION_DEFAULTS, EMOTION_DISPLAY_ORDER, EMOTION_LABELS, build_steering_state_rows, clamp_numeric_value, normalize_emotions, split_steering_vectors
 
 PROVIDER_OPTIONS = {
     "auto": "Auto (folgt Haupt-Provider)",
@@ -318,16 +318,20 @@ def render_settings_overlay(backend):
 
         runtime_report = _build_emotion_runtime_report(backend, new_emotions)
         layer_rows = backend.get_emotion_layer_config(new_emotions)
+        state_rows = build_steering_state_rows(runtime_report)
+        base_vectors, composite_vectors = split_steering_vectors(runtime_report)
         max_layer_index = max(0, backend.steering_manager.model_profile.get("total_layers", 1) - 1)
 
-        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+        col_r1, col_r2, col_r3, col_r4, col_r5 = st.columns(5)
         with col_r1:
             st.metric("Modus", runtime_report.get("mode", "-"))
         with col_r2:
             st.metric("Prompt-Emotionen", "Ja" if runtime_report.get("prompt_emotions_enabled") else "Nein")
         with col_r3:
-            st.metric("Aktive Vektoren", len(runtime_report.get("active_vectors", [])))
+            st.metric("Basisvektoren", len(base_vectors))
         with col_r4:
+            st.metric("Composite", len(composite_vectors))
+        with col_r5:
             st.metric("Dominant", runtime_report.get("dominant_vector", "neutral"))
 
         if runtime_report.get("prompt_emotions_enabled"):
@@ -339,6 +343,20 @@ def render_settings_overlay(backend):
 
         if runtime_report.get("summary"):
             st.caption(f"Aktuelle Layer-Wirkung: {runtime_report.get('summary')}")
+        st.caption("Die Gehirnstruktur bleibt erhalten: Kontext, Tool-Auswahl und Global Workspace laufen vor der Endgenerierung. Das Steering praegt nur die finale Modellantwort.")
+
+        if state_rows:
+            with st.expander("7 Vitalzeichen im Live-Steering", expanded=True):
+                st.caption("Hier siehst du die 7 Basis-Vitalzeichen, wie sie aktuell in das Endausgabe-Steering einfliessen.")
+                st.dataframe(state_rows, use_container_width=True)
+
+        if base_vectors:
+            with st.expander("Basisvektoren im Request-Payload", expanded=False):
+                st.dataframe(base_vectors, use_container_width=True)
+
+        if composite_vectors:
+            with st.expander("Composite-Zusatzmuster im Payload", expanded=False):
+                st.dataframe(composite_vectors, use_container_width=True)
 
         with st.expander("Layer Editing pro Emotion", expanded=True):
             st.caption("Hier definierst du pro Basis-Emotion Staerke und Layer-Bereich des Steering-Vektors. Diese Werte beeinflussen lokale vLLM-Steuerung direkt.")
@@ -405,11 +423,6 @@ def render_settings_overlay(backend):
                     )
                 st.session_state.last_layer_settings_hash = current_layer_hash
                 st.toast("Layer Editing automatisch aktualisiert 💾")
-
-        active_vectors = runtime_report.get("active_vectors", [])
-        if active_vectors:
-            st.markdown("**Aktive Layer-Vektoren / Composite-Modes**")
-            st.dataframe(active_vectors, use_container_width=True)
 
         composite_modes = runtime_report.get("composite_modes", [])
         if composite_modes:

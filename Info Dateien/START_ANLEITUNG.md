@@ -38,6 +38,11 @@ Vorlagen und Settings:
 - Brain CLI: `python chappie_brain_cli.py`
 - Training: `python -m Chappies_Trainingspartner.training_daemon --neu`
 
+### Was du in der UI jetzt sehen solltest
+
+- im Tab **Emotionen**: alle 7 Vitalzeichen mit Layer-Range, Steering-Staerke und Live-Steering-Tabelle
+- im **Debug Mode / Brain Monitor**: Basisvektoren, Composite-Zusatzmuster und die Trennung zwischen Gehirnstruktur und Endausgabe-Steering
+
 ## Kritischer Hinweis
 
 Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten, **nicht** `training_loop.py`.
@@ -45,4 +50,6 @@ Der Linux-Service muss `Chappies_Trainingspartner.training_daemon` starten, **ni
 Mehr Details stehen jetzt in [`docs/deployment.md`](../docs/deployment.md).
 
 Steering-Details: [`docs/vLLM-Setup.md`](../docs/vLLM-Setup.md)
+
+Tests / UI-Checks: [`docs/testing.md`](../docs/testing.md)
 

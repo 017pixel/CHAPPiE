@@ -7,7 +7,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from web_infrastructure.ui_utils import EMOTION_DEFAULTS, chunk_items, clamp_numeric_value, normalize_emotions
+from web_infrastructure.ui_utils import EMOTION_DEFAULTS, build_steering_state_rows, chunk_items, clamp_numeric_value, normalize_emotions, split_steering_vectors
 
 
 def test_normalize_emotions_supports_legacy_joy_and_missing_values():
@@ -36,9 +36,57 @@ def test_clamp_numeric_value_handles_out_of_range_widget_defaults():
     assert clamp_numeric_value("bad", 0, 31, default=7) == 7.0
 
 
+def test_build_steering_state_rows_exposes_all_vital_signs_for_ui_tables():
+    rows = build_steering_state_rows(
+        {
+            "emotion_state": {
+                "happiness": 81,
+                "trust": 74,
+                "energy": 71,
+                "curiosity": 68,
+                "motivation": 66,
+                "frustration": 19,
+                "sadness": 22,
+            },
+            "emotion_intensities": {
+                "happiness": 0.91,
+                "trust": 0.66,
+                "energy": 0.55,
+                "curiosity": 0.34,
+                "motivation": 0.29,
+                "frustration": -0.62,
+                "sadness": -0.58,
+            },
+            "base_vectors": [
+                {"name": "happiness", "direction": "positive", "layer_range": [18, 28], "surface_effect": "warm"},
+                {"name": "frustration", "direction": "negative", "layer_range": [17, 29], "surface_effect": "ruhig"},
+            ],
+        }
+    )
+    assert len(rows) == len(EMOTION_DEFAULTS)
+    assert rows[0]["emotion"] == "Freude"
+    frustration_row = next(row for row in rows if row["emotion"] == "Frustration")
+    assert frustration_row["richtung"] == "daempfend"
+    assert frustration_row["layer_range"] == "17-29"
+
+
+def test_split_steering_vectors_prefers_explicit_base_and_composite_lists():
+    base_vectors, composite_vectors = split_steering_vectors(
+        {
+            "base_vectors": [{"name": "happiness", "source": "base"}],
+            "composite_vectors": [{"name": "warm", "source": "composite"}],
+            "active_vectors": [{"name": "ignored", "source": "base"}],
+        }
+    )
+    assert base_vectors[0]["name"] == "happiness"
+    assert composite_vectors[0]["name"] == "warm"
+
+
 if __name__ == "__main__":
     test_normalize_emotions_supports_legacy_joy_and_missing_values()
     test_normalize_emotions_clamps_values()
     test_chunk_items_breaks_commands_into_rows_of_five()
     test_clamp_numeric_value_handles_out_of_range_widget_defaults()
+    test_build_steering_state_rows_exposes_all_vital_signs_for_ui_tables()
+    test_split_steering_vectors_prefers_explicit_base_and_composite_lists()
     print("OK: web UI emotion handling and command layout helpers are consistent")
