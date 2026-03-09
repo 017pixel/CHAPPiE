@@ -55,6 +55,22 @@ def _clamp_emotion_value(value, default: int) -> int:
     return max(0, min(100, numeric))
 
 
+def clamp_numeric_value(value, minimum, maximum, default=None):
+    """Klemmt numerische UI-Werte robust in einen erlaubten Bereich."""
+    fallback = minimum if default is None else default
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = float(fallback)
+
+    minimum_value = float(minimum)
+    maximum_value = float(maximum)
+    if minimum_value > maximum_value:
+        minimum_value, maximum_value = maximum_value, minimum_value
+
+    return max(minimum_value, min(maximum_value, numeric))
+
+
 def normalize_emotions(emotions: Mapping[str, int] | None) -> dict[str, int]:
     source = dict(emotions or {})
     normalized = dict(EMOTION_DEFAULTS)

@@ -326,6 +326,50 @@ class SteeringManager:
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(steering_vector.to_dict(), f, indent=2, ensure_ascii=False)
 
+    def _get_runtime_layer_bounds(self) -> tuple[int, int, int]:
+        self.refresh_runtime_profile()
+        max_layer = max(0, self.model_profile["total_layers"] - 1)
+        default_start, default_end = self.model_profile["emotion_range"]
+        default_start = max(0, min(max_layer, int(default_start)))
+        default_end = max(default_start, min(max_layer, int(default_end)))
+        return max_layer, default_start, default_end
+
+    def _sanitize_vector_runtime_config(self, steering_vector: Optional[SteeringVector]) -> Dict[str, Any]:
+        max_layer, default_start, default_end = self._get_runtime_layer_bounds()
+        if steering_vector is None:
+            return {
+                "layer_start": default_start,
+                "layer_end": default_end,
+                "default_alpha": BASE_VECTOR_DEFAULT_ALPHA,
+            }
+
+        try:
+            raw_start = int(getattr(steering_vector, "layer_start", default_start))
+        except (TypeError, ValueError):
+            raw_start = default_start
+
+        try:
+            raw_end = int(getattr(steering_vector, "layer_end", default_end))
+        except (TypeError, ValueError):
+            raw_end = default_end
+
+        start = max(0, min(max_layer, raw_start))
+        end = max(0, min(max_layer, raw_end))
+        if end < start:
+            start, end = end, start
+
+        try:
+            alpha = float(getattr(steering_vector, "default_alpha", BASE_VECTOR_DEFAULT_ALPHA))
+        except (TypeError, ValueError):
+            alpha = BASE_VECTOR_DEFAULT_ALPHA
+        alpha = max(0.0, min(MAX_VECTOR_DEFAULT_ALPHA, alpha))
+
+        return {
+            "layer_start": start,
+            "layer_end": end,
+            "default_alpha": alpha,
+        }
+
     def is_local_provider(self, provider: Optional[LLMProvider] = None) -> bool:
         """Prueft ob ein lokaler Provider aktiv ist (vLLM / Ollama)."""
         return self._effective_provider(provider) in (LLMProvider.VLLM, LLMProvider.OLLAMA)
@@ -350,9 +394,11 @@ class SteeringManager:
         sv = self.vectors.get(emotion)
         if sv is None:
             return 1.0
-        if sv.default_alpha <= 0:
+        sanitized = self._sanitize_vector_runtime_config(sv)
+        default_alpha = sanitized["default_alpha"]
+        if default_alpha <= 0:
             return 0.0
-        return max(0.05, min(MAX_VECTOR_DEFAULT_ALPHA / BASE_VECTOR_DEFAULT_ALPHA, sv.default_alpha / BASE_VECTOR_DEFAULT_ALPHA))
+        return max(0.05, min(MAX_VECTOR_DEFAULT_ALPHA / BASE_VECTOR_DEFAULT_ALPHA, default_alpha / BASE_VECTOR_DEFAULT_ALPHA))
 
     def compute_emotion_intensity(self, emotions: Dict[str, int]) -> Dict[str, float]:
         """
@@ -523,13 +569,14 @@ class SteeringManager:
             sv = self.vectors.get(emotion)
             if sv is None:
                 continue
+            runtime_config = self._sanitize_vector_runtime_config(sv)
 
             active_vectors.append({
                 "name": sv.name,
                 "vector": sv.vector_data if not (HAS_NUMPY and isinstance(sv.vector_data, np.ndarray)) else sv.vector_data.tolist(),
                 "strength": abs(alpha),
                 "direction": "positive" if alpha > 0 else "negative",
-                "layer_range": [sv.layer_start, sv.layer_end],
+                "layer_range": [runtime_config["layer_start"], runtime_config["layer_end"]],
                 "emotion_value": current_emotions.get(emotion, 50),
                 "source": "base",
                 "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
@@ -673,7 +720,7 @@ class SteeringManager:
         if sv is None:
             return None
 
-        max_layer = max(0, self.model_profile["total_layers"] - 1)
+        max_layer, _, _ = self._get_runtime_layer_bounds()
         if layer_start is not None:
             sv.layer_start = max(0, min(max_layer, int(layer_start)))
         if layer_end is not None:
@@ -695,6 +742,7 @@ class SteeringManager:
         for emotion in EMOTION_VECTOR_MAP:
             sv = self.vectors.get(emotion)
             profile = EMOTION_STRENGTH_PROFILES.get(emotion, {})
+            runtime_config = self._sanitize_vector_runtime_config(sv)
             vector_type = "synthetic"
             if sv and isinstance(sv.vector_data, dict):
                 vector_type = str(sv.vector_data.get("type", "synthetic"))
@@ -702,9 +750,9 @@ class SteeringManager:
             rows.append({
                 "emotion": emotion,
                 "current_value": int(emotions.get(emotion, 50)),
-                "layer_start": getattr(sv, "layer_start", self.model_profile["emotion_range"][0]),
-                "layer_end": getattr(sv, "layer_end", self.model_profile["emotion_range"][1]),
-                "default_alpha": round(float(getattr(sv, "default_alpha", BASE_VECTOR_DEFAULT_ALPHA)), 3),
+                "layer_start": runtime_config["layer_start"],
+                "layer_end": runtime_config["layer_end"],
+                "default_alpha": round(float(runtime_config["default_alpha"]), 3),
                 "active_alpha": round(float(intensities.get(emotion, 0.0)), 4),
                 "surface_effect": profile.get("surface_effect", ""),
                 "description": getattr(sv, "description", ""),
