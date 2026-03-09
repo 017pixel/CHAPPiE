@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from config.config import settings, LLMProvider
-from web_infrastructure.ui_utils import EMOTION_DEFAULTS, EMOTION_DISPLAY_ORDER, EMOTION_LABELS, normalize_emotions
+from web_infrastructure.ui_utils import EMOTION_DEFAULTS, EMOTION_DISPLAY_ORDER, EMOTION_LABELS, clamp_numeric_value, normalize_emotions
 
 PROVIDER_OPTIONS = {
     "auto": "Auto (folgt Haupt-Provider)",
@@ -350,11 +350,14 @@ def render_settings_overlay(backend):
                 label = EMOTION_LABELS.get(emotion_key, emotion_key)
                 with st.expander(f"{label} · Wert {row.get('current_value', 0)} · Aktiv {row.get('active_alpha', 0.0):+.3f}", expanded=False):
                     st.caption(row.get("surface_effect", ""))
+                    alpha_default = clamp_numeric_value(row.get("default_alpha", 0.3), 0.0, 1.5, default=0.3)
+                    start_default = int(clamp_numeric_value(row.get("layer_start", 0), 0, max_layer_index, default=0))
+                    end_default = int(clamp_numeric_value(row.get("layer_end", max_layer_index), 0, max_layer_index, default=max_layer_index))
                     alpha_value = st.slider(
                         f"Steering-Staerke ({label})",
                         min_value=0.0,
                         max_value=1.5,
-                        value=float(row.get("default_alpha", 0.3)),
+                        value=float(alpha_default),
                         step=0.05,
                         key=f"layer_alpha_{emotion_key}",
                     )
@@ -364,7 +367,7 @@ def render_settings_overlay(backend):
                             f"Start-Layer ({label})",
                             min_value=0,
                             max_value=max_layer_index,
-                            value=int(row.get("layer_start", 0)),
+                            value=start_default,
                             step=1,
                             key=f"layer_start_{emotion_key}",
                         )
@@ -373,7 +376,7 @@ def render_settings_overlay(backend):
                             f"End-Layer ({label})",
                             min_value=0,
                             max_value=max_layer_index,
-                            value=int(row.get("layer_end", max_layer_index)),
+                            value=end_default,
                             step=1,
                             key=f"layer_end_{emotion_key}",
                         )

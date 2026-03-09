@@ -175,6 +175,41 @@ def test_layer_config_exposes_per_emotion_alpha_and_layers():
             manager.vectors["happiness"].layer_end = original_end
 
 
+def test_runtime_layer_config_clamps_outdated_saved_ranges():
+    original_provider = settings.llm_provider
+    original_model = settings.vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_model = "Qwen/Qwen3.5-9B"
+        manager = SteeringManager()
+        vector = manager.vectors["happiness"]
+
+        original_alpha = vector.default_alpha
+        original_start = vector.layer_start
+        original_end = vector.layer_end
+
+        vector.layer_start = 99
+        vector.layer_end = 123
+        vector.default_alpha = 9.0
+
+        row = next(item for item in manager.get_emotion_layer_config({"happiness": 90}) if item["emotion"] == "happiness")
+        payload = manager.get_steering_payload({"happiness": 90}, force=True)
+        base_vector = next(item for item in payload["steering"]["vectors"] if item["name"] == "happiness")
+
+        assert row["layer_start"] == 31
+        assert row["layer_end"] == 31
+        assert row["default_alpha"] == 1.5
+        assert base_vector["layer_range"] == [31, 31]
+        assert payload["steering"]["model_layers"] == 32
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_model = original_model
+        if 'manager' in locals() and "happiness" in manager.vectors:
+            manager.vectors["happiness"].default_alpha = original_alpha
+            manager.vectors["happiness"].layer_start = original_start
+            manager.vectors["happiness"].layer_end = original_end
+
+
 def test_action_response_suffix_can_skip_fixed_tone_directives():
     suffix = ActionResponseLayer().build_prompt_suffix(
         {"response_strategy": "conversational", "response_guidance": "Antworte direkt."},
@@ -194,5 +229,6 @@ if __name__ == "__main__":
     test_api_models_keep_prompt_emotion_rules()
     test_local_ollama_models_do_not_use_prompt_emotions_anymore()
     test_layer_config_exposes_per_emotion_alpha_and_layers()
+    test_runtime_layer_config_clamps_outdated_saved_ranges()
     test_action_response_suffix_can_skip_fixed_tone_directives()
     print("OK: local-first runtime configuration is consistent")
