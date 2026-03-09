@@ -238,10 +238,18 @@ class VLLMBrain(BaseBrain):
     def is_available(self) -> bool:
         """Prueft ob vLLM bereit ist."""
         try:
-            # Schneller Check ob der Port offen ist
             import requests
-            r = requests.get(f"{self.url}/models", timeout=2)
-            return r.status_code == 200
+
+            api_url = self.url.rstrip("/")
+            root_url = api_url[:-3] if api_url.endswith("/v1") else api_url
+            for candidate in (f"{root_url}/health", f"{api_url}/models"):
+                try:
+                    response = requests.get(candidate, timeout=5)
+                    if response.status_code == 200:
+                        return True
+                except Exception:
+                    continue
+            return False
         except Exception:
             return False
 

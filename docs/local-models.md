@@ -81,9 +81,10 @@ Fuer das bevorzugte Setup **`vllm`-Provider + lokaler Steering-Endpoint + Qwen 3
 
 - keine expliziten Emotions-Verhaltensregeln im Systemprompt
 - Emotionen sollen sich stattdessen ueber **Layer-/Activation-Steering** bemerkbar machen
+- die 7 Basis-Vitalzeichen (`happiness`, `sadness`, `frustration`, `trust`, `curiosity`, `motivation`, `energy`) sind dabei die primaeren Steering-Signale
 - der lokale Endpoint stabilisiert das Verhalten zusaetzlich ueber eine kurze interne Stilvorgabe, damit instruction-tuned Qwen die Richtung auch sichtbar ausspielt
 - lokales Qwen-Steering wird im Antwortpfad forciert, damit die Wirkung nicht an `ENABLE_STEERING=False` haengen bleibt
-- der Debug-Mode zeigt aktive Basisvektoren und Composite-Modi wie `warm`, `melancholic`, `guarded` oder `crashout`
+- der Debug-Mode zeigt aktive Basisvektoren aller 7 Vitalzeichen und zusaetzliche Composite-Modi wie `warm`, `melancholic`, `guarded` oder `crashout`
 - die Streamlit-UI zeigt im Tab **Emotionen** jetzt pro Emotion die editierbare Layer-Range und Steering-Staerke
 - starke Emotionsspruenge werden pro Turn geglaettet, damit Zustandswechsel sichtbarer und plausibler bleiben
 

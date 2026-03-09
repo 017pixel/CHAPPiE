@@ -7,6 +7,7 @@ from pathlib import Path
 
 from config.config import settings, LLMProvider
 from brain import get_brain
+from brain.agents.steering_manager import get_steering_manager
 from memory.memory_engine import MemoryEngine
 
 
@@ -138,6 +139,31 @@ def main():
     service_ok, service_msg = _training_service_is_valid()
     print("  Service-Datei:", service_msg)
 
+    # 5b. Steering / Gehirnstruktur
+    print("\nSTEERING & GEHIRNSTRUKTUR:")
+    try:
+        steering = get_steering_manager()
+        sample_emotions = {
+            "happiness": 76,
+            "sadness": 28,
+            "frustration": 22,
+            "trust": 74,
+            "curiosity": 67,
+            "motivation": 69,
+            "energy": 72,
+        }
+        payload = steering.get_steering_payload(sample_emotions, force=(settings.llm_provider == LLMProvider.VLLM))
+        steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
+        emotion_state = steering_meta.get("emotion_state", {}) if isinstance(steering_meta.get("emotion_state", {}), dict) else {}
+        base_vectors = steering_meta.get("base_vectors", []) if isinstance(steering_meta.get("base_vectors", []), list) else []
+        print("  Steering aktiv:", bool(steering_meta.get("enabled")))
+        print("  Vitalzeichen im Payload:", len(emotion_state), "/ 7")
+        print("  Basisvektoren aktiv:", len(base_vectors))
+        print("  Dominante Emotion:", steering_meta.get("dominant_emotion", "neutral"))
+        print("  Aktivierungs-Steering unterstuetzt:", steering.supports_activation_steering())
+    except Exception as e:
+        print("  FEHLER Steering:", e)
+
     # 6. Zusammenfassung
     print("\nZUSAMMENFASSUNG:")
 
@@ -165,6 +191,26 @@ def main():
 
     if not service_ok:
         issues.append(service_msg)
+
+    try:
+        steering = get_steering_manager()
+        payload = steering.get_steering_payload(
+            {
+                "happiness": 76,
+                "sadness": 28,
+                "frustration": 22,
+                "trust": 74,
+                "curiosity": 67,
+                "motivation": 69,
+                "energy": 72,
+            },
+            force=(settings.llm_provider == LLMProvider.VLLM),
+        )
+        emotion_state = payload.get("steering", {}).get("emotion_state", {}) if isinstance(payload, dict) else {}
+        if settings.llm_provider == LLMProvider.VLLM and len(emotion_state) != 7:
+            issues.append("Steering-Payload enthaelt nicht alle 7 Vitalzeichen")
+    except Exception:
+        issues.append("Steering-Validierung fehlgeschlagen")
 
     if issues:
         print("  PROBLEME GEFUNDEN:")

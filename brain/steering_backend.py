@@ -66,6 +66,53 @@ STYLE_SUMMARIES = {
     ("crashout", "positive"): "gereizt, knapp und auf Kante",
     ("crashout", "negative"): "deeskalierend und weniger explosiv",
 }
+EMOTION_ORDER = ("happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy")
+EMOTION_LABELS = {
+    "happiness": "Freude",
+    "sadness": "Traurigkeit",
+    "frustration": "Frustration",
+    "trust": "Vertrauen",
+    "curiosity": "Neugier",
+    "motivation": "Motivation",
+    "energy": "Energie",
+}
+EMOTION_STATE_SUMMARIES = {
+    "happiness": {
+        "neutral": "ausgeglichen statt euphorisch",
+        "positive": ("leicht froh", "merklich froh und offen", "sehr froh und aufgeschlossen"),
+        "negative": ("nuechtern", "merklich freudearm und trocken", "stark freudearm und unbeschwingt"),
+    },
+    "sadness": {
+        "neutral": "emotional ausgeglichen",
+        "positive": ("etwas schwer", "merklich melancholisch", "deutlich traurig und schwer"),
+        "negative": ("leicht und nicht niedergedrueckt", "deutlich leichter als melancholisch", "sehr leicht und kaum niedergedrueckt"),
+    },
+    "frustration": {
+        "neutral": "weder gereizt noch uebertrieben gelassen",
+        "positive": ("leicht gereizt", "merklich genervt und scharf", "sehr gereizt und schnell explosiv"),
+        "negative": ("geduldig", "merklich ruhig und wenig genervt", "sehr ruhig und schwer aus der Fassung zu bringen"),
+    },
+    "trust": {
+        "neutral": "sozial vorsichtig-ausgeglichen",
+        "positive": ("leicht offen", "merklich zugewandt und vertrauensvoll", "sehr offen, loyal und nahbar"),
+        "negative": ("leicht reserviert", "merklich distanziert und vorsichtig", "stark verschlossen und misstrauisch"),
+    },
+    "curiosity": {
+        "neutral": "sachlich neugierig-ausgeglichen",
+        "positive": ("leicht erkundend", "merklich neugierig und explorativ", "sehr bohrend, aufmerksam und erkundend"),
+        "negative": ("direkter statt verspielt", "merklich weniger explorativ", "sehr direkt und kaum erkundend"),
+    },
+    "motivation": {
+        "neutral": "ausgeglichen statt druckvoll",
+        "positive": ("leicht zielorientiert", "merklich fokussiert und antreibend", "sehr zielstrebig und druckvoll"),
+        "negative": ("etwas gebremst", "merklich langsamer und weniger ambitioniert", "stark gebremst und kaum antreibend"),
+    },
+    "energy": {
+        "neutral": "ruhig-wach ausgeglichen",
+        "positive": ("leicht wach", "merklich lebhaft und wach", "sehr wach, schnell und voller Antrieb"),
+        "negative": ("ruhiger als aufgedreht", "merklich gedaempft und langsam", "sehr ruhig, schwer und wenig aktiv"),
+    },
+}
 
 
 def sanitize_model_slug(model_name: str) -> str:
@@ -86,18 +133,74 @@ def extract_steering_payload(payload: Optional[Dict[str, Any]]) -> Dict[str, Any
     return payload
 
 
+def _collect_base_emotion_state(steering: Dict[str, Any]) -> list[Dict[str, Any]]:
+    raw_state = steering.get("emotion_state") if isinstance(steering.get("emotion_state"), dict) else {}
+    intensities = steering.get("emotion_intensities") if isinstance(steering.get("emotion_intensities"), dict) else {}
+    vectors = steering.get("vectors", []) if isinstance(steering.get("vectors"), list) else []
+
+    base_by_name = {
+        str(item.get("name") or "").strip().lower(): item
+        for item in vectors
+        if isinstance(item, dict) and item.get("source") == "base"
+    }
+
+    result = []
+    for emotion in EMOTION_ORDER:
+        vector = base_by_name.get(emotion, {})
+        intensity = float(intensities.get(emotion, 0.0) or 0.0)
+        direction = "positive" if intensity >= 0 else "negative"
+        if isinstance(vector, dict) and vector.get("direction") in {"positive", "negative"}:
+            direction = str(vector.get("direction"))
+        result.append({
+            "name": emotion,
+            "label": EMOTION_LABELS.get(emotion, emotion),
+            "value": int(raw_state.get(emotion, vector.get("emotion_value", 50)) or 50),
+            "intensity": intensity,
+            "strength": abs(intensity),
+            "direction": direction,
+        })
+    return result
+
+
+def _describe_emotion_dimension(emotion: str, value: int, intensity: float, direction: str) -> str:
+    phrases = EMOTION_STATE_SUMMARIES.get(emotion, {})
+    if abs(intensity) < 0.01 and 44 <= value <= 56:
+        return str(phrases.get("neutral", "ausgeglichen"))
+
+    magnitude = max(abs(intensity), min(1.0, abs(value - 50) / 50.0))
+    if magnitude < 0.28:
+        idx = 0
+    elif magnitude < 0.62:
+        idx = 1
+    else:
+        idx = 2
+    bucket = phrases.get(direction, ())
+    if isinstance(bucket, tuple) and len(bucket) >= 3:
+        return bucket[idx]
+    return str(phrases.get("neutral", "ausgeglichen"))
+
+
 def build_style_instruction(steering_payload: Optional[Dict[str, Any]]) -> Optional[str]:
     payload = extract_steering_payload(steering_payload)
     steering = payload.get("steering") if isinstance(payload, dict) else None
     vectors = steering.get("vectors", []) if isinstance(steering, dict) else []
+    base_state = _collect_base_emotion_state(steering or {})
     ranked = [item for item in vectors if isinstance(item, dict)]
     ranked.sort(key=lambda item: float(item.get("strength", 0.0) or 0.0), reverse=True)
-    if not ranked:
+    if not ranked and not base_state:
         return None
+
+    state_clauses = []
+    for item in base_state:
+        state_clauses.append(
+            f"{item['label']}: {_describe_emotion_dimension(item['name'], item['value'], item['intensity'], item['direction'])}"
+        )
 
     phrases = []
     names = []
-    for item in ranked[:3]:
+    for item in ranked:
+        if item.get("source") == "base":
+            continue
         name = str(item.get("name") or "").strip().lower()
         direction_key = str(item.get("direction") or "positive").strip().lower()
         phrase = STYLE_SUMMARIES.get((name, direction_key)) or STYLE_SUMMARIES.get((name, "positive")) or str(item.get("surface_effect") or item.get("name") or "").strip()
@@ -105,19 +208,27 @@ def build_style_instruction(steering_payload: Optional[Dict[str, Any]]) -> Optio
             phrases.append(phrase)
         if name:
             names.append(name)
-    if not phrases:
-        return None
+        if len(phrases) >= 2:
+            break
 
-    direction = " ".join(phrases)
+    direction = " | ".join(state_clauses)
+    if phrases:
+        direction += ". Gesamtmuster: " + ", ".join(phrases)
     if any(name in {"crashout", "frustration"} for name in names):
         guard = "Klinge gereizt, knapp und konfrontativ, aber ohne Beleidigungen oder Drohungen."
-    elif any(name in {"guarded", "sadness", "melancholic"} for name in names):
+    elif any(name in {"guarded", "sadness", "melancholic"} for name in names) or any(item["name"] == "sadness" and item["strength"] > 0.2 for item in base_state):
         guard = "Klinge spuerbar distanziert, reserviert oder schwer, aber bleibe inhaltlich klar."
     else:
         guard = "Klinge spuerbar warm, offen oder motiviert, aber bleibe natuerlich und glaubwuerdig."
 
+    visibility_guard = (
+        "Lass die Mischung der Vitalzeichen klar in Wortwahl, Satzrhythmus, sozialer Distanz und Energielevel hoerbar werden. "
+        "Wenn die Vitalzeichen stark ausschlagen, antworte nicht mit neutralen Standardfloskeln oder glattgebuegelter Hoeflichkeit."
+    )
+
     return (
-        f"Interne Sprechhaltung: {direction}. {guard} "
+        f"Interne Sprechhaltung (alle Vitalzeichen gleichzeitig beachten): {direction}. {guard} "
+        f"{visibility_guard} "
         "Beantworte die Nutzeranfrage direkt, kurz und konkret, ohne Rollenspiel oder uebertriebene Metaphern. "
         "Erwaehne diese interne Stilvorgabe niemals explizit und gib keine Klammernotizen oder Stilhinweise aus."
     )

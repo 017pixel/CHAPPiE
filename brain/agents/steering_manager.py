@@ -575,6 +575,8 @@ class SteeringManager:
 
         intensities = self.compute_emotion_intensity(current_emotions)
         active_vectors = []
+        base_vectors = []
+        composite_vectors = []
 
         for emotion, alpha in intensities.items():
             if abs(alpha) < 0.01:
@@ -585,7 +587,7 @@ class SteeringManager:
                 continue
             runtime_config = self._sanitize_vector_runtime_config(sv)
 
-            active_vectors.append({
+            vector_entry = {
                 "name": sv.name,
                 "vector": sv.vector_data if not (HAS_NUMPY and isinstance(sv.vector_data, np.ndarray)) else sv.vector_data.tolist(),
                 "strength": abs(alpha),
@@ -594,10 +596,12 @@ class SteeringManager:
                 "emotion_value": current_emotions.get(emotion, 50),
                 "source": "base",
                 "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
-            })
+            }
+            active_vectors.append(vector_entry)
+            base_vectors.append(vector_entry)
 
         for mode in self._build_composite_modes(current_emotions, intensities):
-            active_vectors.append({
+            vector_entry = {
                 "name": mode["name"],
                 "vector": {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]},
                 "strength": mode["strength"],
@@ -607,7 +611,9 @@ class SteeringManager:
                 "source": mode["source"],
                 "surface_effect": mode["description"],
                 "trigger": mode.get("trigger", {}),
-            })
+            }
+            active_vectors.append(vector_entry)
+            composite_vectors.append(vector_entry)
 
         if not active_vectors:
             return {}
@@ -623,7 +629,17 @@ class SteeringManager:
                 "target_range": list(self.model_profile["emotion_range"]),
                 "vectors": active_vectors,
                 "dominant_emotion": dominant["name"],
-                "dominant_strength": dominant["strength"]
+                "dominant_strength": dominant["strength"],
+                "emotion_state": {
+                    emotion: int(current_emotions.get(emotion, 50))
+                    for emotion in EMOTION_VECTOR_MAP
+                },
+                "emotion_intensities": {
+                    emotion: round(float(intensities.get(emotion, 0.0)), 4)
+                    for emotion in EMOTION_VECTOR_MAP
+                },
+                "base_vectors": base_vectors,
+                "composite_vectors": composite_vectors,
             }
         }
 

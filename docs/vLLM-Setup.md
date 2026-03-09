@@ -86,9 +86,10 @@ Nur bei **API-Modellen** bleiben Emotionsregeln im Prompt aktiv.
 Fuer den lokalen Steering-Endpoint + Qwen 3.5 gilt:
 
 1. CHAPPiE berechnet aktuelle 7 Emotionen
-2. daraus werden Basisvektoren und Composite-Modi abgeleitet
+2. daraus werden fuer **alle 7 Vitalzeichen** Basisvektoren abgeleitet
 3. daraus wird ein Steering-Payload fuer den lokalen Endpoint gebaut
-4. Qwen bekommt die Wirkung ueber Residual-/Activation-Steering plus eine kurze interne Stilfuehrung statt ueber eine Prompt-Liste der Vitalwerte
+4. optionale Composite-Modi bleiben als Zusatzmuster erhalten, dominieren aber nicht mehr den gesamten Stilpfad
+5. Qwen bekommt die Wirkung ueber Residual-/Activation-Steering plus eine kurze interne Stilfuehrung statt ueber eine Prompt-Liste der Vitalwerte
 
 Wichtiger Realitaetscheck:
 
@@ -103,7 +104,7 @@ Du kannst das Verhalten an zwei Stellen sehen:
 ### Emotionen-Tab
 
 - aktueller Modus (`api_prompt_emotions`, `local_layer_only`, ...)
-- aktive Vektoren / Composite-Modi
+- aktive Basisvektoren aller 7 Vitalzeichen / Composite-Modi
 - editierbare Basis-Konfiguration pro Emotion
 
 ### Debug Mode / Brain Monitor
