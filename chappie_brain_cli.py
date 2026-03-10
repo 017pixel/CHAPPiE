@@ -1,9 +1,27 @@
 """Interaktive CHAPPiE-CLI auf Basis des echten Web-/Runtime-Pfads."""
 
 import sys
-import colorama
 from datetime import datetime
 from typing import Dict, Any
+
+try:
+    import colorama
+except ImportError:
+    class _AnsiFallback:
+        BLACK = RED = GREEN = YELLOW = BLUE = MAGENTA = CYAN = WHITE = ""
+        LIGHTBLACK_EX = ""
+        RESET_ALL = ""
+        BRIGHT = ""
+
+    class _ColoramaFallback:
+        Fore = _AnsiFallback()
+        Style = _AnsiFallback()
+
+        @staticmethod
+        def init(*_args, **_kwargs):
+            return None
+
+    colorama = _ColoramaFallback()
 
 colorama.init(autoreset=True)
 

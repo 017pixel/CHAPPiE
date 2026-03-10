@@ -8,7 +8,6 @@
 We are still at the beginning of our journey. I'm excited to learn more about you.
 
 ## What I've Learned So Far
-- Test learning entry
 - Your communication style: [Still observing]
 - Topics you care about: [Still discovering]
 

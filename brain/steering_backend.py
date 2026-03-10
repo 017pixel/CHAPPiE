@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 import re
 import threading
 from contextlib import contextmanager
@@ -12,6 +14,9 @@ from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 NEUTRAL_DESCRIPTION = "ruhig, ausgeglichen, neutral, kontrolliert"
@@ -67,6 +72,7 @@ STYLE_SUMMARIES = {
     ("crashout", "negative"): "deeskalierend und weniger explosiv",
 }
 EMOTION_ORDER = ("happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy")
+FORCE_CPU_ENV = "CHAPPIE_STEERING_FORCE_CPU"
 EMOTION_LABELS = {
     "happiness": "Freude",
     "sadness": "Traurigkeit",
@@ -427,7 +433,7 @@ class ActivationVectorResolver:
 class LocalSteeringEngine:
     def __init__(self, model_name: str, cache_dir: Optional[Path] = None):
         self.model_name = model_name
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = self._select_device()
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
         self._generation_lock = threading.Lock()
@@ -451,6 +457,46 @@ class LocalSteeringEngine:
         self.model.eval()
         self.layers = list(getattr(getattr(self.model, "model", self.model), "layers"))
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
+
+    def _select_device(self) -> torch.device:
+        force_cpu = os.getenv(FORCE_CPU_ENV, "").strip().lower()
+        if force_cpu in {"1", "true", "yes", "on"}:
+            LOGGER.warning("Steering-Backend erzwingt CPU-Modus via %s.", FORCE_CPU_ENV)
+            return torch.device("cpu")
+        if not torch.cuda.is_available():
+            return torch.device("cpu")
+
+        required_gpu_gib = self._estimate_required_gpu_gib()
+        available_gpu_gib = self._cuda_total_gib()
+        if required_gpu_gib and available_gpu_gib and available_gpu_gib < required_gpu_gib:
+            LOGGER.warning(
+                "Steering-Backend nutzt CPU-Fallback: %.2f GiB GPU-RAM sind fuer %s zu klein (ca. %.2f GiB benoetigt).",
+                available_gpu_gib,
+                self.model_name,
+                required_gpu_gib,
+            )
+            return torch.device("cpu")
+        return torch.device("cuda:0")
+
+    def _estimate_required_gpu_gib(self) -> float:
+        model_lower = (self.model_name or "").lower()
+        match = re.search(r"qwen/qwen3(?:\.5)?-(\d+)b", model_lower)
+        if not match:
+            return 0.0
+        try:
+            billions = float(match.group(1))
+        except ValueError:
+            return 0.0
+        return billions * 2.2
+
+    @staticmethod
+    def _cuda_total_gib() -> float:
+        if not torch.cuda.is_available():
+            return 0.0
+        try:
+            return float(torch.cuda.get_device_properties(0).total_memory) / float(1024 ** 3)
+        except Exception:
+            return 0.0
 
     def _build_loader_kwargs(self) -> Dict[str, Any]:
         """Erlaubt Remote-Code fuer Modellfamilien, die lokal noch nicht nativ im Transformers-Pin stecken."""

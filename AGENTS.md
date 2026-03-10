@@ -38,6 +38,12 @@ Vor jedem GitHub-Push-Update muss geprüft werden, ob mindestens eine dieser Dat
 - `vLLM` bevorzugt
 - APIs nur Fallback, wenn lokal nicht praktikabel
 
+### 5. Lange Downloads / Modellstarts
+
+- lange Modell-Downloads, Cache-Warmups oder aehnliche Jobs nicht unnoetig blockierend im Vordergrund laufen lassen
+- stattdessen `nohup`-artig als Hintergrundprozess oder ueber den bestehenden Service starten, Logs beobachten und waehrenddessen an unabhaengigen Schritten weiterarbeiten
+- erst fuer den eigentlichen Health-/Live-Test wieder gezielt auf Abschluss und Erreichbarkeit warten
+
 ## Dokumentationskarte
 
 - Projektüberblick: [`README.md`](README.md)

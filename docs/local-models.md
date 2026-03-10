@@ -76,6 +76,7 @@ Praxis-Hinweis fuer kleine Server:
 - stock vLLM hat das CHAPPiE-`steering`-Payload in dieser Umgebung ignoriert; `chappie-vllm.service` startet deshalb einen steering-faehigen lokalen OpenAI-Server
 - echte Wirkung kommt dort ueber eine Hybridspur aus Residual-Activation-Steering plus kompakter interner Stilfuehrung
 - fuer `Qwen 3.5` nutzt der lokale Steering-Loader bei Bedarf `trust_remote_code=True`, damit das Modell auch mit aelteren `transformers`-Pins geladen werden kann
+- wenn eine lokale GPU fuer das ausgewaehlte Qwen-Modell nicht genug VRAM hat, faellt der Steering-Loader automatisch auf CPU zurueck statt in einem OOM-/Startfehler zu enden; der erste Start kann dann deutlich laenger dauern
 
 ### Emotionale Steuerung bei lokalem Qwen 3.5
 
