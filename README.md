@@ -99,7 +99,7 @@ Für den produktiven lokalen Betrieb ist das Zielbild aktuell:
 
 1. `LLM_PROVIDER = "vllm"`
 2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Steering-Endpoint** setzen, z. B. `http://localhost:8000/v1`
-3. auf kleineren lokalen GPUs ist `Qwen/Qwen3.5-9B` jetzt das bevorzugte Default-Modell; `Qwen/Qwen3.5-27B` ist die nächste Stufe bei mehr VRAM
+3. auf kleineren lokalen GPUs ist `Qwen/Qwen3.5-4B` jetzt das bevorzugte Default-Modell; `Qwen/Qwen3.5-9B` ist die naechste Stufe bei mehr VRAM und `Qwen/Qwen3.5-27B` eher etwas fuer deutlich staerkere Karten
 4. `VLLM_FORCE_SINGLE_MODEL = True` setzen, wenn ein einzelner vLLM-Endpoint alle CHAPPiE-Aufrufe bedienen soll
 5. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
 6. Ollama nur als **leichteren lokalen Fallback** weiterverwenden

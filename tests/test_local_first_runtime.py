@@ -257,6 +257,26 @@ def test_runtime_layer_config_clamps_outdated_saved_ranges():
             manager.vectors["happiness"].layer_end = original_end
 
 
+def test_qwen35_4b_runtime_profile_exposes_expected_layer_window():
+    original_provider = settings.llm_provider
+    original_model = settings.vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_model = "Qwen/Qwen3.5-4B"
+        manager = SteeringManager()
+
+        payload = manager.get_steering_payload({"happiness": 88, "trust": 64, "energy": 58}, force=True)
+
+        assert manager.model_profile["total_layers"] == 32
+        assert manager.model_profile["hidden_dim"] == 2560
+        assert manager.model_profile["emotion_range"] == (10, 26)
+        assert payload["steering"]["model_layers"] == 32
+        assert payload["steering"]["target_range"] == [10, 26]
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_model = original_model
+
+
 def test_action_response_suffix_can_skip_fixed_tone_directives():
     suffix = ActionResponseLayer().build_prompt_suffix(
         {"response_strategy": "conversational", "response_guidance": "Antworte direkt."},
@@ -279,5 +299,6 @@ if __name__ == "__main__":
     test_local_ollama_models_do_not_use_prompt_emotions_anymore()
     test_layer_config_exposes_per_emotion_alpha_and_layers()
     test_runtime_layer_config_clamps_outdated_saved_ranges()
+    test_qwen35_4b_runtime_profile_exposes_expected_layer_window()
     test_action_response_suffix_can_skip_fixed_tone_directives()
     print("OK: local-first runtime configuration is consistent")

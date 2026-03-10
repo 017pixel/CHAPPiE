@@ -89,6 +89,13 @@ COMPOSITE_BEHAVIOR_MODES = {
 # Optimale Layer-Bereiche fuer verschiedene Modellgroessen
 # Qwen 2.5 32B hat 64 Layers, die mittleren sind am effektivsten
 MODEL_LAYER_PROFILES = {
+    "qwen3.5-4b": {
+        "total_layers": 32,
+        "personality_range": (8, 24),
+        "emotion_range": (10, 26),
+        "reasoning_range": (14, 31),
+        "hidden_dim": 2560,
+    },
     "qwen3-4b-instruct-2507": {
         "total_layers": 36,
         "personality_range": (12, 24),

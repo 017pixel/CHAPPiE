@@ -56,9 +56,9 @@ OLLAMA_MODELS = {
 }
 
 VLLM_MODELS = {
-    "1": ("Qwen/Qwen3.5-9B", "Qwen 3.5 9B - Schnell und effizient"),
-    "2": ("Qwen/Qwen3.5-35B-A3B", "Qwen 3.5 35B A3B - Gute Qualitaet lokal"),
-    "3": ("Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "Qwen 3.5 35B A3B GPTQ - Empfohlen"),
+    "1": ("Qwen/Qwen3.5-4B", "Qwen 3.5 4B - Empfohlen fuer 16GB-GPUs"),
+    "2": ("Qwen/Qwen3.5-9B", "Qwen 3.5 9B - Mehr Qualitaet bei mehr VRAM"),
+    "3": ("Qwen/Qwen3.5-35B-A3B-GPTQ-Int4", "Qwen 3.5 35B A3B GPTQ - Experimentell fuer Steering"),
     "4": ("Qwen/Qwen3.5-122B-A10B-GPTQ-Int4", "Qwen 3.5 122B A10B GPTQ - High-End"),
     "5": ("CUSTOM", "Eigenes Modell eingeben..."),
 }

@@ -51,11 +51,11 @@ Die konkrete Standardrichtung für CHAPPiE ist:
 ```python
 LLM_PROVIDER = "vllm"
 VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-9B"
+VLLM_MODEL = "Qwen/Qwen3.5-4B"
 VLLM_FORCE_SINGLE_MODEL = True
 
-INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-9B"
-QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-9B"
+INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-4B"
+QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-4B"
 ```
 
 Wichtig dazu:
@@ -70,13 +70,15 @@ Wichtig dazu:
 
 Praxis-Hinweis fuer kleine Server:
 
-- `Qwen/Qwen3.5-9B` ist jetzt der bevorzugte lokale Standardpfad fuer CHAPPiE auf `vllm`
-- `Qwen/Qwen3.5-27B` ist die naechste sinnvolle Stufe, wenn mehr VRAM und etwas mehr Latenz akzeptabel sind
+- `Qwen/Qwen3.5-4B` ist jetzt der bevorzugte lokale Standardpfad fuer CHAPPiE auf `vllm`, wenn nur ~16 GB VRAM verfuegbar sind
+- `Qwen/Qwen3.5-9B` ist die naechste sinnvolle Stufe, wenn mehr VRAM und etwas mehr Latenz akzeptabel sind
+- `Qwen/Qwen3.5-27B` ist fuer deutlich staerkere lokale GPUs gedacht
 - 35B/122B bleiben Zielprofile fuer staerkere Maschinen, nicht die sichere Default-Wahl
 - stock vLLM hat das CHAPPiE-`steering`-Payload in dieser Umgebung ignoriert; `chappie-vllm.service` startet deshalb einen steering-faehigen lokalen OpenAI-Server
 - echte Wirkung kommt dort ueber eine Hybridspur aus Residual-Activation-Steering plus kompakter interner Stilfuehrung
 - fuer `Qwen 3.5` nutzt der lokale Steering-Loader bei Bedarf `trust_remote_code=True`, damit das Modell auch mit aelteren `transformers`-Pins geladen werden kann
 - wenn eine lokale GPU fuer das ausgewaehlte Qwen-Modell nicht genug VRAM hat, faellt der Steering-Loader automatisch auf CPU zurueck statt in einem OOM-/Startfehler zu enden; der erste Start kann dann deutlich laenger dauern
+- quantisierte GPTQ-/GGUF-Varianten sowie `GLM-4.7-Flash` bleiben fuer das aktuelle Hook-/Layer-Steering technisch experimentell und sind deshalb vorerst keine Repo-Defaults
 
 ### Emotionale Steuerung bei lokalem Qwen 3.5
 
@@ -98,11 +100,11 @@ Dadurch soll der Zustand im Stil merkbar werden: waermer, gereizter, rueckzugsor
 
 | Modell | Einsatzidee |
 |---|---|
-| `Qwen/Qwen3.5-27B` | staerkeres lokales Hauptmodell, wenn 9B qualitativ nicht reicht |
-| `Qwen/Qwen3.5-9B` | kompakt für Step-1/Intent und Utility-Aufgaben |
-| `Qwen/Qwen3.5-35B-A3B` | guter Qualitäts-/Latenz-Kompromiss lokal |
-| `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | empfohlen für lokale GPUs mit VRAM-Limit |
-| `Qwen/Qwen3.5-122B-A10B-GPTQ-Int4` | maximale lokale Zielausbaustufe |
+| `Qwen/Qwen3.5-4B` | aktueller Sweet Spot fuer 16GB-GPUs: schnell, 262k Kontext, lokales Layer-Steering funktioniert |
+| `Qwen/Qwen3.5-9B` | mehr Qualitaet, wenn genug VRAM vorhanden ist |
+| `Qwen/Qwen3.5-27B` | staerkeres lokales Hauptmodell fuer deutlich groessere GPUs |
+| `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` | moegliche Spaeter-Option, aber fuer Steering derzeit experimentell |
+| `GLM-4.7-Flash` | spannend fuer reine Inferenz, aber aktuell kein verifizierter CHAPPiE-Layer-Steering-Default |
 
 ### Ollama-Setup (sekundärer lokaler Fallback)
 
