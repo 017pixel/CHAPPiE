@@ -99,7 +99,7 @@ Für den produktiven lokalen Betrieb ist das Zielbild aktuell:
 
 1. `LLM_PROVIDER = "vllm"`
 2. `VLLM_URL` auf einen **OpenAI-kompatiblen lokalen Steering-Endpoint** setzen, z. B. `http://localhost:8000/v1`
-3. auf Einzel-GPU-Servern zuerst ein startbares Textmodell nutzen, z. B. `Qwen/Qwen3-4B-Instruct-2507`
+3. auf kleineren lokalen GPUs ist `Qwen/Qwen3.5-9B` jetzt das bevorzugte Default-Modell; `Qwen/Qwen3.5-27B` ist die nächste Stufe bei mehr VRAM
 4. `VLLM_FORCE_SINGLE_MODEL = True` setzen, wenn ein einzelner vLLM-Endpoint alle CHAPPiE-Aufrufe bedienen soll
 5. im UI bei Bedarf auch **Intent Processor** und **Query Extraction** auf vLLM/Qwen umstellen
 6. Ollama nur als **leichteren lokalen Fallback** weiterverwenden
@@ -112,6 +112,8 @@ Praktische Referenzen:
 - [`docs/vLLM-Setup.md`](docs/vLLM-Setup.md)
 
 Wichtiger Praxis-Hinweis: `chappie-vllm.service` startet im Repository inzwischen einen **steering-faehigen lokalen OpenAI-Server**. Ein reiner Standard-vLLM-Server hat das `steering`-Payload in dieser Umgebung ignoriert.
+
+Fuer `Qwen 3.5` nutzt der lokale Steering-Loader im Repository bei Bedarf `trust_remote_code=True`, damit der Server auch dann starten kann, wenn der lokal gepinnte `transformers`-Stand die Architektur `qwen3_5` noch nicht nativ kennt.
 
 ### Emotionen: API-Prompt vs. lokales Layer-Steering
 

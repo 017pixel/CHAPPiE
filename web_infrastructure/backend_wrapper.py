@@ -31,9 +31,8 @@ from brain.deep_think import DeepThinkEngine
 from life import get_life_simulation_service
 
 
-@st.cache_resource
-def init_chappie():
-    """Initialisiert das Backend mit neuem Zwei-Schritte System."""
+def create_chappie_backend():
+    """Erzeugt ein CHAPPiE-Backend ohne Streamlit-Cache, z. B. fuer CLI/Tests."""
     class CHAPPiEBackend:
         def __init__(self):
             # Module init
@@ -527,13 +526,16 @@ def init_chappie():
             except:
                 brain_ok = False
 
+            life_snapshot = self.life_simulation.get_snapshot()
+
             return {
                 "brain_available": brain_ok,
                 "model": get_active_model(),
                 "emotions": self._get_emotions_snapshot(),
                 "daily_info_count": self.short_term_memory_v2.get_count(),
                 "two_step_enabled": settings.enable_two_step_processing,
-                "life_snapshot": self.life_simulation.get_snapshot(),
+                "life_snapshot": life_snapshot,
+                "life_state": life_snapshot,
             }
 
         def get_emotion_layer_config(self, current_emotions: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
@@ -1450,4 +1452,10 @@ def init_chappie():
             return f"Unbekannter Command: {command}"
 
     return CHAPPiEBackend()
+
+
+@st.cache_resource
+def init_chappie():
+    """Initialisiert das Backend mit Streamlit-Cache fuer die Web-App."""
+    return create_chappie_backend()
 

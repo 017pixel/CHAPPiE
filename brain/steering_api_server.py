@@ -117,7 +117,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CHAPPiE Steering API Server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--model", default=os.getenv("CHAPPIE_STEERING_MODEL", "Qwen/Qwen3-4B-Instruct-2507"))
+    parser.add_argument("--model", default=os.getenv("CHAPPIE_STEERING_MODEL", "Qwen/Qwen3.5-9B"))
     args = parser.parse_args()
     uvicorn.run(create_app(args.model), host=args.host, port=args.port, log_level="info")
 

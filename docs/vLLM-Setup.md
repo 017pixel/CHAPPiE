@@ -24,7 +24,9 @@ Starte den steering-faehigen lokalen Endpoint mit deinem Qwen-3.5-Modell, typisc
 Wichtig fuer CHAPPiE:
 
 - nutze ein **Qwen-3.5-Modell** als Hauptmodell
-- auf kleineren Einzel-GPU-Servern ist `Qwen/Qwen3-4B-Instruct-2507` der sichere Text-Startpunkt
+- `Qwen/Qwen3.5-9B` ist der bevorzugte Default-Startpunkt fuer CHAPPiE
+- `Qwen/Qwen3.5-27B` ist die naechste Stufe, wenn deine GPU mehr Reserven hat
+- falls dein lokaler `transformers`-Pin `qwen3_5` noch nicht nativ kennt, laedt der CHAPPiE-Steering-Endpoint `Qwen 3.5` im Repository mit `trust_remote_code=True`
 - wenn moeglich `chat_template_kwargs.enable_thinking=false`
 - der Endpunkt muss Chat-Completions kompatibel sein
 
@@ -41,7 +43,7 @@ Setze in deiner Konfiguration bzw. UI mindestens:
 
 - `LLM_PROVIDER = "vllm"`
 - `VLLM_URL = "http://localhost:8000/v1"`
-- `VLLM_MODEL = "Qwen/Qwen3-4B-Instruct-2507"`
+- `VLLM_MODEL = "Qwen/Qwen3.5-9B"`
 - `VLLM_FORCE_SINGLE_MODEL = True` fuer einen einzelnen vLLM-Endpoint
 
 Optional sinnvoll:

@@ -431,17 +431,33 @@ class LocalSteeringEngine:
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
         self._generation_lock = threading.Lock()
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name, **self._build_loader_kwargs())
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         try:
-            self.model = AutoModelForCausalLM.from_pretrained(model_name, dtype=self.dtype, attn_implementation="sdpa")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=self.dtype,
+                attn_implementation="sdpa",
+                **self._build_loader_kwargs(),
+            )
         except TypeError:
-            self.model = AutoModelForCausalLM.from_pretrained(model_name, dtype=self.dtype)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=self.dtype,
+                **self._build_loader_kwargs(),
+            )
         self.model.to(self.device)
         self.model.eval()
         self.layers = list(getattr(getattr(self.model, "model", self.model), "layers"))
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
+
+    def _build_loader_kwargs(self) -> Dict[str, Any]:
+        """Erlaubt Remote-Code fuer Modellfamilien, die lokal noch nicht nativ im Transformers-Pin stecken."""
+        model_lower = (self.model_name or "").lower()
+        if "qwen/qwen3.5" in model_lower:
+            return {"trust_remote_code": True}
+        return {}
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})

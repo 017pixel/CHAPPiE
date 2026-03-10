@@ -1,27 +1,15 @@
-"""
-CHAPPiE - Next-Gen Brain CLI
-============================
-Nutzt die volle Multi-Agenten Brain-Architektur inklusive 
-neuem vLLM-Backend, Qwen 3.5 und emotionalem Steering.
-"""
+"""Interaktive CHAPPiE-CLI auf Basis des echten Web-/Runtime-Pfads."""
 
 import sys
-import threading
-import json
-import time
 import colorama
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Dict, Any
 
 colorama.init(autoreset=True)
 
-from config.config import settings, get_active_model, LLMProvider
-from brain.brain_pipeline import get_brain_pipeline
-from brain.base_brain import GenerationConfig, Message
-from memory import MemoryEngine
+from config.config import settings, LLMProvider
 from memory.emotions_engine import EmotionsEngine
-from memory.context_files import get_context_files_manager
-from brain.agents.steering_manager import get_steering_manager
+from web_infrastructure.backend_wrapper import create_chappie_backend
 
 # --- COLORS ---
 class Colors:
@@ -43,14 +31,17 @@ def print_log(category: str, msg: str, color=Colors.DEBUG):
 class CHAPPiEBrainCLI:
     def __init__(self):
         print_log("INIT", "Initialisiere High-End Brain Architektur...", Colors.AI)
-        
-        self.pipeline = get_brain_pipeline()
-        self.memory = MemoryEngine()
-        self.emotions = EmotionsEngine()
-        self.context = get_context_files_manager()
-        self.steering = get_steering_manager()
-        
-        model_name = settings.vllm_model if settings.llm_provider == LLMProvider.VLLM else get_active_model()
+
+        self.backend = create_chappie_backend()
+        self.memory = self.backend.memory
+        self.emotions = self.backend.emotions
+        self.context = self.backend.context_files
+        self.steering = self.backend.steering_manager
+        self.history = []
+        self.last_result: Dict[str, Any] | None = None
+
+        status = self.backend.get_status()
+        model_name = status.get("model", "unbekannt")
         print_log("INIT", f"Modell: {model_name}", Colors.AI)
         print_log("INIT", f"Provider: {settings.llm_provider.value}", Colors.AI)
         
@@ -61,14 +52,93 @@ class CHAPPiEBrainCLI:
             print_log("INIT", f"Verfuegbare Vektoren: {len(self.steering.get_available_vectors())}", Colors.STEER)
         else:
             print_log("INIT", "Steering: DEAKTIVIERT", Colors.THOUGHT)
-        
-        self.history = []
+
+    def _get_emotions_dict(self) -> Dict[str, int]:
+        return self.emotions.get_state().to_dict()
+
+    def _build_steering_report(self) -> Dict[str, Any]:
+        status = self.backend.get_status()
+        model_name = status.get("model", settings.vllm_model)
+        force = self.steering.should_force_local_emotion_steering(settings.llm_provider, model_name)
+        return self.steering.build_debug_report(self._get_emotions_dict(), force=force)
+
+    @staticmethod
+    def _format_vector_names(items: list[Dict[str, Any]], limit: int = 5) -> str:
+        if not items:
+            return "-"
+        parts = []
+        for item in items[:limit]:
+            name = item.get("name", "?")
+            strength = item.get("strength")
+            if isinstance(strength, (int, float)):
+                parts.append(f"{name}({strength:.2f})")
+            else:
+                parts.append(name)
+        return ", ".join(parts)
+
+    def _show_runtime(self):
+        status = self.backend.get_status()
+        steering_report = self._build_steering_report()
+        print(f"\n{Colors.AI}{'='*58}")
+        print("  RUNTIME / MODELLPFAD")
+        print(f"{'='*58}")
+        print(f"  Provider:           {settings.llm_provider.value}")
+        print(f"  Aktives Modell:     {status.get('model', '---')}")
+        print(f"  vLLM URL:           {settings.vllm_url}")
+        print(f"  Two-Step:           {'AN' if settings.enable_two_step_processing else 'AUS'}")
+        print(f"  Query Extraction:   {'AN' if settings.enable_query_extraction else 'AUS'}")
+        print(f"  Steering:           {'AN' if settings.enable_steering else 'AUS'}")
+        print(f"  Steering-Modus:     {steering_report.get('mode', '---')}")
+        print(f"  Prompt-Emotionen:   {'AN' if steering_report.get('prompt_emotions_enabled') else 'AUS'}")
+        print(f"  Intent-Modell:      {settings.intent_processor_model_vllm if settings.intent_provider == LLMProvider.VLLM else settings.intent_processor_model_ollama}")
+        print(f"  Query-Modell:       {settings.query_extraction_vllm_model if settings.query_extraction_provider == LLMProvider.VLLM else settings.query_extraction_ollama_model}")
+        print(f"  Steering-Modell:    {settings.steering_model}")
+        print(f"  Debug immer an:     {'JA' if settings.cli_debug_always_on else 'NEIN'}")
+        print(f"{'='*58}{Colors.RESET}\n")
+
+    def _show_steering_report(self):
+        report = self._build_steering_report()
+        print(f"\n{Colors.STEER}{'='*58}")
+        print("  STEERING REPORT")
+        print(f"{'='*58}")
+        print(f"  Modus:              {report.get('mode', '---')}")
+        print(f"  Aktiv:              {'JA' if report.get('steering_active') else 'NEIN'}")
+        print(f"  Dominant:           {report.get('dominant_vector', 'neutral')} ({report.get('dominant_strength', 0.0):.2f})")
+        print(f"  Zusammenfassung:    {report.get('summary', '-')}")
+        print(f"  Basisvektoren:      {self._format_vector_names(report.get('base_vectors', []))}")
+        print(f"  Aktive Vektoren:    {self._format_vector_names(report.get('active_vectors', []))}")
+        print(f"  Composite-Modes:    {self._format_vector_names(report.get('composite_modes', []))}")
+        print(f"  Layer-Profil:       {self.steering.model_profile.get('num_layers', '?')} Layers | Range {self.steering.model_profile.get('emotion_range', ('?', '?'))}")
+        print(f"{'='*58}{Colors.RESET}\n")
+
+    def _show_last_result(self):
+        if not self.last_result:
+            print_log("LAST", "Noch keine Antwort vorhanden.", Colors.THOUGHT)
+            return
+
+        result = self.last_result
+        steering = result.get("emotion_steering", {})
+        print(f"\n{Colors.DEBUG}{'='*58}")
+        print("  LETZTER TURN")
+        print(f"{'='*58}")
+        print(f"  Provider/Modell:    {result.get('provider', '---')} / {result.get('model', '---')}")
+        print(f"  Intent:             {result.get('intent_type', '---')} ({result.get('intent_confidence', 0.0):.2f})")
+        print(f"  Tools:              {len(result.get('selected_tools', []))} genutzt | {', '.join(result.get('selected_tools', [])[:5]) or '-'}")
+        print(f"  RAG-Memories:       {len(result.get('rag_memories', []))}")
+        print(f"  Processing Time:    {result.get('processing_time_ms', 0):.1f} ms")
+        print(f"  Antwort-Laenge:     {len(result.get('response_text', ''))} Zeichen")
+        print(f"  Prompt-Modus:       {result.get('prompt_emotion_mode', '---')}")
+        print(f"  Steering dominant:  {steering.get('dominant_vector', 'neutral')} ({steering.get('dominant_strength', 0.0):.2f})")
+        print(f"  Aktive Vektoren:    {self._format_vector_names(steering.get('active_vectors', []))}")
+        print(f"  Workspace-Fokus:    {result.get('global_workspace', {}).get('dominant_focus', {}).get('label', '---')}")
+        print(f"{'='*58}{Colors.RESET}\n")
         
     def _show_status(self):
         """Zeigt den aktuellen emotionalen Status."""
         state = self.emotions.get_state()
-        status = self.pipeline.get_status()
+        status = self.backend.get_status()
         mood = state.get_mood_description()
+        steering_report = self._build_steering_report()
         
         print(f"\n{Colors.EMOTION}{'='*50}")
         print(f"  EMOTIONALER STATUS: {mood}")
@@ -79,11 +149,11 @@ class CHAPPiEBrainCLI:
         print(f"  Traurigkeit:  {state.sadness:>3}/100")
         
         if settings.enable_steering:
-            emotions_dict = state.to_dict()
-            summary = self.steering.get_emotion_summary(emotions_dict)
             is_local = self.steering.is_local_provider()
             mode = "VEKTOR" if is_local else "PROMPT"
-            print(f"\n  Steering [{mode}]: {summary}")
+            print(f"\n  Steering [{mode}]: {steering_report.get('summary', '-')}")
+            print(f"  Dominant: {steering_report.get('dominant_vector', 'neutral')} ({steering_report.get('dominant_strength', 0.0):.2f})")
+            print(f"  Prompt-Modus: {steering_report.get('mode', '---')}")
         
         # Sleep Info
         from memory.sleep_phase import get_sleep_phase_handler
@@ -102,12 +172,56 @@ class CHAPPiEBrainCLI:
             print(f"  Need-Fokus: {dominant_need} | Ziel: {goal.get('title', '---')} | Stage: {development.get('stage', '---')}")
             print(f"  Weltmodell: {world.get('predicted_user_need', '---')} | Next: {world.get('next_best_action', '---')[:55]}")
             print(f"  Planung: {planning.get('planning_horizon', '---')} | {planning.get('next_milestone', '---')[:55]}")
+        print(f"  Runtime: {status.get('model', '---')} | Two-Step={'AN' if status.get('two_step_enabled') else 'AUS'}")
         print(f"{'='*50}{Colors.RESET}\n")
+
+    def _handle_emotion_command(self, cmd: str) -> bool:
+        parts = cmd.split()
+        if len(parts) != 3:
+            print_log("EMOTION", "Nutze: /emotion <name> <0-100>", Colors.EMOTION)
+            return True
+
+        _, emotion, value_text = parts
+        try:
+            value = int(value_text)
+        except ValueError:
+            print_log("EMOTION", f"Ungueltiger Wert: {value_text}", Colors.STEER)
+            return True
+
+        valid = {"happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness"}
+        if emotion not in valid:
+            print_log("EMOTION", f"Unbekannte Emotion: {emotion}", Colors.STEER)
+            return True
+
+        self.emotions.set_emotion(emotion, value)
+        print_log("EMOTION", f"{emotion} auf {max(0, min(100, value))} gesetzt.", Colors.EMOTION)
+        self._show_steering_report()
+        return True
     
     def _handle_command(self, cmd: str) -> bool:
         """Verarbeitet CLI-Befehle. Returns True wenn Befehl verarbeitet."""
         
         if cmd == "/status":
+            self._show_status()
+            return True
+
+        if cmd == "/runtime":
+            self._show_runtime()
+            return True
+
+        if cmd == "/steering":
+            self._show_steering_report()
+            return True
+
+        if cmd == "/last":
+            self._show_last_result()
+            return True
+
+        if cmd.startswith("/emotion "):
+            return self._handle_emotion_command(cmd)
+
+        if cmd == "/resetemotions":
+            self.emotions.reset()
             self._show_status()
             return True
         
@@ -133,7 +247,8 @@ class CHAPPiEBrainCLI:
                 print_log("REPLAY", f"Habit: {replay.get('habit_reinforcement', '---')} | Themes: {', '.join(replay.get('themes', [])[:3])}", Colors.AI)
             
             # Lade neuen Status
-            self.emotions = EmotionsEngine()
+            self.backend.emotions = EmotionsEngine()
+            self.emotions = self.backend.emotions
             self._show_status()
             return True
         
@@ -153,6 +268,11 @@ class CHAPPiEBrainCLI:
         if cmd == "/help":
             print(f"\n{Colors.AI}CHAPPiE Brain CLI Commands:")
             print(f"  /status   - Zeigt emotionalen Status & Steering")
+            print(f"  /runtime  - Zeigt aktiven Runtime-/Modellpfad")
+            print(f"  /steering - Zeigt detaillierten Steering-Report")
+            print(f"  /last     - Zeigt Metriken des letzten Turns")
+            print(f"  /emotion <name> <0-100> - Setzt eine Emotion direkt")
+            print(f"  /resetemotions - Setzt den Emotionszustand zurueck")
             print(f"  /sleep    - Startet Schlafphase (Energie-Reset)")
             print(f"  /life     - Zeigt Life-Simulation Zustand")
             print(f"  /world    - Zeigt World-Model Vorhersage")
@@ -168,7 +288,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/life":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             life_state = status.get("life_state", {})
             goal = life_state.get("active_goal", {})
             world = life_state.get("world_model", {})
@@ -193,7 +313,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/habits":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             habits = sorted(status.get("life_state", {}).get("habits", {}).items(), key=lambda item: item[1].get("strength", 0), reverse=True)
             print(f"\n{Colors.MEMORY}Habit Engine")
             for name, meta in habits[:5]:
@@ -202,7 +322,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/stage":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             development = status.get("life_state", {}).get("development", {})
             print(f"\n{Colors.AI}Development Stage")
             print(f"  Stage: {development.get('stage', '---')}")
@@ -212,7 +332,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/plan":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             planning = status.get("life_state", {}).get("planning_state", {})
             print(f"\n{Colors.AI}Planning State")
             print(f"  Horizon: {planning.get('planning_horizon', '---')}")
@@ -222,7 +342,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/forecast":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             forecast = status.get("life_state", {}).get("forecast_state", {})
             print(f"\n{Colors.AI}Self Forecast")
             print(f"  Risk: {forecast.get('risk_level', '---')}")
@@ -232,7 +352,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/arc":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             social_arc = status.get("life_state", {}).get("social_arc", {})
             print(f"\n{Colors.MEMORY}Social Arc")
             print(f"  Arc: {social_arc.get('arc_name', '---')}")
@@ -242,7 +362,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/timeline":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             summary = status.get("life_state", {}).get("timeline_summary", {})
             history = status.get("life_state", {}).get("timeline_history", [])
             print(f"\n{Colors.MEMORY}Growth Timeline")
@@ -254,7 +374,7 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd == "/world":
-            status = self.pipeline.get_status()
+            status = self.backend.get_status()
             world = status.get("life_state", {}).get("world_model", {})
             print(f"\n{Colors.AI}World Model")
             print(f"  Interaction: {world.get('interaction_mode', '---')}")
@@ -263,6 +383,11 @@ class CHAPPiEBrainCLI:
             print(f"  Trajectory: {world.get('expected_trajectory', '---')}")
             print(f"  Confidence: {world.get('confidence', 0):.2f}{Colors.RESET}")
             return True
+
+        backend_response = self.backend.handle_command(cmd)
+        if not backend_response.startswith("Unbekannter Command:"):
+            print(f"\n{Colors.MEMORY}{backend_response}{Colors.RESET}\n")
+            return True
         
         return False
 
@@ -270,103 +395,22 @@ class CHAPPiEBrainCLI:
         if not user_text.strip():
             return
 
-        # 1. Pipeline Execution (Multi-Agent)
-        print_log("BRAIN", "Starte Multi-Agenten Analyse...", Colors.AI)
-        
-        current_emotions = self.emotions.get_state().__dict__
-        # Nur die 7 relevanten Dimensionen
-        emotion_keys = ["happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness"]
-        filtered_emotions = {k: current_emotions[k] for k in emotion_keys if k in current_emotions}
-        
-        brain_result = self.pipeline.process(
-            user_input=user_text,
-            history=self.history,
-            current_emotions=filtered_emotions,
-            memory_engine=self.memory,
-            context_files=self.context,
-            run_background=True
-        )
-        
-        # 2. Results Extraction
-        amygdala = brain_result["amygdala"].data
-        pfc = brain_result["prefrontal"].data
-        steering_payload = brain_result["steering_payload"]
-        steering_mode = brain_result.get("steering_mode", "prompt")
-        
-        primary_emotion = amygdala.get('primary_emotion', 'neutral')
-        intensity = amygdala.get('emotional_intensity', 0)
-        print_log("AMYGDALA", f"Emotion: {primary_emotion} (Intensitaet: {intensity:.2f})", Colors.EMOTION)
-        
-        # Steering Info
-        if steering_payload:
-            n_vectors = len(steering_payload.get('steering', {}).get('vectors', []))
-            dominant = steering_payload.get('steering', {}).get('dominant_emotion', '?')
-            strength = steering_payload.get('steering', {}).get('dominant_strength', 0)
-            print_log("STEERING", f"[{steering_mode.upper()}] {n_vectors} Vektoren aktiv | Dominant: {dominant} ({strength:.2f})", Colors.STEER)
-        else:
-            print_log("STEERING", f"[{steering_mode.upper()}] Keine aktive Steuerung", Colors.THOUGHT)
-        
-        strategy = pfc.get('response_strategy', 'standard')
-        tone = pfc.get('tone', 'neutral')
-        print_log("PFC", f"Strategie: {strategy} | Ton: {tone}", Colors.AI)
-        workspace = brain_result.get("global_workspace", {})
-        dominant_focus = workspace.get("dominant_focus", {}).get("label", "stability")
-        print_log("WORKSPACE", f"Fokus: {dominant_focus}", Colors.MEMORY)
-        
-        # 3. Final Generation with Steering
-        print_log("GEN", "Generiere Antwort...", Colors.AI)
-        
-        system_prompt = (
-            f"Du bist CHAPPiE, eine lebensnahe digitale Bewusstseins-Simulation. "
-            f"Strategie: {strategy}. Ton: {tone}.\n\n"
-            f"{brain_result.get('response_prompt_suffix', '')}"
-        )
-        
-        messages = [
-            Message(role="system", content=system_prompt),
-            Message(role="user", content=user_text)
-        ]
-        
-        # Bei lokalen Modellen: Steering via extra_body, bei Cloud: kein extra_body
-        extra = steering_payload if (settings.enable_steering and steering_mode == "vector") else None
-        
-        config = GenerationConfig(
-            max_tokens=settings.max_tokens,
-            temperature=settings.temperature,
-            stream=True,
-            extra_body=extra
-        )
-        
-        print(f"\n{Colors.AI}CHAPPiE > {Colors.RESET}", end="")
-        full_response = ""
-        
-        brain_backend = self.pipeline.prefrontal_cortex._get_brain()
-        
-        for token in brain_backend.generate(messages, config):
-            full_response += token
-            print(f"{Colors.AI}{token}", end="")
-            sys.stdout.flush()
-        print("\n")
-        
-        # 4. Update History & Emotions
-        self.history.append({"role": "user", "content": user_text})
-        self.history.append({"role": "assistant", "content": full_response})
+        print_log("BRAIN", "Starte echten Zwei-Schritte Runtime-Pfad...", Colors.AI)
+        result = self.backend.process(user_text, self.history, debug_mode=True)
+        self.last_result = result
 
-        self.pipeline.complete_turn(
-            user_input=user_text,
-            response=full_response,
-            emotions_before=filtered_emotions,
-            emotions_after=brain_result["emotions_after"],
-            memory_engine=self.memory,
-            context_files=self.context,
-            amygdala_result=brain_result.get("amygdala"),
-            hippocampus_result=brain_result.get("hippocampus"),
-            prefrontal_result=brain_result.get("prefrontal"),
-            global_workspace=brain_result.get("global_workspace"),
-        )
-        
-        # Emotionen in der Engine aktualisieren
-        self.emotions.update_state(brain_result["emotions_after"])
+        steering = result.get("emotion_steering", {})
+        print_log("INTENT", f"Typ: {result.get('intent_type', '---')} | Confidence: {result.get('intent_confidence', 0.0):.2f}", Colors.EMOTION)
+        print_log("TOOLS", f"Genutzt: {', '.join(result.get('selected_tools', [])[:5]) or 'keine'}", Colors.MEMORY)
+        print_log("STEERING", f"[{result.get('prompt_emotion_mode', '---')}] Dominant: {steering.get('dominant_vector', 'neutral')} ({steering.get('dominant_strength', 0.0):.2f}) | Aktiv: {len(steering.get('active_vectors', []))}", Colors.STEER)
+        print_log("WORKSPACE", f"Fokus: {result.get('global_workspace', {}).get('dominant_focus', {}).get('label', '---')}", Colors.MEMORY)
+        print_log("RUNTIME", f"{result.get('provider', '---')} | {result.get('model', '---')} | {result.get('processing_time_ms', 0):.1f} ms", Colors.DEBUG)
+
+        print(f"\n{Colors.AI}CHAPPiE > {Colors.RESET}{Colors.AI}{result.get('response_text', '')}{Colors.RESET}\n")
+
+        self.history.append({"role": "user", "content": user_text})
+        self.history.append({"role": "assistant", "content": result.get("response_text", "")})
+        self._show_last_result()
 
     def run(self):
         is_local = self.steering.is_local_provider()

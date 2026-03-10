@@ -11,7 +11,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from config.config import LLMProvider, settings  # noqa: E402
 from brain.agents.steering_manager import SteeringManager  # noqa: E402
-from brain.steering_backend import add_vector_to_inputs, add_vector_to_output, build_activation_plan, build_style_instruction, extract_steering_payload  # noqa: E402
+from brain.steering_backend import LocalSteeringEngine, add_vector_to_inputs, add_vector_to_output, build_activation_plan, build_style_instruction, extract_steering_payload  # noqa: E402
 
 
 def test_extract_steering_payload_supports_extra_body_wrapper():
@@ -140,6 +140,18 @@ def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
     assert base_names == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
 
 
+def test_local_steering_engine_uses_trust_remote_code_for_qwen35():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-9B"
+    assert engine._build_loader_kwargs() == {"trust_remote_code": True}
+
+
+def test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3-4B-Instruct-2507"
+    assert engine._build_loader_kwargs() == {}
+
+
 if __name__ == "__main__":
     test_extract_steering_payload_supports_extra_body_wrapper()
     test_build_activation_plan_combines_sign_and_strength()
@@ -149,4 +161,6 @@ if __name__ == "__main__":
     test_build_style_instruction_mentions_negative_guardrails()
     test_build_style_instruction_uses_all_seven_vitals_from_payload_metadata()
     test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors()
+    test_local_steering_engine_uses_trust_remote_code_for_qwen35()
+    test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()
     print("OK: steering backend")
