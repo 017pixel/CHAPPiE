@@ -145,6 +145,7 @@ def process_command(user_input: str, backend) -> bool:
                 new_emotions = normalize_emotions(step_result.emotions_after)
                 if new_emotions and isinstance(new_emotions, dict):
                     st.session_state.current_emotions = new_emotions
+                    st.session_state.current_emotions_loaded = True
                 
                 # Zeige Live-Vitalzeichen im Status-Container
                 _render_live_vital_signs(new_emotions)
@@ -532,6 +533,7 @@ def process_chat_message(user_input: str, backend):
                 if not final_meta.get("pending"):
                     if final_meta.get("emotions") and isinstance(final_meta["emotions"], dict):
                         st.session_state.current_emotions = normalize_emotions(final_meta["emotions"])
+                        st.session_state.current_emotions_loaded = True
                     if final_meta.get("life_snapshot"):
                         st.session_state.current_life_state = final_meta["life_snapshot"]
                     if final_meta.get("global_workspace"):

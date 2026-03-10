@@ -1,6 +1,6 @@
 import streamlit as st
 from config.config import settings, LLMProvider
-from web_infrastructure.ui_utils import normalize_emotions
+from web_infrastructure.ui_utils import bootstrap_current_emotions, normalize_emotions
 
 def init_session_state():
     """Initialisiert die Streamlit Session States."""
@@ -10,7 +10,12 @@ def init_session_state():
         st.session_state.messages = []
     if "session_updated_at" not in st.session_state:
         st.session_state.session_updated_at = None
-    st.session_state.current_emotions = normalize_emotions(st.session_state.get("current_emotions"))
+    if "current_emotions" not in st.session_state:
+        st.session_state.current_emotions = {}
+    elif st.session_state.get("current_emotions_loaded"):
+        st.session_state.current_emotions = normalize_emotions(st.session_state.get("current_emotions"))
+    if "current_emotions_loaded" not in st.session_state:
+        st.session_state.current_emotions_loaded = False
     if "show_settings" not in st.session_state:
         st.session_state.show_settings = False
     if "show_memories" not in st.session_state:
@@ -62,6 +67,26 @@ def init_session_state():
         st.session_state.last_filter_label = "Alle"
     if "last_filter_type" not in st.session_state:
         st.session_state.last_filter_type = "Alle"
+
+
+def sync_current_emotions(backend, force: bool = False):
+    """Lädt die persistierten Vitalzeichen aus dem Backend in den Session-State."""
+    backend_snapshot = {}
+    try:
+        backend_snapshot = backend._get_emotions_snapshot()
+    except Exception:
+        backend_snapshot = {}
+
+    current_emotions, loaded = bootstrap_current_emotions(
+        st.session_state.get("current_emotions"),
+        backend_snapshot,
+        already_loaded=(False if force else bool(st.session_state.get("current_emotions_loaded"))),
+    )
+    st.session_state.current_emotions = current_emotions
+    st.session_state.current_emotions_loaded = loaded
+    if current_emotions:
+        st.session_state.last_emo_settings_hash = hash(str(current_emotions))
+    return current_emotions
 
 
 def restore_active_chat_session(backend):

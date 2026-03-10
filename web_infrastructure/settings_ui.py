@@ -348,6 +348,7 @@ def render_settings_overlay(backend):
         if state_rows:
             with st.expander("7 Vitalzeichen im Live-Steering", expanded=True):
                 st.caption("Hier siehst du die 7 Basis-Vitalzeichen, wie sie aktuell in das Endausgabe-Steering einfliessen.")
+                st.caption("`basisvektor_konfiguriert` bedeutet: fuer diese Emotion existiert ein Steering-Vektor. `im_payload_aktiv` bedeutet: dieser Vektor ist fuer die aktuellen Vitalwerte gerade wirklich im Request aktiv. Werte nahe 50 bleiben bewusst in einer Neutralzone.")
                 st.dataframe(state_rows, use_container_width=True)
 
         if base_vectors:
@@ -436,6 +437,7 @@ def render_settings_overlay(backend):
             
         if current_emo_hash != st.session_state.last_emo_settings_hash:
             st.session_state.current_emotions = new_emotions
+            st.session_state.current_emotions_loaded = True
             backend.emotions.state.happiness = new_happiness
             backend.emotions.state.trust = new_trust
             backend.emotions.state.energy = new_energy
@@ -450,6 +452,7 @@ def render_settings_overlay(backend):
         if st.button("Emotionen auf Standardwerte zurücksetzen", key="reset_settings_emo"):
             default_emotions = dict(EMOTION_DEFAULTS)
             st.session_state.current_emotions = default_emotions
+            st.session_state.current_emotions_loaded = True
             backend.emotions.reset()
             st.toast("Emotionen zurückgesetzt")
             time.sleep(0.5)

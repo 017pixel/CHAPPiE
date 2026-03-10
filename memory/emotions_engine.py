@@ -232,6 +232,7 @@ class EmotionsEngine:
     
     def __init__(self):
         """Initialisiert die Emotions Engine."""
+        self._last_state_mtime_ns: int | None = None
         self.state = self._load_state()
         
         # Brain einmal beim ersten Init laden (lazy loading)
@@ -239,6 +240,35 @@ class EmotionsEngine:
             self._init_ollama_brain()
         
         print(f"Emotions Engine geladen: H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
+
+    def _status_mtime_ns(self) -> int | None:
+        try:
+            return STATUS_FILE.stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def _read_state_from_disk(self) -> EmotionalState | None:
+        if not STATUS_FILE.exists():
+            self._last_state_mtime_ns = None
+            return None
+        try:
+            with open(STATUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._last_state_mtime_ns = self._status_mtime_ns()
+            return EmotionalState.from_dict(data)
+        except Exception as e:
+            print(f"Fehler beim Laden des Status: {e}")
+            return None
+
+    def _sync_state_from_disk_if_newer(self, force: bool = False) -> EmotionalState:
+        current_mtime_ns = self._status_mtime_ns()
+        if current_mtime_ns is None:
+            return self.state
+        if force or self._last_state_mtime_ns is None or current_mtime_ns > self._last_state_mtime_ns:
+            refreshed = self._read_state_from_disk()
+            if refreshed is not None:
+                self.state = refreshed
+        return self.state
     
     def _init_ollama_brain(self):
         """Initialisiert die Ollama Brain-Instanz einmalig (gecached)."""
@@ -261,14 +291,10 @@ class EmotionsEngine:
     
     def _load_state(self) -> EmotionalState:
         """Laedt den Status aus der Datei oder erstellt Defaults."""
-        if STATUS_FILE.exists():
-            try:
-                with open(STATUS_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return EmotionalState.from_dict(data)
-            except Exception as e:
-                print(f"Fehler beim Laden des Status: {e}")
-        
+        loaded = self._read_state_from_disk()
+        if loaded is not None:
+            return loaded
+
         return EmotionalState()
     
     def _save_state(self):
@@ -277,6 +303,7 @@ class EmotionsEngine:
         try:
             with open(STATUS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self.state.to_dict(), f, indent=2)
+            self._last_state_mtime_ns = self._status_mtime_ns()
         except Exception as e:
             print(f"Fehler beim Speichern des Status: {e}")
     
@@ -343,6 +370,8 @@ class EmotionsEngine:
         Args:
             user_message: Die zu analysierende User-Nachricht
         """
+        self._sync_state_from_disk_if_newer()
+
         # Versuche LLM-Analyse
         llm_result = self._analyze_with_llm(user_message)
         
@@ -412,6 +441,7 @@ class EmotionsEngine:
         Legacy-Methode fuer Rueckwaertskompatibilitaet.
         Verwendet intern _apply_simple_sentiment.
         """
+        self._sync_state_from_disk_if_newer()
         self._apply_simple_sentiment(sentiment)
         self.state.clamp()
         self._save_state()
@@ -426,6 +456,7 @@ class EmotionsEngine:
         Args:
             amount: Menge der wiederherzustellenden Energie
         """
+        self._sync_state_from_disk_if_newer()
         self.state.energy += amount
         self.state.clamp()
         self._save_state()
@@ -437,6 +468,7 @@ class EmotionsEngine:
         Returns:
             Formatierter String mit aktuellem Status
         """
+        self._sync_state_from_disk_if_newer()
         from config.prompts import EMOTION_STATUS_TEMPLATE
         
         return EMOTION_STATUS_TEMPLATE.format(
@@ -451,6 +483,7 @@ class EmotionsEngine:
     
     def get_state(self) -> EmotionalState:
         """Gibt den aktuellen Zustand zurueck."""
+        self._sync_state_from_disk_if_newer()
         return self.state
     
     def set_emotion(self, emotion: str, value: int):
@@ -461,6 +494,7 @@ class EmotionsEngine:
             emotion: Name der Emotion (happiness, trust, energy, curiosity, frustration, motivation, sadness)
             value: Neuer Wert (0-100)
         """
+        self._sync_state_from_disk_if_newer()
         value = max(0, min(100, value))
         
         if emotion == "happiness":
@@ -482,6 +516,7 @@ class EmotionsEngine:
     
     def reset(self):
         """Setzt den emotionalen Zustand zurueck."""
+        self._sync_state_from_disk_if_newer()
         self.state = EmotionalState()
         self._save_state()
         print("Emotionaler Zustand zurueckgesetzt")

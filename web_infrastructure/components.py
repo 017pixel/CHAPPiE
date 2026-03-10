@@ -36,6 +36,7 @@ def render_vital_signs(backend):
 
     emotions_dict = normalize_emotions(emotions_dict)
     st.session_state.current_emotions = emotions_dict
+    st.session_state.current_emotions_loaded = True
 
     for emotion_key in EMOTION_DISPLAY_ORDER:
         render_emotion_metric(

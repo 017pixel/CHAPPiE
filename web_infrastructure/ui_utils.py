@@ -85,6 +85,24 @@ def normalize_emotions(emotions: Mapping[str, int] | None) -> dict[str, int]:
     return normalized
 
 
+def bootstrap_current_emotions(
+    session_emotions: Mapping[str, int] | None,
+    backend_emotions: Mapping[str, int] | None,
+    already_loaded: bool = False,
+) -> tuple[dict[str, int] | dict, bool]:
+    """Bestimmt die UI-Emotionen robust zwischen Session-State und persistiertem Backend-State."""
+    has_session_emotions = bool(session_emotions)
+    has_backend_emotions = bool(backend_emotions)
+
+    if already_loaded and has_session_emotions:
+        return normalize_emotions(session_emotions), True
+    if has_backend_emotions:
+        return normalize_emotions(backend_emotions), True
+    if has_session_emotions:
+        return normalize_emotions(session_emotions), already_loaded
+    return {}, already_loaded
+
+
 def chunk_items(items: Sequence[T], chunk_size: int) -> list[list[T]]:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be greater than zero")
@@ -119,10 +137,17 @@ def build_steering_state_rows(report: Mapping[str, Any] | None) -> list[dict[str
     legacy_intensities = source.get("intensities", {}) if isinstance(source.get("intensities", {}), Mapping) else {}
     base_vectors, _ = split_steering_vectors(source)
     base_by_name = {str(item.get("name") or ""): item for item in base_vectors}
+    base_vector_config = source.get("base_vector_config", []) if isinstance(source.get("base_vector_config", []), Sequence) else []
+    config_by_name = {
+        str(item.get("emotion") or ""): item
+        for item in base_vector_config
+        if isinstance(item, Mapping)
+    }
 
     rows = []
     for emotion_key in EMOTION_DISPLAY_ORDER:
         vector = base_by_name.get(emotion_key, {})
+        vector_config = config_by_name.get(emotion_key, {})
         intensity = _safe_float(emotion_intensities.get(emotion_key, legacy_intensities.get(emotion_key, 0.0)), default=0.0)
         direction = str(vector.get("direction") or "").strip().lower()
         if direction not in {"positive", "negative"}:
@@ -148,7 +173,8 @@ def build_steering_state_rows(report: Mapping[str, Any] | None) -> list[dict[str
                 "negative": "daempfend",
                 "neutral": "neutral",
             }.get(direction, direction),
-            "basisvektor_aktiv": bool(vector),
+            "basisvektor_konfiguriert": bool(vector_config) or emotion_key in EMOTION_DEFAULTS,
+            "im_payload_aktiv": bool(vector) or abs(intensity) > 0.01,
             "layer_range": layer_label,
             "wirkung": vector.get("surface_effect", ""),
         })
