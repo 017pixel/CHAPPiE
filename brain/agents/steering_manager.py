@@ -51,13 +51,13 @@ EMOTION_VECTOR_MAP = {
 }
 
 EMOTION_STRENGTH_PROFILES = {
-    "happiness": {"max_alpha": 0.85, "boost": 1.15, "surface_effect": "offener, verspielter, enthusiastischer"},
-    "sadness": {"max_alpha": 0.95, "boost": 1.3, "surface_effect": "verletzlicher, schwerer, melancholischer"},
-    "frustration": {"max_alpha": 1.0, "boost": 1.45, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
-    "trust": {"max_alpha": 0.7, "boost": 1.05, "surface_effect": "waermer, offener, naeher"},
-    "curiosity": {"max_alpha": 0.78, "boost": 1.12, "surface_effect": "fragender, explorativer, bohrender"},
-    "motivation": {"max_alpha": 0.82, "boost": 1.18, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
-    "energy": {"max_alpha": 0.76, "boost": 1.1, "surface_effect": "schneller, lebhafter, impulsiver"},
+    "happiness": {"max_alpha": 1.15, "boost": 1.35, "surface_effect": "offener, verspielter, enthusiastischer"},
+    "sadness": {"max_alpha": 1.25, "boost": 1.5, "surface_effect": "verletzlicher, schwerer, melancholischer"},
+    "frustration": {"max_alpha": 1.35, "boost": 1.65, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
+    "trust": {"max_alpha": 1.0, "boost": 1.25, "surface_effect": "waermer, offener, naeher"},
+    "curiosity": {"max_alpha": 1.08, "boost": 1.32, "surface_effect": "fragender, explorativer, bohrender"},
+    "motivation": {"max_alpha": 1.12, "boost": 1.38, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
+    "energy": {"max_alpha": 1.06, "boost": 1.3, "surface_effect": "schneller, lebhafter, impulsiver"},
 }
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.3
@@ -463,7 +463,7 @@ class SteeringManager:
             if deviation >= 34:
                 alpha *= 1.08
             alpha *= profile.get("boost", 1.0)
-            alpha = min(1.35, max_alpha * profile.get("boost", 1.0), alpha)
+            alpha = min(1.8, max_alpha * profile.get("boost", 1.0), alpha)
 
             # Richtung: Negativer Steering bei niedrigen Werten
             if value < 50 and emotion not in negative_emotions:

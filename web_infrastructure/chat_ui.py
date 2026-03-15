@@ -7,12 +7,12 @@ def _parse_emotional_text(text: str) -> str:
     if not text:
         return text
     # 3 dots or more
-    text = re.sub(r'(?<!\.)(\.{3,})(?!\.)', r'<br/><em>\1</em><br/>', text)
+    text = re.sub(r'(?<!\.)(\.{3,})(?!\.)', r'<br/><br/><em>\1</em><br/><br/>', text)
     # *text*
-    text = re.sub(r'(?<!\*)\*([^\*]+)\*(?!\*)', r'<br/><em>*\1*</em><br/>', text)
+    text = re.sub(r'(?<!\*)\*([^\*]+)\*(?!\*)', r'<br/><br/><em>*\1*</em><br/><br/>', text)
     # """" or more
-    text = re.sub(r'("{3,})', r'<br/><em>\1</em><br/>', text)
-    return text
+    text = re.sub(r'("{3,})', r'<br/><br/><em>\1</em><br/><br/>', text)
+    return text.strip()
 
 COMMANDS = [
     "/sleep", "/life", "/world", "/habits", "/stage",
