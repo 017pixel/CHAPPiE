@@ -122,6 +122,7 @@ Fuer `Qwen 3.5` nutzt der lokale Steering-Loader im Repository bei Bedarf `trust
 - Dabei werden die **7 Vitalzeichen gleichzeitig** als Basis-Signale verwendet: Freude, Traurigkeit, Frustration, Vertrauen, Neugier, Motivation und Energie.
 - Im **Emotionen-Tab** der Streamlit-UI sieht und aendert man jetzt pro Emotion die Layer-Range und Steering-Staerke sowie die 7 Vitalzeichen im Live-Steering.
 - Im **Debug Mode / Brain Monitor** werden jetzt rohe Agent-Deltas, geglaettete angewandte Deltas, Gruende sowie getrennt **Basisvektoren**, **Composite-Zusatzmuster**, `emotion_state` und `emotion_intensities` angezeigt.
+- **NEU: JuFo27 Anti-KI-Floskel-Vektor.** Das System lädt nun permanent einen Vector (`anti_safeguard`), um typische LLM-Floskeln ("Als KI...") zu unterdrücken und die digitale Ego-Perspektive zu stärken. Dies kann über das Skript `generate_anti_safeguard.py` berechnet und im Frontend optisch durch Markdown-Kursivschreibung (`...`, `*seufzt*`, `""""`) sichtbar gemacht werden.
 
 ### 3. Startmodi
 
@@ -250,6 +251,7 @@ python tests/test_steering_backend.py
 python tests/test_brain_pipeline_steering_integration.py
 python tests/test_debug_monitor_data.py
 python tests/test_web_ui_consistency.py
+python tests/test_chat_ui_formatting.py
 python tests/test_ollama_response_handling.py
 python tests/test_chat_manager_persistence.py
 python tests/test_vllm_response_handling.py

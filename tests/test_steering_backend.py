@@ -141,6 +141,34 @@ def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
     assert base_names == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
 
 
+def test_steering_manager_includes_anti_safeguard_vector():
+    provider_before = settings.llm_provider
+    settings.llm_provider = LLMProvider.VLLM
+    try:
+        manager = SteeringManager()
+        # Mock the existence of the anti_safeguard vector
+        class MockVector:
+            name = "anti_safeguard"
+            vector_data = [0.1, 0.2, 0.3]
+            default_alpha = 0.8
+            layer_start = 14
+            layer_end = 32
+
+        manager.vectors["anti_safeguard"] = MockVector()
+        
+        payload = manager.get_steering_payload({"happiness": 50}, force=True)
+    finally:
+        settings.llm_provider = provider_before
+
+    steering_vectors = payload["steering"]["vectors"]
+    anti_safeguard_vec = next((v for v in steering_vectors if v["name"] == "anti_safeguard"), None)
+    
+    assert anti_safeguard_vec is not None
+    assert anti_safeguard_vec["source"] == "permanent_override"
+    assert anti_safeguard_vec["strength"] == 0.8
+    assert anti_safeguard_vec["layer_range"] == [14, 31]
+
+
 def test_local_steering_engine_uses_trust_remote_code_for_qwen35():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3.5-9B"
@@ -184,6 +212,7 @@ if __name__ == "__main__":
     test_build_style_instruction_mentions_negative_guardrails()
     test_build_style_instruction_uses_all_seven_vitals_from_payload_metadata()
     test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors()
+    test_steering_manager_includes_anti_safeguard_vector()
     test_local_steering_engine_uses_trust_remote_code_for_qwen35()
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()
     test_local_steering_engine_falls_back_to_cpu_for_small_gpu()

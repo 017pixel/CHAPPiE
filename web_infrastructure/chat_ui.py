@@ -1,6 +1,18 @@
 import streamlit as st
+import re
 from web_infrastructure.components import render_brain_monitor, render_memory_item
 from web_infrastructure.ui_utils import UI_VERSION, chunk_items
+
+def _parse_emotional_text(text: str) -> str:
+    if not text:
+        return text
+    # 3 dots or more
+    text = re.sub(r'(?<!\.)(\.{3,})(?!\.)', r'<br/><em>\1</em><br/>', text)
+    # *text*
+    text = re.sub(r'(?<!\*)\*([^\*]+)\*(?!\*)', r'<br/><em>*\1*</em><br/>', text)
+    # """" or more
+    text = re.sub(r'("{3,})', r'<br/><em>\1</em><br/>', text)
+    return text
 
 COMMANDS = [
     "/sleep", "/life", "/world", "/habits", "/stage",
@@ -19,7 +31,7 @@ def _render_assistant_message(msg: dict):
     if memory_count > 0:
         st.caption(f"📎 **{memory_count} Einträge als Kontext geladen**")
 
-    st.markdown(msg["content"])
+    st.markdown(_parse_emotional_text(msg["content"]), unsafe_allow_html=True)
 
     if meta.get("pending"):
         st.caption(meta.get("status_text") or "Nachricht wird im Hintergrund weiter verarbeitet...")
@@ -143,7 +155,10 @@ def render_chat_interface(backend):
             if msg["role"] == "assistant" and msg.get("metadata"):
                 _render_assistant_message(msg)
             else:
-                st.markdown(msg["content"])
+                if msg["role"] == "assistant":
+                    st.markdown(_parse_emotional_text(msg["content"]), unsafe_allow_html=True)
+                else:
+                    st.markdown(msg["content"])
 
     # ==========================================
     # 4. INPUT AREA & RETURN LOGIC

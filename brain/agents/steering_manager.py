@@ -622,6 +622,21 @@ class SteeringManager:
             active_vectors.append(vector_entry)
             composite_vectors.append(vector_entry)
 
+        sv_as = self.vectors.get("anti_safeguard")
+        if sv_as is not None:
+            runtime_config_as = self._sanitize_vector_runtime_config(sv_as)
+            vector_entry_as = {
+                "name": sv_as.name,
+                "vector": sv_as.vector_data if not (HAS_NUMPY and isinstance(sv_as.vector_data, np.ndarray)) else sv_as.vector_data.tolist(),
+                "strength": sv_as.default_alpha,
+                "direction": "positive",
+                "layer_range": [runtime_config_as["layer_start"], runtime_config_as["layer_end"]],
+                "emotion_value": 100,
+                "source": "permanent_override",
+                "surface_effect": "Unterdrueckt KI-Floskeln",
+            }
+            active_vectors.append(vector_entry_as)
+
         if not active_vectors:
             return {}
 
