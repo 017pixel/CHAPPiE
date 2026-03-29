@@ -243,3 +243,16 @@ Die Datei [`web_infrastructure/growth_dashboard_ui.py`](../web_infrastructure/gr
 - [Architektur](architecture.md)
 - [Testing](testing.md)
 - [Deployment](deployment.md)
+
+### Neu: Debug-Kette im Brain Monitor
+
+Im Debug-Mode zeigt CHAPPiE jetzt nicht nur Phasen, sondern auch die Kette dahinter:
+
+- welche Eingabe wie klassifiziert wurde
+- welche Erinnerungen gefunden und gemerged wurden
+- welche Emotionen sich wie veraendert haben
+- welche Steering- und Layer-Signale aktiv waren
+- welche Life-/Homeostasis-Signale mitgewirkt haben
+- warum am Ende genau dieser Ton gewaehlt wurde
+
+Die bestehende Phasenstruktur bleibt dabei unveraendert.

@@ -62,4 +62,6 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 ## Legacy-Hinweis
 
 Einige ältere Dateien in `Info Dateien/` bleiben als kurze Brücken erhalten. Die inhaltliche Hauptquelle ist jetzt jedoch `docs/` plus `README.md` und `agent.md`.
+## Trace-Hinweis
 
+Die Debug-Doku soll die Ursache-Wirkung-Kette klar lesbar machen: Input, Memory, Emotion, Steering und Ton gehoeren gemeinsam beschrieben, nicht getrennt als Rohdatenliste.

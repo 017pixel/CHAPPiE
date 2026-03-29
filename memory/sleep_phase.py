@@ -93,7 +93,7 @@ class SleepPhaseHandler:
                 self._state.get("interaction_count_since_sleep", 0) + 1
             self._save_state()
     
-    def execute_sleep_phase(self, memory_engine=None, context_files=None) -> Dict[str, Any]:
+    def execute_sleep_phase(self, memory_engine=None, context_files=None, short_term_memory=None) -> Dict[str, Any]:
         """
         Execute the sleep phase.
         
@@ -129,7 +129,8 @@ class SleepPhaseHandler:
                 if memory_engine:
                     consolidation_result = self._consolidate_memories(
                         memory_engine,
-                        consolidation_config
+                        consolidation_config,
+                        short_term_memory=short_term_memory,
                     )
                     results["consolidation"] = consolidation_result
                 
@@ -239,7 +240,7 @@ class SleepPhaseHandler:
             
         return recovery
     
-    def _consolidate_memories(self, memory_engine, config: Dict) -> Dict[str, Any]:
+    def _consolidate_memories(self, memory_engine, config: Dict, short_term_memory=None) -> Dict[str, Any]:
         """
         Consolidate memories from short-term to long-term.
         
@@ -263,10 +264,47 @@ class SleepPhaseHandler:
             if hasattr(memory_engine, 'get_recent_memories'):
                 candidates = memory_engine.get_recent_memories(limit=batch_size)
                 result["candidates"] = len(candidates) if candidates else 0
-            
-            if hasattr(memory_engine, 'migrate_expired_entries'):
-                migrated = memory_engine.migrate_expired_entries()
-                result["consolidated"] = migrated
+                now = datetime.now()
+                unique_keys = set()
+                filtered_candidates = []
+                for memory in candidates or []:
+                    mem_type = str(getattr(memory, "mem_type", "interaction") or "interaction")
+                    label = str(getattr(memory, "label", "original") or "original")
+                    if require_original and (mem_type != "interaction" or label != "original"):
+                        result["skipped"] += 1
+                        continue
+                    timestamp_raw = str(getattr(memory, "timestamp", "") or "")
+                    try:
+                        created_at = datetime.fromisoformat(timestamp_raw)
+                    except ValueError:
+                        created_at = now
+                    age_hours = max(0.0, (now - created_at).total_seconds() / 3600.0)
+                    if age_hours < float(min_age_hours):
+                        result["skipped"] += 1
+                        continue
+                    content = str(getattr(memory, "content", "") or "").strip().lower()
+                    dedupe_key = " ".join(content.split())[:180]
+                    if not dedupe_key or dedupe_key in unique_keys:
+                        result["skipped"] += 1
+                        continue
+                    unique_keys.add(dedupe_key)
+                    filtered_candidates.append(memory)
+                result["details"] = [
+                    {
+                        "id": str(getattr(memory, "id", "") or "")[:8],
+                        "role": str(getattr(memory, "role", "unknown") or "unknown"),
+                        "timestamp": str(getattr(memory, "timestamp", "") or ""),
+                    }
+                    for memory in filtered_candidates[:8]
+                ]
+                result["deduplicated_candidates"] = len(filtered_candidates)
+
+            migrated = 0
+            if short_term_memory and hasattr(short_term_memory, "migrate_expired_entries"):
+                migrated = int(short_term_memory.migrate_expired_entries() or 0)
+            elif hasattr(memory_engine, 'migrate_expired_entries'):
+                migrated = int(memory_engine.migrate_expired_entries() or 0)
+            result["consolidated"] = migrated
             
         except Exception as e:
             result["error"] = str(e)
@@ -287,10 +325,58 @@ class SleepPhaseHandler:
         }
         
         try:
-            ebbinghaus = self.forgetting_config["ebbinghaus"]
-            strength_config = self.forgetting_config["memory_strength"]
-            
-            pass
+            if not memory_engine or not hasattr(memory_engine, "get_recent_memories"):
+                return result
+
+            limit = 200
+            if hasattr(memory_engine, "get_memory_count"):
+                try:
+                    limit = max(1, min(400, int(memory_engine.get_memory_count())))
+                except Exception:
+                    limit = 200
+
+            recent = memory_engine.get_recent_memories(limit=limit)
+            mapped_memories: List[Dict[str, Any]] = []
+            for memory in recent or []:
+                timestamp_raw = str(getattr(memory, "timestamp", "") or "")
+                created_at = None
+                if timestamp_raw:
+                    try:
+                        created_at = datetime.fromisoformat(timestamp_raw).isoformat()
+                    except ValueError:
+                        created_at = None
+                mapped_memories.append(
+                    {
+                        "id": str(getattr(memory, "id", "") or ""),
+                        "relevance": float(getattr(memory, "relevance_score", 0.5) or 0.5),
+                        "created_at": created_at,
+                        "strength": 1.0,
+                        "emotional_boost": 1.0,
+                        "recall_count": 0,
+                    }
+                )
+
+            if not mapped_memories:
+                return result
+
+            decay_result = self.decay_manager.process_memories(mapped_memories)
+            result["memories_processed"] = int(decay_result.get("stats", {}).get("total", 0))
+            result["memories_decayed"] = int(decay_result.get("stats", {}).get("update_count", 0))
+            result["memories_archived"] = int(decay_result.get("stats", {}).get("archive_count", 0))
+            archive_ids = [
+                str(item.get("id", ""))[:8]
+                for item in decay_result.get("archive", [])[:12]
+                if isinstance(item, dict)
+            ]
+            if archive_ids:
+                result["archive_candidates"] = archive_ids
+            update_ids = [
+                str((item.get("memory", {}) or {}).get("id", ""))[:8]
+                for item in decay_result.get("update", [])[:12]
+                if isinstance(item, dict)
+            ]
+            if update_ids:
+                result["boost_recommended"] = update_ids
             
         except Exception as e:
             result["error"] = str(e)

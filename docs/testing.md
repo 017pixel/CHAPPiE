@@ -104,3 +104,16 @@ Vor automatisierten Änderungen immer fragen:
 - [`tests/README.md`](../tests/README.md)
 - [Lokale Modelle & Fallbacks](local-models.md)
 - [Deployment](deployment.md)
+
+## Neue Pruefpunkte fuer Debug- und Memory-Upgrade
+
+Fuer die erweiterten Trace- und Memory-Pfade sind diese Dateien besonders wichtig:
+
+- `tests/test_debug_monitor_data.py`
+- `tests/test_memory_query_extraction_german.py`
+- `tests/test_sleep_phase_context_updates.py`
+- `tests/test_forgetting_curve.py`
+- `tests/test_brain_pipeline_steering_integration.py`
+- `tests/test_reasoning_layering.py`
+
+Wenn nur die Doku angepasst wurde, reicht weiterhin ein schneller Struktur- oder `py_compile`-Check.

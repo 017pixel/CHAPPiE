@@ -67,9 +67,32 @@ def test_debug_logger_keeps_emotion_steering_details():
     assert entries[0]["details"]["base_vectors"][0]["name"] == "happiness"
     assert entries[0]["details"]["active_vectors"][1]["name"] == "crashout"
 
+def test_debug_logger_keeps_causal_trace_details():
+    logger = DebugLogger(max_entries=5)
+    logger.log_info(
+        "CAUSAL_TRACE",
+        "Ursache-Wirkung-Kette aufgebaut",
+        {
+            "steps": [
+                {
+                    "phase": "Input",
+                    "driver": "Intent technical_discussion",
+                    "effect": "Kontextbedarf steigt",
+                    "evidence": ["architecture", "debug"],
+                }
+            ],
+            "memory_query": "architecture debug",
+        },
+    )
+    entries = logger.get_entries_as_dict()
+    assert entries[0]["category"] == "CAUSAL_TRACE"
+    assert entries[0]["details"]["steps"][0]["phase"] == "Input"
+    assert entries[0]["details"]["steps"][0]["evidence"][1] == "debug"
+
 
 if __name__ == "__main__":
     test_global_workspace_exposes_math_trace()
     test_debug_logger_clear_and_dict_output()
     test_debug_logger_keeps_emotion_steering_details()
+    test_debug_logger_keeps_causal_trace_details()
     print("OK: debug monitor data")

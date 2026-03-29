@@ -91,3 +91,19 @@ Relevante Dateien liegen unter [`life/`](../life).
 - [Lokale Modelle & Fallbacks](local-models.md)
 - [Projektkarte](project-map.md)
 
+## Debug- und Entscheidungsspuren
+
+Der Debug-Modus ersetzt die bestehende Phasenstruktur nicht. Er macht die Ursache-Wirkung-Kette nur dichter sichtbar:
+
+- Input / Intent: Klassifikation der Eingabe, erkannte Entitaeten, geplante Tool-Nutzung
+- Memory: Intent-nahe und generative Suche, gemergte Treffer, Relevanz und Voransichten
+- Emotion: rohe und angewendete Emotionsdeltas, Homeostasis, Steering-Profile und Composite-Muster
+- Life: aktuelle Beduerfnisse, Modus und homeostatische Signale
+- Tone: warum CHAPPiE freundlich, distanziert, gereizt, rueckzugsorientiert oder explorativ antwortet
+
+Quellen:
+
+- `web_infrastructure/backend_wrapper.py`
+- `web_infrastructure/components.py`
+- `memory/memory_engine.py`
+- `memory/sleep_phase.py`

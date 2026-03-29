@@ -53,3 +53,8 @@ Steering-Details: [`docs/vLLM-Setup.md`](../docs/vLLM-Setup.md)
 
 Tests / UI-Checks: [`docs/testing.md`](../docs/testing.md)
 
+Neu im Debug-Mode:
+
+- Input-Klassifikation und Memory-Trace werden in der Brain-Ansicht mit angezeigt
+- die Kausalkette zeigt, warum CHAPPiE genau diesen Ton gewaehlt hat
+- die bestehende Phasenstruktur bleibt erhalten und wurde nur verdichtet

@@ -24,6 +24,7 @@ Der Fokus des Projekts liegt darauf, eine **verständliche, menschenlesbare und 
 - **Growth Layer** mit Planung, Forecasting und Timeline
 - **Web UI**, **CLI** und **Training-Daemon** als verschiedene Betriebsmodi
 - **lokale Modellstrategie** mit Qwen-3.5 als bevorzugtem Zielbild
+- **Debug Mode / Brain Monitor** mit sichtbarer Kausalkette: Input-Klassifikation, Memory-Trace, Emotionsverschiebung, Steering und finaler Ton
 
 ## Gehirn-Metapher auf einen Blick
 
@@ -167,6 +168,15 @@ Wenn keine normale Antwort zustande kommt, erscheint `CHAPPiE schweigt...` und v
 Im Debug-Mode sieht man jetzt fuer Emotionen zusaetzlich den Unterschied zwischen **Prompt-Steuerung** und **Layer-Manipulation**, inklusive der 7 Basis-Vitalzeichen, `emotion_state`, `emotion_intensities` und zusaetzlicher Ausdrucksprofile wie `warm`, `melancholic`, `guarded` oder `crashout`.
 
 Wichtig fuer das Verstaendnis: **Kontextaufbau, Tool-Orchestrierung und Global Workspace bleiben Teil der Gehirnstruktur**; das Emotions-Steering greift erst in der finalen Modellgenerierung fuer die Endantwort.
+
+Der Brain Monitor zeigt jetzt ausserdem die Ursache-Wirkung-Kette der Antwort:
+
+- welche Eingabe wie klassifiziert wurde
+- welche Erinnerungen gefunden und gemerged wurden
+- welche Emotionen sich wie veraendert haben
+- welche Layer- oder Steering-Signale aktiv waren
+- welche Life-/Homeostasis-Signale mitgewirkt haben
+- warum am Ende genau dieser Ton gewaehlt wurde
 
 ### Sidebar und Vitalzeichen
 

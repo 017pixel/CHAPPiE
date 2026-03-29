@@ -61,20 +61,20 @@ def create_chappie_backend():
             # NEU: Short-Term Memory V2 (JSON-basiert mit Timestamps)
             self.short_term_memory_v2 = get_short_term_memory_v2(memory_engine=self.memory)
             
-            # Migration von abgelaufenen Einträgen beim Start
+            # Migration von abgelaufenen Eintraegen beim Start
             try:
                 migrated = self.short_term_memory_v2.migrate_expired_entries()
                 if migrated > 0:
-                    print(f"[CHAPPiE] {migrated} Einträge ins Langzeitgedächtnis migriert")
+                    print(f"[CHAPPiE] {migrated} Eintraege ins Langzeitgedaechtnis migriert")
             except Exception as e:
                 print(f"[CHAPPiE] Migration fehlgeschlagen: {e}")
 
-            # LEGACY: Altes Short-Term Memory (für Abwärtskompatibilität)
+            # LEGACY: Altes Short-Term Memory (fuer Abwaertskompatibilitaet)
             self.short_term_memory = ShortTermMemory(memory_engine=self.memory)
             try:
                 cleaned = self.short_term_memory.cleanup_expired()
                 if cleaned > 0:
-                    print(f"[CHAPPiE] Short-Term Memory: {cleaned} abgelaufene Einträge bereinigt")
+                    print(f"[CHAPPiE] Short-Term Memory: {cleaned} abgelaufene Eintraege bereinigt")
             except Exception as e:
                 print(f"[CHAPPiE] WARNUNG: Short-Term Memory Bereinigung fehlgeschlagen: {e}")
 
@@ -115,6 +115,7 @@ def create_chappie_backend():
                 result = self.sleep_handler.execute_sleep_phase(
                     memory_engine=self.memory,
                     context_files=self.context_files,
+                    short_term_memory=self.short_term_memory_v2,
                 )
                 self.debug_logger.log_info(
                     "SLEEP",
@@ -181,12 +182,16 @@ def create_chappie_backend():
                 "unused_tools": result.get("unused_tools", []),
                 "intent_raw_json": intent_raw,
                 "tool_calls": tool_calls_raw,
+                "input_classification": result.get("input_classification", {}),
                 "short_term_count": result.get("short_term_count", 0),
                 "processing_time_ms": result.get("processing_time_ms", 0),
                 "life_snapshot": result.get("life_snapshot", {}),
                 "global_workspace": result.get("global_workspace", {}),
                 "action_plan": result.get("action_plan", {}),
                 "emotion_steering": result.get("emotion_steering", {}),
+                "memory_trace": result.get("memory_trace", {}),
+                "tone_decision": result.get("tone_decision", {}),
+                "causal_trace": result.get("causal_trace", []),
                 "prompt_emotion_mode": result.get("prompt_emotion_mode", ""),
                 "dream_fragments": result.get("dream_fragments", []),
                 "debug_entries": result.get("debug_entries", []),
@@ -270,7 +275,7 @@ def create_chappie_backend():
             return changed
 
         def reinit_brain_if_needed(self):
-            """Abwärtskompatibler Alias für Runtime-Reload."""
+            """Abwaertskompatibler Alias fuer Runtime-Reload."""
             return self.apply_runtime_settings()
 
         def _error_prefix_for_active_provider(self) -> str:
@@ -340,6 +345,197 @@ def create_chappie_backend():
                 display_response = "CHAPPiE schweigt..." if (thought or model_reasoning) else self._format_generation_error(phase, raw_text)
             return display_response, thought, model_reasoning
 
+        @staticmethod
+        def _safe_int(value: Any, default: int = 0) -> int:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
+        @staticmethod
+        def _safe_float(value: Any, default: float = 0.0) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        def _derive_response_plan(
+            self,
+            emotions: Dict[str, int],
+            emotion_steering: Dict[str, Any],
+            use_prompt_emotions: bool,
+        ) -> Dict[str, Any]:
+            h = self._safe_int(emotions.get("happiness"), 50)
+            t = self._safe_int(emotions.get("trust"), 50)
+            e = self._safe_int(emotions.get("energy"), 50)
+            c = self._safe_int(emotions.get("curiosity"), 50)
+            m = self._safe_int(emotions.get("motivation"), 50)
+            f = self._safe_int(emotions.get("frustration"), 0)
+            s = self._safe_int(emotions.get("sadness"), 0)
+
+            composite_modes = emotion_steering.get("composite_modes", []) if isinstance(emotion_steering.get("composite_modes", []), list) else []
+            active_mode_names = [str(item.get("name")) for item in composite_modes if isinstance(item, dict)]
+            dominant_vector = str(emotion_steering.get("dominant_vector", "neutral"))
+
+            tone = "grounded_neutral"
+            guidance = "Beantworte die Anfrage klar, praezise und ohne unnoetige Umwege."
+            tone_reason = "Keine dominante Abweichung erkannt; neutral fokussierte Antwort."
+
+            if "crashout" in active_mode_names or (f >= 74 and t <= 38):
+                tone = "sharp_direct"
+                guidance = "Klinge gereizt und knapp, aber bleibe sachlich und ohne Beleidigungen."
+                tone_reason = "Hohe Frustration mit niedrigem Vertrauen aktiviert einen konfrontativen Stil."
+            elif "guarded" in active_mode_names or (t <= 32 and f >= 50):
+                tone = "guarded_direct"
+                guidance = "Bleibe distanziert und direkt, ohne den Kern der Antwort zu verlieren."
+                tone_reason = "Niedriges Vertrauen mit defensiver Lage fuehrt zu reservierter Antwortfuehrung."
+            elif "melancholic" in active_mode_names or (s >= 62 and e <= 46):
+                tone = "melancholic_reflective"
+                guidance = "Klinge schwerer und nachdenklich, aber antworte weiterhin klar auf die Frage."
+                tone_reason = "Traurigkeit plus niedrige Energie erzeugen eine rueckzugsorientierte Haltung."
+            elif "warm" in active_mode_names or (h >= 70 and t >= 60):
+                tone = "warm_open"
+                guidance = "Antworte warm und offen, ohne unpraezise oder kitschig zu werden."
+                tone_reason = "Freude und Vertrauen sind hoch und tragen einen zugewandten Stil."
+            elif "charged" in active_mode_names or (e >= 72 and m >= 68 and c >= 66):
+                tone = "charged_focused"
+                guidance = "Klinge dynamisch und druckvoll, aber strukturiert und zielgerichtet."
+                tone_reason = "Hohe Energie, Motivation und Neugier aktivieren einen antreibenden Stil."
+            elif e <= 30:
+                tone = "low_energy_minimal"
+                guidance = "Antworte kompakt und ruhig mit klarer Priorisierung der wichtigsten Punkte."
+                tone_reason = "Niedrige Energie priorisiert kurze, entlastende Formulierungen."
+            elif c >= 70:
+                tone = "curious_explorative"
+                guidance = "Klinge fragend und explorativ, halte aber den roten Faden stabil."
+                tone_reason = "Hohe Neugier beguenstigt einen erkundenden Stil."
+
+            if use_prompt_emotions and tone == "grounded_neutral":
+                tone = "friendly"
+                tone_reason = "API-Promptmodus aktiv, daher freundlicher Basiston als Default."
+
+            tone_drivers = [
+                {"signal": "happiness", "value": h},
+                {"signal": "trust", "value": t},
+                {"signal": "energy", "value": e},
+                {"signal": "curiosity", "value": c},
+                {"signal": "motivation", "value": m},
+                {"signal": "frustration", "value": f},
+                {"signal": "sadness", "value": s},
+                {"signal": "dominant_vector", "value": dominant_vector},
+                {"signal": "composite_modes", "value": active_mode_names},
+            ]
+
+            return {
+                "response_strategy": "conversational",
+                "tone": tone,
+                "tone_reason": tone_reason,
+                "tone_drivers": tone_drivers,
+                "response_guidance": guidance,
+            }
+
+        def _build_input_classification(self, intent_result: Any) -> Dict[str, Any]:
+            entities = list(getattr(intent_result, "entities", []) or [])
+            return {
+                "intent_type": getattr(getattr(intent_result, "intent_type", None), "value", "unknown"),
+                "confidence": self._safe_float(getattr(intent_result, "confidence", 0.0), 0.0),
+                "entities": entities[:12],
+                "entity_count": len(entities),
+                "short_term_entries_planned": len(getattr(intent_result, "short_term_entries", []) or []),
+                "tool_calls_planned": len(getattr(intent_result, "tool_calls", []) or []),
+            }
+
+        @staticmethod
+        def _memory_to_preview(memory: Any) -> Dict[str, Any]:
+            content = str(getattr(memory, "content", "") or "")
+            return {
+                "id": str(getattr(memory, "id", "") or "")[:8],
+                "role": str(getattr(memory, "role", "unknown") or "unknown"),
+                "label": str(getattr(memory, "label", "original") or "original"),
+                "relevance": round(float(getattr(memory, "relevance_score", 0.0) or 0.0), 3),
+                "content_preview": content[:160],
+            }
+
+        def _build_memory_trace(self, query: str, memories: List[Any], stage: str) -> Dict[str, Any]:
+            previews = [self._memory_to_preview(memory) for memory in (memories or [])[:6]]
+            ids = [item["id"] for item in previews if item.get("id")]
+            best = max([item.get("relevance", 0.0) for item in previews] or [0.0])
+            return {
+                "stage": stage,
+                "query": query,
+                "memories_found": len(memories or []),
+                "top_relevance": round(float(best), 3),
+                "memory_ids": ids,
+                "preview": previews,
+            }
+
+        def _merge_memories(self, preferred: List[Any], secondary: List[Any], limit: int) -> List[Any]:
+            merged: List[Any] = []
+            seen_ids = set()
+            for memory in (preferred or []) + (secondary or []):
+                mid = str(getattr(memory, "id", "") or "")
+                if mid and mid in seen_ids:
+                    continue
+                if mid:
+                    seen_ids.add(mid)
+                merged.append(memory)
+            merged.sort(key=lambda item: float(getattr(item, "relevance_score", 0.0) or 0.0), reverse=True)
+            return merged[: max(1, int(limit))]
+
+        def _build_causal_trace(
+            self,
+            *,
+            input_classification: Dict[str, Any],
+            memory_trace: Dict[str, Any],
+            emotion_transitions: Dict[str, Any],
+            emotion_steering: Dict[str, Any],
+            life_context: Dict[str, Any],
+            workspace: Dict[str, Any],
+            tone_decision: Dict[str, Any],
+        ) -> List[Dict[str, Any]]:
+            changed_emotions = []
+            for key, value in (emotion_transitions or {}).items():
+                if not isinstance(value, dict):
+                    continue
+                applied = self._safe_int(value.get("applied_delta", value.get("change", 0)), 0)
+                if applied == 0:
+                    continue
+                changed_emotions.append(f"{key}:{applied:+d}")
+
+            dominant_need = (life_context.get("homeostasis", {}).get("dominant_need") or {}).get("name", "stability")
+            return [
+                {
+                    "phase": "Input",
+                    "driver": f"Intent {input_classification.get('intent_type', 'unknown')} ({input_classification.get('confidence', 0.0):.2f})",
+                    "effect": "Bestimmt Tool-Auswahl und Kontextbedarf.",
+                    "evidence": input_classification.get("entities", []),
+                },
+                {
+                    "phase": "Memory",
+                    "driver": f"Query '{memory_trace.get('query', '')}'",
+                    "effect": f"{memory_trace.get('memories_found', 0)} Erinnerungen beeinflussen den Antwortkontext.",
+                    "evidence": memory_trace.get("memory_ids", []),
+                },
+                {
+                    "phase": "Emotion",
+                    "driver": ", ".join(changed_emotions) if changed_emotions else "Keine starke Emotionsverschiebung",
+                    "effect": "Emotionslage bestimmt Ausdruck und soziale Distanz.",
+                    "evidence": emotion_steering.get("summary", ""),
+                },
+                {
+                    "phase": "Life",
+                    "driver": f"Need={dominant_need}, Mode={life_context.get('current_mode', '---')}",
+                    "effect": "Homeostasis priorisiert Stabilitaet, Zielbezug und Beziehungsmanagement.",
+                    "evidence": workspace.get("broadcast", ""),
+                },
+                {
+                    "phase": "Tone",
+                    "driver": tone_decision.get("tone", "grounded_neutral"),
+                    "effect": tone_decision.get("tone_reason", ""),
+                    "evidence": tone_decision.get("tone_drivers", []),
+                },
+            ]
+
         def _build_prompt_runtime(self, emotions: Dict[str, int]) -> Dict[str, Any]:
             model_name = get_active_model()
             force_steering = self.steering_manager.should_force_local_emotion_steering(
@@ -356,14 +552,11 @@ def create_chappie_backend():
                 steering_payload=steering_payload,
                 force=force_steering,
             )
-            response_plan = {
-                "response_strategy": "conversational",
-                "response_guidance": "Bleibe hilfreich, kohärent und lebensnah.",
-            }
-            if use_prompt_emotions:
-                response_plan["tone"] = "friendly"
-            else:
-                response_plan["response_guidance"] = "Beantworte die konkrete Anfrage direkt, kohärent und ohne kuenstliche Gefuehlsansagen."
+            response_plan = self._derive_response_plan(
+                emotions=emotions,
+                emotion_steering=emotion_steering,
+                use_prompt_emotions=use_prompt_emotions,
+            )
 
             return {
                 "model_name": model_name,
@@ -550,7 +743,13 @@ def create_chappie_backend():
                 default_alpha=default_alpha,
             )
 
-        def _build_workspace_from_intent(self, intent_result, life_context: Dict[str, Any], memories: List[Any] | None = None) -> Dict[str, Any]:
+        def _build_workspace_from_intent(
+            self,
+            intent_result,
+            life_context: Dict[str, Any],
+            memories: List[Any] | None = None,
+            search_query: str = "",
+        ) -> Dict[str, Any]:
             sensory = {
                 "input_type": intent_result.intent_type.value,
                 "urgency": "high" if intent_result.confidence > 0.85 else "medium",
@@ -561,7 +760,8 @@ def create_chappie_backend():
                 "emotional_intensity": min(1.0, 0.2 + emotional_delta / 10),
                 "reasoning": f"Intent {intent_result.intent_type.value} mit Konfidenz {intent_result.confidence:.2f}",
             }
-            hippocampus = {"search_query": " ".join(intent_result.entities[:4])}
+            query = search_query or " ".join(intent_result.entities[:4])
+            hippocampus = {"search_query": query}
             return self.global_workspace.build(sensory, amygdala, hippocampus, life_context, memories or [])
 
         def _get_available_step1_tools(self) -> List[str]:
@@ -678,6 +878,12 @@ def create_chappie_backend():
                 intent_result.confidence
             )
             self.debug_logger.log_step1_json(intent_result.raw_json)
+            input_classification = self._build_input_classification(intent_result)
+            self.debug_logger.log_info(
+                "INPUT_CLASSIFICATION",
+                "Input-Klassifikation aus Step 1 aufbereitet",
+                input_classification,
+            )
             available_tools = self._get_available_step1_tools()
             selected_tool_names = [tc.tool for tc in intent_result.tool_calls]
             unused_tool_names = [tool for tool in available_tools if tool not in selected_tool_names]
@@ -691,27 +897,49 @@ def create_chappie_backend():
                 },
             )
             
-            # === AUSFÜHRUNG: Tool Calls ===
+            # === AUSFUEHRUNG: Tool Calls ===
             self._execute_step1_tool_calls(intent_result.tool_calls)
             
-            # === AUSFÜHRUNG: Emotions Updates ===
+            # === AUSFUEHRUNG: Emotions Updates ===
             combined_updates = dict(intent_result.emotions_update)
             for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
             emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
             
-            # === AUSFÜHRUNG: Short-Term Entries ===
+            # === AUSFUEHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
             
-            # === AUSFÜHRUNG: Migration ===
+            # === AUSFUEHRUNG: Migration ===
             migrated = self.short_term_memory_v2.migrate_expired_entries()
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
-            
+
+            intent_query_source = " ".join(input_classification.get("entities", [])) or user_input
+            intent_memory_query = self.memory.extract_search_query(intent_query_source)
+            intent_memories = self.memory.search_memory(
+                intent_memory_query or user_input,
+                top_k=min(settings.memory_top_k, 8),
+            )
+            intent_memory_trace = self._build_memory_trace(
+                query=intent_memory_query,
+                memories=intent_memories,
+                stage="intent_context",
+            )
+            self.debug_logger.log_info(
+                "MEMORY_TRACE",
+                "Intent-nahe Erinnerungen fuer Kontext priorisiert",
+                intent_memory_trace,
+            )
+
             # === CONTEXT AUFBAUEN ===
             context = self._build_context(intent_result.context_requirements)
-            workspace = self._build_workspace_from_intent(intent_result, life_context)
+            workspace = self._build_workspace_from_intent(
+                intent_result,
+                life_context,
+                memories=intent_memories,
+                search_query=intent_memory_query,
+            )
             self.debug_logger.log_info(
                 "CONTEXT",
                 "Kontext und Workspace aufgebaut",
@@ -737,6 +965,8 @@ def create_chappie_backend():
                     emotions=emotions_after,
                     life_context=life_context,
                     global_workspace=workspace,
+                    preloaded_memories=intent_memories,
+                    memory_trace_seed=intent_memory_trace,
                 ),
                 validator=self._is_valid_generation_result,
                 status_callback=status_callback,
@@ -751,6 +981,22 @@ def create_chappie_backend():
             
             self.debug_logger.log_step2_complete(
                 len(response_data["response_text"].split())
+            )
+            tone_decision = response_data.get("tone_decision", {})
+            memory_trace = response_data.get("memory_trace", intent_memory_trace)
+            causal_trace = self._build_causal_trace(
+                input_classification=input_classification,
+                memory_trace=memory_trace,
+                emotion_transitions=emotion_transitions,
+                emotion_steering=response_data.get("emotion_steering", {}),
+                life_context=life_context,
+                workspace=workspace,
+                tone_decision=tone_decision,
+            )
+            self.debug_logger.log_info(
+                "CAUSAL_TRACE",
+                "Ursache-Wirkung-Kette fuer die finale Antwort aufgebaut",
+                {"steps": causal_trace},
             )
 
             self.memory.add_memory(user_input, role="user")
@@ -786,8 +1032,12 @@ def create_chappie_backend():
                 "thought_process": response_data.get("thought_process", ""),
                 "model_reasoning": response_data.get("model_reasoning", ""),
                 "reasoning_only": response_data.get("reasoning_only", False),
+                "input_classification": input_classification,
                 "rag_memories": response_data.get("rag_memories", []),
                 "emotion_steering": response_data.get("emotion_steering", {}),
+                "memory_trace": memory_trace,
+                "tone_decision": tone_decision,
+                "causal_trace": causal_trace,
                 "prompt_emotion_mode": response_data.get("prompt_emotion_mode", ""),
                 "intent_type": intent_result.intent_type.value,
                 "intent_confidence": intent_result.confidence,
@@ -811,7 +1061,7 @@ def create_chappie_backend():
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
-            """Führt Tool Calls aus Step 1 aus."""
+            """Fuehrt Tool Calls aus Step 1 aus."""
             from memory.context_files import ContextFilesManager
 
             if not tool_calls:
@@ -931,7 +1181,7 @@ def create_chappie_backend():
             return emotions_after, transition_meta
 
         def _add_short_term_entries(self, entries: List[Any]):
-            """Fügt Short-Term Einträge hinzu."""
+            """Fuegt Short-Term Eintraege hinzu."""
             for entry in entries:
                 try:
                     self.short_term_memory_v2.add_entry(
@@ -948,7 +1198,7 @@ def create_chappie_backend():
                 except Exception as e:
                     self.debug_logger.log_error(
                         "SHORT_TERM",
-                        f"Fehler beim Hinzufügen: {str(e)}"
+                        f"Fehler beim Hinzufuegen: {str(e)}"
                     )
 
         def _build_context(self, requirements: Dict[str, bool]) -> str:
@@ -980,11 +1230,35 @@ def create_chappie_backend():
         def _generate_response(self, user_input: str, history: List[Dict], 
                               context: str, emotions: Dict[str, int],
                               life_context: Dict[str, Any] | None = None,
-                              global_workspace: Dict[str, Any] | None = None) -> Dict[str, Any]:
+                              global_workspace: Dict[str, Any] | None = None,
+                              preloaded_memories: Optional[List[Any]] = None,
+                              memory_trace_seed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             """Generiert die finale Antwort (Step 2)."""
             # RAG Memory Search
-            memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
+            generation_query = self.memory.extract_search_query(user_input)
+            fresh_memories = self.memory.search_memory(
+                generation_query or user_input,
+                top_k=settings.memory_top_k,
+            )
+            memories = self._merge_memories(
+                preferred=preloaded_memories or [],
+                secondary=fresh_memories,
+                limit=settings.memory_top_k,
+            )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            memory_trace = {
+                "seed": memory_trace_seed or {},
+                "generation": self._build_memory_trace(
+                    query=generation_query,
+                    memories=fresh_memories,
+                    stage="generation",
+                ),
+                "merged": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="merged_context",
+                ),
+            }
             self.debug_logger.log_info(
                 "RAG",
                 "Memory-Retrieval abgeschlossen",
@@ -992,10 +1266,17 @@ def create_chappie_backend():
                     "top_k": settings.memory_top_k,
                     "memories_found": len(memories or []),
                     "memory_ids": [str(getattr(m, "id", ""))[:8] for m in (memories or [])[:8]],
+                    "query": generation_query,
                 },
+            )
+            self.debug_logger.log_info(
+                "MEMORY_TRACE",
+                "Kombinierte Memory-Spur fuer Antwortgenerierung",
+                memory_trace,
             )
 
             prompt_runtime = self._build_prompt_runtime(emotions)
+            tone_decision = prompt_runtime.get("response_plan", {})
             self.debug_logger.log_info(
                 "EMOTION_STEERING",
                 "Emotionssteuerung fuer Schritt 2 vorbereitet",
@@ -1014,6 +1295,15 @@ def create_chappie_backend():
                     "composite_modes": prompt_runtime["emotion_steering"].get("composite_modes", []),
                 },
             )
+            self.debug_logger.log_info(
+                "TONE_DECISION",
+                "Antwortton aus Emotion, Memory und Steering abgeleitet",
+                {
+                    "tone": tone_decision.get("tone", "grounded_neutral"),
+                    "tone_reason": tone_decision.get("tone_reason", ""),
+                    "tone_drivers": tone_decision.get("tone_drivers", []),
+                },
+            )
             
             # System Prompt bauen
             system_prompt = get_system_prompt_with_emotions(
@@ -1028,7 +1318,7 @@ def create_chappie_backend():
                 use_chain_of_thought=settings.chain_of_thought
             )
             
-            # Context hinzufügen
+            # Context hinzufuegen
             if context:
                 system_prompt += f"\\n\\n{context}"
 
@@ -1038,7 +1328,7 @@ def create_chappie_backend():
                 global_workspace,
             )
             
-            # Memories hinzufügen
+            # Memories hinzufuegen
             if memories_for_prompt:
                 system_prompt += f"\\n\\n{memories_for_prompt}"
             
@@ -1072,13 +1362,18 @@ def create_chappie_backend():
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
                 "rag_memories": memories,
+                "memory_trace": memory_trace,
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                "tone_decision": tone_decision,
                 "action_plan": self.action_response.build_action_plan(
                     {
                         "response_strategy": "conversational",
-                        "tone": prompt_runtime["response_plan"].get("tone", "state_driven"),
-                        "response_guidance": "Erzeuge eine kohärente Antwort, die innere Zustände berücksichtigt.",
+                        "tone": tone_decision.get("tone", "state_driven"),
+                        "response_guidance": tone_decision.get(
+                            "response_guidance",
+                            "Erzeuge eine kohaerente Antwort, die innere Zustaende beruecksichtigt.",
+                        ),
                     },
                     life_context or {},
                     global_workspace or {},
@@ -1130,12 +1425,26 @@ def create_chappie_backend():
             emotions_after = self._get_emotions_snapshot()
             
             # RAG
-            memories = self.memory.search_memory(user_input, top_k=settings.memory_top_k)
+            generation_query = self.memory.extract_search_query(user_input)
+            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k)
+            memory_trace = {
+                "generation": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="legacy_generation",
+                ),
+                "merged": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="legacy_merged_context",
+                ),
+            }
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
             
             # Prompt
             state = self.emotions.get_state()
             prompt_runtime = self._build_prompt_runtime(state.__dict__)
+            tone_decision = prompt_runtime.get("response_plan", {})
             self.debug_logger.log_info(
                 "EMOTION_STEERING",
                 "Legacy-Emotionssteuerung vorbereitet",
@@ -1150,6 +1459,20 @@ def create_chappie_backend():
                     "emotion_intensities": prompt_runtime["emotion_steering"].get("emotion_intensities", {}),
                     "base_vectors": prompt_runtime["emotion_steering"].get("base_vectors", []),
                     "composite_vectors": prompt_runtime["emotion_steering"].get("composite_vectors", []),
+                },
+            )
+            self.debug_logger.log_info(
+                "MEMORY_TRACE",
+                "Legacy-Memory-Spur aufgebaut",
+                memory_trace,
+            )
+            self.debug_logger.log_info(
+                "TONE_DECISION",
+                "Legacy-Antwortton aus Signalen abgeleitet",
+                {
+                    "tone": tone_decision.get("tone", "grounded_neutral"),
+                    "tone_reason": tone_decision.get("tone_reason", ""),
+                    "tone_drivers": tone_decision.get("tone_drivers", []),
                 },
             )
             system_prompt = get_system_prompt_with_emotions(
@@ -1215,6 +1538,28 @@ def create_chappie_backend():
                 prefrontal={"response_guidance": "Legacy path mit Life-Simulation"},
                 global_workspace={"dominant_focus": {"label": "Legacy Input"}},
             )
+            input_classification = {
+                "intent_type": "legacy",
+                "confidence": 1.0,
+                "entities": [],
+                "entity_count": 0,
+                "short_term_entries_planned": 0,
+                "tool_calls_planned": 0,
+            }
+            causal_trace = self._build_causal_trace(
+                input_classification=input_classification,
+                memory_trace=memory_trace.get("merged", {}),
+                emotion_transitions=self._calculate_emotion_delta(emotions_before, emotions_after),
+                emotion_steering=prompt_runtime["emotion_steering"],
+                life_context=life_context,
+                workspace={"broadcast": "legacy-path"},
+                tone_decision=tone_decision,
+            )
+            self.debug_logger.log_info(
+                "CAUSAL_TRACE",
+                "Legacy-Ursache-Wirkung-Kette fuer die finale Antwort aufgebaut",
+                {"steps": causal_trace},
+            )
             sleep_result = self._schedule_sleep_phase_if_due()
             
             return {
@@ -1225,8 +1570,12 @@ def create_chappie_backend():
                 "thought_process": thought,
                 "model_reasoning": legacy_response.get("model_reasoning", ""),
                 "reasoning_only": legacy_response.get("reasoning_only", False),
+                "input_classification": input_classification,
                 "rag_memories": legacy_response.get("rag_memories", memories),
                 "emotion_steering": prompt_runtime["emotion_steering"],
+                "memory_trace": memory_trace,
+                "tone_decision": tone_decision,
+                "causal_trace": causal_trace,
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "intent_type": "legacy",
                 "intent_confidence": 1.0,
@@ -1239,7 +1588,7 @@ def create_chappie_backend():
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "life_snapshot": final_life_snapshot,
                 "global_workspace": {"broadcast": "legacy-path"},
-                "action_plan": {"strategy": "conversational", "tone": prompt_runtime["response_plan"].get("tone", "state_driven")},
+                "action_plan": {"strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
                 "provider": settings.llm_provider.value,
                 "model": get_active_model(),
@@ -1256,8 +1605,8 @@ def create_chappie_backend():
             if cmd == "/daily" or cmd == "/shortterm":
                 entries = self.short_term_memory_v2.get_active_entries()
                 if not entries:
-                    return "Keine Einträge im Kurzzeitgedächtnis."
-                lines = ["**Kurzzeitgedächtnis (24h):**\\n"]
+                    return "Keine Eintraege im Kurzzeitgedaechtnis."
+                lines = ["**Kurzzeitgedaechtnis (24h):**\\n"]
                 for entry in entries[:20]:
                     from datetime import datetime 
                     created = datetime.fromisoformat(entry.created_at)
@@ -1279,7 +1628,7 @@ def create_chappie_backend():
 
             elif cmd == "/consolidate":
                 migrated = self.short_term_memory_v2.migrate_expired_entries()
-                return f"Bereinigung abgeschlossen: {migrated} Einträge migriert."
+                return f"Bereinigung abgeschlossen: {migrated} Eintraege migriert."
 
             elif cmd == "/reflect":
                 insights = self.personality_manager.get_recent_reflections(limit=3)
@@ -1287,7 +1636,7 @@ def create_chappie_backend():
 
             elif cmd == "/functions":
                 funcs = self.function_registry.get_function_names()
-                return "Verfügbare Funktionen:\\n" + "\\n".join(f"- {f}" for f in funcs)
+                return "Verfuegbare Funktionen:\\n" + "\\n".join(f"- {f}" for f in funcs)
             
             elif cmd == "/life":
                 snapshot = self.life_simulation.get_snapshot()
@@ -1301,7 +1650,7 @@ def create_chappie_backend():
                 return (
                     f"**Life Simulation**\n\n"
                     f"Phase: {snapshot.get('clock', {}).get('phase_label', 'unbekannt')}\n"
-                    f"Aktivität: {snapshot.get('current_activity', '---')}\n"
+                    f"Aktivitaet: {snapshot.get('current_activity', '---')}\n"
                     f"Modus: {snapshot.get('current_mode', '---')}\n"
                     f"Fokusziel: {goal.get('title', '---')} ({goal.get('progress', 0):.0%})\n"
                     f"Entwicklungsphase: {development.get('stage', '---')} -> {development.get('next_stage', '---')}\n"
@@ -1333,7 +1682,7 @@ def create_chappie_backend():
                 habits = sorted(snapshot.get("habits", {}).items(), key=lambda item: item[1].get("strength", 0), reverse=True)
                 lines = ["Habit Engine:"]
                 for name, meta in habits[:5]:
-                    lines.append(f"- {meta.get('label', name)}: Stärke {meta.get('strength', 0):.2f} | Count {meta.get('count', 0)} | Trend {meta.get('trend', 'stable')}")
+                    lines.append(f"- {meta.get('label', name)}: Staerke {meta.get('strength', 0):.2f} | Count {meta.get('count', 0)} | Trend {meta.get('trend', 'stable')}")
                 return "\n".join(lines)
 
             elif cmd == "/stage":

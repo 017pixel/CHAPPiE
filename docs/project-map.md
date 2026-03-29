@@ -84,3 +84,12 @@ Der Ordner [`data/`](../data) ist wichtig, aber sensibel:
 - [Deployment](deployment.md)
 - [Architektur](architecture.md)
 
+## Aktuelle Debug- und Memory-Schwerpunkte
+
+Die folgenden Pfade sind fuer das neue Trace-Verstaendnis besonders relevant:
+
+- `web_infrastructure/backend_wrapper.py` fuer Input-Klassifikation, Memory-Trace, Tone-Decision und Kausalkette
+- `web_infrastructure/components.py` fuer die Brain-Monitor-Darstellung
+- `memory/memory_engine.py` fuer deutsche Query-Extraktion und Memory-Priorisierung
+- `memory/sleep_phase.py` fuer Konsolidierung, Dedupe und Forgetting-Analyse
+- `tests/test_memory_query_extraction_german.py` fuer die Query-Extraktion

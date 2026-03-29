@@ -13,6 +13,7 @@ Funktionen:
 import os
 import sys
 import uuid
+import re
 from datetime import datetime, timezone
 from typing import Optional, Any
 from dataclasses import dataclass
@@ -376,6 +377,81 @@ class MemoryEngine:
                 print(f"   Self-Reflection Suche fehlgeschlagen: {e}")
             return self.search_memory(query, top_k=top_k, min_relevance=min_relevance)
 
+    @staticmethod
+    def _normalize_german_text(text: str) -> str:
+        if not text:
+            return ""
+        replacements = str.maketrans({
+            "ä": "ae",
+            "ö": "oe",
+            "ü": "ue",
+            "ß": "ss",
+            "Ä": "ae",
+            "Ö": "oe",
+            "Ü": "ue",
+        })
+        return text.translate(replacements).lower()
+
+    @staticmethod
+    def _default_stop_words() -> set[str]:
+        return {
+            "ich", "du", "er", "sie", "es", "wir", "ihr", "uns", "euch", "ihnen",
+            "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
+            "und", "oder", "aber", "doch", "weil", "dass", "wenn", "als", "wie", "sowie",
+            "bin", "bist", "ist", "sind", "war", "waren", "waere", "sein", "haben", "hat", "hatte",
+            "mich", "dich", "sich", "mir", "dir", "ihm", "ihr",
+            "nicht", "auch", "noch", "schon", "nur", "sehr", "mehr", "ganz", "wirklich",
+            "fuer", "auf", "an", "in", "im", "am", "bei", "nach", "vor", "mit", "ohne", "ueber", "unter",
+            "was", "wer", "wen", "wem", "welche", "welcher", "welchem", "dieser", "diese", "diesem",
+            "koennen", "kann", "muessen", "muss", "sollen", "soll", "wollen", "will", "duerfen", "darf",
+            "koennte", "wuerde", "sollte", "moechte", "werde", "wurde", "worden",
+            "hallo", "hi", "hey", "moin", "servus", "guten", "tag", "morgen", "abend", "bitte", "danke",
+            "mal", "halt", "eben", "ja", "nein", "ok", "okay",
+        }
+
+    def _tokenize_for_keywords(self, text: str) -> list[str]:
+        normalized = self._normalize_german_text(text)
+        return re.findall(r"[a-z0-9]{3,}", normalized)
+
+    @staticmethod
+    def _clean_query_output(raw_query: str) -> str:
+        if not raw_query:
+            return ""
+        cleaned = str(raw_query).replace("\n", " ").replace("\r", " ").strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        cleaned = cleaned.strip(" ,.;:|")
+        if cleaned.startswith("{") and cleaned.endswith("}"):
+            return ""
+        return cleaned[:280]
+
+    def _build_keyword_query(self, text: str, max_terms: int = 15) -> str:
+        stop_words = self._default_stop_words()
+        tokens = self._tokenize_for_keywords(text)
+        if not tokens:
+            return ""
+
+        first_position: dict[str, int] = {}
+        frequency: dict[str, int] = {}
+        for idx, token in enumerate(tokens):
+            if token in stop_words:
+                continue
+            if token not in first_position:
+                first_position[token] = idx
+            frequency[token] = frequency.get(token, 0) + 1
+
+        if not frequency:
+            return ""
+
+        ranked = sorted(
+            frequency.keys(),
+            key=lambda token: (
+                -frequency[token],
+                -(len(token)),
+                first_position[token],
+            ),
+        )
+        return " ".join(ranked[: max(1, int(max_terms))])
+
     def extract_search_query(self, user_input: str) -> str:
         """
         Extrahiert optimierte Suchbegriffe aus dem User-Input.
@@ -400,22 +476,8 @@ class MemoryEngine:
         words = user_input.split()
         
         if len(words) < 10:
-            stop_words = {
-                "ich", "du", "er", "sie", "es", "wir", "ihr", "sie",
-                "der", "die", "das", "ein", "eine", "einen", "einem", "einer",
-                "und", "oder", "aber", "doch", "als", "wie",
-                "bin", "bist", "ist", "sind", "war", "waere", "haben", "hat",
-                "mir", "dir", "ihm", "ihr", "uns", "euch", "ihnen",
-                "mich", "dich", "sich",
-                "hallo", "hi", "hey", "moin", "servus", "guten", "tag", "morgen", "abend",
-                "bitte", "danke", "mal", "halt", "eben", "so", "doch", "ja", "nein",
-                "koennte", "wuerde", "sollte", "moechte", "kannst", "bitte"
-            }
-            
-            keywords = [w for w in words if w.lower().strip(".,!?") not in stop_words]
-            
-            if keywords:
-                extracted = " ".join(keywords)
+            extracted = self._build_keyword_query(user_input, max_terms=10)
+            if extracted:
                 if settings.debug:
                     print(f"   Query Extraction (Manual): '{user_input}' -> '{extracted}'")
                 return extracted
@@ -446,10 +508,11 @@ class MemoryEngine:
             if brain:
                 result = brain.generate(messages, config=gen_config)
                 if not looks_like_model_error(result):
-                    extracted = result.strip()
+                    extracted = self._clean_query_output(result)
                     if settings.debug:
                         print(f"   Query Extraction ({effective_provider.value}): '{extracted[:100]}...'")
-                    return extracted
+                    if extracted:
+                        return extracted
                 elif settings.debug:
                     print(f"   Query Extraction ({effective_provider.value}): LLM returned error or empty: {result[:100] if result else 'None'}")
         except Exception as e:
@@ -478,35 +541,7 @@ class MemoryEngine:
 
     def _extract_keywords_simple(self, text: str) -> str:
         """Extrahiert einfach Schluesselwoerter ohne LLM."""
-        import re
-        stop_words = {
-            "ich", "du", "er", "sie", "es", "wir", "ihr", "sie", "sich",
-            "der", "die", "das", "den", "dem", "des", "ein", "eine", "einer", "einem", "einen",
-            "und", "oder", "aber", "wenn", "weil", "dass", "ob", "als", "wie",
-            "ist", "sind", "war", "waren", "sein", "haben", "hat", "hatte", "werden", "wird",
-            "mir", "dir", "ihm", "ihnen", "uns", "euch",
-            "mich", "dich",
-            "nicht", "auch", "noch", "schon", "nur", "sehr", "so", "zu", "von", "mit",
-            "fuer", "auf", "an", "in", "im", "am", "bei", "nach", "vor", "ueber", "unter",
-            "diese", "dieser", "diesem", "welche", "welcher", "welchem", "was", "wer", "wen", "wem",
-            "koennen", "kann", "muessen", "muss", "sollen", "soll", "wollen", "will", "duerfen", "darf",
-            "wuerde", "koennte", "sollte", "moechte", "werde", "wurde", "worden",
-            "habe", "haben", "bin", "bist", "ist", "sind", "war", "waren",
-            "mehr", "andere", "anderer", "anderem", "andren",
-            "bitte", "danke", "vielleicht", "vielleicht", "gerade", "wirklich", "ganz", "viel"
-        }
-        
-        words = re.findall(r'\b[A-Za-zAEIOUaeiou]{3,}\b', text.lower())
-        keywords = [w for w in words if w not in stop_words and len(w) > 2]
-        
-        seen = set()
-        unique_keywords = []
-        for w in keywords:
-            if w not in seen:
-                seen.add(w)
-                unique_keywords.append(w)
-        
-        return " ".join(unique_keywords[:15]) if unique_keywords else ""
+        return self._build_keyword_query(text, max_terms=15)
 
     def search_memory(self, query: str, top_k: Optional[int] = None, min_relevance: float = 0.0) -> list[Memory]:
         """

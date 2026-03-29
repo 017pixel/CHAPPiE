@@ -70,3 +70,14 @@ Wenn Testdateien verschoben oder neu gruppiert werden, müssen mindestens diese 
 - `docs/testing.md`
 - `tests/README.md`
 - ggf. CI-/Skript- oder Service-Dateien
+
+## Zusaetzliche aktuelle Testdateien
+
+Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
+
+- `tests/test_debug_monitor_data.py`
+- `tests/test_memory_query_extraction_german.py`
+- `tests/test_sleep_phase_context_updates.py`
+- `tests/test_forgetting_curve.py`
+- `tests/test_brain_pipeline_steering_integration.py`
+- `tests/test_reasoning_layering.py`

@@ -41,3 +41,8 @@ In der Streamlit-UI sieht man das jetzt explizit:
 
 Details: [`docs/local-models.md`](../docs/local-models.md)
 
+Zusatz fuer den neuen Debug-Stand:
+
+- Brain Monitor zeigt jetzt Input, Memory, Emotion, Steering und Ton als nachvollziehbare Kette
+- Memory arbeitet robuster mit deutscher Query-Extraktion und besserer Verdichtung
+- Sleep-Phase verdichtet Kurzzeitdaten sauberer in Richtung Langzeitgedaechtnis

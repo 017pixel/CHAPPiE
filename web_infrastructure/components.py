@@ -122,15 +122,48 @@ def render_brain_monitor(metadata: Dict[str, Any]):
         st.caption("Laufzeit")
         st.write(f"{processing_time:.1f} ms")
 
+    causal_trace = metadata.get("causal_trace", []) if isinstance(metadata.get("causal_trace", []), list) else []
+    if causal_trace:
+        with st.expander("Kausalkette: Warum CHAPPiE so geantwortet hat", expanded=True):
+            for idx, step in enumerate(causal_trace, start=1):
+                if not isinstance(step, dict):
+                    continue
+                phase = step.get("phase", f"Schritt {idx}")
+                st.markdown(f"**{idx}. {phase}**")
+                st.markdown(f"- Treiber: {step.get('driver', '-')}")
+                st.markdown(f"- Wirkung: {step.get('effect', '-')}")
+                evidence = step.get("evidence", [])
+                if isinstance(evidence, list):
+                    if evidence:
+                        st.markdown(f"- Evidenz: {', '.join(str(item) for item in evidence)}")
+                elif evidence:
+                    st.markdown(f"- Evidenz: {evidence}")
+
     input_text = metadata.get("input_analysis", "")
     intent_type = metadata.get("intent_type", "-")
     intent_confidence = metadata.get("intent_confidence", 0.0)
     intent_raw = metadata.get("intent_raw_json", {}) if isinstance(metadata.get("intent_raw_json", {}), dict) else {}
+    input_classification = metadata.get("input_classification", {}) if isinstance(metadata.get("input_classification", {}), dict) else {}
     with st.expander("Phase 1: Input und Intent", expanded=False):
         st.markdown(f"**Intent:** `{intent_type}` ({intent_confidence:.1%})")
         if input_text:
             st.markdown("**Input Analyse:**")
             st.write(input_text)
+        if input_classification:
+            st.markdown("**Klassifikation:**")
+            st.dataframe(
+                [
+                    {"feld": "intent_type", "wert": input_classification.get("intent_type", "-")},
+                    {"feld": "confidence", "wert": round(float(input_classification.get("confidence", 0.0)), 3)},
+                    {"feld": "entity_count", "wert": input_classification.get("entity_count", 0)},
+                    {"feld": "tool_calls_planned", "wert": input_classification.get("tool_calls_planned", 0)},
+                    {"feld": "short_term_entries_planned", "wert": input_classification.get("short_term_entries_planned", 0)},
+                ],
+                use_container_width=True,
+            )
+            entities = input_classification.get("entities", [])
+            if isinstance(entities, list) and entities:
+                st.markdown(f"**Entities:** {', '.join(str(item) for item in entities)}")
         if intent_raw:
             st.markdown("**Step-1 Roh-JSON:**")
             render_json_block(intent_raw)
@@ -139,6 +172,7 @@ def render_brain_monitor(metadata: Dict[str, Any]):
     selected_tools = metadata.get("selected_tools", []) or []
     unused_tools = metadata.get("unused_tools", []) or []
     tool_calls = metadata.get("tool_calls", []) or []
+    memory_trace = metadata.get("memory_trace", {}) if isinstance(metadata.get("memory_trace", {}), dict) else {}
     with st.expander("Phase 2: Tool-Orchestrierung", expanded=False):
         st.markdown(f"**Verfuegbare Tools:** {', '.join(available_tools) if available_tools else '-'}")
         st.markdown(f"**Ausgewaehlte Tools:** {', '.join(selected_tools) if selected_tools else 'keine'}")
@@ -149,6 +183,22 @@ def render_brain_monitor(metadata: Dict[str, Any]):
                     render_json_block(call)
         else:
             st.info("Keine Tool Calls ausgefuehrt.")
+        if memory_trace:
+            st.markdown("**Memory-Trace:**")
+            for block_name in ["seed", "generation", "merged"]:
+                block = memory_trace.get(block_name, {})
+                if not isinstance(block, dict) or not block:
+                    continue
+                with st.expander(f"Retrieval {block_name}", expanded=False):
+                    st.markdown(f"- Query: `{block.get('query', '')}`")
+                    st.markdown(f"- Treffer: `{block.get('memories_found', 0)}`")
+                    st.markdown(f"- Top-Relevanz: `{block.get('top_relevance', 0.0)}`")
+                    ids = block.get("memory_ids", [])
+                    if isinstance(ids, list) and ids:
+                        st.markdown(f"- Memory IDs: {', '.join(str(item) for item in ids)}")
+                    preview = block.get("preview", [])
+                    if isinstance(preview, list) and preview:
+                        st.dataframe(preview, use_container_width=True)
 
     before = normalize_emotions(metadata.get("emotions_before", {}))
     delta = metadata.get("emotions_delta", {}) if isinstance(metadata.get("emotions_delta", {}), dict) else {}
@@ -259,6 +309,7 @@ def render_brain_monitor(metadata: Dict[str, Any]):
     thought = metadata.get("thought_process", "")
     model_reasoning = metadata.get("model_reasoning", "")
     action_plan = metadata.get("action_plan", {}) if isinstance(metadata.get("action_plan", {}), dict) else {}
+    tone_decision = metadata.get("tone_decision", {}) if isinstance(metadata.get("tone_decision", {}), dict) else {}
     with st.expander("Phase 5: Antwortgenerierung", expanded=False):
         if model_reasoning:
             st.markdown("**Modell-Reasoning:**")
@@ -266,6 +317,13 @@ def render_brain_monitor(metadata: Dict[str, Any]):
         if thought:
             st.markdown("**Reasoning / Gedankenprozess:**")
             st.code(thought, language=None)
+        if tone_decision:
+            st.markdown("**Tone Decision:**")
+            st.markdown(f"- Ton: `{tone_decision.get('tone', 'grounded_neutral')}`")
+            st.markdown(f"- Begruendung: {tone_decision.get('tone_reason', '-')}")
+            tone_drivers = tone_decision.get("tone_drivers", [])
+            if isinstance(tone_drivers, list) and tone_drivers:
+                st.dataframe(tone_drivers, use_container_width=True)
         if action_plan:
             st.markdown("**Action Plan:**")
             render_json_block(action_plan)
