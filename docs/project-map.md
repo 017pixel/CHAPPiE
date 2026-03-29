@@ -93,3 +93,12 @@ Die folgenden Pfade sind fuer das neue Trace-Verstaendnis besonders relevant:
 - `memory/memory_engine.py` fuer deutsche Query-Extraktion und Memory-Priorisierung
 - `memory/sleep_phase.py` fuer Konsolidierung, Dedupe und Forgetting-Analyse
 - `tests/test_memory_query_extraction_german.py` fuer die Query-Extraktion
+
+## Training-Control Schwerpunkte
+
+Fuer die Stabilitaet von Start/Stop/Status in der Web-UI sind diese Pfade zentral:
+
+- `web_infrastructure/training_ui.py` fuer Renderlogik und Bedienung
+- `Chappies_Trainingspartner/daemon_manager.py` fuer Prozesssteuerung und Snapshot
+- `Chappies_Trainingspartner/training_daemon.py` als Daemon-Entry-Point
+- `Chappies_Trainingspartner/training_loop.py` fuer Heartbeat und State-Datei

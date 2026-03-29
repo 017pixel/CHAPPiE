@@ -95,3 +95,10 @@ Die frühere SSH-Sammlung wurde inhaltlich in diese Seite überführt. Für den 
 - [Lokale Modelle & Fallbacks](local-models.md)
 - [Projektkarte](project-map.md)
 
+## Training-UI Steuerung
+
+Die Web-UI steuert Training weiterhin subprocess-basiert, nicht ueber systemd-API-Aufrufe:
+
+- Start/Stop/Restart laufen ueber `Chappies_Trainingspartner/daemon_manager.py`
+- Prozesszustand wird ueber `training.pid` plus Heartbeat in `training_state.json` bewertet
+- Der Daemon gilt nur dann als gesund, wenn Prozess und aktuelle Aktivitaet zusammenpassen

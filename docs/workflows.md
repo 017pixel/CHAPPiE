@@ -256,3 +256,13 @@ Im Debug-Mode zeigt CHAPPiE jetzt nicht nur Phasen, sondern auch die Kette dahin
 - warum am Ende genau dieser Ton gewaehlt wurde
 
 Die bestehende Phasenstruktur bleibt dabei unveraendert.
+
+### Trainingssteuerung: UI bis Daemon
+
+Der Trainings-Workflow ist jetzt in klaren Schritten aufgebaut:
+
+1. `web_infrastructure/training_ui.py` sammelt nur Eingaben und Actions.
+2. `Chappies_Trainingspartner/daemon_manager.py` fuehrt Start/Stop/Restart aus und liefert einen Snapshot.
+3. `Chappies_Trainingspartner/training_daemon.py` startet den Loop als Hintergrundprozess.
+4. `Chappies_Trainingspartner/training_loop.py` schreibt Heartbeat und Zustand nach `training_state.json`.
+5. Die UI liest den Snapshot und zeigt Running-/Stopped-/Degraded-Zustaende getrennt an.

@@ -268,6 +268,15 @@ python tests/test_vllm_response_handling.py
 python tests/test_reasoning_layering.py
 python tests/manual/test_compatibility.py
 python -m Chappies_Trainingspartner.training_daemon --help
+
+### Training-UI und Daemon-Steuerung
+
+Der Trainingsbereich der Web-UI nutzt jetzt eine klar getrennte Kontrollschicht:
+
+- UI rendert nur Status, Aktionen, Konfiguration und Diagnose
+- `Chappies_Trainingspartner/daemon_manager.py` ist der zentrale Einstieg fuer Start/Stop/Restart, Snapshot und Logs
+- `training_state.json`, `training.pid` und `training_config.json` werden konsistent im Projekt-Root verwaltet
+- Stale-PID und "laeuft, aber keine Aktivitaet" werden getrennt diagnostiziert
 ```
 
 Mehr Einordnung: [docs/testing.md](docs/testing.md) und [tests/README.md](tests/README.md)

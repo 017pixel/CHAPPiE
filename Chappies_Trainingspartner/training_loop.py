@@ -87,6 +87,7 @@ class TrainingLoop:
         self.context_files = get_context_files_manager()
         self.sleep_handler = get_sleep_phase_handler()
         data_dir = os.path.join(PROJECT_ROOT, "data")
+        self.state_file = os.path.join(PROJECT_ROOT, "training_state.json")
         self.chat_manager = ChatManager(data_dir)
         self.deep_think_engine = DeepThinkEngine(
             memory_engine=self.memory,
@@ -720,7 +721,7 @@ class TrainingLoop:
             }
         }
         try:
-            with open("training_state.json", "w", encoding="utf-8") as f:
+            with open(self.state_file, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
             log.debug(f"State gespeichert: {len(self.conversation_history)} Nachrichten")
         except Exception as e:
@@ -729,13 +730,13 @@ class TrainingLoop:
 
     def load_state(self):
         """Lädt den Trainings-Status falls vorhanden."""
-        if not os.path.exists("training_state.json"):
+        if not os.path.exists(self.state_file):
             log.info("Kein vorheriger Trainings-Status gefunden, starte neu")
             return
             
         try:
             console.print("[dim]Lade vorherigen Trainings-Status...[/dim]")
-            with open("training_state.json", "r", encoding="utf-8") as f:
+            with open(self.state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
                 
             self.conversation_history = state.get("history", [])
@@ -844,4 +845,3 @@ class TrainingLoop:
         
         log.info("Conversation Reset abgeschlossen - starte frisch")
         console.print("[green]✅ Reset abgeschlossen. Starte mit frischer Konversation.[/green]")
-

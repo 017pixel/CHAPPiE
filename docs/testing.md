@@ -116,4 +116,9 @@ Fuer die erweiterten Trace- und Memory-Pfade sind diese Dateien besonders wichti
 - `tests/test_brain_pipeline_steering_integration.py`
 - `tests/test_reasoning_layering.py`
 
+Fuer die Trainingssteuerung in UI + Daemon sind zusaetzlich wichtig:
+
+- `tests/test_training_config_ui.py`
+- `tests/test_training_daemon_lifecycle.py`
+
 Wenn nur die Doku angepasst wurde, reicht weiterhin ein schneller Struktur- oder `py_compile`-Check.
