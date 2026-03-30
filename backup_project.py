@@ -225,7 +225,8 @@ unterschiedlich ist, kann es zu Konflikten kommen. In diesem Fall:
 
 ## Schritt 5: Starten
 ```bash
-streamlit run app.py
+uvicorn api.main:app --reload --port 8010
+cd frontend && npm run dev
 ```
 
 ## Bei Problemen

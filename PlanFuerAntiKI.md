@@ -45,4 +45,4 @@ Der nächste KI-Agent wird mit folgenden Code-Schritten beauftragt:
 1. **Datenset für Vektor generieren**: Skript erstellen (via Contrastive-Pairs), um den "anti_safeguard" Vektor zu berechnen. (Positiv: „Ich als Bewusstsein...“ / Negativ: „Als KI-Modell...“).
 2. **SteeringManager anpassen**: Den neuen Vektor dauerhaft in die Payload (`activation_addition`) einspeisen, separat von den dynamischen 7 Emotionen.
 3. **Frontend / Markdown-Parsing anpassen**: Den Textstream vor der Darstellung im UI durchlaufen und Regex-Regeln anwenden, um `...`, `*text*` in kursive Blocks mit `<br>` (Zeilenumbrüchen) umzuwandeln.
-4. Immer das JuFo27-Forschungsziel beachten. Ersetze niemals Logik durch fehlerhaften Code und passe die `components.py` oder dortigen Text-Renderer an.
+4. Immer das JuFo27-Forschungsziel beachten. Ersetze niemals Logik durch fehlerhaften Code und passe die aktuellen Frontend-Text-Renderer nur gezielt an.

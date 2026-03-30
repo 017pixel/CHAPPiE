@@ -1,4 +1,3 @@
-import streamlit as st
 import os
 import re
 import time
@@ -32,7 +31,7 @@ from life import get_life_simulation_service
 
 
 def create_chappie_backend():
-    """Erzeugt ein CHAPPiE-Backend ohne Streamlit-Cache, z. B. fuer CLI/Tests."""
+    """Erzeugt ein CHAPPiE-Backend ohne UI-Cache, z. B. fuer CLI, API und Tests."""
     class CHAPPiEBackend:
         def __init__(self):
             # Module init
@@ -99,16 +98,14 @@ def create_chappie_backend():
             self.steering_manager = get_steering_manager()
             self._chat_jobs: Dict[str, threading.Thread] = {}
             self._chat_jobs_lock = threading.RLock()
+            self.last_memory_timestamp: Optional[str] = None
 
         @staticmethod
         def _chat_job_key(session_id: str, message_id: str) -> str:
             return f"{session_id}:{message_id}"
 
         def _set_last_memory_timestamp(self):
-            try:
-                st.session_state.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
-            except Exception:
-                return
+            self.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
 
         def _run_sleep_phase_job(self):
             try:
@@ -1803,8 +1800,7 @@ def create_chappie_backend():
     return CHAPPiEBackend()
 
 
-@st.cache_resource
 def init_chappie():
-    """Initialisiert das Backend mit Streamlit-Cache fuer die Web-App."""
+    """Initialisiert das Backend ohne UI-spezifischen Cache."""
     return create_chappie_backend()
 

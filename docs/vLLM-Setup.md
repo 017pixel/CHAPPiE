@@ -1,156 +1,92 @@
-# vLLM-Modus / Steering-Endpoint fuer CHAPPiE mit Qwen 3.5
+# vLLM-Modus und Steering-Endpoint fuer CHAPPiE
 
 ## Zielbild
 
-Dieses Repository soll bevorzugt mit **lokalem Qwen 3.5 im `vllm`-Provider-Modus** laufen.
+CHAPPiE soll bevorzugt mit lokalem Qwen-3.5 im `vllm`-Modus laufen.
 
-- **lokal**: Emotionen **nicht** im Systemprompt anhängen
-- **lokal + steering-faehiger Endpoint + Qwen 3.5**: Emotionen über **Layer Editing / Activation Steering** ausdrücken
-- **API-Modelle**: Emotionsregeln dürfen zusätzlich im Prompt bleiben
+- lokal: Emotionen ueber Steering und Runtime-Signale
+- API-Modelle: Prompt-Regeln nur als Fallback
 
 ## 1. Voraussetzungen
 
 Du brauchst:
 
-1. eine funktionierende Python-Umgebung fuer CHAPPiE
-2. ein lokales Qwen-3.5-Modell oder einen Pfad/Checkpoint dafuer
-3. einen laufenden **OpenAI-kompatiblen lokalen Steering-Endpunkt**
-4. genug GPU-/RAM-Ressourcen fuer das gewaehlte Modell
+1. eine funktionierende Python-Umgebung
+2. ein lokales Qwen-3.5-Modell oder einen passenden Checkpoint
+3. einen OpenAI-kompatiblen lokalen Steering-Endpoint
+4. genug GPU- oder RAM-Ressourcen fuer das gewaehlte Modell
 
 ## 2. Steering-Endpoint starten
 
-Starte den steering-faehigen lokalen Endpoint mit deinem Qwen-3.5-Modell, typischerweise auf `http://localhost:8000/v1`.
+Typischerweise auf `http://localhost:8000/v1`.
 
-Wichtig fuer CHAPPiE:
+Wichtige Punkte:
 
-- nutze ein **Qwen-3.5-Modell** als Hauptmodell
-- `Qwen/Qwen3.5-4B` ist der bevorzugte Default-Startpunkt fuer CHAPPiE auf 16GB-GPUs
-- `Qwen/Qwen3.5-9B` ist die naechste Stufe, wenn deine GPU mehr Reserven hat
-- `Qwen/Qwen3.5-27B` ist eher fuer deutlich staerkere lokale GPUs gedacht
-- quantisierte GPTQ-/GGUF-Varianten und `GLM-4.7-Flash` bleiben fuer CHAPPiEs aktuelles Layer-Steering experimentell und sind deshalb nicht der Default
-- falls dein lokaler `transformers`-Pin `qwen3_5` noch nicht nativ kennt, laedt der CHAPPiE-Steering-Endpoint `Qwen 3.5` im Repository mit `trust_remote_code=True`
-- wenn moeglich `chat_template_kwargs.enable_thinking=false`
-- der Endpunkt muss Chat-Completions kompatibel sein
-
-Optional produktionsnah per `systemd`:
-
-- `chappie-vllm.service` aus dem Repo installieren
-- danach `sudo systemctl enable --now chappie-vllm.service`
-- der Service startet den Endpoint aus `brain/steering_api_server.py`
-- der Dateiname bleibt historisch `chappie-vllm.service`, obwohl der Prozess nicht mehr der rohe Standard-vLLM-Server ist
+- `Qwen/Qwen3.5-4B` ist der bevorzugte Default
+- `Qwen/Qwen3.5-9B` ist die naechste Stufe
+- `Qwen/Qwen3.5-27B` ist fuer staerkere GPUs
+- `chappie-vllm.service` startet den steering-faehigen Server aus `brain/steering_api_server.py`
+- ein roher Standard-vLLM-Server reicht fuer CHAPPiEs Steering-Payload in dieser Umgebung nicht
 
 ## 3. CHAPPiE konfigurieren
 
-Setze in deiner Konfiguration bzw. UI mindestens:
+Mindestens setzen:
 
 - `LLM_PROVIDER = "vllm"`
 - `VLLM_URL = "http://localhost:8000/v1"`
 - `VLLM_MODEL = "Qwen/Qwen3.5-4B"`
-- `VLLM_FORCE_SINGLE_MODEL = True` fuer einen einzelnen vLLM-Endpoint
+- `VLLM_FORCE_SINGLE_MODEL = True`
 
-Optional sinnvoll:
+Optional:
 
-- `INTENT_PROCESSOR_MODEL_VLLM` fuer Step-1 / Intent
-- `QUERY_EXTRACTION_VLLM_MODEL` fuer kleinere Memory-Aufgaben
+- `INTENT_PROCESSOR_MODEL_VLLM`
+- `QUERY_EXTRACTION_VLLM_MODEL`
 
 Relevante Dateien:
 
 - `config/config.py`
 - `config/secrets_example.py`
-- `web_infrastructure/settings_ui.py`
+- `docs/local-models.md`
 
-## 4. Streamlit-UI richtig setzen
+## 4. Runtime pruefen
 
-Im Settings-Overlay:
+Im neuen Webpfad kannst du ueber Settings, Debug und Visualizer kontrollieren:
 
-1. Provider auf **vLLM** stellen
-2. URL und Modell fuer vLLM setzen
-3. im Tab **Emotionen** die 7 Emotionswerte pruefen
-4. darunter im Bereich **Layer Editing pro Emotion** pro Emotion anpassen:
-   - `Steering-Staerke`
-   - `Start-Layer`
-   - `End-Layer`
+- aktiven Provider
+- Modell und Endpoint
+- Emotions- und Intensitaetsdaten
+- Steering-nahe Debug-Ausgaben
 
-Damit steuerst du direkt, wie stark und in welchem Layerbereich lokale Emotionen wirken.
+## 5. Was bewusst nicht passieren soll
 
-## 5. Was jetzt bewusst NICHT passieren soll
+Im lokalen Hauptpfad sollen Emotionen nicht primaer ueber lange Prompt-Zusatztexte erzwungen werden.
 
-Bei lokalem Betrieb sollen **keine Emotions-Vitalwerte** im Systemprompt landen.
+Das gilt fuer:
 
-Das gilt jetzt fuer lokale Laufzeitpfade wie:
-
-- Web-UI
+- App-API
+- Frontend
 - CLI
-- Training-Loop
+- Training
 
-Nur bei **API-Modellen** bleiben Emotionsregeln im Prompt aktiv.
-
-## 6. Wie die Emotionen transportiert werden
-
-Fuer den lokalen Steering-Endpoint + Qwen 3.5 gilt:
-
-1. CHAPPiE berechnet aktuelle 7 Emotionen
-2. daraus werden fuer **alle 7 Vitalzeichen** Basisvektoren abgeleitet
-3. daraus wird ein Steering-Payload fuer den lokalen Endpoint gebaut
-4. optionale Composite-Modi bleiben als Zusatzmuster erhalten, dominieren aber nicht mehr den gesamten Stilpfad
-5. Qwen bekommt die Wirkung ueber Residual-/Activation-Steering plus eine kurze interne Stilfuehrung statt ueber eine Prompt-Liste der Vitalwerte
-
-Wichtiger Realitaetscheck:
-
-- CHAPPiE baut und sendet das `steering`-Payload
-- der Repo-Service auf `:8000` wendet dieses Payload serverseitig an
-- ein reiner Standard-vLLM-Server war dafuer in dieser Umgebung **nicht** ausreichend, weil er `steering` ignorierte
-
-## 7. Sichtbarkeit und Debugging
-
-Du kannst das Verhalten an zwei Stellen sehen:
-
-### Emotionen-Tab
-
-- aktueller Modus (`api_prompt_emotions`, `local_layer_only`, ...)
-- Tabelle mit allen 7 Vitalzeichen inkl. `emotion_state`, `emotion_intensities`, Richtung und `layer_range`
-- aktive Basisvektoren aller 7 Vitalzeichen / Composite-Modi
-- editierbare Basis-Konfiguration pro Emotion
-
-### Debug Mode / Brain Monitor
-
-- rohe Emotions-Deltas
-- angewandte geglaettete Deltas
-- Gruende aus Intent/Homeostasis
-- aktive Layer-Vektoren und Basis-Konfiguration
-- getrennte Anzeige von Basisvektoren und Composite-Zusatzmustern im Payload
-- sichtbare Trennung zwischen Gehirnstruktur (Kontext, Tool-Pfad, Global Workspace) und Endausgabe-Steering
-
-## 8. Warum die Emotionsspruenge jetzt sanfter sind
-
-Starke Einzelturn-Spruenge werden geglaettet und pro Emotion gedeckelt.
-
-Ziel:
-
-- keine unplausiblen Abstuerze wie z. B. `100 -> 15` in einem Schritt
-- trotzdem sichtbare Reaktion auf neue Ereignisse
-- besser lesbare Entwicklung im Debug-Monitor
-
-## 9. Schnelle Verifikation
-
-Ohne `pytest` kannst du direkt ausfuehren:
+## 6. Schnelle Verifikation
 
 - `python tests/test_local_first_runtime.py`
-- `python tests/test_emotion_transition_rules.py`
 - `python tests/test_debug_monitor_data.py`
 - `python tests/test_vllm_response_handling.py`
 - `python tests/test_steering_backend.py`
-- `python tests/test_web_ui_consistency.py`
 - `python tests/test_brain_pipeline_steering_integration.py`
 
-## 10. Wenn es lokal nicht wie erwartet wirkt
+## 7. Wenn es lokal nicht wie erwartet wirkt
 
 Pruefe in dieser Reihenfolge:
 
-1. laeuft wirklich `chappie-vllm.service` / der lokale Steering-Endpoint und nicht Ollama/API?
-2. zeigt die UI `local_layer_only`?
-3. ist ein **Qwen-3.5-Modell** aktiv?
-4. ist die Steering-Staerke pro Emotion groesser als `0.0`?
-5. liegen `Start-Layer` und `End-Layer` in einem sinnvollen mittleren/spaeteren Layerbereich?
+1. laeuft wirklich `chappie-vllm.service`?
+2. zeigt die Runtime `vllm` als aktiven Provider?
+3. ist ein Qwen-3.5-Modell aktiv?
+4. stimmen URL, Modell und Steering-nahe Runtime-Settings?
 
-Wenn diese Punkte stimmen, ist das gewuenschte Zielbild erreicht: **lokale Emotionen ueber Layer Editing, Prompt-Emotionen nur fuer API-Modelle**.
+## Weiterfuehrend
+
+- [Lokale Modelle](local-models.md)
+- [Deployment](deployment.md)
+- [Testing](testing.md)

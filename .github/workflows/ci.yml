@@ -13,7 +13,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Checkout code
@@ -22,8 +22,15 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install CI dependencies
         shell: bash
@@ -44,6 +51,13 @@ jobs:
           PY
           python -m pip install -r /tmp/ci-requirements.txt
 
+      - name: Install frontend dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm install
+
       - name: Run fast local verification suite
         shell: bash
         run: |
@@ -58,6 +72,9 @@ jobs:
           python tests/test_vllm_response_handling.py
           python tests/test_web_ui_consistency.py
           python tests/test_reasoning_layering.py
+          python tests/test_api_contract.py
+          python tests/test_chat_ui_formatting.py
+          python tests/test_training_config_ui.py
           python tests/manual/test_compatibility.py
 
       - name: Run syntax checks
@@ -66,22 +83,27 @@ jobs:
           set -euo pipefail
           python -m py_compile \
             app.py \
+            api/main.py \
+            api/dependencies.py \
+            api/schemas.py \
+            api/services/command_service.py \
+            api/services/text_formatting.py \
+            api/routers/chat.py \
+            api/routers/context.py \
+            api/routers/memory.py \
+            api/routers/runtime.py \
+            api/routers/system.py \
+            api/routers/training.py \
             brain/response_parser.py \
             brain/ollama_brain.py \
             brain/vllm_brain.py \
             memory/chat_manager.py \
             web_infrastructure/backend_wrapper.py \
-            web_infrastructure/chat_ui.py \
-            web_infrastructure/command_handler.py \
-            web_infrastructure/sidebar_ui.py \
-            web_infrastructure/state_manager.py
+            web_infrastructure/ui_utils.py
 
-      - name: Smoke-test Streamlit startup
+      - name: Build frontend
         shell: bash
         run: |
           set -euo pipefail
-          python -m streamlit run app.py --server.headless true --server.port 8505 >/tmp/chappie-streamlit.log 2>&1 &
-          STREAMLIT_PID=$!
-          trap 'kill ${STREAMLIT_PID} || true' EXIT
-          sleep 20
-          curl --fail --silent http://127.0.0.1:8505 >/dev/null
+          cd frontend
+          npm run build

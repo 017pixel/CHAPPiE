@@ -1,5 +1,5 @@
 [Unit]
-Description=CHAPPiE Web Interface (Streamlit)
+Description=CHAPPiE App API
 After=network.target chappie-vllm.service
 Wants=chappie-vllm.service
 
@@ -7,26 +7,16 @@ Wants=chappie-vllm.service
 User=bbecker
 Group=bbecker
 WorkingDirectory=/home/bbecker/CHAPPiE
-
-# Python-Umgebung
 Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONIOENCODING=utf-8"
 Environment="CUDA_VISIBLE_DEVICES=-1"
-
-# ChromaDB/SQLite Workarounds für Segmentation Fault
 Environment="CHROMA_SQLITE_JOURNAL_MODE=WAL"
 Environment="TOKENIZERS_PARALLELISM=false"
 Environment="OMP_NUM_THREADS=1"
-
-# Streamlit auf allen Interfaces starten (Headless Mode wichtig für Server!)
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
-
-# Restart-Policy
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python -m uvicorn api.main:app --host 0.0.0.0 --port 8010
 Restart=always
 RestartSec=5
-
-# Graceful Shutdown
 TimeoutStopSec=10
 
 [Install]

@@ -12,9 +12,9 @@ Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONIOENCODING=utf-8"
 Environment="CUDA_VISIBLE_DEVICES=0"
 Environment="HF_HOME=/home/bbecker/.cache/huggingface"
-Environment="CHAPPIE_STEERING_MODEL=Qwen/Qwen3.5-4B"
+Environment="CHAPPIE_STEERING_MODEL=Qwen/Qwen3.5-9B"
 
-ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m brain.steering_api_server --host 127.0.0.1 --port 8000 --model Qwen/Qwen3.5-4B
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m brain.steering_api_server --host 127.0.0.1 --port 8000 --model Qwen/Qwen3.5-9B
 
 Restart=always
 RestartSec=10

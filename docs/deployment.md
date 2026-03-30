@@ -2,103 +2,104 @@
 
 ## Ziel
 
-Diese Seite bündelt den produktionsnahen Betrieb von CHAPPiE für Web-App und Trainingsprozess.
+Diese Seite beschreibt den produktiven Betrieb von CHAPPiE mit lokalem Modellservice, App-API, Frontend und Training.
 
 ## Wichtige Service-Regeln
 
 ### Training-Service
 
-Die Datei [`chappie-training.service`](../chappie-training.service) muss für den Hintergrundbetrieb auf **`training_daemon.py`** zeigen:
+`chappie-training.service` muss auf `-m Chappies_Trainingspartner.training_daemon` zeigen.
 
-- korrekt: `-m Chappies_Trainingspartner.training_daemon`
-- falsch: `-m Chappies_Trainingspartner.training_loop`
+- korrekt: `ExecStart=... -m Chappies_Trainingspartner.training_daemon`
+- falsch: `ExecStart=... -m Chappies_Trainingspartner.training_loop`
 
-### Zuverlässigkeit
+### Zuverlaessigkeit
 
-- `Restart=always` verwenden
+- `Restart=always` beibehalten
 - absolute Pfade in `ExecStart` und `WorkingDirectory`
-- Logs über `journalctl` prüfen
+- Logs ueber `journalctl` pruefen
 
 ## Services im Repository
 
 | Datei | Zweck |
 |---|---|
 | `chappie-vllm.service` | steering-faehiger lokaler OpenAI-kompatibler Modellserver auf `:8000` |
-| `chappie-training.service` | Hintergrund-Training / Lernprozess |
-| `chappie-web.service` | Streamlit-Weboberfläche |
-| `deploy_training.sh` | Linux-Setup / Deployment-Helfer |
+| `chappie-training.service` | Hintergrund-Training |
+| `chappie-web.service` | FastAPI-App auf `:8010` |
+| `chappie-frontend.service` | React-Frontend im Preview-Betrieb auf `:4173` |
+| `deploy_training.sh` | Linux-Deployment-Helfer fuer alle Services |
 | `deploy_training.bat` | Windows-Helfer |
+
+## Frontend zu API
+
+- das React-Frontend darf `VITE_API_BASE_URL` leer lassen und leitet dann automatisch auf den aktuellen Host mit Port `8010`
+- fuer Reverse-Proxy- oder HTTPS-Setups sollte `VITE_API_BASE_URL` explizit auf den produktiven API-Ursprung gesetzt werden
+- fuer getrennten Frontend-Betrieb kann `CHAPPIE_CORS_ORIGINS` als kommagetrennte Liste zusaetzlicher Origins gesetzt werden
 
 ## Betriebsbild
 
 ```mermaid
 flowchart TD
-    SYS[systemd / Betriebssystem] --> VLLM[chappie-vllm.service / Steering-Endpoint]
-    SYS[systemd / Betriebssystem] --> WEB[chappie-web.service]
-    SYS --> TRAIN[chappie-training.service]
-    WEB --> VLLM
+    SYS["systemd"] --> VLLM["chappie-vllm.service"]
+    SYS --> API["chappie-web.service"]
+    SYS --> FE["chappie-frontend.service"]
+    SYS --> TRAIN["chappie-training.service"]
+    FE --> API
+    API --> BW["backend_wrapper.py"]
+    BW --> BP["brain_pipeline.py"]
+    API --> TD["daemon_manager.py"]
+    TRAIN --> TD2["training_daemon.py"]
+    BP --> VLLM
     TRAIN --> VLLM
-    WEB --> APP[app.py]
-    TRAIN --> TD[training_daemon.py]
-    TD --> LOOP[training_loop.py]
-    APP --> BP[brain_pipeline.py]
-    TD --> BP
 ```
 
 ## Deployment-Checkliste
 
 1. Python-Umgebung vorhanden
-2. lokale Modell- oder API-Konfiguration gesetzt
-3. Kontextdateien in `data/` gesichert
-4. `chappie-training.service` auf `training_daemon.py` geprüft
-5. `Restart=always` und absolute Pfade geprüft
-6. Steering-, Web- und Training-Service separat getestet
-7. relevante Doku aktualisiert (`README.md`, `agent.md`, `docs/*`)
-
-## Steering-Service konkret
-
-- `chappie-vllm.service` ist der historische Dateiname, startet aber jetzt den steering-faehigen lokalen OpenAI-Server aus `brain/steering_api_server.py`
-- `LLM_PROVIDER = "vllm"` bleibt bewusst erhalten, weil CHAPPiE weiterhin ueber das OpenAI-kompatible Endpoint-Schema auf `http://localhost:8000/v1` spricht
-- Web UI, CLI und Training muessen alle auf denselben Endpoint zeigen, damit Steering, Debugdaten und Single-Model-Routing konsistent bleiben
-
-## GitHub Actions: nur CI / Tests
-
-GitHub Actions wird in diesem Repository nur für automatische Tests genutzt.
-
-- `.github/workflows/ci.yml` führt automatische Push-/PR-Checks aus.
-- Server-Deployments laufen **nicht** über GitHub Actions.
-
-Produktions- oder Server-Updates müssen bewusst manuell auf dem Zielsystem durchgeführt werden, nachdem die CI grün ist.
+2. Frontend-Dependencies installiert oder Build erzeugt
+3. lokale Modell- oder API-Konfiguration gesetzt
+4. `data/` gesichert
+5. `chappie-training.service` auf `training_daemon` geprueft
+6. `Restart=always` und absolute Pfade geprueft
+7. `chappie-vllm.service`, `chappie-web.service`, `chappie-frontend.service` und `chappie-training.service` separat getestet
+8. auf dem Server ist das Steering-Modell bewusst auf `Qwen/Qwen3.5-9B` gesetzt, waehrend lokale Defaults schlank bleiben
+9. relevante Doku aktualisiert
 
 ## Server-Kommandos
 
-Die frühere SSH-Sammlung wurde inhaltlich in diese Seite überführt. Für den Alltag sind typischerweise relevant:
+Direkt lokal:
 
-- Service-Status prüfen
-- Logs lesen
-- Service neu starten
-- Arbeitsverzeichnis und Pfade validieren
+- `python -m uvicorn api.main:app --host 0.0.0.0 --port 8010`
+- `cd frontend && npm run dev`
+- `python -m Chappies_Trainingspartner.training_daemon --neu`
 
-## Achtung bei Änderungen
+Per Deployment-Skript:
 
-Änderungen an diesen Bereichen brauchen fast immer Doku-Abgleich:
+- `./deploy_training.sh install-service`
+- `./deploy_training.sh service-start`
+- `./deploy_training.sh service-status`
+- `./deploy_training.sh tail-web`
+- `./deploy_training.sh tail-frontend`
+- `./deploy_training.sh tail-vllm`
+
+## GitHub Actions
+
+`.github/workflows/ci.yml` prueft nur Tests und Builds. Server-Deployments laufen bewusst nicht ueber GitHub Actions.
+
+## Aenderungen mit Doku-Pflicht
+
+Fast immer pruefen bei Aenderungen an:
 
 - `app.py`
+- `api/*`
+- `frontend/*`
 - `Chappies_Trainingspartner/*`
 - `chappie-*.service`
 - `deploy_training.*`
 - `config/*`
 
-## Weiterführend
+## Weiterfuehrend
 
 - [Workflows](workflows.md)
-- [Lokale Modelle & Fallbacks](local-models.md)
+- [Lokale Modelle](local-models.md)
 - [Projektkarte](project-map.md)
-
-## Training-UI Steuerung
-
-Die Web-UI steuert Training weiterhin subprocess-basiert, nicht ueber systemd-API-Aufrufe:
-
-- Start/Stop/Restart laufen ueber `Chappies_Trainingspartner/daemon_manager.py`
-- Prozesszustand wird ueber `training.pid` plus Heartbeat in `training_state.json` bewertet
-- Der Daemon gilt nur dann als gesund, wenn Prozess und aktuelle Aktivitaet zusammenpassen

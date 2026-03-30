@@ -2,123 +2,87 @@
 
 ## Testphilosophie
 
-CHAPPiE enthält sowohl **sichere lokale Prüfungen** als auch **live-/manuelle Tests**. Diese sollten bewusst getrennt betrachtet werden.
+CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests und teureren Live-Pfaden.
 
 ## Testtypen
 
 | Typ | Ziel | Beispiele |
 |---|---|---|
-| Schnelle lokale Checks | Kernlogik ohne riskante Seiteneffekte prüfen | `tests/test_forgetting_curve.py`, `tests/test_life_simulation.py` |
-| Struktur-/Kompatibilitätschecks | Module, Services und Dateien validieren | `tests/manual/test_compatibility.py` |
-| Live-/Provider-Tests | Verhalten mit echten Modellen/APIs prüfen | `tests/test_brain_agents.py`, `tests/test_nvidia_api.py`, `tests/test_integration.py` |
-| Interaktive Smoke-Tests | UI oder Chat manuell antesten | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
+| schnelle lokale Checks | Kernlogik und Webpfad ohne externe Kosten pruefen | `tests/test_forgetting_curve.py`, `tests/test_api_contract.py` |
+| Struktur- und Kompatibilitaetschecks | Module, Dateien, Startpfade validieren | `tests/manual/test_compatibility.py`, `py_compile` |
+| Live- und Provider-Tests | Verhalten mit echten Modellen oder APIs pruefen | `tests/test_brain_agents.py`, `tests/test_integration.py` |
+| manuelle Bedienung | Chat oder UI bewusst testen | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
 
 ## GitHub Actions / CI
 
-Bei Pushes und Pull Requests auf `main`/`master` läuft der Workflow `.github/workflows/ci.yml`.
+`.github/workflows/ci.yml` fuehrt automatisiert aus:
 
-Er führt die sicheren lokalen Prüfungen automatisiert aus:
-
-- schnelle Python-Tests aus `tests/`
-- den Kompatibilitätscheck
-- `py_compile` für die zentralen App-/UI-Dateien
-- einen headless Streamlit-Smoke-Test mit HTTP-Check
-
-## Wichtige Regel
-
-Nicht jeder Test ist für jeden Commit geeignet. Vor allem Live- und API-Tests können:
-
-- externe Kosten verursachen
-- auf lokale Services angewiesen sein
-- Kontextdateien verändern
-- langsamer oder fragiler sein
+- schnelle Python-Tests
+- API-Contract-Checks
+- Text-Formatting-Checks fuer Chat-Ausgabe
+- Training-Config-Checks
+- `py_compile` fuer zentrale Python-Dateien
+- Frontend-Build
 
 ## Empfohlene Reihenfolge
 
-1. **kleinster lokaler Test**
-2. **passender Dateitest**
-3. **Kompatibilitätscheck**
-4. **erst dann Live-/API-Test**, wenn die Änderung das wirklich benötigt
+1. kleinster lokaler Test
+2. passender Dateitest
+3. `py_compile`
+4. Frontend-Build bei Web-Aenderungen
+5. erst danach Live- oder Provider-Test
 
 ## Sinnvolle schnelle Checks
 
 - `python tests/test_forgetting_curve.py`
 - `python tests/test_life_simulation.py`
-- `python tests/test_local_first_runtime.py`
-- `python tests/test_steering_backend.py`
-- `python tests/test_brain_pipeline_steering_integration.py`
 - `python tests/test_debug_monitor_data.py`
+- `python tests/test_local_first_runtime.py`
 - `python tests/test_ollama_response_handling.py`
 - `python tests/test_chat_manager_persistence.py`
 - `python tests/test_config_package_import.py`
 - `python tests/test_vllm_response_handling.py`
+- `python tests/test_web_ui_consistency.py`
 - `python tests/test_reasoning_layering.py`
-- `python tests/test_web_ui_consistency.py`
-- `python -m py_compile app.py web_infrastructure/backend_wrapper.py web_infrastructure/command_handler.py`
+- `python tests/test_api_contract.py`
+- `python tests/test_chat_ui_formatting.py`
+- `python tests/test_training_config_ui.py`
 - `python tests/manual/test_compatibility.py`
-- `python validate_system.py`
+- `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py`
+- `cd frontend && npm run build`
 
-Fuer UI-/Debug-Aenderungen rund um Emotions-Steering sind besonders wichtig:
+## Bei Modelllogik-Aenderungen
 
-- `python tests/test_debug_monitor_data.py`
-- `python tests/test_web_ui_consistency.py`
-- `python tests/test_steering_backend.py`
-- `python validate_system.py`
-
-## Wenn Doku geändert wurde
-
-Bei reinen Doku-Änderungen reichen meist:
-
-- ein kurzer Struktur-/Import-Check
-- ggf. ein schneller Python-Kompatibilitätscheck
-- keine teuren Live-Modelltests
-
-## Wenn Modelllogik geändert wurde
-
-Dann zusätzlich prüfen:
+Zusammen pruefen:
 
 - `config/config.py`
 - `config/brain_config.py`
 - `brain/agents/*.py`
-- lokale/API-Unterscheidung im Prompt- und Steering-Pfad
-- lokaler Steering-Endpoint (`brain/steering_api_server.py`, `brain/steering_backend.py`)
-- Debug-Monitor-Metadaten fuer Emotions-/Layer-Steuerung
-- Streamlit-Sichtbarkeit fuer `emotion_state`, `emotion_intensities`, Basisvektoren und Composite-Zusatzmuster
-- betroffene Live-/Agent-Tests
+- `brain/steering_api_server.py`
+- `tests/test_debug_monitor_data.py`
+- `tests/test_web_ui_consistency.py`
 
-## Testkarte
+## Bei Web-Aenderungen
 
-Eine dateinahe Übersicht steht in [`tests/README.md`](../tests/README.md).
+Besonders wichtig:
 
-## Hinweise für Agents
+- `tests/test_api_contract.py`
+- `tests/test_chat_ui_formatting.py`
+- `tests/test_training_config_ui.py`
+- `tests/test_web_ui_consistency.py`
+- `cd frontend && npm run build`
 
-Vor automatisierten Änderungen immer fragen:
+## Hinweise fuer Agents
+
+Vor automatisierten Aenderungen immer pruefen:
 
 1. Ist der Test lokal sicher?
-2. Nutzt er echte APIs oder externe Kosten?
-3. Verändert er Dateien in `data/`?
-4. Ist ein kleinerer Test ausreichend?
+2. Nutzt er echte APIs oder verursacht Kosten?
+3. Veraendert er Dateien in `data/`?
+4. Reicht ein kleinerer Test?
 
-## Weiterführend
+## Weiterfuehrend
 
 - [`tests/README.md`](../tests/README.md)
-- [Lokale Modelle & Fallbacks](local-models.md)
+- [Lokale Modelle](local-models.md)
 - [Deployment](deployment.md)
-
-## Neue Pruefpunkte fuer Debug- und Memory-Upgrade
-
-Fuer die erweiterten Trace- und Memory-Pfade sind diese Dateien besonders wichtig:
-
-- `tests/test_debug_monitor_data.py`
-- `tests/test_memory_query_extraction_german.py`
-- `tests/test_sleep_phase_context_updates.py`
-- `tests/test_forgetting_curve.py`
-- `tests/test_brain_pipeline_steering_integration.py`
-- `tests/test_reasoning_layering.py`
-
-Fuer die Trainingssteuerung in UI + Daemon sind zusaetzlich wichtig:
-
-- `tests/test_training_config_ui.py`
-- `tests/test_training_daemon_lifecycle.py`
-
-Wenn nur die Doku angepasst wurde, reicht weiterhin ein schneller Struktur- oder `py_compile`-Check.

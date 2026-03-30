@@ -235,6 +235,8 @@ class Settings:
         for key in ["temperature", "max_tokens", "chain_of_thought", "memory_top_k", "memory_min_relevance"]:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
+        if "enable_two_step_processing" in kwargs:
+            self.enable_two_step_processing = bool(kwargs["enable_two_step_processing"])
 
         self._persist_to_addsecrets()
         self._needs_reload = True
@@ -274,6 +276,7 @@ class Settings:
                 f.write(f"INTENT_PROCESSOR_MODEL_OLLAMA = '{self.intent_processor_model_ollama}'\n")
                 f.write(f"INTENT_PROCESSOR_MODEL_VLLM = '{self.intent_processor_model_vllm}'\n")
                 f.write(f"INTENT_PROCESSOR_MODEL_NVIDIA = '{self.intent_processor_model_nvidia}'\n")
+                f.write(f"ENABLE_TWO_STEP_PROCESSING = {self.enable_two_step_processing}\n")
 
                 f.write("\n# === Query Extraction ===\n")
                 if self.query_extraction_provider:

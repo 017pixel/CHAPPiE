@@ -383,7 +383,7 @@ Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
 
 
 # =============================================================================
-# HELPER: Async-Wrapper für Streamlit (optional)
+# HELPER: Async-Wrapper fuer UI-Integration (optional)
 # =============================================================================
 
 def run_deep_think_async(engine: DeepThinkEngine, iterations: int = 10):

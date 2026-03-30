@@ -1,0 +1,18 @@
+[Unit]
+Description=CHAPPiE Frontend
+After=network.target chappie-web.service
+Wants=chappie-web.service
+
+[Service]
+User=bbecker
+Group=bbecker
+WorkingDirectory=/home/bbecker/CHAPPiE/frontend
+Environment="PATH=/home/bbecker/.nvm/versions/node/v22.14.0/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="NODE_ENV=production"
+ExecStart=/home/bbecker/.nvm/versions/node/v22.14.0/bin/npm run preview -- --host 0.0.0.0 --port 4173
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen bg-ink text-mist antialiased;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(106, 141, 115, 0.08), transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(61, 90, 68, 0.15), transparent 40%);
+  }
+
+  #root {
+    @apply min-h-screen overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply border border-white/5 bg-white/5 backdrop-blur-xl;
+  }
+  
+  .square-button {
+    @apply rounded-none border-2 border-white/10 transition-all duration-300 active:scale-95;
+  }
+}

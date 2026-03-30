@@ -5,264 +5,151 @@
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant UI as Web UI / CLI
+    participant FE as Frontend oder CLI
+    participant API as App API
+    participant BW as Backend Wrapper
     participant BP as Brain Pipeline
-    participant S as Sensory
-    participant A as Amygdala
-    participant H as Hippocampus
-    participant P as Prefrontal
     participant L as Life Service
     participant M as Memory
 
-    U->>UI: Nachricht / Command
-    UI->>BP: process(...)
+    U->>FE: Nachricht oder Command
+    FE->>API: HTTP oder SSE
+    API->>BW: process / command / session action
+    BW->>BP: process(...)
     BP->>L: prepare_turn(...)
-    BP->>S: Klassifikation
-    BP->>A: Emotionsanalyse
-    BP->>H: Retrieval / Encoding-Entscheidung
-    S-->>BP: Eingabetyp
-    A-->>BP: Emotionale Gewichtung
-    H-->>BP: Such- & Memory-Signale
-    BP->>P: Orchestrationsinput
-    P-->>BP: Strategie / Guidance
-    BP->>UI: Antwort + Zustände
-    BP->>L: finalize_turn(...)
-    BP->>M: Hintergrundverarbeitung
+    BP->>M: retrieval / encoding / memory updates
+    BP-->>BW: Antwort plus Debugdaten
+    BW->>L: finalize_turn(...)
+    BW-->>API: Antwortobjekt
+    API-->>FE: JSON oder Stream
 ```
 
-## 2. Was dabei technisch passiert
+## 2. Was technisch passiert
 
-1. **Interface nimmt Eingabe entgegen**  
-   Dateien: `app.py`, `chappie_brain_cli.py`, `web_infrastructure/command_handler.py`
-2. **Brain Pipeline baut Kontext zusammen**  
-   Datei: `brain/brain_pipeline.py`
-3. **Life Service liefert inneren Zustand**  
-   Datei: `life/service.py`
-4. **Sensory / Amygdala / Hippocampus arbeiten vor**
-5. **Prefrontal Cortex bestimmt Antwortstrategie**
-6. **Action Layer ergänzt Handlungsempfehlungen**
-7. **Antwort geht zurück an UI oder CLI**
-8. **Hintergrundarbeit speichert, bewertet und konsolidiert**
+1. Frontend oder CLI nimmt Eingabe entgegen.
+2. Die App-API routet nach Chat, Runtime, Memory, Context oder Training.
+3. `web_infrastructure/backend_wrapper.py` kapselt die Fachlogik.
+4. `brain/brain_pipeline.py` orchestriert Sensory, Amygdala, Hippocampus und Prefrontal.
+5. `life/service.py` liefert inneren Zustand und Forecast-Signale.
+6. `memory/*` liefert Retrieval, Persistenz und Konsolidierung.
+7. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
 
-## 3. Schlafphase / Konsolidierung
+## 3. Schlafphase und Konsolidierung
 
 ```mermaid
 flowchart LR
-    I[Interaktionen] --> STM[Kurzzeit-/aktive Signale]
-    STM --> SLEEP[Sleep Phase Trigger]
-    SLEEP --> REPLAY[Replay & Verdichtung]
-    REPLAY --> DECAY[Vergessenskurve]
-    DECAY --> LTM[Langzeitgedächtnis / Neocortex]
-    REPLAY --> CTX[Kontextdateien]
+    I["Interaktionen"] --> STM["Kurzzeit- und aktive Signale"]
+    STM --> SLEEP["Sleep Trigger"]
+    SLEEP --> REPLAY["Replay und Verdichtung"]
+    REPLAY --> DECAY["Vergessenskurve"]
+    DECAY --> LTM["Langzeitgedaechtnis"]
+    REPLAY --> CTX["Kontextdateien"]
 ```
 
-### Trigger der Schlafphase
+Trigger:
 
-- zeitbasiert: alle **24 Stunden**
-- interaktionsbasiert: alle **25 Interaktionen**
-- manuell: Command **`/sleep`**
-- im Web-Chat wird die Schlafphase nach Erreichen des Intervalls im Hintergrund gestartet, inklusive Kontextdatei-Pflege
+- zeitbasiert
+- interaktionsbasiert
+- manuell ueber `/sleep`
 
-Quelle:
+Relevante Dateien:
+
 - `memory/sleep_phase.py`
+- `memory/forgetting_curve.py`
 - `config/brain_config.py`
 
 ## 4. Trainings-Workflow
 
 ```mermaid
 flowchart TD
-    CFG[training_config.json / Setup] --> TD[training_daemon.py]
-    TD --> TA[TrainerAgent]
-    TA --> LOOP[TrainingLoop]
-    LOOP --> CH[CHAPPiE]
-    CH --> STATE[training_state.json]
-    LOOP --> SLP[regelmäßige Konsolidierung]
+    CFG["training_config.json"] --> TD["training_daemon.py"]
+    TD --> LOOP["training_loop.py"]
+    LOOP --> CH["CHAPPiE"]
+    LOOP --> STATE["training_state.json"]
+    LOOP --> SLP["regelmaessige Sleep-Phasen"]
 ```
 
-### Wichtige Punkte
+Wichtige Punkte:
 
-- Der **Service-Entry-Point ist `training_daemon.py`**.
-- `training_loop.py` ist **kein** systemd-Entry-Point.
-- Trainingslogik liegt unter [`Chappies_Trainingspartner/`](../Chappies_Trainingspartner).
-- `training_config.json` enthält Persona, Curriculum, Sleep-Intervall und Laufzeitparameter für den 24/7-Betrieb.
-- `training_loop.py` führt regelmäßige Sleep-/Traumzyklen aus und schreibt erweiterten Heartbeat / Topic-Fortschritt in `training_state.json`.
+- `training_daemon.py` ist der Service-Entry-Point
+- `training_loop.py` ist kein systemd-Entry-Point
+- API und Frontend steuern Training ueber `Chappies_Trainingspartner/daemon_manager.py`
 
-## 5. Web-UI-Workflow
+## 5. Web-Workflow
 
-Datei [`app.py`](../app.py) routet zwischen:
+Der produktive Webpfad ist jetzt:
+
+1. React-Frontend in [`frontend/`](../frontend)
+2. FastAPI in [`api/`](../api)
+3. Fachlogik in [`web_infrastructure/backend_wrapper.py`](../web_infrastructure/backend_wrapper.py)
+4. Session-Persistenz in [`memory/chat_manager.py`](../memory/chat_manager.py)
+
+Wichtig:
+
+- Frontend spricht nur mit der App-API
+- die API spricht nie direkt mit einem UI-spezifischen State
+- Streaming laeuft ueber `POST /chat/stream`
+- Slash-Commands werden serverseitig ueber `api/services/command_service.py` behandelt
+
+## 6. Debug, Memory und Runtime
+
+Der Debug-Pfad zeigt die Kette hinter einer Antwort:
+
+- Input und Intent
+- Memory-Treffer und Merge
+- Emotionen und Deltas
+- Life- und Forecast-Signale
+- finale Ton- und Antwortentscheidung
+
+Wichtige Pfade:
+
+- `api/routers/system.py`
+- `api/routers/chat.py`
+- `api/services/text_formatting.py`
+- `web_infrastructure/backend_wrapper.py`
+
+## 7. Wichtige Commands
+
+| Command | Bedeutung |
+|---|---|
+| `/sleep` | startet die Schlaf- und Konsolidierungsphase |
+| `/think [thema]` | startet einen Reflexionszyklus |
+| `/deep think` | startet rekursive Selbstreflexion |
+| `/help` | Command-Hilfe |
+| `/stats` | Modell-, Memory- und Emotionsstatus |
+| `/config` | Runtime-Settings anzeigen |
+| `/clear` | startet einen frischen Chat |
+| `/life` | kompakter Life-State |
+| `/world` | Weltmodell |
+| `/habits` | Gewohnheiten |
+| `/stage` | Entwicklungsstufe |
+| `/plan` | Planung |
+| `/forecast` | Prognosen und Risiken |
+| `/arc` | Social Arc |
+| `/timeline` | autobiografische Verlaufseintraege |
+
+## 8. Frontend-Seiten
+
+Das Frontend bildet die frueheren Ansichten jetzt ueber eigene Seiten ab:
 
 - Chat
-- Einstellungen
+- Context
 - Memories
-- Training UI
-- Life Dashboard
-- Growth Dashboard
+- Life
+- Growth
+- Settings
+- Training
+- Debug
+- Visualizer
 
-Der Chat-Flow stellt die zuletzt aktive Session automatisch wieder her. Laufende Antworten werden zuerst als pending gespeichert und können im Hintergrund weiterlaufen, sodass ein kurzes Schließen/Neuladen der UI den Chat nicht mehr verwerfen soll.
+Relevante Pfade:
 
-Die Chat-Pipeline pflegt außerdem die Kontextdateien `soul.md`, `user.md` und `CHAPPiEsPreferences.md` an zwei Stellen:
+- `frontend/src/router.tsx`
+- `frontend/src/pages/*.tsx`
+- `frontend/src/services/api.ts`
 
-- direkt über Tool-Calls wie `update_soul`, `update_user_profile` und `update_preferences`
-- indirekt über die Schlafphase, die Replay-/Life-Snapshot-Daten in diese Dateien verdichtet
-
-Im Chat werden Antwortschichten getrennt behandelt:
-
-- **Modell-Reasoning**: echtes Provider-/Modell-Denken, z. B. von Qwen über Ollama oder den lokalen steering-faehigen `vllm`-Endpoint
-- **CHAPPiEs Gedankenprozess**: interne `<thinking>` / `<gedanke>`-Tags
-- **Antwort**: finaler sichtbarer Antworttext
-
-Wenn keine finale Antwort vorliegt, wird stattdessen `CHAPPiE schweigt...` angezeigt und die vorhandenen Thinking-Bereiche werden automatisch aufgeklappt.
-
-Fuer Emotionen gilt ausserdem:
-
-- **Nur API-Modelle** bekommen explizite Emotionsregeln ueber den Prompt.
-- **Lokales Qwen 3.5 im `vllm`-Modus** soll Emotionen primär ueber Layer-/Activation-Steering ausdruecken; der lokale Endpoint stabilisiert das Verhalten zusaetzlich ueber eine interne Stilvorgabe.
-- Der **Emotionen-Tab** der Streamlit-UI erlaubt jetzt das direkte Einsehen und Aendern der Layer-Range sowie der Steering-Staerke pro Basis-Emotion.
-- Feste Stilvorgaben wie dauerhaft `friendly` werden im lokalen Qwen-Pfad reduziert, damit die Layer-Manipulation wirklich durchkommt.
-
-Die UI-Komponenten liegen unter [`web_infrastructure/`](../web_infrastructure).
-
-### Debug Mode / Brain Monitor
-
-Im **DEBUG MODE: ON** zeigt der aufklappbare **Brain Monitor** die Laufzeitpipeline in Phasen:
-
-1. Input + Intent (inkl. Step-1-Roh-JSON)
-2. Tool-Orchestrierung (verfügbar, ausgewählt, nicht genutzt, ausgeführt)
-3. Emotionen + Homeostasis (Before/After/Raw Delta/Applied Delta + Anpassungen)
-4. Layer-Pipeline (Goal, World Model, Planning, Forecast, Social Arc, Attachment, Development, Emotion-Steering)
-5. Antwortgenerierung (Modell-Reasoning + CHAPPiE-Thought + Action Plan)
-6. Event-Log (strukturierte Debug-Einträge pro Schritt)
-
-Zusätzlich enthält der Global Workspace eine `math_trace`-Spur mit den Salience-Berechnungen je Layerquelle. Im Emotion-Steering-Bereich sieht man ausserdem Prompt-Modus, aktive Vektoren, Composite-Modi, Basis-Konfigurationen pro Emotion und den erwartbaren Ausdruck des Zustands. In Phase 3 werden rohe und geglaettete Deltas getrennt dargestellt.
-
-## 6. Wichtige Commands
-
-### Web / Chat: System, Memory und Reflexion
-
-| Command | Bedeutung |
-|---|---|
-| `/sleep` | startet die Schlaf-/Konsolidierungsphase |
-| `/think [thema]` | startet einen einfachen Reflexionszyklus |
-| `/deep think` | startet rekursive Selbstreflexion in Batches mit Human-in-the-Loop |
-| `/help` | zeigt die Command-Hilfe |
-| `/stats` | zeigt Modell-, Memory- und Emotionsstatus |
-| `/config` | öffnet die Einstellungen |
-| `/clear` | startet einen frischen Chat |
-| `/daily` | zeigt Kurzzeitgedächtnis / Daily Info |
-| `/personality` | zeigt aktuelle Persönlichkeits-/Selbstbeschreibung |
-| `/consolidate` | bereinigt und migriert Kurzzeiteinträge |
-| `/reflect` | zeigt letzte Selbstreflexionen |
-| `/functions` | listet verfügbare Tool-/Funktionsaufrufe |
-
-### Web / Chat: Life- und Growth-Commands
-
-| Command | Bedeutung |
-|---|---|
-| `/life` | kompakter Überblick über den aktuellen Life-State |
-| `/needs` | zeigt aktive Bedürfnisse / Homeostasis |
-| `/goals` | zeigt Goal Competition und Prioritäten |
-| `/world` | zeigt das prädiktive Weltmodell |
-| `/habits` | zeigt aktuelle Gewohnheiten und Trends |
-| `/stage` | zeigt Entwicklungsstufe, Score und Fortschritt |
-| `/plan` | zeigt Multi-Horizon-Planung und nächste Meilensteine |
-| `/forecast` | zeigt Prognosen, Risiken und Schutzfaktoren |
-| `/arc` | zeigt den aktuellen Social Arc / Beziehungsbogen |
-| `/timeline` | zeigt autobiografische Verlaufseinträge |
-
-### CLI
-
-| Command | Bedeutung |
-|---|---|
-| `/status` | technischer Statusüberblick |
-| `/sleep` | Schlafphase |
-| `/life`, `/world`, `/habits` | Life- und Weltzustand |
-| `/stage`, `/plan`, `/forecast`, `/arc`, `/timeline` | Entwicklungs- und Growth-Sicht |
-| `/vectors` | Steering-/Vektorstatus |
-| `/help`, `/exit` | Hilfe und Beenden |
-
-## 7. Life Dashboard lesen
-
-Die Datei [`web_infrastructure/life_dashboard_ui.py`](../web_infrastructure/life_dashboard_ui.py) zeigt CHAPPiEs inneres Leben in fünf Tabs.
-
-### Kopfmetriken
-
-- **Phase** – aktueller Abschnitt im inneren Zeit-/Aktivitätszyklus
-- **Aktivität** – dominierende laufende Aktivität
-- **Need-Fokus** – aktuell stärkstes Bedürfnis aus der Homeostasis
-- **Stage** – aktuelle Entwicklungsstufe
-
-### Tabs im Life Dashboard
-
-| Tab | Was er bedeutet |
-|---|---|
-| `Überblick` | kombinierte Sicht auf Homeostasis, Modus, Ziel, Planung, Forecast und Social Arc |
-| `Goals` | Goal Competition: welches Ziel aktiv ist, welche Konkurrenz besteht und wie hoch die Spannung ist |
-| `World Model` | prädiktives Modell über User-Bedürfnisse, nächste beste Aktion, Risiken und Chancen |
-| `Habits & Growth` | Gewohnheiten, Development Stages und Attachment Model |
-| `Selbst & Erinnern` | autobiografisches Selbstmodell, Beziehung, jüngste Ereignisse und Replay/Konsolidierung |
-
-### Wichtige Begriffe
-
-- **Goal Mode** – welcher Zielmodus die aktuelle Interaktion steuert
-- **Forecast** – erwartete kurzfristige Entwicklung des nächsten Turns
-- **Trajectory** – vermutete längerfristige Richtung der Interaktion
-- **Attachment Security** – wie stabil und sicher die Bindung modelliert wird
-- **Replay / Konsolidierung** – Zusammenfassung dessen, was aus Erlebnissen gefestigt wurde
-
-## 8. Growth & Timeline Dashboard lesen
-
-Die Datei [`web_infrastructure/growth_dashboard_ui.py`](../web_infrastructure/growth_dashboard_ui.py) zeigt die Langzeitspur von CHAPPiEs Entwicklung.
-
-### Kopfmetriken
-
-- **Planning Horizon** – wie weit CHAPPiE aktuell vorausplant
-- **Forecast Risk** – wie riskant oder fragil der nächste Verlauf eingeschätzt wird
-- **Social Arc** – aktueller Beziehungsbogen / soziale Phase
-- **Timeline Entries** – Zahl der autobiografischen Verlaufseinträge
-
-### Tabs im Growth Dashboard
-
-| Tab | Was er bedeutet |
-|---|---|
-| `Planning` | Koordinationsmodus, Confidence, Meilensteine, Bottlenecks und Habit Dynamics |
-| `Forecast & Arc` | kurzfristige Prognose, Protective Factors, Social Arc und Development Trend |
-| `Timeline` | zusammengefasste Verlaufslinie und letzte Timeline-Einträge |
-
-### Wichtige Begriffe
-
-- **Coordination Mode** – wie CHAPPiE gerade unmittelbare vs. langfristige Ziele balanciert
-- **Bottlenecks** – Engstellen, die Entwicklung oder Zielerreichung bremsen
-- **Habit Dynamics** – Balance, Konflikte und Abbau/Aufbau von Gewohnheiten
-- **Protective Factors** – stabilisierende Faktoren gegen negative Entwicklung
-- **Stage Trajectory** – erwartete Richtung der nächsten Entwicklungsstufe
-- **Arc Score** – numerische Einordnung des aktuellen Beziehungsbogens
-- **Timeline Summary** – verdichtete autobiografische Zusammenfassung bisheriger Entwicklung
-
-## Weiterführend
+## Weiterfuehrend
 
 - [Architektur](architecture.md)
 - [Testing](testing.md)
 - [Deployment](deployment.md)
-
-### Neu: Debug-Kette im Brain Monitor
-
-Im Debug-Mode zeigt CHAPPiE jetzt nicht nur Phasen, sondern auch die Kette dahinter:
-
-- welche Eingabe wie klassifiziert wurde
-- welche Erinnerungen gefunden und gemerged wurden
-- welche Emotionen sich wie veraendert haben
-- welche Steering- und Layer-Signale aktiv waren
-- welche Life-/Homeostasis-Signale mitgewirkt haben
-- warum am Ende genau dieser Ton gewaehlt wurde
-
-Die bestehende Phasenstruktur bleibt dabei unveraendert.
-
-### Trainingssteuerung: UI bis Daemon
-
-Der Trainings-Workflow ist jetzt in klaren Schritten aufgebaut:
-
-1. `web_infrastructure/training_ui.py` sammelt nur Eingaben und Actions.
-2. `Chappies_Trainingspartner/daemon_manager.py` fuehrt Start/Stop/Restart aus und liefert einen Snapshot.
-3. `Chappies_Trainingspartner/training_daemon.py` startet den Loop als Hintergrundprozess.
-4. `Chappies_Trainingspartner/training_loop.py` schreibt Heartbeat und Zustand nach `training_state.json`.
-5. Die UI liest den Snapshot und zeigt Running-/Stopped-/Degraded-Zustaende getrennt an.

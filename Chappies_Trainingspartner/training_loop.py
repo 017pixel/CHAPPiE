@@ -21,7 +21,7 @@ from rich.live import Live
 import logging
 log = logging.getLogger(__name__)
 
-# Backend Imports (Manuell um Streamlit Dependencies zu vermeiden)
+# Backend Imports ohne UI-Abhaengigkeiten
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.prompts import get_system_prompt_with_emotions
 from memory.memory_engine import MemoryEngine
@@ -76,7 +76,7 @@ class TrainingLoop:
         self.consecutive_repetitive = 0
         self.MAX_CONSECUTIVE_REPETITIVE = 3
         
-        # Chappie Backend Initialisierung (ohne Streamlit Cache)
+        # Chappie Backend Initialisierung ohne UI-Cache
         msg = "Initialisiere Chappie Backend..."
         print(msg)
         log.info(msg)

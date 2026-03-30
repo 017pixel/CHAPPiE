@@ -13,7 +13,7 @@ Lokales `vLLM`/Steering endgültig auf `Qwen/Qwen3.5-9B` umstellen, live testen 
   - `config/secrets.py`
   - `config/addSecrets.py`
 - UI-Modellauswahl auf `Qwen 3.5 9B/27B` priorisiert:
-  - `web_infrastructure/settings_ui.py`
+  - `frontend/src/pages/settings-page.tsx`
 - CLI verbessert:
   - `chappie_brain_cli.py` nutzt jetzt den echten Backend-/Zwei-Schritt-/Systemprompt-Pfad
   - neue Kommandos/Metriken: `/runtime`, `/steering`, `/last`, `/emotion`, `/resetemotions`
@@ -76,8 +76,9 @@ Danach:
    - dieselbe oder ähnliche Frage schicken
    - `/last`
    - prüfen, ob sich dominante Vektoren, Stil und Antwortcharakter sichtbar unterscheiden
-3. Streamlit grob prüfen:
-   - `http://localhost:8501`
+3. Frontend und API grob prüfen:
+   - API: `http://localhost:8010/health`
+   - Frontend: `http://localhost:4173`
    - sicherstellen, dass Antworten wieder kommen
 
 ### Erwartetes Zielbild
@@ -89,7 +90,7 @@ Danach:
 
 ### Wichtige Hinweise
 - In `/etc/systemd/system/` mussten die Repo-Service-Dateien benutzt werden; beim Weiterarbeiten immer prüfen, dass die installierten Units aktuell sind.
-- Streamlit-Service-Name ist `chappie-web.service`.
+- API-Service-Name ist `chappie-web.service`.
 - In der letzten Live-Prüfung lief `chappie-web.service`, aber `chappie-vllm.service` restartete wegen des `transformers`-Problems.
 
 ### Nicht versehentlich mitcommitten
@@ -103,4 +104,3 @@ Dann noch:
 - ggf. README/Doku fein nachziehen, falls sich durch das echte Upgrade noch etwas ändert
 - committen
 - auf `origin/main` pushen
-

@@ -26,6 +26,7 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_sleep_phase_context_updates.py`
 - `tests/test_training_config_ui.py`
 - `tests/test_training_daemon_lifecycle.py`
+- `tests/test_api_contract.py`
 
 ### 2. Live-/Integrationsnahe Tests
 
@@ -46,11 +47,12 @@ Diese Tests können echte Modelle, Provider oder Kontextdateien berühren:
 
 1. zuerst lokale Logiktests
 2. bei Modell-/Emotionsänderungen besonders `tests/test_local_first_runtime.py`, `tests/test_steering_backend.py`, `tests/test_brain_pipeline_steering_integration.py`, `tests/test_emotion_transition_rules.py`, `tests/test_debug_monitor_data.py` und `tests/test_web_ui_consistency.py`
-3. bei Streamlit-/Debug-Monitor-Aenderungen besonders `tests/test_web_ui_consistency.py`, `tests/test_debug_monitor_data.py` und `python validate_system.py`
-4. dann Kompatibilitätscheck
-5. auf GitHub die automatische `CI`-Pipeline prüfen
-6. interaktive Tests nur bewusst und mit Kontextwissen
-7. Live-/API-Tests nur bei Bedarf
+3. bei Web- oder Debug-Monitor-Aenderungen besonders `tests/test_web_ui_consistency.py`, `tests/test_debug_monitor_data.py` und `python validate_system.py`
+4. bei neuem React-/FastAPI-Webpfad besonders `tests/test_api_contract.py` und ein `py_compile` fuer `api/`
+5. dann Kompatibilitätscheck
+6. auf GitHub die automatische `CI`-Pipeline prüfen
+7. interaktive Tests nur bewusst und mit Kontextwissen
+8. Live-/API-Tests nur bei Bedarf
 
 ## Warum diese Trennung wichtig ist
 

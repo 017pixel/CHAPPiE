@@ -44,6 +44,16 @@ class ShortTermMemoryV2:
         self.entries: List[ShortTermEntry] = []
         
         self._load_entries()
+
+    @staticmethod
+    def _timestamp_sort_value(value: str) -> float:
+        try:
+            parsed = datetime.fromisoformat(value)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return parsed.timestamp()
+        except (TypeError, ValueError):
+            return 0.0
     
     def _load_entries(self):
         """Lädt Einträge aus JSON-Datei."""
@@ -145,11 +155,11 @@ class ShortTermMemoryV2:
             active.append(entry)
         
         importance_order = {"high": 0, "normal": 1, "low": 2}
-        active.sort(key=lambda e: (
-            importance_order.get(e.importance, 1),
-            e.created_at
-        ), reverse=True)
-        
+        active.sort(key=lambda entry: (
+            importance_order.get(entry.importance, 1),
+            -self._timestamp_sort_value(entry.created_at),
+        ))
+
         return active
     
     def migrate_expired_entries(self) -> int:

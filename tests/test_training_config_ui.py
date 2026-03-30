@@ -10,8 +10,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from Chappies_Trainingspartner import daemon_manager
+from Chappies_Trainingspartner.training_config_utils import curriculum_to_text, parse_curriculum_text
 from Chappies_Trainingspartner.trainer_agent import TrainerConfig
-from web_infrastructure.training_ui import _curriculum_to_text, _parse_curriculum_text
 
 
 class TrainingConfigAndUiTests(unittest.TestCase):
@@ -37,7 +37,7 @@ class TrainingConfigAndUiTests(unittest.TestCase):
         self.assertEqual(data["curriculum"][0]["topic"], "Memory")
 
     def test_training_ui_curriculum_helpers_parse_and_format(self):
-        curriculum = _parse_curriculum_text("Memory | 15\nReasoning | infinite", "Fallback")
+        curriculum = parse_curriculum_text("Memory | 15\nReasoning | infinite", "Fallback")
         self.assertEqual(
             curriculum,
             [
@@ -45,7 +45,7 @@ class TrainingConfigAndUiTests(unittest.TestCase):
                 {"topic": "Reasoning", "duration_minutes": "infinite"},
             ],
         )
-        self.assertEqual(_curriculum_to_text(curriculum), "Memory | 15\nReasoning | infinite")
+        self.assertEqual(curriculum_to_text(curriculum), "Memory | 15\nReasoning | infinite")
 
     def test_daemon_manager_normalizes_and_persists_training_config(self):
         with TemporaryDirectory() as tmp_dir:

@@ -75,6 +75,7 @@ Bei Änderungen an der Modelllogik immer diese Pfade gemeinsam prüfen:
 - Links in Doku immer pfadgenau setzen
 - Brain-Metapher als **technische Analogie**, nicht als biologische 1:1-Behauptung formulieren
 - bei Architekturänderungen Diagramme mitpflegen
+- bei Web-Aenderungen `app.py`, `api/` und `frontend/` gemeinsam mitdenken
 
 ## Doku-Änderung ist Pflicht, wenn ...
 
@@ -95,4 +96,3 @@ Bei Änderungen an der Modelllogik immer diese Pfade gemeinsam prüfen:
 ## Legacy-Hinweis
 
 Ältere Dateien in `Info Dateien/` sind nur noch Brücken. Die Hauptquelle für aktuelle Erklärungen ist `README.md` + `docs/` + `agent.md`.
-
