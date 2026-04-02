@@ -4,8 +4,8 @@
 
 | Pfad | Inhalt | Wichtige Dateien |
 |---|---|---|
-| `brain/` | Brain-Pipeline, Agenten, Steering-Endpoint | `brain_pipeline.py`, `global_workspace.py`, `action_response.py`, `steering_api_server.py` |
-| `brain/agents/` | Spezialisierte Gehirn-Agenten | `sensory_cortex.py`, `amygdala.py`, `hippocampus.py`, `prefrontal_cortex.py` |
+| `brain/` | Brain-Pipeline, Agenten, Steering, Global Workspace | `brain_pipeline.py`, `global_workspace.py`, `action_response.py`, `steering_api_server.py`, `steering_backend.py` |
+| `brain/agents/` | Spezialisierte Gehirn-Agenten | `sensory_cortex.py`, `amygdala.py`, `hippocampus.py`, `prefrontal_cortex.py`, `steering_manager.py` |
 | `memory/` | Gedaechtnis, Konsolidierung, Kontextdateien | `memory_engine.py`, `sleep_phase.py`, `forgetting_curve.py`, `context_files.py` |
 | `life/` | inneres Zustandsmodell und Entwicklung | `service.py`, `goal_engine.py`, `planning_engine.py`, `social_arc.py` |
 | `api/` | FastAPI-App fuer den Webpfad | `main.py`, `routers/*`, `schemas.py`, `dependencies.py` |

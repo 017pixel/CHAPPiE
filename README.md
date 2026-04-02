@@ -102,6 +102,8 @@ python -m Chappies_Trainingspartner.training_daemon --neu
 
 ## Betriebsbild
 
+### Architektur-Uebersicht
+
 ```mermaid
 flowchart TD
     U["User"] --> FE["React Frontend"]
@@ -113,6 +115,182 @@ flowchart TD
     API --> TRAIN["Training APIs"]
     TRAIN --> TD["training_daemon.py"]
     BP --> VLLM["steering endpoint :8000"]
+```
+
+### Wie CHAPPiE "denkt" – Die Brain-Pipeline
+
+```mermaid
+flowchart TD
+    %% === INPUT PHASE ===
+    User["User Input"] --> LifePrep["Life Simulation: prepare_turn\n- Berliner Uhrzeit\n- Baseline-Decay\n- Aktivitaet waehlen\n- Homeostasis"]
+
+    LifePrep --> Sensory["Sensory Cortex\nInput-Typ, Dringlichkeit,\nMemory-Suche noetig?"]
+
+    %% === PARALLEL PHASE ===
+    Sensory --> Amygdala["Amygdala\nEmotionsanalyse\n- 7 Emotionen\n- Intensity 0-1\n- memory_boost\n- steering_hints"]
+    Sensory --> Hippocampus["Hippocampus\nMemory-Operationen\n- Encoding-Entscheidung\n- Query-Extraktion\n- Context-Relevanz"]
+
+    Amygdala --> MemoryEngine["Memory Engine\nEpisodische Suche\nmit optimierter Query"]
+    Hippocampus --> MemoryEngine
+
+    %% === INTEGRATION PHASE ===
+    Amygdala --> GW["Global Workspace\n7 Signale mit Salience\n- homeostasis\n- emotion\n- sensory\n- memory\n- goal\n- world_model\n- social_arc"]
+    Hippocampus --> GW
+    MemoryEngine --> GW
+    LifePrep --> GW
+
+    GW --> Prefrontal["Prefrontal Cortex\nResponse-Strategie\n- Tone\n- Guidance\n- Planning-Mode\n- Life-Alignment"]
+
+    %% === RESPONSE PHASE ===
+    Prefrontal --> ActionLayer["Action Response Layer\n- prompt_suffix\n- action_plan"]
+
+    Amygdala --> EmotionUpdate["Emotion Updates\nAmygdala + Homeostasis\nclamped 0-100"]
+    LifePrep --> EmotionUpdate
+
+    EmotionUpdate --> Steering["Steering Manager\n- VAD-Mapping\n- Alpha-Berechnung\n- Composite Modes\n- Layer-Profile"]
+
+    ActionLayer --> FinalPrompt["Finaler Prompt\n- Basis-Systemprompt\n- Emotions-Status\n- Personality\n- Memories\n- Life-Kontext\n- Workspace\n- Response-Plan\n- Style-Instruction"]
+    Steering --> FinalPrompt
+
+    FinalPrompt --> LLM["1x LLM-Call\n(vLLM mit Layer Editing\noder Cloud-API)"]
+
+    %% === POST-RESPONSE PHASE ===
+    LLM --> LifeFinal["Life Simulation: finalize_turn\n- Goal-Progress\n- Relationship\n- Habits\n- Attachment\n- Self-Model\n- Timeline"]
+
+    LLM --> MemorySave["Memory speichern\n- Episodisch\n- Short-Term\n- Sleep-Phase wenn due"]
+
+    LLM --> Response["Antwort an User\n+ Debug-Daten\n+ Causal Trace\n+ Emotion-Steering-Report"]
+
+    LifeFinal --> Response
+    MemorySave --> Response
+
+    %% === STEERING DETAIL ===
+    Steering -.->|vLLM lokal| LayerEdit["Layer Editing\nHidden-State-Vektoren\nin Layers 10-26 injiziert"]
+    Steering -.->|Cloud| PromptOnly["Nur Style-Instruction\nim Systemprompt"]
+
+    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef brain fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef memory fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef life fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef steering fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+
+    class User,LifePrep input
+    class Sensory,Amygdala,Hippocampus,MemoryEngine,GW,Prefrontal,ActionLayer brain
+    class MemorySave memory
+    class LifeFinal life
+    class FinalPrompt,LLM,Response output
+    class Steering,LayerEdit,PromptOnly steering
+```
+
+### Emotion-Steering im Detail
+
+```mermaid
+flowchart LR
+    Emotions["7 Emotionen\n0-100"] --> VAD["VAD-Mapping\nValence, Arousal, Dominance"]
+    VAD --> Alpha["Alpha-Berechnung\nToter Bereich: 44-56\nSigmoid ab 56\nMax ab 74"]
+    Alpha --> Composite["Composite Modes\ncrashout, guarded,\nmelancholic, warm, charged"]
+    Composite --> Layers["Layer-Profile\nQwen3.5-4B: L10-26\nQwen2.5-32B: L20-44"]
+    Layers --> Injection["Forward Pre-Hook\nhidden_state += alpha * vector"]
+    Injection --> Output["Modifizierter Output\nEmotion direkt im\nneuronalen Zustand"]
+
+    classDef emofill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef procfill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef layerfill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef outfill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class Emotions emofill
+    class VAD,Alpha,Composite procfill
+    class Layers,Injection layerfill
+    class Output outfill
+```
+
+### Wie CHAPPiE "denkt" – Die Brain-Pipeline
+
+```mermaid
+flowchart TD
+    %% === INPUT PHASE ===
+    User["User Input"] --> LifePrep["Life Simulation: prepare_turn\n- Berliner Uhrzeit\n- Baseline-Decay\n- Aktivitaet waehlen\n- Homeostasis"]
+
+    LifePrep --> Sensory["Sensory Cortex\nInput-Typ, Dringlichkeit,\nMemory-Suche noetig?"]
+
+    %% === PARALLEL PHASE ===
+    Sensory --> Amygdala["Amygdala\nEmotionsanalyse\n- 7 Emotionen\n- Intensity 0-1\n- memory_boost\n- steering_hints"]
+    Sensory --> Hippocampus["Hippocampus\nMemory-Operationen\n- Encoding-Entscheidung\n- Query-Extraktion\n- Context-Relevanz"]
+
+    Amygdala --> MemoryEngine["Memory Engine\nEpisodische Suche\nmit optimierter Query"]
+    Hippocampus --> MemoryEngine
+
+    %% === INTEGRATION PHASE ===
+    Amygdala --> GW["Global Workspace\n7 Signale mit Salience\n- homeostasis\n- emotion\n- sensory\n- memory\n- goal\n- world_model\n- social_arc"]
+    Hippocampus --> GW
+    MemoryEngine --> GW
+    LifePrep --> GW
+
+    GW --> Prefrontal["Prefrontal Cortex\nResponse-Strategie\n- Tone\n- Guidance\n- Planning-Mode\n- Life-Alignment"]
+
+    %% === RESPONSE PHASE ===
+    Prefrontal --> ActionLayer["Action Response Layer\n- prompt_suffix\n- action_plan"]
+
+    Amygdala --> EmotionUpdate["Emotion Updates\nAmygdala + Homeostasis\nclamped 0-100"]
+    LifePrep --> EmotionUpdate
+
+    EmotionUpdate --> Steering["Steering Manager\n- VAD-Mapping\n- Alpha-Berechnung\n- Composite Modes\n- Layer-Profile"]
+
+    ActionLayer --> FinalPrompt["Finaler Prompt\n- Basis-Systemprompt\n- Emotions-Status\n- Personality\n- Memories\n- Life-Kontext\n- Workspace\n- Response-Plan\n- Style-Instruction"]
+    Steering --> FinalPrompt
+
+    FinalPrompt --> LLM["1x LLM-Call\n(vLLM mit Layer Editing\noder Cloud-API)"]
+
+    %% === POST-RESPONSE PHASE ===
+    LLM --> LifeFinal["Life Simulation: finalize_turn\n- Goal-Progress\n- Relationship\n- Habits\n- Attachment\n- Self-Model\n- Timeline"]
+
+    LLM --> MemorySave["Memory speichern\n- Episodisch\n- Short-Term\n- Sleep-Phase wenn due"]
+
+    LLM --> Response["Antwort an User\n+ Debug-Daten\n+ Causal Trace\n+ Emotion-Steering-Report"]
+
+    LifeFinal --> Response
+    MemorySave --> Response
+
+    %% === STEERING DETAIL ===
+    Steering -.->|vLLM lokal| LayerEdit["Layer Editing\nHidden-State-Vektoren\nin Layers 10-26 injiziert"]
+    Steering -.->|Cloud| PromptOnly["Nur Style-Instruction\nim Systemprompt"]
+
+    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef brain fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef memory fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef life fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef steering fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+
+    class User,LifePrep input
+    class Sensory,Amygdala,Hippocampus,MemoryEngine,GW,Prefrontal,ActionLayer brain
+    class MemorySave memory
+    class LifeFinal life
+    class FinalPrompt,LLM,Response output
+    class Steering,LayerEdit,PromptOnly steering
+```
+
+### Emotion-Steering im Detail
+
+```mermaid
+flowchart LR
+    Emotions["7 Emotionen\n0-100"] --> VAD["VAD-Mapping\nValence, Arousal, Dominance"]
+    VAD --> Alpha["Alpha-Berechnung\nToter Bereich: 44-56\nSigmoid ab 56\nMax ab 74"]
+    Alpha --> Composite["Composite Modes\ncrashout, guarded,\nmelancholic, warm, charged"]
+    Composite --> Layers["Layer-Profile\nQwen3.5-4B: L10-26\nQwen2.5-32B: L20-44"]
+    Layers --> Injection["Forward Pre-Hook\nhidden_state += alpha * vector"]
+    Injection --> Output["Modifizierter Output\nEmotion direkt im\nneuronalen Zustand"]
+
+    classDef emofill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef procfill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef layerfill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef outfill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class Emotions emofill
+    class VAD,Alpha,Composite procfill
+    class Layers,Injection layerfill
+    class Output outfill
 ```
 
 ## Web- und API-Pfade

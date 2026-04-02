@@ -8,20 +8,44 @@ sequenceDiagram
     participant FE as Frontend oder CLI
     participant API as App API
     participant BW as Backend Wrapper
-    participant BP as Brain Pipeline
     participant L as Life Service
-    participant M as Memory
+    participant BP as Brain Pipeline
+    participant S as Sensory Cortex
+    participant A as Amygdala
+    participant H as Hippocampus
+    participant M as Memory Engine
+    participant GW as Global Workspace
+    participant P as Prefrontal Cortex
+    participant ST as Steering Manager
+    participant VLLM as vLLM / Cloud API
+    participant OUT as Antwort
 
     U->>FE: Nachricht oder Command
     FE->>API: HTTP oder SSE
-    API->>BW: process / command / session action
-    BW->>BP: process(...)
-    BP->>L: prepare_turn(...)
-    BP->>M: retrieval / encoding / memory updates
-    BP-->>BW: Antwort plus Debugdaten
+    API->>BW: process(...)
+    BW->>L: prepare_turn(...)
+    L-->>BP: Life-Kontext
+    BP->>S: Input klassifizieren
+    S-->>BP: Input-Typ, Dringlichkeit
+    BP->>A: Emotionsanalyse
+    BP->>H: Memory-Operationen
+    A-->>M: Query + emotional_boost
+    H-->>M: Query + context_relevance
+    M-->>GW: Relevante Memories
+    A-->>GW: Emotion-Signale
+    H-->>GW: Encoding-Entscheidung
+    L-->>GW: Homeostasis
+    GW-->>P: Priorisierte Signale
+    P-->>BP: Strategie, Tone, Guidance
+    BP->>ST: Emotion-Steering berechnen
+    ST->>VLLM: Payload + Layer-Vektoren
+    VLLM-->>OUT: Generierte Antwort
+    OUT-->>BW: Antwort + Debug-Daten
     BW->>L: finalize_turn(...)
+    L-->>BW: Finaler Life-State
     BW-->>API: Antwortobjekt
     API-->>FE: JSON oder Stream
+    FE-->>U: Angezeigte Antwort
 ```
 
 ## 2. Was technisch passiert
@@ -29,21 +53,31 @@ sequenceDiagram
 1. Frontend oder CLI nimmt Eingabe entgegen.
 2. Die App-API routet nach Chat, Runtime, Memory, Context oder Training.
 3. `web_infrastructure/backend_wrapper.py` kapselt die Fachlogik.
-4. `brain/brain_pipeline.py` orchestriert Sensory, Amygdala, Hippocampus und Prefrontal.
-5. `life/service.py` liefert inneren Zustand und Forecast-Signale.
-6. `memory/*` liefert Retrieval, Persistenz und Konsolidierung.
-7. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
+4. `life/service.py` berechnet `prepare_turn`: Uhrzeit, Baseline-Decay, Aktivitaet, Homeostasis.
+5. `brain/brain_pipeline.py` orchestriert:
+   - Sensory Cortex: Input-Klassifikation (Typ, Dringlichkeit, Memory-Bedarf)
+   - Amygdala: Emotionsanalyse (7 Emotionen, Intensity, memory_boost, steering_hints)
+   - Hippocampus: Memory-Operationen (Encoding, Query-Extraktion, Context-Relevanz)
+   - Memory Engine: Episodische Suche mit optimierter Query
+   - Global Workspace: 7 Signale mit Salience bundeln und priorisieren
+   - Prefrontal Cortex: Response-Strategie, Tone, Guidance, Planning-Mode
+   - Action Response Layer: prompt_suffix und action_plan bauen
+   - Steering Manager: VAD-Mapping, Alpha, Composite Modes, Layer-Profile
+6. Antwortgenerierung: 1x LLM-Call mit komplettem Kontext (Prompt + Steering-Payload)
+7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline.
+8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
 
 ## 3. Schlafphase und Konsolidierung
 
 ```mermaid
 flowchart LR
     I["Interaktionen"] --> STM["Kurzzeit- und aktive Signale"]
-    STM --> SLEEP["Sleep Trigger"]
-    SLEEP --> REPLAY["Replay und Verdichtung"]
+    STM --> SLEEP["Sleep Trigger\n- zeitbasiert\n- interaktionsbasiert\n- manuell /sleep"]
+    SLEEP --> REPLAY["Replay und Verdichtung\n- Needs erholen\n- Habits verstaerken\n- Traum-Fragmente"]
     REPLAY --> DECAY["Vergessenskurve"]
     DECAY --> LTM["Langzeitgedaechtnis"]
-    REPLAY --> CTX["Kontextdateien"]
+    REPLAY --> CTX["Kontextdateien\n- soul.md\n- user.md\n- preferences"]
+    REPLAY --> SELF["Self-Model\nautobiografische Reflexion"]
 ```
 
 Trigger:

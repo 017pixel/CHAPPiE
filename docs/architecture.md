@@ -10,17 +10,23 @@ CHAPPiE ist kein neurologisch exaktes Gehirnmodell. Es nutzt eine technische Ana
 flowchart TD
     FE["Frontend / CLI / Training"] --> API["App API oder direkter Laufzeitpfad"]
     API --> PIPE["brain/brain_pipeline.py"]
-    PIPE --> S["Sensory Cortex"]
-    PIPE --> A["Amygdala"]
-    PIPE --> H["Hippocampus"]
-    S --> P["Prefrontal Cortex"]
-    A --> P
-    H --> P
+    PIPE --> S["Sensory Cortex\nInput-Klassifikation"]
+    PIPE --> L["life/service.py\nprepare_turn"]
+    S --> A["Amygdala\nEmotionsanalyse"]
+    S --> H["Hippocampus\nMemory-Operationen"]
+    A --> M["Memory Engine\nEpisodische Suche"]
+    H --> M
+    A --> GW["Global Workspace\n7 Signale mit Salience"]
+    H --> GW
+    M --> GW
+    L --> GW
+    GW --> P["Prefrontal Cortex\nStrategie und Antwortfuehrung"]
     P --> OUT["Antwort und Aktionsplan"]
-    P --> BG["Basal Ganglia"]
-    P --> N["Neocortex"]
-    PIPE --> LIFE["life/service.py"]
-    PIPE --> MEM["memory/*"]
+    P --> BG["Basal Ganglia\nReward und Lernsignal"]
+    P --> N["Neocortex\nLangfristige Konsolidierung"]
+    P --> STEER["Steering Manager\nVAD + Alpha + Layer Editing"]
+    STEER --> VLLM["steering endpoint :8000\n(vLLM mit Layer Editing)"]
+    OUT --> L2["life/service.py\nfinalize_turn"]
 ```
 
 ## Abbildung Gehirnidee zu CHAPPiE-Komponente
@@ -59,6 +65,42 @@ Die Life-Simulation erweitert die Gehirn-Metapher um:
 - Development Stage
 - Attachment und Social Arc
 - Timeline und autobiografische Entwicklung
+
+## Emotion-Steering
+
+Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:
+
+1. **VAD-Mapping**: Jede Emotion wird auf Valence, Arousal, Dominance abgebildet
+2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74
+3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged)
+4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
+5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
+
+Bei Cloud-Providern (Groq, NVIDIA, Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
+
+Relevante Dateien:
+
+- `brain/agents/steering_manager.py`
+- `brain/steering_backend.py`
+- `brain/steering_api_server.py`
+
+## Emotion-Steering
+
+Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:
+
+1. **VAD-Mapping**: Jede Emotion wird auf Valence, Arousal, Dominance abgebildet
+2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74
+3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged)
+4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
+5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
+
+Bei Cloud-Providern (Groq, NVIDIA, Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
+
+Relevante Dateien:
+
+- `brain/agents/steering_manager.py`
+- `brain/steering_backend.py`
+- `brain/steering_api_server.py`
 
 ## Debug- und Entscheidungsspuren
 
