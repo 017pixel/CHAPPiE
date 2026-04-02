@@ -55,10 +55,10 @@ flowchart TD
     LLM --> Response["Antwort +\nDebug + Causal Trace"]
     LifeFinal --> Response
 
-    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef brain fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    classDef steering fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
+    classDef brain fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+    classDef steering fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
 
     class User,LifePrep input
     class Sensory,Amygdala,Hippocampus,MemoryEngine,GW,Prefrontal brain
@@ -77,10 +77,10 @@ flowchart LR
     Layers --> Hook["Forward Pre-Hook\nhidden += alpha * vec"]
     Hook --> Out["Emotion im\nneuronalen Zustand"]
 
-    classDef e fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef p fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef l fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    classDef o fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef e fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
+    classDef p fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef l fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef o fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
 
     class E e
     class VAD,Alpha,Modes p
