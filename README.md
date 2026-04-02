@@ -1,24 +1,24 @@
 # CHAPPiE
 
-CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die versucht, menschliches Verhalten durch die Kombination von LLMs, episodischem Gedaechtnis und einer kontinuierlichen Life-Simulation zu modellieren.
+CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die versucht, menschliches Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation zu modellieren.
 
-Im Gegensatz zu klassischen Chatbots besitzt CHAPPiE interne Zustaende wie Emotionen, Beduerfnisse und langfristige Ziele. Er entwickelt sein Verhalten ueber Zeit durch Memory, Simulation und Training weiter.
+Im Gegensatz zu klassischen Chatbots besitzt CHAPPiE interne Zustände wie Emotionen, Bedürfnisse und langfristige Ziele. Er entwickelt sein Verhalten über Zeit durch Memory, Simulation und Training weiter.
 
-**Ein Agent, der sich an vergangene Interaktionen erinnert, emotionale Zustaende entwickelt und sein Verhalten langfristig anpasst.**
+**Ein Agent, der sich an vergangene Interaktionen erinnert, emotionale Zustände entwickelt und sein Verhalten langfristig anpasst.**
 
 ---
 
 ## Das Problem
 
-LLMs haben kein echtes Gedaechtnis. Jede Sitzung faengt bei Null an. Sie haben keine Entwicklung, keine Beduerfnisse, keine emotionale Kontinuitaet. Sie reagieren – sie erleben nicht.
+LLMs haben kein echtes Gedächtnis. Jede Sitzung fängt bei Null an. Sie haben keine Entwicklung, keine Bedürfnisse, keine emotionale Kontinuität. Sie reagieren – sie erleben nicht.
 
 ## Die Idee
 
-CHAPPiE setzt auf drei Saeulen, die zusammen ein konsistentes Innenleben erzeugen:
+CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeugen:
 
-| Saeule | Was sie bringt | Forschungsfeld |
+| Säule | Was sie bringt | Forschungsfeld |
 |---|---|---|
-| **Episodisches Gedaechtnis** | Vergangene Interaktionen werden gespeichert, retrieved, verdichtet und vergessen | Memory-Augmented LLMs |
+| **Episodisches Gedächtnis** | Vergangene Interaktionen werden gespeichert, retrieved, verdichtet und vergessen | Memory-Augmented LLMs |
 | **Life-Simulation** | Needs, Goals, Habits, Attachment, Development-Stufen – ein kontinuierlicher innerer Zustand | Agent Systems, Simulation-based AI |
 | **Emotion Steering** | Emotionen werden nicht nur im Prompt beschrieben, sondern direkt in die Hidden States des Modells injiziert | Affective Computing |
 
@@ -27,7 +27,7 @@ CHAPPiE setzt auf drei Saeulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
 - **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
 - **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
-- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedaechtnisdenken"
+- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
 
 ---
@@ -146,7 +146,7 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 
 - **Cognitive Architectures** – modulare Architektur nach kognitiver Trennung
 - **Agent Systems** – autonome Agenten mit internem Zustandsmodell
-- **Memory-Augmented LLMs** – episodisches Gedaechtnis mit Retrieval und Vergessen
+- **Memory-Augmented LLMs** – episodisches Gedächtnis mit Retrieval und Vergessen
 - **Affective Computing** – Emotion Steering via Activation Steering
 - **Simulation-based AI** – Life-Simulation als kontinuierliche Umgebung
 
@@ -169,11 +169,11 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 ## Wichtige Projektbereiche
 
 - [`brain/`](brain) – Brain-Pipeline, Agenten, Steering, Global Workspace
-- [`memory/`](memory) – Gedaechtnis, Konsolidierung, Kontextdateien
+- [`memory/`](memory) – Gedächtnis, Konsolidierung, Kontextdateien
 - [`life/`](life) – inneres Zustandsmodell und Entwicklung
-- [`api/`](api) – FastAPI-App fuer den Webpfad
+- [`api/`](api) – FastAPI-App für den Webpfad
 - [`frontend/`](frontend) – React/Vite/TypeScript-Frontend
-- [`web_infrastructure/`](web_infrastructure) – UI-freie Brueckenschicht
+- [`web_infrastructure/`](web_infrastructure) – UI-freie Brückenschicht
 - [`Chappies_Trainingspartner/`](Chappies_Trainingspartner) – autonomes Training
 - [`config/`](config) – Provider-, Prompt- und Modellkonfiguration
 - [`data/`](data) – Laufzeitdaten, Memories, Kontextdateien
@@ -182,8 +182,8 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 
 ## Datenhinweis
 
-[`data/`](data) ist sensibel: enthaelt Kontextdateien, Memory-Daten und lokale Zustaende. Nicht unbedacht loeschen. Siehe [`data/README_GEDAECHTNIS_WARNUNG.txt`](data/README_GEDAECHTNIS_WARNUNG.txt).
+[`data/`](data) ist sensibel: enthält Kontextdateien, Memory-Daten und lokale Zustände. Nicht unbedacht löschen. Siehe [`data/README_GEDAECHTNIS_WARNUNG.txt`](data/README_GEDAECHTNIS_WARNUNG.txt).
 
 ## Legacy-Hinweis
 
-[`Info Dateien/`](Info%20Dateien) enthaelt nur noch kurze Bruecken. Die aktuelle Hauptdokumentation ist `README.md`, `agent.md` und `docs/`.
+[`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken. Die aktuelle Hauptdokumentation ist `README.md`, `agent.md` und `docs/`.
