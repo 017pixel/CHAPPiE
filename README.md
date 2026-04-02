@@ -1,6 +1,6 @@
 # CHAPPiE
 
-CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die versucht, menschliches Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation zu modellieren.
+CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die untersucht, wie sich Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation entwickeln kann.
 
 Im Gegensatz zu klassischen Chatbots besitzt CHAPPiE interne Zustände wie Emotionen, Bedürfnisse und langfristige Ziele. Er entwickelt sein Verhalten über Zeit durch Memory, Simulation und Training weiter.
 
@@ -19,16 +19,24 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 | Säule | Was sie bringt | Forschungsfeld |
 |---|---|---|
 | **Episodisches Gedächtnis** | Vergangene Interaktionen werden gespeichert, retrieved, verdichtet und vergessen | Memory-Augmented LLMs |
-| **Life-Simulation** | Needs, Goals, Habits, Attachment, Development-Stufen – ein kontinuierlicher innerer Zustand | Agent Systems, Simulation-based AI |
+| **Life-Simulation** | Das Life-System bestimmt kontinuierlich Prioritäten zwischen konkurrierenden Zielen und beeinflusst so Verhalten über mehrere Interaktionen hinweg | Agent Systems, Simulation-based AI |
 | **Emotion Steering** | Emotionen werden nicht nur im Prompt beschrieben, sondern direkt in die Hidden States des Modells injiziert | Affective Computing |
+
+## Konkretes Szenario
+
+> Ein Nutzer beleidigt den Agenten wiederholt. CHAPPiE speichert diese Interaktionen episodisch, verstärkt negative emotionale Zustände und verändert langfristig seinen Ton und seine Reaktionen gegenüber diesem Nutzer. Vertrauen sinkt, Frustration steigt – bis hin zu einem „crashout"-Modus: kurze, gereizte Antworten ohne Floskeln. Erst wenn der Nutzer sein Verhalten ändert, kann sich CHAPPiE über mehrere Interaktionen hinweg wieder öffnen.
 
 ## Was CHAPPiE besonders macht
 
 - **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
 - **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
 - **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
-- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
+- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes „Gedächtnisdenken"
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
+
+## Erste Beobachtungen
+
+Agenten mit aktivem Memory und Life-System zeigen konsistentere Persönlichkeitsverläufe über mehrere Sessions hinweg als reine Prompt-basierte Ansätze. Emotionale Zustände bleiben über Interaktionen hinweg stabil, und das Verhalten passt sich nachvollziehbar an wiederkehrende Muster an.
 
 ---
 
