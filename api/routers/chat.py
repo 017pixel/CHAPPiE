@@ -5,9 +5,8 @@ import queue
 import threading
 from typing import Any, Dict, Generator, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from starlette.responses import Response
 
 from api.dependencies import get_backend
 from api.services.command_service import execute_slash_command
@@ -209,9 +208,6 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
             "X-Accel-Buffering": "no",
         },
     )

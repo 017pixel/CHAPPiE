@@ -9,6 +9,7 @@ type ChatMessage = {
   id?: string;
   role: string;
   content: string;
+  metadata?: Record<string, unknown>;
 };
 
 type SessionDetail = {
@@ -29,10 +30,10 @@ type ProcessingState = "idle" | "thinking" | "streaming" | "error";
 
 const THINKING_MESSAGES = [
   "CHAPPiE denkt nach...",
-  "Hmm, warte, ich überlege noch...",
+  "Hmm, warte, ich ueberlege noch...",
   "Habs gleich, versprochen!",
   "Gib mir noch einen Moment...",
-  "Ich durchforste mein Langzeitgedächtnis...",
+  "Ich durchforste mein Langzeitgedaechtnis...",
   "Das ist eine interessante Frage...",
   "Ich analysiere die emotionalen Nuancen...",
   "Fast fertig mit der Verarbeitung...",
@@ -41,6 +42,10 @@ const THINKING_MESSAGES = [
   "Ich sortiere gerade meine Gedanken...",
   "Die Antwort formt sich...",
 ];
+
+function isPending(msg: ChatMessage): boolean {
+  return msg.metadata?.pending === true;
+}
 
 export function ChatPage() {
   const currentSessionId = useUiStore((state) => state.currentSessionId);
@@ -51,9 +56,9 @@ export function ChatPage() {
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
   const [streamingContent, setStreamingContent] = useState("");
   const [thinkingIndex, setThinkingIndex] = useState(0);
-  const [serverMessages, setServerMessages] = useState<ChatMessage[]>([]);
+  const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const processingRef = useRef(false);
 
   const sessionsQuery = useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
   const activeSessionQuery = useQuery({ queryKey: ["active-session"], queryFn: api.getActiveSession });
@@ -64,11 +69,12 @@ export function ChatPage() {
   });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus });
 
-  // Sync server messages (only when idle)
+  // Sync display messages from server, filtering out pending messages
   useEffect(() => {
     if (processingState !== "idle") return;
-    const msgs = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
-    setServerMessages(msgs);
+    const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
+    const cleanMessages = rawMessages.filter(msg => !isPending(msg) && !msg.content.startsWith("_CHAPPiE"));
+    setDisplayMessages(cleanMessages);
   }, [sessionQuery.data, processingState]);
 
   // Initialize session
@@ -87,7 +93,7 @@ export function ChatPage() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [serverMessages, streamingContent, thinkingIndex]);
+  }, [displayMessages, streamingContent, thinkingIndex]);
 
   // Thinking animation
   useEffect(() => {
@@ -99,46 +105,52 @@ export function ChatPage() {
   }, [processingState]);
 
   // Auto-send from queue when idle
-  const sendNextFromQueue = useCallback(() => {
-    setQueue(prev => {
-      if (prev.length === 0) return prev;
-      const [next, ...rest] = prev;
-      // Use setTimeout to avoid state update during render
-      setTimeout(() => {
-        processMessage(next.text);
-      }, 300);
-      return rest;
-    });
-  }, []);
-
   useEffect(() => {
-    if (processingState === "idle" && queue.length > 0) {
-      sendNextFromQueue();
+    if (processingState !== "idle" || queue.length === 0) return;
+
+    const next = queue[0];
+    setQueue(prev => prev.slice(1));
+
+    const timer = setTimeout(() => {
+      processMessage(next.text);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [processingState, queue.length]);
+
+  async function sendMessage(text: string) {
+    if (!text.trim()) return;
+
+    if (processingRef.current) {
+      setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text }]);
+      setMessage("");
+      return;
     }
-  }, [processingState, queue.length, sendNextFromQueue]);
+
+    await processMessage(text);
+  }
 
   async function processMessage(text: string) {
-    if (!text.trim() || processingState !== "idle") return;
+    if (!text.trim() || processingRef.current) return;
 
-    // Abort any previous stream
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
+    processingRef.current = true;
 
-    const abortController = new AbortController();
-    abortRef.current = abortController;
-
-    // Add user message to server messages immediately
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       content: text,
     };
-    setServerMessages(prev => [...prev, userMsg]);
+
+    setDisplayMessages(prev => [...prev, userMsg]);
+    setMessage("");
     setStreamingContent("");
     setThinkingIndex(0);
     setProcessingState("thinking");
 
+    let usedStream = false;
+    let streamedContent = "";
+
+    // Try streaming first
     try {
       const stream = api.sendMessageStream({
         session_id: currentSessionId,
@@ -147,89 +159,111 @@ export function ChatPage() {
         command_mode: text.trim().startsWith("/"),
       });
 
-      let accumulatedContent = "";
-      let receivedAnyToken = false;
+      usedStream = true;
 
       for await (const event of stream) {
-        if (abortController.signal.aborted) break;
-
         if (event.event === "token") {
-          if (!receivedAnyToken) {
-            receivedAnyToken = true;
+          if (processingState === "thinking") {
             setProcessingState("streaming");
           }
-          accumulatedContent += event.data.content || "";
-          setStreamingContent(accumulatedContent);
+          streamedContent += event.data.content || "";
+          setStreamingContent(streamedContent);
+          // Also update display messages with streaming content
+          setDisplayMessages(prev => {
+            const updated = [...prev];
+            // Remove any existing assistant message at the end that's a placeholder
+            while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
+              updated.pop();
+            }
+            updated.push({ id: "streaming", role: "assistant", content: streamedContent });
+            return updated;
+          });
         } else if (event.event === "turn_error") {
-          accumulatedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
-          setStreamingContent(accumulatedContent);
-          setProcessingState("error");
+          streamedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
+          setDisplayMessages(prev => {
+            const updated = [...prev];
+            while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
+              updated.pop();
+            }
+            updated.push({ id: `error-${Date.now()}`, role: "assistant", content: streamedContent });
+            return updated;
+          });
           break;
         } else if (event.event === "turn_finished") {
+          const finalContent = streamedContent || event.data?.assistant_message?.content || "";
+          if (finalContent) {
+            setDisplayMessages(prev => {
+              const updated = [...prev];
+              while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
+                updated.pop();
+              }
+              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent });
+              return updated;
+            });
+          }
           break;
         }
       }
+    } catch (streamErr) {
+      // Streaming failed, fall back to synchronous endpoint
+      console.warn("Streaming failed, falling back to synchronous endpoint:", streamErr);
 
-      if (!abortController.signal.aborted) {
-        // If we received tokens, add the streamed message to server messages
-        if (receivedAnyToken && accumulatedContent.trim()) {
-          setServerMessages(prev => [...prev, {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            content: accumulatedContent,
-          }]);
+      // Remove the thinking placeholder
+      setDisplayMessages(prev => {
+        const updated = [...prev];
+        while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "thinking")) {
+          updated.pop();
         }
-        setProcessingState("idle");
-        setStreamingContent("");
-        sessionQuery.refetch();
-        statusQuery.refetch();
+        return updated;
+      });
+
+      try {
+        const result = await api.sendMessage({
+          session_id: currentSessionId,
+          message: text,
+          debug_mode: false,
+          command_mode: text.trim().startsWith("/"),
+        }) as any;
+
+        const assistantContent = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
+        const sessionId = result?.session_id || result?.replacement_session_id;
+        if (sessionId && sessionId !== currentSessionId) {
+          setCurrentSessionId(sessionId);
+        }
+
+        setDisplayMessages(prev => [...prev, {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: assistantContent,
+        }]);
+      } catch (syncErr: any) {
+        setDisplayMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: `Fehler: ${syncErr.message || "Unbekannter Fehler"}`,
+        }]);
       }
-    } catch (err) {
-      if (abortController.signal.aborted) return;
-      setServerMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: "assistant",
-        content: `Fehler: ${(err as Error).message}`,
-      }]);
-      setProcessingState("error");
     } finally {
-      if (!abortController.signal.aborted) {
-        setProcessingState("idle");
-        setStreamingContent("");
-      }
+      processingRef.current = false;
+      setProcessingState("idle");
+      setStreamingContent("");
+      // Refetch server data to ensure consistency
+      sessionQuery.refetch();
+      statusQuery.refetch();
     }
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!message.trim() || processingState !== "idle") return;
-
-    if (processingState !== "idle") {
-      // Queue the message
-      setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: message }]);
-      setMessage("");
-      return;
-    }
-
-    const textToSend = message;
-    setMessage("");
-    processMessage(textToSend);
+    if (!message.trim()) return;
+    sendMessage(message);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!message.trim()) return;
-
-      if (processingState !== "idle") {
-        setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: message }]);
-        setMessage("");
-        return;
-      }
-
-      const textToSend = message;
-      setMessage("");
-      processMessage(textToSend);
+      sendMessage(message);
     }
   }
 
@@ -241,23 +275,19 @@ export function ChatPage() {
   const allCommands = ["/sleep", "/stats", "/help", "/clear", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
   const visibleCommands = commandsExpanded ? allCommands : allCommands.slice(0, 4);
 
-  // Build display messages
-  let displayMessages = [...serverMessages];
+  // Build final display messages: add thinking/streaming overlay
+  let finalMessages = [...displayMessages];
   if (processingState === "thinking") {
-    displayMessages = [...displayMessages, {
+    finalMessages = [...finalMessages, {
       id: "thinking",
       role: "assistant",
       content: THINKING_MESSAGES[thinkingIndex],
     }];
   } else if (processingState === "streaming") {
-    displayMessages = [...displayMessages, {
-      id: "streaming",
-      role: "assistant",
-      content: streamingContent,
-    }];
+    // Streaming messages are already in displayMessages, don't double-add
   }
 
-  const isInputDisabled = processingState !== "idle";
+  const isProcessing = processingRef.current;
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-6">
@@ -285,7 +315,7 @@ export function ChatPage() {
         ref={scrollRef}
         className="flex-1 overflow-y-auto rounded-none border border-white/5 bg-white/[0.02] p-8 space-y-6 scroll-smooth shadow-inner"
       >
-        {displayMessages.length === 0 ? (
+        {finalMessages.length === 0 ? (
           <div className="flex h-full items-center justify-center text-slate">
             <div className="text-center">
               <span className="material-symbols-outlined text-4xl opacity-20 transition-transform duration-700 hover:scale-110">bubble_chart</span>
@@ -293,7 +323,7 @@ export function ChatPage() {
             </div>
           </div>
         ) : (
-          displayMessages.map((entry, idx) => (
+          finalMessages.map((entry, idx) => (
             <div
               key={entry.id ?? idx}
               className={`flex flex-col ${entry.role === "assistant" ? "items-start" : "items-end"}`}
@@ -370,7 +400,7 @@ export function ChatPage() {
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isInputDisabled ? "CHAPPiE antwortet gerade..." : "Write a message or use /commands..."}
+            placeholder={isProcessing ? "CHAPPiE antwortet gerade..." : "Write a message or use /commands..."}
             className="w-full rounded-none border border-white/10 bg-input p-5 pr-32 text-sm text-mist shadow-glass outline-none transition-all placeholder:text-slate focus:border-ember focus:ring-1 focus:ring-ember/20"
             rows={2}
           />
