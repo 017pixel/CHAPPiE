@@ -8,6 +8,16 @@ export function VisualizerPage() {
   const data = (query.data ?? {}) as any;
   const emotions = data.emotions ?? {};
 
+  const emotionState = {
+    happiness: Number(emotions.happiness ?? 50),
+    trust: Number(emotions.trust ?? 50),
+    energy: Number(emotions.energy ?? 50),
+    curiosity: Number(emotions.curiosity ?? 50),
+    frustration: Number(emotions.frustration ?? 0),
+    motivation: Number(emotions.motivation ?? 50),
+    sadness: Number(emotions.sadness ?? 0),
+  };
+
   return (
     <SectionCard eyebrow="Spatial Neural Interface" title="3D Emotion Lattice" subtitle="High-fidelity 3D representation of the digital entity's current emotional state using React Three Fiber.">
       <div className="grid gap-8 xl:grid-cols-[1.5fr_1fr]">
@@ -18,11 +28,7 @@ export function VisualizerPage() {
                   <span className="text-[10px] font-bold text-ember uppercase tracking-widest">Live Rendering</span>
               </div>
           </div>
-          <VisualizerCanvas
-            happiness={Number(emotions.happiness ?? 50)}
-            energy={Number(emotions.energy ?? 50)}
-            frustration={Number(emotions.frustration ?? 0)}
-          />
+          <VisualizerCanvas emotions={emotionState} />
         </div>
 
         <div className="space-y-6">
