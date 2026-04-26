@@ -9,7 +9,7 @@
 | `memory/` | Gedaechtnis, Konsolidierung, Kontextdateien | `memory_engine.py`, `sleep_phase.py`, `forgetting_curve.py`, `context_files.py` |
 | `life/` | inneres Zustandsmodell und Entwicklung | `service.py`, `goal_engine.py`, `planning_engine.py`, `social_arc.py` |
 | `api/` | FastAPI-App fuer den Webpfad | `main.py`, `routers/*`, `schemas.py`, `dependencies.py` |
-| `frontend/` | React/Vite/TypeScript-Frontend | `src/router.tsx`, `src/pages/*`, `src/services/api.ts` |
+| `frontend/` | React/Vite/TypeScript-Frontend | `src/router.tsx`, `src/pages/*`, `src/services/api.ts`, `src/components/visualizer-canvas.tsx` |
 | `web_infrastructure/` | UI-freie Brueckenschicht | `backend_wrapper.py`, `ui_utils.py` |
 | `Chappies_Trainingspartner/` | autonomes Training | `training_daemon.py`, `training_loop.py`, `daemon_manager.py` |
 | `config/` | Provider-, Prompt- und Modellkonfiguration | `config.py`, `brain_config.py`, `secrets_example.py` |
@@ -57,7 +57,9 @@
 - [`api/services/`](../api/services)
 - [`frontend/src/router.tsx`](../frontend/src/router.tsx)
 - [`frontend/src/pages/chat-page.tsx`](../frontend/src/pages/chat-page.tsx)
-- [`frontend/src/pages/training-page.tsx`](../frontend/src/pages/training-page.tsx)
+- [`frontend/src/pages/visualizer-page.tsx`](../frontend/src/pages/visualizer-page.tsx)
+- [`frontend/src/components/visualizer-canvas.tsx`](../frontend/src/components/visualizer-canvas.tsx)
+- [`frontend/src/services/api.ts`](../frontend/src/services/api.ts)
 - [`web_infrastructure/backend_wrapper.py`](../web_infrastructure/backend_wrapper.py)
 - [`web_infrastructure/ui_utils.py`](../web_infrastructure/ui_utils.py)
 

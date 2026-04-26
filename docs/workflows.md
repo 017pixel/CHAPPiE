@@ -122,8 +122,25 @@ Wichtig:
 
 - Frontend spricht nur mit der App-API
 - die API spricht nie direkt mit einem UI-spezifischen State
-- Streaming laeuft ueber `POST /chat/stream`
+- Streaming laeuft ueber `POST /chat/stream` mit echten Token-Events
 - Slash-Commands werden serverseitig ueber `api/services/command_service.py` behandelt
+
+### Chat-Streaming
+
+Der Chat unterstuetzt jetzt Token-Level Streaming:
+
+1. User sendet Nachricht -> Eingabefeld wird sofort geleert, Nachricht erscheint sofort im Chat (Optimistic UI)
+2. Waehrend CHAPPiE denkt, zeigt eine pulsierende "Denk-Bubble" rotierende Status-Saetze an
+3. Sobald das erste Token generiert wird, erscheint die Antwort live Wort fuer Wort in der UI
+4. Neue Nachrichten koennen waehrend des Streamings eingegeben werden und landen in einer Queue
+5. Nach Abschluss einer Antwort wird automatisch die naechste Nachricht aus der Queue abgeschickt
+
+Relevante Dateien:
+
+- `frontend/src/pages/chat-page.tsx` – Chat UI mit Queue, Thinking-Animation, Token-Streaming
+- `frontend/src/services/api.ts` – SSE Streaming Client
+- `api/routers/chat.py` – `/chat/stream` Endpoint mit Token-Events
+- `web_infrastructure/backend_wrapper.py` – `process_stream()` fuer Token-Level Generierung
 
 ## 6. Debug, Memory und Runtime
 
@@ -166,21 +183,24 @@ Wichtige Pfade:
 
 Das Frontend bildet die frueheren Ansichten jetzt ueber eigene Seiten ab:
 
-- Chat
-- Context
-- Memories
-- Life
-- Growth
-- Settings
-- Training
-- Debug
-- Visualizer
+| Seite | Beschreibung |
+|---|---|
+| **Chat** | Chat-Interface mit Token-Level Streaming, Message Queue, Thinking-Animation und Optimistic UI |
+| **Context** | Kontextdateien und System-Kontext |
+| **Memories** | Episodisches Gedaechtnis durchsuchen |
+| **Life** | Life-Simulation Status, Needs, Goals |
+| **Growth** | Entwicklung und Lernfortschritt |
+| **Settings** | Runtime-Konfiguration |
+| **Training** | Trainings-Status und Steuerung |
+| **Debug** | Debug-Logs und Causal Trace |
+| **Visualizer** | 3D Emotion Lattice – lebendiger Orb mit Vertex Displacement und Partikeln |
 
 Relevante Pfade:
 
 - `frontend/src/router.tsx`
 - `frontend/src/pages/*.tsx`
 - `frontend/src/services/api.ts`
+- `frontend/src/components/visualizer-canvas.tsx`
 
 ## Weiterfuehrend
 

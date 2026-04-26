@@ -84,23 +84,21 @@ Relevante Dateien:
 - `brain/steering_backend.py`
 - `brain/steering_api_server.py`
 
-## Emotion-Steering
+## 3D Emotion Lattice
 
-Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:
+CHAPPiEs emotionale Zustaende werden in einer 3D-Visualisierung sichtbar:
 
-1. **VAD-Mapping**: Jede Emotion wird auf Valence, Arousal, Dominance abgebildet
-2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74
-3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged)
-4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
-5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
-
-Bei Cloud-Providern (Groq, NVIDIA, Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
+- **Living Orb**: Verformte Geometrie mit Vertex Displacement via FBM Noise
+- **Emotion-Mapping**: Alle 7 Emotionen steuern Farbe, Oberflaechenstruktur, Puls und Partikel
+- **Inner Core**: Zweiter transparenter Kern mit eigenem Puls
+- **Partikel-Feld**: 100 schwebende Partikel, deren Bewegung von Frustration und Energie gesteuert wird
+- **Material**: `meshPhysicalMaterial` mit `transmission`, `clearcoat`, `iridescence`
 
 Relevante Dateien:
 
-- `brain/agents/steering_manager.py`
-- `brain/steering_backend.py`
-- `brain/steering_api_server.py`
+- `frontend/src/components/visualizer-canvas.tsx`
+- `frontend/src/pages/visualizer-page.tsx`
+- `api/services/command_service.py` (`build_visualizer_payload`)
 
 ## Debug- und Entscheidungsspuren
 

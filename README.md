@@ -31,8 +31,11 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
 - **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
 - **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
-- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes „Gedächtnisdenken"
+- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
+- **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
+- **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden
+- **3D Emotion Lattice**: Lebendiger 3D-Orb, der sich in Echtzeit an alle 7 Emotionen anpasst – Farbe, Oberflaeche, Puls und Partikel reagieren auf emotionale Zustaende
 
 ## Erste Beobachtungen
 
