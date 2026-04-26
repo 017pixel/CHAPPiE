@@ -5,8 +5,9 @@ import queue
 import threading
 from typing import Any, Dict, Generator, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from starlette.responses import Response
 
 from api.dependencies import get_backend
 from api.services.command_service import execute_slash_command
@@ -202,7 +203,18 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
             )
             yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/command", response_model=CommandResponse)
