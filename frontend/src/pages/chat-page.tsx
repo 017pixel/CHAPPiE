@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState, useRef } from "react";
+import { FormEvent, useEffect, useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { parseEmotionalText } from "../lib/format";
@@ -25,6 +25,8 @@ type QueuedMessage = {
   text: string;
 };
 
+type ProcessingState = "idle" | "thinking" | "streaming" | "error";
+
 const THINKING_MESSAGES = [
   "CHAPPiE denkt nach...",
   "Hmm, warte, ich überlege noch...",
@@ -46,12 +48,12 @@ export function ChatPage() {
   const [message, setMessage] = useState("");
   const [commandsExpanded, setCommandsExpanded] = useState(false);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingState, setProcessingState] = useState<ProcessingState>("idle");
   const [streamingContent, setStreamingContent] = useState("");
   const [thinkingIndex, setThinkingIndex] = useState(0);
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
+  const [serverMessages, setServerMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const processingLock = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const sessionsQuery = useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
   const activeSessionQuery = useQuery({ queryKey: ["active-session"], queryFn: api.getActiveSession });
@@ -62,12 +64,12 @@ export function ChatPage() {
   });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus });
 
-  // Sync local messages with server data (only when not actively processing)
+  // Sync server messages (only when idle)
   useEffect(() => {
-    if (isProcessing) return;
-    const serverMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
-    setLocalMessages(serverMessages);
-  }, [sessionQuery.data, isProcessing]);
+    if (processingState !== "idle") return;
+    const msgs = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
+    setServerMessages(msgs);
+  }, [sessionQuery.data, processingState]);
 
   // Initialize session
   useEffect(() => {
@@ -80,58 +82,62 @@ export function ChatPage() {
     }
   }, [activeSessionQuery.data, currentSessionId, sessionsQuery.data, setCurrentSessionId]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [localMessages, streamingContent, thinkingIndex]);
+  }, [serverMessages, streamingContent, thinkingIndex]);
 
-  // Thinking animation - cycles every 2.5s while processing but no tokens yet
+  // Thinking animation
   useEffect(() => {
-    if (!isProcessing || streamingContent) return;
+    if (processingState !== "thinking") return;
     const interval = setInterval(() => {
       setThinkingIndex(i => (i + 1) % THINKING_MESSAGES.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, [isProcessing, streamingContent]);
+  }, [processingState]);
 
-  // Auto-send from queue when processing completes
+  // Auto-send from queue when idle
+  const sendNextFromQueue = useCallback(() => {
+    setQueue(prev => {
+      if (prev.length === 0) return prev;
+      const [next, ...rest] = prev;
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => {
+        processMessage(next.text);
+      }, 300);
+      return rest;
+    });
+  }, []);
+
   useEffect(() => {
-    if (isProcessing || queue.length === 0 || processingLock.current) return;
+    if (processingState === "idle" && queue.length > 0) {
+      sendNextFromQueue();
+    }
+  }, [processingState, queue.length, sendNextFromQueue]);
 
-    const next = queue[0];
-    setQueue(prev => prev.slice(1));
-    processingLock.current = true;
+  async function processMessage(text: string) {
+    if (!text.trim() || processingState !== "idle") return;
 
-    const timer = setTimeout(() => {
-      processingLock.current = false;
-      sendMessage(next.text);
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [isProcessing, queue]);
-
-  async function sendMessage(text: string) {
-    if (!text.trim()) return;
-
-    if (isProcessing) {
-      setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text }]);
-      setMessage("");
-      return;
+    // Abort any previous stream
+    if (abortRef.current) {
+      abortRef.current.abort();
     }
 
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
+    // Add user message to server messages immediately
     const userMsg: ChatMessage = {
-      id: `local-${Date.now()}`,
+      id: `user-${Date.now()}`,
       role: "user",
       content: text,
     };
-
-    setLocalMessages(prev => [...prev, userMsg]);
-    setMessage("");
-    setIsProcessing(true);
+    setServerMessages(prev => [...prev, userMsg]);
     setStreamingContent("");
     setThinkingIndex(0);
+    setProcessingState("thinking");
 
     try {
       const stream = api.sendMessageStream({
@@ -141,36 +147,90 @@ export function ChatPage() {
         command_mode: text.trim().startsWith("/"),
       });
 
-      let assistantContent = "";
+      let accumulatedContent = "";
+      let receivedAnyToken = false;
 
       for await (const event of stream) {
+        if (abortController.signal.aborted) break;
+
         if (event.event === "token") {
-          assistantContent += event.data.content || "";
-          setStreamingContent(assistantContent);
+          if (!receivedAnyToken) {
+            receivedAnyToken = true;
+            setProcessingState("streaming");
+          }
+          accumulatedContent += event.data.content || "";
+          setStreamingContent(accumulatedContent);
         } else if (event.event === "turn_error") {
-          assistantContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
-          setStreamingContent(assistantContent);
+          accumulatedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
+          setStreamingContent(accumulatedContent);
+          setProcessingState("error");
+          break;
         } else if (event.event === "turn_finished") {
           break;
         }
       }
+
+      if (!abortController.signal.aborted) {
+        // If we received tokens, add the streamed message to server messages
+        if (receivedAnyToken && accumulatedContent.trim()) {
+          setServerMessages(prev => [...prev, {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: accumulatedContent,
+          }]);
+        }
+        setProcessingState("idle");
+        setStreamingContent("");
+        sessionQuery.refetch();
+        statusQuery.refetch();
+      }
     } catch (err) {
-      setLocalMessages(prev => [...prev, {
+      if (abortController.signal.aborted) return;
+      setServerMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: "assistant",
         content: `Fehler: ${(err as Error).message}`,
       }]);
+      setProcessingState("error");
     } finally {
-      setIsProcessing(false);
-      setStreamingContent("");
-      sessionQuery.refetch();
-      statusQuery.refetch();
+      if (!abortController.signal.aborted) {
+        setProcessingState("idle");
+        setStreamingContent("");
+      }
     }
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    sendMessage(message);
+    if (!message.trim() || processingState !== "idle") return;
+
+    if (processingState !== "idle") {
+      // Queue the message
+      setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: message }]);
+      setMessage("");
+      return;
+    }
+
+    const textToSend = message;
+    setMessage("");
+    processMessage(textToSend);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!message.trim()) return;
+
+      if (processingState !== "idle") {
+        setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text: message }]);
+        setMessage("");
+        return;
+      }
+
+      const textToSend = message;
+      setMessage("");
+      processMessage(textToSend);
+    }
   }
 
   function removeFromQueue(id: string) {
@@ -181,23 +241,23 @@ export function ChatPage() {
   const allCommands = ["/sleep", "/stats", "/help", "/clear", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
   const visibleCommands = commandsExpanded ? allCommands : allCommands.slice(0, 4);
 
-  // Build display messages: server messages + streaming/thinking overlay
-  let displayMessages = [...localMessages];
-  if (isProcessing) {
-    if (streamingContent) {
-      displayMessages = [...displayMessages, {
-        id: "streaming",
-        role: "assistant",
-        content: streamingContent,
-      }];
-    } else {
-      displayMessages = [...displayMessages, {
-        id: "thinking",
-        role: "assistant",
-        content: THINKING_MESSAGES[thinkingIndex],
-      }];
-    }
+  // Build display messages
+  let displayMessages = [...serverMessages];
+  if (processingState === "thinking") {
+    displayMessages = [...displayMessages, {
+      id: "thinking",
+      role: "assistant",
+      content: THINKING_MESSAGES[thinkingIndex],
+    }];
+  } else if (processingState === "streaming") {
+    displayMessages = [...displayMessages, {
+      id: "streaming",
+      role: "assistant",
+      content: streamingContent,
+    }];
   }
+
+  const isInputDisabled = processingState !== "idle";
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-6">
@@ -309,13 +369,8 @@ export function ChatPage() {
           <textarea
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(message);
-              }
-            }}
-            placeholder="Write a message or use /commands..."
+            onKeyDown={handleKeyDown}
+            placeholder={isInputDisabled ? "CHAPPiE antwortet gerade..." : "Write a message or use /commands..."}
             className="w-full rounded-none border border-white/10 bg-input p-5 pr-32 text-sm text-mist shadow-glass outline-none transition-all placeholder:text-slate focus:border-ember focus:ring-1 focus:ring-ember/20"
             rows={2}
           />
