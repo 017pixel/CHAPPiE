@@ -100,78 +100,107 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     def event_stream() -> Generator[str, None, None]:
-        status_queue: queue.Queue[Dict[str, Any]] = queue.Queue()
-        result_box: Dict[str, Any] = {}
-        error_box: Dict[str, str] = {}
-
-        def status_callback(event: Dict[str, Any]):
-            status_queue.put(event)
-            backend.chat_manager.update_message(
-                session_id,
-                message_id,
-                metadata_updates={
-                    "pending": True,
-                    "status_text": event.get("status_text", "Nachricht wird verarbeitet..."),
-                    "current_step": event.get("step"),
-                },
-            )
-
-        def run_chat():
-            try:
-                if request.command_mode or request.message.strip().startswith("/"):
-                    result_box["result"] = execute_slash_command(request.message.strip(), backend)
-                else:
-                    result_box["result"] = backend.process(
-                        request.message,
-                        history,
-                        debug_mode=request.debug_mode,
-                        status_callback=status_callback,
-                    )
-            except Exception as exc:
-                error_box["message"] = str(exc)
-
-        worker = threading.Thread(target=run_chat, daemon=True)
-        worker.start()
         yield _format_sse("turn_started", {"session_id": session_id, "message_id": message_id})
 
-        while worker.is_alive() or not status_queue.empty():
+        # Slash commands are fast and don't need streaming
+        if request.command_mode or request.message.strip().startswith("/"):
             try:
-                event = status_queue.get(timeout=0.2)
-                yield _format_sse("status", event)
-            except queue.Empty:
-                continue
+                result = execute_slash_command(request.message.strip(), backend)
+                if result.get("replacement_session_id"):
+                    session_id = result["replacement_session_id"]
+                    message_id = backend.chat_manager.create_message_id()
+                    pending_message = backend._build_pending_message(message_id)
+                    _persist_pending_turn(backend, session_id, user_message, pending_message)
 
-        if error_box:
+                assistant_message = backend._build_assistant_message(request.message, result, message_id=message_id)
+                backend.chat_manager.update_message(
+                    session_id,
+                    message_id,
+                    content=assistant_message["content"],
+                    role="assistant",
+                    metadata_updates=assistant_message["metadata"],
+                )
+                # Yield the full response as a single token for consistency
+                yield _format_sse("token", {"content": assistant_message["content"]})
+                yield _format_sse(
+                    "turn_finished",
+                    {
+                        "session_id": session_id,
+                        "message_id": message_id,
+                        "assistant_message": assistant_message,
+                        "life_snapshot": result.get("life_snapshot", {}),
+                        "emotion_snapshot": result.get("emotions", {}),
+                        "debug_entries": result.get("debug_entries", []),
+                    },
+                )
+            except Exception as exc:
+                error_text = str(exc)
+                backend.chat_manager.update_message(
+                    session_id,
+                    message_id,
+                    content=error_text,
+                    role="assistant",
+                    metadata_updates={"pending": False, "status_text": ""},
+                )
+                yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
+            return
+
+        # Normal messages: stream tokens
+        try:
+            for event in backend.process_stream(
+                request.message,
+                history,
+                debug_mode=request.debug_mode,
+            ):
+                event_type = event.get("event")
+                if event_type == "token":
+                    yield _format_sse("token", {"content": event.get("content", "")})
+                elif event_type == "status":
+                    yield _format_sse("status", event)
+                elif event_type == "error":
+                    error_text = event.get("error", "Unbekannter Fehler")
+                    backend.chat_manager.update_message(
+                        session_id,
+                        message_id,
+                        content=error_text,
+                        role="assistant",
+                        metadata_updates={"pending": False, "status_text": ""},
+                    )
+                    yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
+                    return
+                elif event_type == "finished":
+                    result = event.get("result", {})
+                    assistant_message = backend._build_assistant_message(request.message, result, message_id=message_id)
+                    backend.chat_manager.update_message(
+                        session_id,
+                        message_id,
+                        content=assistant_message["content"],
+                        role="assistant",
+                        metadata_updates=assistant_message["metadata"],
+                    )
+                    yield _format_sse(
+                        "turn_finished",
+                        {
+                            "session_id": session_id,
+                            "message_id": message_id,
+                            "assistant_message": assistant_message,
+                            "life_snapshot": result.get("life_snapshot", {}),
+                            "emotion_snapshot": result.get("emotions", {}),
+                            "debug_entries": result.get("debug_entries", []),
+                        },
+                    )
+                    return
+
+        except Exception as exc:
+            error_text = str(exc)
             backend.chat_manager.update_message(
                 session_id,
                 message_id,
-                content=error_box["message"],
+                content=error_text,
                 role="assistant",
                 metadata_updates={"pending": False, "status_text": ""},
             )
-            yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_box["message"]})
-            return
-
-        result = result_box["result"]
-        assistant_message = backend._build_assistant_message(request.message, result, message_id=message_id)
-        backend.chat_manager.update_message(
-            session_id,
-            message_id,
-            content=assistant_message["content"],
-            role="assistant",
-            metadata_updates=assistant_message["metadata"],
-        )
-        yield _format_sse(
-            "turn_finished",
-            {
-                "session_id": session_id,
-                "message_id": message_id,
-                "assistant_message": assistant_message,
-                "life_snapshot": result.get("life_snapshot", {}),
-                "emotion_snapshot": result.get("emotions", {}),
-                "debug_entries": result.get("debug_entries", []),
-            },
-        )
+            yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

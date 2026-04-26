@@ -4,7 +4,7 @@ import time
 import threading
 from datetime import datetime, timezone
 
-from typing import Dict, Any, List, Callable, Optional
+from typing import Dict, Any, List, Callable, Optional, Generator
 
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
@@ -1592,6 +1592,528 @@ def create_chappie_backend():
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
             }
+
+        def _generate_response_stream_raw(
+            self,
+            user_input: str,
+            history: List[Dict],
+            context: str,
+            emotions: Dict[str, int],
+            life_context: Dict[str, Any] | None = None,
+            global_workspace: Dict[str, Any] | None = None,
+            preloaded_memories: Optional[List[Any]] = None,
+            memory_trace_seed: Optional[Dict[str, Any]] = None,
+        ):
+            """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
+            generation_query = self.memory.extract_search_query(user_input)
+            fresh_memories = self.memory.search_memory(
+                generation_query or user_input,
+                top_k=settings.memory_top_k,
+            )
+            memories = self._merge_memories(
+                preferred=preloaded_memories or [],
+                secondary=fresh_memories,
+                limit=settings.memory_top_k,
+            )
+            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            memory_trace = {
+                "seed": memory_trace_seed or {},
+                "generation": self._build_memory_trace(
+                    query=generation_query,
+                    memories=fresh_memories,
+                    stage="generation",
+                ),
+                "merged": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="merged_context",
+                ),
+            }
+
+            prompt_runtime = self._build_prompt_runtime(emotions)
+            tone_decision = prompt_runtime.get("response_plan", {})
+
+            system_prompt = get_system_prompt_with_emotions(
+                happiness=emotions["happiness"],
+                trust=emotions["trust"],
+                energy=emotions["energy"],
+                curiosity=emotions["curiosity"],
+                frustration=emotions["frustration"],
+                motivation=emotions["motivation"],
+                sadness=emotions["sadness"],
+                include_emotion_status=prompt_runtime["use_prompt_emotions"],
+                use_chain_of_thought=settings.chain_of_thought
+            )
+
+            if context:
+                system_prompt += f"\n\n{context}"
+
+            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
+                prompt_runtime["response_plan"],
+                life_context,
+                global_workspace,
+            )
+
+            if memories_for_prompt:
+                system_prompt += f"\n\n{memories_for_prompt}"
+
+            messages = self.brain.build_prompt(system_prompt, "", user_input, history)
+
+            gen_config = GenerationConfig(
+                max_tokens=settings.max_tokens,
+                temperature=settings.temperature,
+                stream=True,
+                extra_body=prompt_runtime["steering_payload"] or None,
+            )
+
+            return self.brain.generate(messages, config=gen_config), {
+                "memory_trace": memory_trace,
+                "tone_decision": tone_decision,
+                "emotion_steering": prompt_runtime["emotion_steering"],
+                "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                "rag_memories": memories,
+            }
+
+        def _process_two_step_stream(
+            self,
+            user_input: str,
+            history: List[Dict],
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Generator[Dict[str, Any], None, None]:
+            """
+            Zwei-Schritte Verarbeitung mit Token-Streaming.
+            Step 1: Intent Analysis (synchron)
+            Step 2: Response Generation (streaming)
+            """
+            self.debug_logger.log_step1_start()
+
+            emotions_before = self._get_emotions_snapshot()
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+
+            # === STEP 1: Intent Analysis ===
+            intent_result = self._run_with_retries(
+                step_number=1,
+                step_name="Intent-Analyse",
+                action=lambda: self.intent_processor.process(
+                    user_input=user_input,
+                    history=history,
+                    current_emotions=emotions_before,
+                ),
+                validator=self._is_valid_intent_result,
+                status_callback=status_callback,
+            )
+
+            self.debug_logger.log_step1_complete(
+                intent_result.intent_type.value,
+                intent_result.confidence
+            )
+            self.debug_logger.log_step1_json(intent_result.raw_json)
+            input_classification = self._build_input_classification(intent_result)
+            available_tools = self._get_available_step1_tools()
+            selected_tool_names = [tc.tool for tc in intent_result.tool_calls]
+            unused_tool_names = [tool for tool in available_tools if tool not in selected_tool_names]
+            self.debug_logger.log_info(
+                "TOOL_DECISION",
+                "Tool-Auswahl aus Step 1 analysiert",
+                {
+                    "available_tools": available_tools,
+                    "selected_tools": selected_tool_names,
+                    "unused_tools": unused_tool_names,
+                },
+            )
+
+            # === AUSFUEHRUNG: Tool Calls ===
+            self._execute_step1_tool_calls(intent_result.tool_calls)
+
+            # === AUSFUEHRUNG: Emotions Updates ===
+            combined_updates = dict(intent_result.emotions_update)
+            for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
+                if emotion_name not in combined_updates:
+                    combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
+            emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
+
+            # === AUSFUEHRUNG: Short-Term Entries ===
+            self._add_short_term_entries(intent_result.short_term_entries)
+
+            # === AUSFUEHRUNG: Migration ===
+            migrated = self.short_term_memory_v2.migrate_expired_entries()
+            if migrated > 0:
+                self.debug_logger.log_migration(migrated)
+
+            intent_query_source = " ".join(input_classification.get("entities", [])) or user_input
+            intent_memory_query = self.memory.extract_search_query(intent_query_source)
+            intent_memories = self.memory.search_memory(
+                intent_memory_query or user_input,
+                top_k=min(settings.memory_top_k, 8),
+            )
+            intent_memory_trace = self._build_memory_trace(
+                query=intent_memory_query,
+                memories=intent_memories,
+                stage="intent_context",
+            )
+            self.debug_logger.log_info(
+                "MEMORY_TRACE",
+                "Intent-nahe Erinnerungen fuer Kontext priorisiert",
+                intent_memory_trace,
+            )
+
+            # === CONTEXT AUFBAUEN ===
+            context = self._build_context(intent_result.context_requirements)
+            workspace = self._build_workspace_from_intent(
+                intent_result,
+                life_context,
+                memories=intent_memories,
+                search_query=intent_memory_query,
+            )
+            self.debug_logger.log_info(
+                "CONTEXT",
+                "Kontext und Workspace aufgebaut",
+                {
+                    "context_requirements": intent_result.context_requirements,
+                    "context_chars": len(context or ""),
+                    "workspace_focus": (workspace.get("dominant_focus") or {}).get("label", "---"),
+                    "workspace_broadcast": workspace.get("broadcast", "---"),
+                    "workspace_math_steps": len(workspace.get("math_trace", [])),
+                },
+            )
+
+            yield {"event": "status", "step": 1, "status_text": "Intent-Analyse abgeschlossen"}
+
+            # === STEP 2: Response Generation (Streaming) ===
+            self.debug_logger.log_step2_start(get_active_model())
+
+            try:
+                token_generator, meta = self._generate_response_stream_raw(
+                    user_input=user_input,
+                    history=history,
+                    context=context,
+                    emotions=emotions_after,
+                    life_context=life_context,
+                    global_workspace=workspace,
+                    preloaded_memories=intent_memories,
+                    memory_trace_seed=intent_memory_trace,
+                )
+
+                raw_parts = []
+                for token in token_generator:
+                    yield {"event": "token", "content": token}
+                    raw_parts.append(token)
+
+                raw_response = "".join(raw_parts)
+                display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
+                self.debug_logger.log_info(
+                    "MODEL_OUTPUT",
+                    "Schritt-2-Ausgabe ausgewertet",
+                    {
+                        "response_chars": len(display_response or ""),
+                        "model_reasoning_chars": len(model_reasoning or ""),
+                        "thought_chars": len(thought or ""),
+                        "looks_like_error": looks_like_model_error(display_response or ""),
+                    },
+                )
+
+            except Exception as exc:
+                error_text = self._format_generation_error("Antwortgenerierung", str(exc))
+                yield {"event": "error", "error": error_text}
+                display_response = error_text
+                thought = ""
+                model_reasoning = ""
+
+            final_life_snapshot = self.life_simulation.finalize_turn(
+                user_input=user_input,
+                response_text=display_response,
+                emotions_after=emotions_after,
+                prefrontal={"response_strategy": "conversational"},
+                global_workspace=workspace,
+            )
+
+            tone_decision = meta.get("tone_decision", {}) if 'meta' in dir() else {}
+            memory_trace = meta.get("memory_trace", intent_memory_trace) if 'meta' in dir() else intent_memory_trace
+            causal_trace = self._build_causal_trace(
+                input_classification=input_classification,
+                memory_trace=memory_trace,
+                emotion_transitions=emotion_transitions,
+                emotion_steering=meta.get("emotion_steering", {}) if 'meta' in dir() else {},
+                life_context=life_context,
+                workspace=workspace,
+                tone_decision=tone_decision,
+            )
+
+            self.memory.add_memory(user_input, role="user")
+            if display_response.strip() and not looks_like_model_error(display_response):
+                self.memory.add_memory(display_response, role="assistant")
+            self._set_last_memory_timestamp()
+
+            self.short_term_memory_v2.add_entry(
+                content=f"User: {user_input}",
+                category="chat",
+                importance="normal"
+            )
+            self.short_term_memory_v2.add_entry(
+                content=f"CHAPPiE: {display_response[:200]}",
+                category="chat",
+                importance="normal"
+            )
+            sleep_result = self._schedule_sleep_phase_if_due()
+
+            start_time_dt = datetime.now()
+            processing_time_ms = 0
+            if hasattr(self, '_processing_start_time'):
+                processing_time_ms = (start_time_dt - self._processing_start_time).total_seconds() * 1000
+
+            result = {
+                "response_text": display_response,
+                "emotions": emotions_after,
+                "emotions_before": emotions_before,
+                "emotions_delta": emotion_transitions,
+                "thought_process": thought,
+                "model_reasoning": model_reasoning,
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "input_classification": input_classification,
+                "rag_memories": meta.get("rag_memories", []) if 'meta' in dir() else [],
+                "emotion_steering": meta.get("emotion_steering", {}) if 'meta' in dir() else {},
+                "memory_trace": memory_trace,
+                "tone_decision": tone_decision,
+                "causal_trace": causal_trace,
+                "prompt_emotion_mode": meta.get("prompt_emotion_mode", "") if 'meta' in dir() else "",
+                "intent_type": intent_result.intent_type.value,
+                "intent_confidence": intent_result.confidence,
+                "tool_calls_executed": len(intent_result.tool_calls),
+                "available_tools": available_tools,
+                "selected_tools": selected_tool_names,
+                "unused_tools": unused_tool_names,
+                "short_term_count": self.short_term_memory_v2.get_count(),
+                "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+                "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
+                "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
+                "processing_time_ms": processing_time_ms,
+                "life_snapshot": final_life_snapshot,
+                "global_workspace": workspace,
+                "action_plan": {"response_strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
+                "dream_fragments": final_life_snapshot.get("dream_fragments", []),
+                "provider": settings.llm_provider.value,
+                "model": get_active_model(),
+                "auto_sleep_triggered": sleep_result.get("triggered", False),
+                "sleep_status": sleep_result.get("status", {}),
+            }
+
+            yield {"event": "finished", "result": result}
+
+        def _process_legacy_stream(
+            self,
+            user_input: str,
+            history: List[Dict],
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Generator[Dict[str, Any], None, None]:
+            """Legacy Verarbeitung mit Token-Streaming."""
+            emotions_before = self._get_emotions_snapshot()
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+
+            self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
+            emotions_after = self._get_emotions_snapshot()
+
+            generation_query = self.memory.extract_search_query(user_input)
+            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k)
+            memory_trace = {
+                "generation": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="legacy_generation",
+                ),
+                "merged": self._build_memory_trace(
+                    query=generation_query,
+                    memories=memories,
+                    stage="legacy_merged_context",
+                ),
+            }
+            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+
+            state = self.emotions.get_state()
+            prompt_runtime = self._build_prompt_runtime(state.__dict__)
+            tone_decision = prompt_runtime.get("response_plan", {})
+            self.debug_logger.log_info(
+                "EMOTION_STEERING",
+                "Legacy-Emotionssteuerung vorbereitet",
+                {
+                    "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                    "forced_local_qwen_steering": prompt_runtime["force_steering"],
+                    "steering_active": prompt_runtime["emotion_steering"].get("steering_active", False),
+                    "dominant_vector": prompt_runtime["emotion_steering"].get("dominant_vector", "neutral"),
+                },
+            )
+            self.debug_logger.log_info(
+                "MEMORY_TRACE",
+                "Legacy-Memory-Spur aufgebaut",
+                memory_trace,
+            )
+            self.debug_logger.log_info(
+                "TONE_DECISION",
+                "Legacy-Antwortton aus Signalen abgeleitet",
+                {
+                    "tone": tone_decision.get("tone", "grounded_neutral"),
+                    "tone_reason": tone_decision.get("tone_reason", ""),
+                },
+            )
+
+            system_prompt = get_system_prompt_with_emotions(
+                **state.__dict__,
+                include_emotion_status=prompt_runtime["use_prompt_emotions"],
+                use_chain_of_thought=settings.chain_of_thought
+            )
+            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
+                prompt_runtime["response_plan"],
+                life_context,
+                {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
+            )
+
+            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
+
+            gen_config = GenerationConfig(
+                max_tokens=settings.max_tokens,
+                temperature=settings.temperature,
+                stream=True,
+                extra_body=prompt_runtime["steering_payload"] or None,
+            )
+
+            yield {"event": "status", "step": 1, "status_text": "Legacy-Antwortgenerierung gestartet"}
+
+            try:
+                token_generator = self.brain.generate(messages, config=gen_config)
+                raw_parts = []
+                for token in token_generator:
+                    yield {"event": "token", "content": token}
+                    raw_parts.append(token)
+
+                raw_response = "".join(raw_parts)
+                display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
+                self.debug_logger.log_info(
+                    "LEGACY",
+                    "Legacy-Antwort generiert",
+                    {
+                        "response_chars": len(display_response or ""),
+                        "thought_chars": len(thought or ""),
+                    },
+                )
+
+            except Exception as exc:
+                error_text = self._format_generation_error("Legacy-Antwortgenerierung", str(exc))
+                yield {"event": "error", "error": error_text}
+                display_response = error_text
+                thought = ""
+                model_reasoning = ""
+
+            self.memory.add_memory(user_input, role="user")
+            if display_response.strip() and not looks_like_model_error(display_response):
+                self.memory.add_memory(display_response, role="assistant")
+            self._set_last_memory_timestamp()
+
+            self.short_term_memory_v2.add_entry(
+                content=f"User: {user_input}",
+                category="chat",
+                importance="normal"
+            )
+            self.short_term_memory_v2.add_entry(
+                content=f"CHAPPiE: {display_response[:200]}",
+                category="chat",
+                importance="normal"
+            )
+            final_life_snapshot = self.life_simulation.finalize_turn(
+                user_input=user_input,
+                response_text=display_response,
+                emotions_after=emotions_after,
+                prefrontal={"response_guidance": "Legacy path mit Life-Simulation"},
+                global_workspace={"dominant_focus": {"label": "Legacy Input"}},
+            )
+            input_classification = {
+                "intent_type": "legacy",
+                "confidence": 1.0,
+                "entities": [],
+                "entity_count": 0,
+                "short_term_entries_planned": 0,
+                "tool_calls_planned": 0,
+            }
+            causal_trace = self._build_causal_trace(
+                input_classification=input_classification,
+                memory_trace=memory_trace.get("merged", {}),
+                emotion_transitions=self._calculate_emotion_delta(emotions_before, emotions_after),
+                emotion_steering=prompt_runtime["emotion_steering"],
+                life_context=life_context,
+                workspace={"broadcast": "legacy-path"},
+                tone_decision=tone_decision,
+            )
+            sleep_result = self._schedule_sleep_phase_if_due()
+
+            result = {
+                "response_text": display_response,
+                "emotions": emotions_after,
+                "emotions_before": emotions_before,
+                "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
+                "thought_process": thought,
+                "model_reasoning": model_reasoning,
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "input_classification": input_classification,
+                "rag_memories": memories,
+                "emotion_steering": prompt_runtime["emotion_steering"],
+                "memory_trace": memory_trace,
+                "tone_decision": tone_decision,
+                "causal_trace": causal_trace,
+                "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                "intent_type": "legacy",
+                "intent_confidence": 1.0,
+                "tool_calls_executed": 0,
+                "available_tools": self._get_available_step1_tools(),
+                "selected_tools": [],
+                "unused_tools": self._get_available_step1_tools(),
+                "short_term_count": self.short_term_memory_v2.get_count(),
+                "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
+                "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
+                "life_snapshot": final_life_snapshot,
+                "global_workspace": {"broadcast": "legacy-path"},
+                "action_plan": {"strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
+                "dream_fragments": final_life_snapshot.get("dream_fragments", []),
+                "provider": settings.llm_provider.value,
+                "model": get_active_model(),
+                "auto_sleep_triggered": sleep_result.get("triggered", False),
+                "sleep_status": sleep_result.get("status", {}),
+            }
+
+            yield {"event": "finished", "result": result}
+
+        def process_stream(
+            self,
+            user_input: str,
+            history: List[Dict],
+            debug_mode: bool = False,
+            status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        ) -> Generator[Dict[str, Any], None, None]:
+            """
+            Streaming-Verarbeitung mit Token-Level Ausgabe.
+            """
+            if debug_mode:
+                self.debug_logger.enable()
+            else:
+                if not settings.cli_debug_always_on:
+                    self.debug_logger.disable()
+
+            if self.debug_logger.enabled:
+                self.debug_logger.clear()
+                self.debug_logger.log_info(
+                    "TURN",
+                    "Neuer Streaming-Turn gestartet",
+                    {
+                        "provider": settings.llm_provider.value,
+                        "model": get_active_model(),
+                        "history_messages": len(history or []),
+                    },
+                )
+
+            self.apply_runtime_settings()
+            self._processing_start_time = datetime.now()
+
+            if settings.enable_two_step_processing:
+                yield from self._process_two_step_stream(user_input, history, status_callback)
+            else:
+                yield from self._process_legacy_stream(user_input, history, status_callback)
 
         # === Command Handler ===
 

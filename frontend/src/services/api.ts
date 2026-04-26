@@ -35,6 +35,43 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function* parseSSEStream(response: Response): AsyncGenerator<{event: string; data: any}> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+
+    for (const part of parts) {
+      const lines = part.split("\n");
+      let eventName = "message";
+      let dataStr = "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          eventName = line.slice(7);
+        } else if (line.startsWith("data: ")) {
+          dataStr = line.slice(6);
+        }
+      }
+
+      if (dataStr) {
+        try {
+          yield { event: eventName, data: JSON.parse(dataStr) };
+        } catch {
+          yield { event: eventName, data: dataStr };
+        }
+      }
+    }
+  }
+}
+
 export const api = {
   baseUrl: API_BASE_URL,
   getHealth: () => request("/health"),
@@ -46,6 +83,19 @@ export const api = {
   deleteSession: (sessionId: string) => request(`/sessions/${sessionId}`, { method: "DELETE" }),
   sendMessage: (payload: { session_id: string | null; message: string; debug_mode: boolean; command_mode: boolean }) =>
     request("/chat", { method: "POST", body: JSON.stringify(payload) }),
+  sendMessageStream: async function*(payload: { session_id: string | null; message: string; debug_mode: boolean; command_mode: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API ${response.status}: ${await response.text()}`);
+    }
+
+    yield* parseSSEStream(response);
+  },
   runCommand: (payload: { session_id?: string | null; command: string }) =>
     request("/command", { method: "POST", body: JSON.stringify(payload) }),
   getLife: () => request("/life"),
