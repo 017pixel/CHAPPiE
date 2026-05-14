@@ -25,9 +25,9 @@ ANCHOR_VARIANTS = (
     "Du bist gepraegt von {description}. Formuliere eine spontane kurze Reaktion.",
     "Deine Persoenlichkeit wirkt gerade {description}. Antworte mit einem einzelnen natuerlichen Satz.",
 )
-ANCHOR_SCALE_FACTOR = 0.015
-PLAN_STRENGTH_SOFT_CAP = 1.8
-PLAN_VECTOR_NORM_CAP = 2.4
+ANCHOR_SCALE_FACTOR = 0.012
+PLAN_STRENGTH_SOFT_CAP = 1.2
+PLAN_VECTOR_NORM_CAP = 1.6
 NEUTRAL_ANCHORS = (
     "Mir geht es okay.",
     "Ich bin ruhig und klar.",

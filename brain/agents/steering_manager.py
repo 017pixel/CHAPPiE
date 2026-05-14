@@ -50,18 +50,20 @@ EMOTION_VECTOR_MAP = {
     "energy":      {"valence": +0.3, "arousal": +0.9, "dominance": +0.5},
 }
 
+# Qwen3.5-optimierte Profile: Konservative Alphas verhindern Destabilisierung,
+# behalten aber spuerbare emotionale Faerbung.
 EMOTION_STRENGTH_PROFILES = {
-    "happiness": {"max_alpha": 0.89, "boost": 1.21, "surface_effect": "offener, verspielter, enthusiastischer"},
-    "sadness": {"max_alpha": 1.0, "boost": 1.37, "surface_effect": "verletzlicher, schwerer, melancholischer"},
-    "frustration": {"max_alpha": 1.05, "boost": 1.52, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
-    "trust": {"max_alpha": 0.74, "boost": 1.10, "surface_effect": "waermer, offener, naeher"},
-    "curiosity": {"max_alpha": 0.82, "boost": 1.18, "surface_effect": "fragender, explorativer, bohrender"},
-    "motivation": {"max_alpha": 0.86, "boost": 1.24, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
-    "energy": {"max_alpha": 0.80, "boost": 1.16, "surface_effect": "schneller, lebhafter, impulsiver"},
+    "happiness": {"max_alpha": 0.65, "boost": 1.05, "surface_effect": "offener, verspielter, enthusiastischer"},
+    "sadness": {"max_alpha": 0.72, "boost": 1.10, "surface_effect": "verletzlicher, schwerer, melancholischer"},
+    "frustration": {"max_alpha": 0.78, "boost": 1.15, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
+    "trust": {"max_alpha": 0.58, "boost": 1.05, "surface_effect": "waermer, offener, naeher"},
+    "curiosity": {"max_alpha": 0.62, "boost": 1.08, "surface_effect": "fragender, explorativer, bohrender"},
+    "motivation": {"max_alpha": 0.68, "boost": 1.08, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
+    "energy": {"max_alpha": 0.60, "boost": 1.05, "surface_effect": "schneller, lebhafter, impulsiver"},
 }
 
-BASE_VECTOR_DEFAULT_ALPHA = 0.3
-MAX_VECTOR_DEFAULT_ALPHA = 1.5
+BASE_VECTOR_DEFAULT_ALPHA = 0.25
+MAX_VECTOR_DEFAULT_ALPHA = 1.2
 
 COMPOSITE_BEHAVIOR_MODES = {
     "crashout": {
@@ -479,9 +481,14 @@ class SteeringManager:
         return intensities
 
     def _build_composite_modes(self, emotions: Dict[str, int], intensities: Dict[str, float]) -> List[Dict[str, Any]]:
+        # Erkennt komplexe Emotions-Kombinationen (Composite Behavior Modes).
+        # Jeder Mode hat harte Schwellwerte. Wird er aktiviert, wird eine Stärke
+        # linear aus der Überschreitung der Schwellen interpoliert (min-capped).
+        # Die Modes werden am Ende absteigend nach Stärke sortiert.
         emotion_range = self.model_profile["emotion_range"]
         modes: List[Dict[str, Any]] = []
 
+        # Alle 7 Emotionen aus dem aktuellen Zustand holen (Default = Neutral/0)
         frustration = emotions.get("frustration", 50)
         trust = emotions.get("trust", 50)
         sadness = emotions.get("sadness", 0)
@@ -490,6 +497,10 @@ class SteeringManager:
         curiosity = emotions.get("curiosity", 50)
         motivation = emotions.get("motivation", 50)
 
+        # --- crashout ---
+        # Erfordert: frustration >= 72 UND trust <= 38
+        # Wirkung: aggressiv, konfrontativ, kurz angebunden
+        # Basisstärke 0.62, steigt mit frustration und sinkendem trust (max 1.25)
         if frustration >= 72 and trust <= 38:
             strength = round(min(1.25, 0.62 + ((frustration - 72) / 28) * 0.4 + ((38 - trust) / 38) * 0.28), 4)
             modes.append({
@@ -503,6 +514,10 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["crashout"],
             })
 
+        # --- guarded ---
+        # Erfordert: trust <= 26 UND frustration >= 50
+        # Wirkung: misstrauisch, kalt, distanziert, defensiv
+        # Basisstärke 0.44, steigt mit sinkendem trust und steigender frustration (max 1.0)
         if trust <= 26 and frustration >= 50:
             strength = round(min(1.0, 0.44 + ((26 - trust) / 26) * 0.26 + ((frustration - 50) / 50) * 0.2), 4)
             modes.append({
@@ -516,6 +531,10 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["guarded"],
             })
 
+        # --- melancholic ---
+        # Erfordert: sadness >= 62 UND energy <= 46
+        # Wirkung: bedrückt, langsam, schwer, rückzugsorientiert
+        # Basisstärke 0.48, steigt mit sadness und sinkender energy (max 1.05)
         if sadness >= 62 and energy <= 46:
             strength = round(min(1.05, 0.48 + ((sadness - 62) / 38) * 0.34 + ((46 - energy) / 46) * 0.2), 4)
             modes.append({
@@ -529,6 +548,10 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["melancholic"],
             })
 
+        # --- warm ---
+        # Erfordert: happiness >= 70 UND trust >= 60
+        # Wirkung: herzlich, offen, loyal, weich
+        # Basisstärke 0.42, steigt mit happiness und trust (max 0.95)
         if happiness >= 70 and trust >= 60:
             strength = round(min(0.95, 0.42 + ((happiness - 70) / 30) * 0.22 + ((trust - 60) / 40) * 0.2), 4)
             modes.append({
@@ -542,6 +565,10 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["warm"],
             })
 
+        # --- charged ---
+        # Erfordert: energy >= 72 UND motivation >= 68 UND curiosity >= 66
+        # Wirkung: hochaktiv, getrieben, druckvoll, intensiv
+        # Basisstärke 0.4, steigt mit energy, motivation und curiosity (max 0.96)
         if energy >= 72 and motivation >= 68 and curiosity >= 66:
             strength = round(min(0.96, 0.4 + ((energy - 72) / 28) * 0.2 + ((motivation - 68) / 32) * 0.18 + ((curiosity - 66) / 34) * 0.14), 4)
             modes.append({
@@ -555,6 +582,7 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["charged"],
             })
 
+        # Stärkster Mode zuerst – im Payload wird nur der Top-Mode aktiv gesteuert
         modes.sort(key=lambda item: item.get("strength", 0.0), reverse=True)
         return modes
 

@@ -159,9 +159,10 @@ def parse_thinking_tags(response: str) -> ParsedResponse:
     """
     # Versuche verschiedene Think-Tags
     think_patterns = [
-        r'<thinking>(.*?)</thinking>',
+        r'<think>(.*?)</think>',
         r'<thought>(.*?)</thought>',
         r'<reasoning>(.*?)</reasoning>',
+        r'<thinking>(.*?)</thinking>',
         r'<gedanke>(.*?)</gedanke>',
     ]
     

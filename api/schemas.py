@@ -15,6 +15,7 @@ class HealthResponse(BaseModel):
 class StatusResponse(BaseModel):
     brain_available: bool
     model: str
+    provider: str = ""
     emotions: Dict[str, int]
     daily_info_count: int
     two_step_enabled: bool

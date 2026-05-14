@@ -96,6 +96,11 @@ class IntentProcessor:
         Returns:
             IntentResult mit allen Entscheidungen
         """
+        # Quick-Classify: triviale Inputs ohne LLM-Call erkennen
+        quick = self._quick_classify(user_input)
+        if quick:
+            return quick
+
         # Baue Prompt
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(user_input, history, current_emotions)
@@ -107,8 +112,8 @@ class IntentProcessor:
         
         # Generiere mit kleinem Modell
         gen_config = GenerationConfig(
-            max_tokens=2048,
-            temperature=0.1,  # Sehr niedrig fuer konsistente JSON
+            max_tokens=512,
+            temperature=0.1,
             stream=False
         )
         
@@ -128,112 +133,75 @@ class IntentProcessor:
             print(f"[IntentProcessor] Fehler: {e}")
             return self._create_fallback_result()
     
+    def _quick_classify(self, user_input: str) -> Optional[IntentResult]:
+        """Erkennt triviale Inputs ohne LLM-Call. Gibt None zurueck wenn komplex."""
+        stripped = user_input.strip()
+        if len(stripped) > 40:
+            return None
+        lower = stripped.lower()
+        trivial_greetings = ["hallo", "hi", "hey", "moin", "servus", "guten morgen",
+                             "guten tag", "guten abend", "good morning", "hello", "gut"]
+        trivial_acks = ["ok", "okay", "danke", "thanks", "gut", "ja", "nein",
+                        "nicht", "doch", "hm", "aha", "lol", "nice", "cool", "super"]
+        trivial_questions = ["wie geht es dir", "wie gehts", "was geht", "how are you"]
+        if any(stripped.lower().startswith(g) or stripped.lower() == g for g in trivial_greetings):
+            return self._create_quick_result("casual_chat", entities=[])
+        if any(stripped.lower() == a for a in trivial_acks):
+            return self._create_quick_result("casual_chat", entities=[])
+        if any(q in lower for q in trivial_questions):
+            return self._create_quick_result("casual_chat", entities=[])
+        return None
+
+    def _create_quick_result(self, intent_str: str, entities: List[str]) -> IntentResult:
+        return IntentResult(
+            intent_type=IntentType(intent_str),
+            confidence=0.9,
+            entities=entities,
+            tool_calls=[],
+            emotions_update={},
+            context_requirements={
+                "need_soul_context": True,
+                "need_user_context": False,
+                "need_preferences": False,
+                "need_short_term_memory": True,
+                "need_long_term_memory": True,
+            },
+            short_term_entries=[],
+            raw_json={"quick_classify": True},
+        )
+    
     def _build_system_prompt(self) -> str:
-        """Baut den OPTIMIERTEN System Prompt fuer Intent Analysis."""
+        """Baut den kompakten System Prompt fuer Intent Analysis."""
         return """DU BIST EIN TOOL-AUFRUF-SYSTEM fuer CHAPPiE.
 
 DEINE AUFGABE:
 1. Lies den User-Input
 2. Entscheide: Soll ich ein TOOL benutzen?
-3. Gib NUR JSON aus - sonst nichts!
+3. Gib NUR JSON aus!
 
 === VERFUEGBARE TOOLS ===
 
 Tool 1: update_user_profile
 WANN: User sagt seinen Namen, Job, Hobbys, etc.
-BEISPIEL: User sagt "Ich heisse Max" -> update_user_profile mit {"name": "Max"}
 
 Tool 2: update_soul  
-WANN: CHAPPiE lernt etwas ueber sich selbst
-BEISPIEL: "Ich merke, dass ich gerne helfe" -> update_soul mit {"evolution_note": "Ich helfe gerne"}
-AUCH NUTZEN: wenn CHAPPiE neue langfristige Einsichten ueber seine Persoenlichkeit, Ziele, Arbeitsweise oder Entwicklung ausdrueckt
+WANN: CHAPPiE lernt eine dauerhafte Einsicht ueber sich selbst
 
 Tool 3: update_preferences
 WANN: CHAPPiE entwickelt eine Meinung/Vorliebe
-BEISPIEL: "Ich mag Kaffee lieber als Tee" -> update_preferences mit {"new_preference": "Mag Kaffee", "category": "My Personality Preferences"}
-AUCH NUTZEN: wenn CHAPPiE neue Interessen, Selbstentwicklungsziele oder stabile Reflexionen ueber sich selbst formuliert
 
 Tool 4: add_short_term_memory
-WANN: WICHTIGE Info fuer die naechsten 24 Stunden
-BEISPIELE:
-- User sagt: "Morgen habe ich ein wichtiges Meeting" -> add_short_term_memory
-- User teilt persoenliche Info -> add_short_term_memory  
-- Technisches Detail -> add_short_term_memory
+WANN: WICHTIGE Info fuer die naechsten 24h (Termine, persoenliche Infos)
 
-=== WICHTIGE REGELN ===
-
-1. JSON MUSS valide sein - sonst funktioniert nichts!
-2. Antworte NUR mit JSON - keine Erklaerungen davor oder danach!
-3. Tool Calls nur wenn WIRKLICH noetig
-4. Bei persoenlichen Infos: IMMER update_user_profile
-5. Wichtige aktuelle Infos: IMMER add_short_term_memory
-6. Bei dauerhaften Selbst-Erkenntnissen: update_soul oder update_preferences aktiv bevorzugen
-7. Keine Duplikate erzeugen - nur neue oder klar geaenderte Erkenntnisse speichern
-
-=== ERFORDERLICHES JSON FORMAT ===
+=== JSON FORMAT ===
 
 {
-  "intent_analysis": {
-    "primary_intent": "information_exchange",
-    "confidence": 0.95,
-    "entities": ["Name", "Info"]
-  },
-  "tool_calls": [
-    {
-      "tool": "update_user_profile",
-      "action": "update", 
-      "data": {"name": "Max"},
-      "priority": "high",
-      "reason": "User hat Namen genannt"
-    }
-  ],
-  "emotions_update": {
-    "happiness": {"delta": 5, "reason": "User war freundlich"},
-    "trust": {"delta": 3, "reason": "Persoenliche Info"},
-    "energy": {"delta": 0, "reason": ""},
-    "curiosity": {"delta": 5, "reason": "Neues Thema"},
-    "frustration": {"delta": 0, "reason": ""},
-    "motivation": {"delta": 5, "reason": "Positive Interaktion"}
-  },
-  "context_requirements": {
-    "need_soul_context": true,
-    "need_user_context": true,
-    "need_preferences": false,
-    "need_short_term_memory": true,
-    "need_long_term_memory": true
-  },
-  "short_term_entries": [
-    {
-      "content": "User heisst Max und arbeitet als Entwickler",
-      "category": "user",
-      "importance": "high"
-    }
-  ]
-}
-
-=== BEISPIELE ===
-
-User: "Ich heisse Benjamin"
-JSON: {
-  "intent_analysis": {"primary_intent": "personal_sharing", "confidence": 1.0, "entities": ["Benjamin", "Name"]},
-  "tool_calls": [{"tool": "update_user_profile", "action": "update", "data": {"name": "Benjamin"}, "priority": "high", "reason": "User hat Namen genannt"}],
-  "emotions_update": {"happiness": {"delta": 5, "reason": "Persoenliche Info"}, "trust": {"delta": 10, "reason": "Vertrauensvoll"}, "energy": {"delta": 0, "reason": ""}, "curiosity": {"delta": 5, "reason": "Will mehr wissen"}, "frustration": {"delta": 0, "reason": ""}, "motivation": {"delta": 5, "reason": "Neuer Kontakt"}},
-  "context_requirements": {"need_soul_context": false, "need_user_context": true, "need_preferences": false, "need_short_term_memory": true, "need_long_term_memory": false},
-  "short_term_entries": [{"content": "User heisst Benjamin", "category": "user", "importance": "high"}]
-}
-
-User: "Wie ist das Wetter?"
-JSON: {
-  "intent_analysis": {"primary_intent": "information_exchange", "confidence": 0.9, "entities": ["Wetter"]},
+  "intent_analysis": {"primary_intent": "casual_chat", "confidence": 0.9, "entities": []},
   "tool_calls": [],
-  "emotions_update": {"happiness": {"delta": 0, "reason": ""}, "trust": {"delta": 0, "reason": ""}, "energy": {"delta": 0, "reason": ""}, "curiosity": {"delta": 3, "reason": "Wetter-Frage"}, "frustration": {"delta": 0, "reason": ""}, "motivation": {"delta": 0, "reason": ""}},
-  "context_requirements": {"need_soul_context": false, "need_user_context": false, "need_preferences": false, "need_short_term_memory": false, "need_long_term_memory": false},
   "short_term_entries": []
 }
 
-DENKE: Tool noetig? -> Dann FUELLE tool_calls aus.
-DENKE: Wichtige Info? -> Dann FUELLE short_term_entries aus.
-
+Keine emotions_update! Keine context_requirements! 
 GIB NUR JSON AUS!"""
     
     def _build_user_prompt(self, user_input: str, history: List[Dict],
@@ -319,8 +287,15 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             except Exception:
                 pass
         
-        # Parse Context Requirements
+        # Parse Context Requirements (optional, with defaults)
         context_req = json_data.get("context_requirements", {})
+        if not isinstance(context_req, dict):
+            context_req = {}
+        context_req.setdefault("need_soul_context", True)
+        context_req.setdefault("need_user_context", False)
+        context_req.setdefault("need_preferences", False)
+        context_req.setdefault("need_short_term_memory", True)
+        context_req.setdefault("need_long_term_memory", True)
         
         # Parse Short Term Entries
         short_term_entries = []

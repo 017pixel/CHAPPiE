@@ -18,6 +18,7 @@ type SessionDetail = {
 
 type StatusSnapshot = {
   model?: string;
+  provider?: string;
   emotions?: Record<string, number>;
 };
 
@@ -57,6 +58,8 @@ export function ChatPage() {
   const [streamingContent, setStreamingContent] = useState("");
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
+  const [reasoningContent, setReasoningContent] = useState("");
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef(false);
 
@@ -69,13 +72,18 @@ export function ChatPage() {
   });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus });
 
-  // Sync display messages from server, filtering out pending messages
+  // Sync display messages from server only on initial load
   useEffect(() => {
     if (processingState !== "idle") return;
+    if (loadedOnce) return;
     const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
+    if (rawMessages.length === 0) return;
     const cleanMessages = rawMessages.filter(msg => !isPending(msg) && !msg.content.startsWith("_CHAPPiE"));
-    setDisplayMessages(cleanMessages);
-  }, [sessionQuery.data, processingState]);
+    if (cleanMessages.length > 0) {
+      setDisplayMessages(cleanMessages);
+      setLoadedOnce(true);
+    }
+  }, [sessionQuery.data, processingState, loadedOnce]);
 
   // Initialize session
   useEffect(() => {
@@ -87,6 +95,11 @@ export function ChatPage() {
       setCurrentSessionId(sessionsQuery.data[0].id);
     }
   }, [activeSessionQuery.data, currentSessionId, sessionsQuery.data, setCurrentSessionId]);
+
+  // Reset loadedOnce when session changes
+  useEffect(() => {
+    setLoadedOnce(false);
+  }, [currentSessionId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -144,11 +157,13 @@ export function ChatPage() {
     setDisplayMessages(prev => [...prev, userMsg]);
     setMessage("");
     setStreamingContent("");
+    setReasoningContent("");
     setThinkingIndex(0);
     setProcessingState("thinking");
 
     let usedStream = false;
     let streamedContent = "";
+    let streamedReasoning = "";
 
     // Try streaming first
     try {
@@ -166,18 +181,22 @@ export function ChatPage() {
           if (processingState === "thinking") {
             setProcessingState("streaming");
           }
-          streamedContent += event.data.content || "";
-          setStreamingContent(streamedContent);
-          // Also update display messages with streaming content
-          setDisplayMessages(prev => {
-            const updated = [...prev];
-            // Remove any existing assistant message at the end that's a placeholder
-            while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
-              updated.pop();
-            }
-            updated.push({ id: "streaming", role: "assistant", content: streamedContent });
-            return updated;
-          });
+          const tokenType = event.data.token_type || "answer";
+          if (tokenType === "reasoning") {
+            streamedReasoning += event.data.content || "";
+            setReasoningContent(streamedReasoning);
+          } else {
+            streamedContent += event.data.content || "";
+            setStreamingContent(streamedContent);
+            setDisplayMessages(prev => {
+              const updated = [...prev];
+              while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
+                updated.pop();
+              }
+              updated.push({ id: "streaming", role: "assistant", content: streamedContent });
+              return updated;
+            });
+          }
         } else if (event.event === "turn_error") {
           streamedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
           setDisplayMessages(prev => {
@@ -191,13 +210,14 @@ export function ChatPage() {
           break;
         } else if (event.event === "turn_finished") {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
+          const finalReasoning = streamedReasoning;
           if (finalContent) {
             setDisplayMessages(prev => {
               const updated = [...prev];
               while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
                 updated.pop();
               }
-              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent });
+              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent, metadata: { reasoning: finalReasoning || undefined } });
               return updated;
             });
           }
@@ -247,8 +267,7 @@ export function ChatPage() {
       processingRef.current = false;
       setProcessingState("idle");
       setStreamingContent("");
-      // Refetch server data to ensure consistency
-      sessionQuery.refetch();
+      setReasoningContent("");
       statusQuery.refetch();
     }
   }
@@ -285,9 +304,19 @@ export function ChatPage() {
     }];
   } else if (processingState === "streaming") {
     // Streaming messages are already in displayMessages, don't double-add
+    // Add a reasoning entry if reasoning content is live
+    if (reasoningContent) {
+      finalMessages = [...finalMessages, {
+        id: "reasoning-live",
+        role: "assistant",
+        content: reasoningContent,
+        metadata: { isReasoning: true },
+      }];
+    }
   }
 
   const isProcessing = processingRef.current;
+  const hasLiveReasoning = processingState === "streaming" && reasoningContent;
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-6">
@@ -297,6 +326,7 @@ export function ChatPage() {
           <h1 className="text-2xl font-bold tracking-tight">Chat & Intelligence</h1>
           <div className="mt-2 flex gap-4 text-[10px] uppercase tracking-widest text-slate">
             <span>Model: <span className="text-ember">{status.model ?? "Loading..."}</span></span>
+            <span>via: <span className="text-mist">{status.provider ?? "---"}</span></span>
             <span>Status: <span className="text-green-500">Active</span></span>
           </div>
         </div>
@@ -326,8 +356,15 @@ export function ChatPage() {
           finalMessages.map((entry, idx) => (
             <div
               key={entry.id ?? idx}
-              className={`flex flex-col ${entry.role === "assistant" ? "items-start" : "items-end"}`}
+              className={`flex flex-col gap-2 ${entry.role === "assistant" ? "items-start" : "items-end"}`}
             >
+              {/* Reasoning box for assistant messages that have it */}
+              {(entry.role === "assistant" && (entry.metadata as any)?.reasoning) && (
+                <div className="max-w-[85%] rounded-none border border-white/5 bg-white/[0.04] px-5 py-3">
+                  <p className="mb-1.5 text-[10px] uppercase tracking-widest text-slate">Reasoning</p>
+                  <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{(entry.metadata as any).reasoning}</div>
+                </div>
+              )}
               <div
                 className={`max-w-[85%] rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
                   entry.role === "assistant"
@@ -340,6 +377,8 @@ export function ChatPage() {
                   <div className="text-sm leading-relaxed whitespace-pre-wrap">
                     {entry.content}
                   </div>
+                ) : entry.id === "reasoning-live" ? (
+                  <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{entry.content}</div>
                 ) : (
                   <div
                     className="text-sm leading-relaxed"

@@ -154,7 +154,10 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
             ):
                 event_type = event.get("event")
                 if event_type == "token":
-                    yield _format_sse("token", {"content": event.get("content", "")})
+                    yield _format_sse("token", {
+                        "content": event.get("content", ""),
+                        "token_type": event.get("token_type", "answer"),
+                    })
                 elif event_type == "status":
                     yield _format_sse("status", event)
                 elif event_type == "error":

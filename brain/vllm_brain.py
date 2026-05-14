@@ -172,13 +172,13 @@ class VLLMBrain(BaseBrain):
         """Bereitet provider-spezifische Optionen vor."""
         payload = dict(extra_body or {})
 
-        # Qwen3.5 neigt im Thinking-Mode zu reasoning-only Antworten ohne message.content.
-        # Standardmaessig deaktivieren, ausser der Aufrufer setzt es explizit.
+        # Thinking-Mode aktivieren fuer lebendigere Antworten.
+        # vLLM liefert reasoning_content als separates Feld, das wir extrahieren.
         if self.model.lower().startswith("qwen/qwen3.5"):
             chat_kwargs = payload.get("chat_template_kwargs")
             if not isinstance(chat_kwargs, dict):
                 chat_kwargs = {}
-            chat_kwargs.setdefault("enable_thinking", False)
+            chat_kwargs.setdefault("enable_thinking", True)
             payload["chat_template_kwargs"] = chat_kwargs
 
         return payload

@@ -721,6 +721,7 @@ def create_chappie_backend():
             return {
                 "brain_available": brain_ok,
                 "model": get_active_model(),
+                "provider": settings.llm_provider.value,
                 "emotions": self._get_emotions_snapshot(),
                 "daily_info_count": self.short_term_memory_v2.get_count(),
                 "two_step_enabled": settings.enable_two_step_processing,
@@ -1605,26 +1606,19 @@ def create_chappie_backend():
             memory_trace_seed: Optional[Dict[str, Any]] = None,
         ):
             """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
-            generation_query = self.memory.extract_search_query(user_input)
-            fresh_memories = self.memory.search_memory(
-                generation_query or user_input,
-                top_k=settings.memory_top_k,
-            )
-            memories = self._merge_memories(
-                preferred=preloaded_memories or [],
-                secondary=fresh_memories,
-                limit=settings.memory_top_k,
-            )
+            # Preloaded memories aus Step 1 direkt nutzen – kein zweiter LLM-Call
+            memories = list(preloaded_memories or [])
+            if not memories:
+                generation_query = self.memory.extract_search_query(user_input)
+                memories = self.memory.search_memory(
+                    generation_query or user_input,
+                    top_k=settings.memory_top_k,
+                )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
             memory_trace = {
                 "seed": memory_trace_seed or {},
-                "generation": self._build_memory_trace(
-                    query=generation_query,
-                    memories=fresh_memories,
-                    stage="generation",
-                ),
                 "merged": self._build_memory_trace(
-                    query=generation_query,
+                    query=user_input,
                     memories=memories,
                     stage="merged_context",
                 ),
@@ -1744,7 +1738,7 @@ def create_chappie_backend():
             intent_memory_query = self.memory.extract_search_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
-                top_k=min(settings.memory_top_k, 8),
+                top_k=settings.memory_top_k,
             )
             intent_memory_trace = self._build_memory_trace(
                 query=intent_memory_query,
@@ -1795,9 +1789,52 @@ def create_chappie_backend():
                 )
 
                 raw_parts = []
+                think_buffer = ""
+                in_think = False
+                think_open_marker = "<think>"
+                think_close_marker = "</think>"
+
                 for token in token_generator:
-                    yield {"event": "token", "content": token}
                     raw_parts.append(token)
+                    think_buffer += token
+                    while len(think_buffer) >= min(len(think_open_marker), len(think_close_marker)):
+                        if not in_think:
+                            idx = think_buffer.find(think_open_marker)
+                            if idx == -1:
+                                keep = min(len(think_buffer), len(think_open_marker) - 1)
+                                prefix = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
+                                think_buffer = think_buffer[-keep:] if keep > 0 else ""
+                                if prefix:
+                                    yield {"event": "token", "content": prefix, "token_type": "answer"}
+                                break
+                            else:
+                                prefix = think_buffer[:idx]
+                                think_buffer = think_buffer[idx + len(think_open_marker):]
+                                if prefix:
+                                    yield {"event": "token", "content": prefix, "token_type": "answer"}
+                                in_think = True
+                        if in_think:
+                            idx = think_buffer.find(think_close_marker)
+                            if idx == -1:
+                                keep = min(len(think_buffer), len(think_close_marker) - 1)
+                                emit = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
+                                think_buffer = think_buffer[-keep:] if keep > 0 else ""
+                                if emit:
+                                    yield {"event": "token", "content": emit, "token_type": "reasoning"}
+                                break
+                            else:
+                                reasoning = think_buffer[:idx]
+                                think_buffer = think_buffer[idx + len(think_close_marker):]
+                                if reasoning:
+                                    yield {"event": "token", "content": reasoning, "token_type": "reasoning"}
+                                in_think = False
+                                if think_buffer:
+                                    yield {"event": "token", "content": think_buffer, "token_type": "answer"}
+                                    think_buffer = ""
+                                break
+                if think_buffer:
+                    token_type = "reasoning" if in_think else "answer"
+                    yield {"event": "token", "content": think_buffer, "token_type": token_type}
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
@@ -1844,16 +1881,21 @@ def create_chappie_backend():
                 self.memory.add_memory(display_response, role="assistant")
             self._set_last_memory_timestamp()
 
-            self.short_term_memory_v2.add_entry(
-                content=f"User: {user_input}",
-                category="chat",
-                importance="normal"
-            )
-            self.short_term_memory_v2.add_entry(
-                content=f"CHAPPiE: {display_response[:200]}",
-                category="chat",
-                importance="normal"
-            )
+            def _bg_stm():
+                try:
+                    self.short_term_memory_v2.add_entry(
+                        content=f"User: {user_input}",
+                        category="chat",
+                        importance="normal"
+                    )
+                    self.short_term_memory_v2.add_entry(
+                        content=f"CHAPPiE: {display_response[:200]}",
+                        category="chat",
+                        importance="normal"
+                    )
+                except Exception:
+                    pass
+            threading.Thread(target=_bg_stm, daemon=True).start()
             sleep_result = self._schedule_sleep_phase_if_due()
 
             start_time_dt = datetime.now()
