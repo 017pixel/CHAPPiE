@@ -212,6 +212,9 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
         },
     )
 
