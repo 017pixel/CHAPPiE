@@ -2,6 +2,26 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [0.11.0] - 2026-05-14
+
+### Erstellt
+- Live-Timer während der Generierung unter der Denk-Animation
+- Timing-Metriken im Info-Popup (TTFT, Thinking-Zeit, Antwort-Zeit, Tokens)
+- Token-Budget-Steuerung für Thinking und Antwort getrennt
+- Effizienteres API-Response-Handling für Cerebras, Groq und NVIDIA
+
+### Verändert
+- Config-System auf Root-Config umgestellt für zentrale Verwaltung
+- Memory-Engine Performance verbessert mit Batch-Operationen
+- Short-Term Memory V2 mit optimierter Sortierung und Filterung
+- vLLM-Service-Config und Deployment-Dokumentation aktualisiert
+
+### Gelöscht
+- Veraltete API-Config-Struktur (APIs/__init__.py vereinfacht)
+- Redundante Config-Beispiele aus secrets_example.py entfernt
+
+---
+
 ## [0.10.3] - 2026-05-14
 
 ### Erstellt

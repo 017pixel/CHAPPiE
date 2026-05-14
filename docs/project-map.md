@@ -12,7 +12,8 @@
 | `frontend/` | React/Vite/TypeScript-Frontend | `src/router.tsx`, `src/pages/*`, `src/services/api.ts`, `src/components/visualizer-canvas.tsx` |
 | `web_infrastructure/` | UI-freie Brueckenschicht | `backend_wrapper.py`, `ui_utils.py` |
 | `Chappies_Trainingspartner/` | autonomes Training | `training_daemon.py`, `training_loop.py`, `daemon_manager.py` |
-| `config/` | Provider-, Prompt- und Modellkonfiguration | `config.py`, `brain_config.py`, `secrets_example.py` |
+| `config/` | Provider-, Prompt- und Modellkonfigurationscode | `config.py`, `root_config.py`, `brain_config.py` |
+| `CHAPPIE_CONFIG.json` | lokale Root-Konfiguration, nicht fuer GitHub | Vorlage: `CHAPPIE_CONFIG.example.json` |
 | `tests/` | lokale, Integrations- und manuelle Tests | `test_api_contract.py`, `test_chat_manager_persistence.py`, `manual/*` |
 | `data/` | Laufzeitdaten, Kontextdateien, Vektoren | `soul.md`, `user.md`, `CHAPPiEsPreferences.md`, `life_state.json` |
 | `docs/` | zentrale Erklaertexte | `architecture.md`, `workflows.md`, `local-models.md` |

@@ -57,12 +57,12 @@ flowchart TD
 
 1. Python-Umgebung vorhanden
 2. Frontend-Dependencies installiert oder Build erzeugt
-3. lokale Modell- oder API-Konfiguration gesetzt
+3. `CHAPPIE_CONFIG.json` aus der Vorlage angelegt und `api.cerebras_api_key` gesetzt
 4. `data/` gesichert
 5. `chappie-training.service` auf `training_daemon` geprueft
 6. `Restart=always` und absolute Pfade geprueft
 7. `chappie-vllm.service`, `chappie-web.service`, `chappie-frontend.service` und `chappie-training.service` separat getestet
-8. auf dem Server ist das Steering-Modell bewusst auf `Qwen/Qwen3.5-9B` gesetzt, waehrend lokale Defaults schlank bleiben
+8. auf dem Server ist das Steering-Modell fuer T4-Betrieb auf `Qwen/Qwen3.5-4B` gesetzt
 9. relevante Doku aktualisiert
 
 ## Server-Kommandos

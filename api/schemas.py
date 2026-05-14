@@ -118,6 +118,7 @@ class SettingsSnapshot(BaseModel):
     query_extraction_vllm_model: str
     query_extraction_nvidia_model: str
     query_extraction_cerebras_model: str
+    query_extraction_min_words_for_llm: int
     emotion_analysis_model: str
     emotion_analysis_host: str
     embedding_model: str
@@ -133,8 +134,18 @@ class SettingsSnapshot(BaseModel):
     steering_model: str
     temperature: float
     max_tokens: int
+    chappie_thinking_token_limit: int
+    chappie_answer_token_limit: int
     chain_of_thought: bool
     enable_two_step_processing: bool
+    stm_summary_threshold: int
+    stm_summary_batch_size: int
+    cerebras_requests_per_minute: int
+    cerebras_requests_per_hour: int
+    cerebras_requests_per_day: int
+    cerebras_tokens_per_minute: int
+    cerebras_tokens_per_hour: int
+    cerebras_tokens_per_day: int
 
 
 class SettingsUpdate(BaseModel):
@@ -162,6 +173,7 @@ class SettingsUpdate(BaseModel):
     query_extraction_vllm_model: Optional[str] = None
     query_extraction_nvidia_model: Optional[str] = None
     query_extraction_cerebras_model: Optional[str] = None
+    query_extraction_min_words_for_llm: Optional[int] = None
     emotion_analysis_model: Optional[str] = None
     emotion_analysis_host: Optional[str] = None
     embedding_model: Optional[str] = None
@@ -177,5 +189,15 @@ class SettingsUpdate(BaseModel):
     steering_model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    chappie_thinking_token_limit: Optional[int] = None
+    chappie_answer_token_limit: Optional[int] = None
     chain_of_thought: Optional[bool] = None
     enable_two_step_processing: Optional[bool] = None
+    stm_summary_threshold: Optional[int] = None
+    stm_summary_batch_size: Optional[int] = None
+    cerebras_requests_per_minute: Optional[int] = None
+    cerebras_requests_per_hour: Optional[int] = None
+    cerebras_requests_per_day: Optional[int] = None
+    cerebras_tokens_per_minute: Optional[int] = None
+    cerebras_tokens_per_hour: Optional[int] = None
+    cerebras_tokens_per_day: Optional[int] = None

@@ -195,6 +195,7 @@ def create_chappie_backend():
                 "debug_log": result.get("debug_log"),
                 "provider": result.get("provider", ""),
                 "model": result.get("model", ""),
+                "timing": result.get("timing", {}),
                 "auto_sleep_triggered": result.get("auto_sleep_triggered", False),
                 "sleep_status": result.get("sleep_status", {}),
                 "pending": False,
@@ -565,6 +566,16 @@ def create_chappie_backend():
                 "response_plan": response_plan,
             }
 
+        def _generation_budget_instruction(self) -> str:
+            thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 2500))
+            answer_limit = int(getattr(settings, "chappie_answer_token_limit", 800))
+            return (
+                "Generation Budget:\n"
+                f"- Internes Thinking maximal {thinking_limit} Tokens.\n"
+                f"- Finale Antwort maximal {answer_limit} Tokens.\n"
+                "- Wenn du die Grenze erreichst, beende die Antwort klar statt weiter auszuholen."
+            )
+
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
             return intent_result is not None and hasattr(intent_result, "intent_type")
@@ -918,6 +929,7 @@ def create_chappie_backend():
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
                 top_k=min(settings.memory_top_k, 8),
+                optimize_query=False,
             )
             intent_memory_trace = self._build_memory_trace(
                 query=intent_memory_query,
@@ -1237,6 +1249,7 @@ def create_chappie_backend():
             fresh_memories = self.memory.search_memory(
                 generation_query or user_input,
                 top_k=settings.memory_top_k,
+                optimize_query=False,
             )
             memories = self._merge_memories(
                 preferred=preloaded_memories or [],
@@ -1325,6 +1338,7 @@ def create_chappie_backend():
                 life_context,
                 global_workspace,
             )
+            system_prompt += "\\n\\n" + self._generation_budget_instruction()
             
             # Memories hinzufuegen
             if memories_for_prompt:
@@ -1335,7 +1349,7 @@ def create_chappie_backend():
             
             # Generierung
             gen_config = GenerationConfig(
-                max_tokens=settings.max_tokens,
+                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
@@ -1424,7 +1438,7 @@ def create_chappie_backend():
             
             # RAG
             generation_query = self.memory.extract_search_query(user_input)
-            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k)
+            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
             memory_trace = {
                 "generation": self._build_memory_trace(
                     query=generation_query,
@@ -1483,12 +1497,13 @@ def create_chappie_backend():
                 life_context,
                 {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
             )
+            system_prompt += "\n\n" + self._generation_budget_instruction()
             
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
             
             # Generierung
             gen_config = GenerationConfig(
-                max_tokens=settings.max_tokens,
+                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
@@ -1613,6 +1628,7 @@ def create_chappie_backend():
                 memories = self.memory.search_memory(
                     generation_query or user_input,
                     top_k=settings.memory_top_k,
+                    optimize_query=False,
                 )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
             memory_trace = {
@@ -1647,6 +1663,7 @@ def create_chappie_backend():
                 life_context,
                 global_workspace,
             )
+            system_prompt += "\n\n" + self._generation_budget_instruction()
 
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
@@ -1654,7 +1671,7 @@ def create_chappie_backend():
             messages = self.brain.build_prompt(system_prompt, "", user_input, history)
 
             gen_config = GenerationConfig(
-                max_tokens=settings.max_tokens,
+                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
                 stream=True,
                 extra_body=prompt_runtime["steering_payload"] or None,
@@ -1739,6 +1756,7 @@ def create_chappie_backend():
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
                 top_k=settings.memory_top_k,
+                optimize_query=False,
             )
             intent_memory_trace = self._build_memory_trace(
                 query=intent_memory_query,
@@ -1776,6 +1794,7 @@ def create_chappie_backend():
             # === STEP 2: Response Generation (Streaming) ===
             self.debug_logger.log_step2_start(get_active_model())
 
+            timing = {}
             try:
                 token_generator, meta = self._generate_response_stream_raw(
                     user_input=user_input,
@@ -1794,6 +1813,40 @@ def create_chappie_backend():
                 think_open_marker = "<think>"
                 think_close_marker = "</think>"
 
+                gen_start = time.time()
+                first_token_ts = None
+                reasoning_start_ts = None
+                reasoning_end_ts = None
+                reasoning_token_count = 0
+                answer_start_ts = None
+                answer_end_ts = None
+                answer_token_count = 0
+
+                def _estimate_tokens(content: str) -> int:
+                    return max(1, round(len(content or "") / 4))
+
+                def _emit_answer(content: str):
+                    nonlocal first_token_ts, answer_start_ts, answer_end_ts, answer_token_count
+                    now = time.time()
+                    if first_token_ts is None:
+                        first_token_ts = now
+                    if answer_start_ts is None:
+                        answer_start_ts = now
+                    answer_end_ts = now
+                    answer_token_count += _estimate_tokens(content)
+                    return {"event": "token", "content": content, "token_type": "answer"}
+
+                def _emit_reasoning(content: str):
+                    nonlocal first_token_ts, reasoning_start_ts, reasoning_end_ts, reasoning_token_count
+                    now = time.time()
+                    if first_token_ts is None:
+                        first_token_ts = now
+                    if reasoning_start_ts is None:
+                        reasoning_start_ts = now
+                    reasoning_end_ts = now
+                    reasoning_token_count += _estimate_tokens(content)
+                    return {"event": "token", "content": content, "token_type": "reasoning"}
+
                 for token in token_generator:
                     raw_parts.append(token)
                     think_buffer += token
@@ -1805,13 +1858,13 @@ def create_chappie_backend():
                                 prefix = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
                                 think_buffer = think_buffer[-keep:] if keep > 0 else ""
                                 if prefix:
-                                    yield {"event": "token", "content": prefix, "token_type": "answer"}
+                                    yield _emit_answer(prefix)
                                 break
                             else:
                                 prefix = think_buffer[:idx]
                                 think_buffer = think_buffer[idx + len(think_open_marker):]
                                 if prefix:
-                                    yield {"event": "token", "content": prefix, "token_type": "answer"}
+                                    yield _emit_answer(prefix)
                                 in_think = True
                         if in_think:
                             idx = think_buffer.find(think_close_marker)
@@ -1820,21 +1873,36 @@ def create_chappie_backend():
                                 emit = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
                                 think_buffer = think_buffer[-keep:] if keep > 0 else ""
                                 if emit:
-                                    yield {"event": "token", "content": emit, "token_type": "reasoning"}
+                                    yield _emit_reasoning(emit)
                                 break
                             else:
                                 reasoning = think_buffer[:idx]
                                 think_buffer = think_buffer[idx + len(think_close_marker):]
                                 if reasoning:
-                                    yield {"event": "token", "content": reasoning, "token_type": "reasoning"}
+                                    yield _emit_reasoning(reasoning)
                                 in_think = False
                                 if think_buffer:
-                                    yield {"event": "token", "content": think_buffer, "token_type": "answer"}
+                                    yield _emit_answer(think_buffer)
                                     think_buffer = ""
                                 break
                 if think_buffer:
                     token_type = "reasoning" if in_think else "answer"
-                    yield {"event": "token", "content": think_buffer, "token_type": token_type}
+                    if token_type == "reasoning":
+                        yield _emit_reasoning(think_buffer)
+                    else:
+                        yield _emit_answer(think_buffer)
+
+                gen_end = time.time()
+                total_token_count = reasoning_token_count + answer_token_count
+                timing = {
+                    "ttft_ms": round((first_token_ts - gen_start) * 1000) if first_token_ts else 0,
+                    "total_gen_ms": round((gen_end - gen_start) * 1000),
+                    "total_tokens": total_token_count,
+                    "reasoning_tokens": reasoning_token_count,
+                    "answer_tokens": answer_token_count,
+                    "reasoning_time_ms": round((reasoning_end_ts - reasoning_start_ts) * 1000) if reasoning_start_ts and reasoning_end_ts else 0,
+                    "answer_time_ms": round((answer_end_ts - answer_start_ts) * 1000) if answer_start_ts and answer_end_ts else 0,
+                }
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
@@ -1935,6 +2003,7 @@ def create_chappie_backend():
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
                 "provider": settings.llm_provider.value,
                 "model": get_active_model(),
+                "timing": timing,
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
             }
@@ -1955,7 +2024,7 @@ def create_chappie_backend():
             emotions_after = self._get_emotions_snapshot()
 
             generation_query = self.memory.extract_search_query(user_input)
-            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k)
+            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
             memory_trace = {
                 "generation": self._build_memory_trace(
                     query=generation_query,
@@ -2007,11 +2076,12 @@ def create_chappie_backend():
                 life_context,
                 {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
             )
+            system_prompt += "\n\n" + self._generation_budget_instruction()
 
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
 
             gen_config = GenerationConfig(
-                max_tokens=settings.max_tokens,
+                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
                 stream=True,
                 extra_body=prompt_runtime["steering_payload"] or None,

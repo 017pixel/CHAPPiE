@@ -123,14 +123,28 @@ cd ..
 
 ### 2. Konfiguration
 
-- [`config/secrets_example.py`](config/secrets_example.py)
-- [`config/config.py`](config/config.py)
+Die lokale Laufzeitkonfiguration liegt in einer einzigen Root-Datei:
+
+```bash
+cp CHAPPIE_CONFIG.example.json CHAPPIE_CONFIG.json
+```
+
+`CHAPPIE_CONFIG.json` wird nicht nach GitHub gepusht. Dort werden API-Keys, lokale Modelle, Cloud-Modelle, Memory, Generation und Training gemeinsam gepflegt.
+
+Pflicht fuer den aktuellen optimierten Backend-Pfad:
+
+- `api.cerebras_api_key` eintragen
+- `local_models.llm_provider = "vllm"`
+- `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
+- `small_tasks.intent_provider = "cerebras"`
+- `small_tasks.query_extraction_provider = "cerebras"`
 
 Empfohlen:
 
-- `LLM_PROVIDER = "vllm"`
+- lokaler CHAPPiE-Hauptpfad ueber `vllm`
 - lokaler Endpoint auf `http://localhost:8000/v1`
-- Qwen-3.5 lokal zuerst, APIs nur Fallback
+- Qwen-3.5-4B lokal fuer Antworten
+- Cerebras `llama-3.1-8b` fuer Intent, Query Extraction und STM-Zusammenfassungen
 
 Details: [docs/local-models.md](docs/local-models.md)
 

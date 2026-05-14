@@ -61,6 +61,8 @@ export function ChatPage() {
   const [reasoningContent, setReasoningContent] = useState("");
   const [loadedOnce, setLoadedOnce] = useState(false);
   const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
+  const [genStartTime, setGenStartTime] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef(false);
 
@@ -118,6 +120,20 @@ export function ChatPage() {
     return () => clearInterval(interval);
   }, [processingState]);
 
+  // Live timer during generation
+  useEffect(() => {
+    if (processingState !== "thinking" && processingState !== "streaming") {
+      setElapsedMs(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      if (genStartTime) {
+        setElapsedMs(Date.now() - genStartTime);
+      }
+    }, 100);
+    return () => clearInterval(timer);
+  }, [processingState, genStartTime]);
+
   // Auto-send from queue when idle
   useEffect(() => {
     if (processingState !== "idle" || queue.length === 0) return;
@@ -160,6 +176,7 @@ export function ChatPage() {
     setStreamingContent("");
     setReasoningContent("");
     setThinkingIndex(0);
+    setGenStartTime(Date.now());
     setProcessingState("thinking");
 
     let usedStream = false;
@@ -270,6 +287,7 @@ export function ChatPage() {
       setProcessingState("idle");
       setStreamingContent("");
       setReasoningContent("");
+      setGenStartTime(null);
       statusQuery.refetch();
     }
   }
@@ -303,6 +321,7 @@ export function ChatPage() {
       id: "thinking",
       role: "assistant",
       content: THINKING_MESSAGES[thinkingIndex],
+      metadata: { timer_ms: elapsedMs },
     }];
   } else if (processingState === "streaming") {
     // Streaming messages are already in displayMessages, don't double-add
@@ -382,6 +401,17 @@ export function ChatPage() {
                     </div>
                   ) : entry.id === "reasoning-live" ? (
                     <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{entry.content}</div>
+                  ) : entry.id === "thinking" ? (
+                    <div>
+                      <div className="text-sm leading-relaxed">{entry.content}</div>
+                      {((entry.metadata as any)?.timer_ms > 0) && (
+                        <div className="mt-1.5 text-[10px] text-slate/40 font-mono">
+                          {(entry.metadata as any).timer_ms < 60000
+                            ? `${((entry.metadata as any).timer_ms / 1000).toFixed(1)}s`
+                            : `${Math.floor((entry.metadata as any).timer_ms / 60000)}m ${Math.floor(((entry.metadata as any).timer_ms % 60000) / 1000)}s`}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div
                       className="text-sm leading-relaxed"
@@ -505,6 +535,22 @@ export function ChatPage() {
                         <div className="text-[10px] text-slate/50">Stärke: <span className="text-slate/70">{steering.dominant_strength}</span></div>
                         <div className="text-[10px] text-slate/50">Mode: <span className="text-slate/70">{steering.summary}</span></div>
                         <div className="text-[10px] text-slate/50">Vektoren: <span className="text-slate/70">{steering.active_vectors?.length || 0}</span></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Timing */}
+                  {meta.timing && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Timing</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-[10px] text-slate/50">TTFT: <span className="text-slate/70">{meta.timing.ttft_ms != null ? (meta.timing.ttft_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Total Tokens: <span className="text-slate/70">{meta.timing.total_tokens ?? "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Gesamtzeit: <span className="text-slate/70">{meta.timing.total_gen_ms != null ? (meta.timing.total_gen_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Thinking-Zeit: <span className="text-slate/70">{meta.timing.reasoning_time_ms != null ? (meta.timing.reasoning_time_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Antwort-Zeit: <span className="text-slate/70">{meta.timing.answer_time_ms != null ? (meta.timing.answer_time_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Reasoning Tokens: <span className="text-slate/70">{meta.timing.reasoning_tokens ?? "?"}</span></div>
+                        <div className="text-[10px] text-slate/50">Answer Tokens: <span className="text-slate/70">{meta.timing.answer_tokens ?? "?"}</span></div>
                       </div>
                     </div>
                   )}

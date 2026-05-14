@@ -15,6 +15,7 @@ from typing import Generator, Optional
 from openai import OpenAI
 
 from .base_brain import BaseBrain, Message, GenerationConfig
+from .cerebras_limits import get_cerebras_limiter
 from config.config import settings
 
 
@@ -38,12 +39,12 @@ class CerebrasBrain(BaseBrain):
             api_key: Cerebras API Key (default: aus Settings)
         """
         self.api_key = api_key or getattr(settings, 'cerebras_api_key', '')
-        model_name = model or getattr(settings, 'cerebras_model', 'llama-3.3-70b')
+        model_name = model or getattr(settings, 'cerebras_model', 'llama-3.1-8b')
         super().__init__(model_name)
         
-        if not self.api_key:
+        if self._is_missing_key(self.api_key):
             print("WARNUNG: Cerebras Brain - Kein API-Key konfiguriert!")
-            print("   Trage deinen Key in config/secrets.py ein")
+            print("   Trage deinen Key in CHAPPIE_CONFIG.json ein")
             self._is_initialized = False
             return
         
@@ -51,7 +52,8 @@ class CerebrasBrain(BaseBrain):
         try:
             self.client = OpenAI(
                 base_url=self.BASE_URL,
-                api_key=self.api_key
+                api_key=self.api_key,
+                timeout=30.0,
             )
             self._is_initialized = True
             
@@ -102,6 +104,20 @@ class CerebrasBrain(BaseBrain):
             return self._stream_generate(openai_messages, config)
         else:
             return self._sync_generate(openai_messages, config)
+
+    @staticmethod
+    def _is_missing_key(api_key: str) -> bool:
+        normalized = (api_key or "").strip()
+        return not normalized or normalized.startswith("DEIN_")
+
+    @staticmethod
+    def _estimate_request_tokens(messages: list[dict], config: GenerationConfig) -> int:
+        text = "\n".join(str(message.get("content", "")) for message in messages)
+        return get_cerebras_limiter().estimate_tokens(text) + int(config.max_tokens or 0)
+
+    def _claim_quota(self, messages: list[dict], config: GenerationConfig) -> Optional[str]:
+        allowed, reason = get_cerebras_limiter().can_start(self._estimate_request_tokens(messages, config))
+        return None if allowed else reason
     
     def _stream_generate(
         self,
@@ -110,6 +126,11 @@ class CerebrasBrain(BaseBrain):
     ) -> Generator[str, None, None]:
         """Streaming-Generierung - Token für Token."""
         try:
+            quota_error = self._claim_quota(messages, config)
+            if quota_error:
+                yield f"\nCerebras Fehler: Rate-Limit erreicht ({quota_error})"
+                return
+
             stream = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -128,6 +149,10 @@ class CerebrasBrain(BaseBrain):
     def _sync_generate(self, messages: list[dict], config: GenerationConfig) -> str:
         """Synchrone Generierung - komplette Antwort auf einmal."""
         try:
+            quota_error = self._claim_quota(messages, config)
+            if quota_error:
+                return f"Cerebras Fehler: Rate-Limit erreicht ({quota_error})"
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -213,6 +238,6 @@ if __name__ == "__main__":
     else:
         console.print("   Cerebras ist nicht erreichbar!")
         if not brain.api_key:
-            console.print("   Trage deinen API-Key in config/secrets.py ein")
+            console.print("   Trage deinen API-Key in CHAPPIE_CONFIG.json ein")
         else:
             console.print("   Prüfe deine Internetverbindung oder den API-Key")

@@ -54,7 +54,7 @@ class NVIDIABrain(BaseBrain):
         
         if not self.api_key:
             print("WARNUNG: NVIDIA Brain - Kein API-Key konfiguriert!")
-            print("   Trage deinen Key in config/secrets.py ein")
+            print("   Trage deinen Key in CHAPPIE_CONFIG.json ein")
             print("   Hole einen Key von: https://build.nvidia.com")
             self._is_initialized = False
             return
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     else:
         console.print("   NVIDIA NIM ist nicht erreichbar!")
         if not brain.api_key:
-            console.print("   Trage deinen API-Key in config/secrets.py ein")
+            console.print("   Trage deinen API-Key in CHAPPIE_CONFIG.json ein")
             console.print("   Hole einen Key von: https://build.nvidia.com")
         else:
             console.print("   Pruefe deine Internetverbindung oder den API-Key")

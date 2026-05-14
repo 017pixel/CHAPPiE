@@ -88,11 +88,11 @@ def test_sync_generate_preserves_answer_and_model_reasoning():
     assert result.strip().endswith("Antwort")
 
 
-def test_prepare_extra_body_sets_qwen_thinking_default_false():
+def test_prepare_extra_body_sets_qwen_thinking_default_true():
     response = _FakeResponse([_FakeChoice(_FakeMessage(content="ok"))])
     brain = _make_brain_with_response(response)
     payload = brain._prepare_extra_body({})
-    assert payload["chat_template_kwargs"]["enable_thinking"] is False
+    assert payload["chat_template_kwargs"]["enable_thinking"] is True
 
 
 def test_prepare_extra_body_respects_explicit_enable_thinking():
@@ -106,6 +106,6 @@ if __name__ == "__main__":
     test_sync_generate_returns_content_when_present()
     test_sync_generate_reports_reasoning_only_output()
     test_sync_generate_preserves_answer_and_model_reasoning()
-    test_prepare_extra_body_sets_qwen_thinking_default_false()
+    test_prepare_extra_body_sets_qwen_thinking_default_true()
     test_prepare_extra_body_respects_explicit_enable_thinking()
     print("OK: vLLM response handling")

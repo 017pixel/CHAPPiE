@@ -32,20 +32,21 @@ Wichtige Punkte:
 
 Mindestens setzen:
 
-- `LLM_PROVIDER = "vllm"`
-- `VLLM_URL = "http://localhost:8000/v1"`
-- `VLLM_MODEL = "Qwen/Qwen3.5-4B"`
-- `VLLM_FORCE_SINGLE_MODEL = True`
+- `local_models.llm_provider = "vllm"` in `CHAPPIE_CONFIG.json`
+- `local_models.vllm_url = "http://localhost:8000/v1"`
+- `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
+- `local_models.vllm_force_single_model = true`
 
 Optional:
 
-- `INTENT_PROCESSOR_MODEL_VLLM`
-- `QUERY_EXTRACTION_VLLM_MODEL`
+- `small_tasks.intent_provider = "cerebras"`
+- `small_tasks.query_extraction_provider = "cerebras"`
+- `api.cerebras_api_key`
 
 Relevante Dateien:
 
-- `config/config.py`
-- `config/secrets_example.py`
+- `CHAPPIE_CONFIG.json`
+- `CHAPPIE_CONFIG.example.json`
 - `docs/local-models.md`
 
 ## 4. Runtime pruefen

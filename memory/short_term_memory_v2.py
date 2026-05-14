@@ -29,6 +29,8 @@ class ShortTermEntry:
     created_at: str
     expires_at: str
     migrated: bool = False
+    summarized: bool = False
+    summary_source_ids: Optional[List[str]] = None
 
 
 class ShortTermMemoryV2:
@@ -61,10 +63,11 @@ class ShortTermMemoryV2:
             try:
                 with open(self.storage_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.entries = [
-                        ShortTermEntry(**entry) 
-                        for entry in data.get('entries', [])
-                    ]
+                    self.entries = []
+                    for entry in data.get('entries', []):
+                        entry.setdefault("summarized", False)
+                        entry.setdefault("summary_source_ids", None)
+                        self.entries.append(ShortTermEntry(**entry))
             except Exception as e:
                 print(f"[ShortTermV2] Fehler beim Laden: {e}")
                 self.entries = []
@@ -117,8 +120,12 @@ class ShortTermMemoryV2:
         
         return entry_id
     
-    def get_active_entries(self, category: str = None, 
-                          query: str = None) -> List[ShortTermEntry]:
+    def get_active_entries(
+        self,
+        category: str = None,
+        query: str = None,
+        include_summarized: bool = False,
+    ) -> List[ShortTermEntry]:
         """
         Gibt aktive (nicht abgelaufene, nicht migrierte) Einträge zurück.
         
@@ -145,6 +152,9 @@ class ShortTermMemoryV2:
             
             if entry.migrated:
                 continue
+
+            if entry.summarized and not include_summarized:
+                continue
             
             if category and entry.category != category:
                 continue
@@ -161,6 +171,83 @@ class ShortTermMemoryV2:
         ))
 
         return active
+
+    def summarize_overflow(self) -> int:
+        """Verdichtet aktive STM-Rohdaten in 5er-Batches via Cerebras."""
+        from config.config import settings
+
+        threshold = int(getattr(settings, "stm_summary_threshold", 5))
+        batch_size = int(getattr(settings, "stm_summary_batch_size", 5))
+        raw_entries = [
+            entry for entry in self.get_active_entries(include_summarized=True)
+            if not entry.summarized and entry.category != "summary"
+        ]
+        if len(raw_entries) <= threshold:
+            return 0
+
+        raw_entries.sort(key=lambda entry: self._timestamp_sort_value(entry.created_at))
+        overflow_count = len(raw_entries) - threshold
+        batches = [
+            raw_entries[i:i + batch_size]
+            for i in range(0, overflow_count, batch_size)
+        ]
+        created = 0
+        for batch in batches:
+            if len(batch) < batch_size:
+                continue
+            summary = self._summarize_batch(batch)
+            if not summary:
+                continue
+            self._add_summary_entry(summary, batch)
+            created += 1
+
+        if created:
+            self._save_entries()
+        return created
+
+    def _summarize_batch(self, batch: List[ShortTermEntry]) -> str:
+        try:
+            from brain.base_brain import GenerationConfig, Message
+            from brain.cerebras_brain import CerebrasBrain
+            from brain.response_parser import looks_like_model_error
+            from config.config import settings
+
+            lines = [f"- [{entry.category}/{entry.importance}] {entry.content}" for entry in batch]
+            prompt = (
+                "Fasse diese Kurzzeitgedaechtnis-Eintraege fuer CHAPPiE kompakt zusammen.\n"
+                "Erhalte relevante Fakten, Entscheidungen, Vorlieben und aktuelle Aufgaben.\n"
+                "Antworte in maximal 5 kurzen Stichpunkten auf Deutsch.\n\n"
+                + "\n".join(lines)
+            )
+            brain = CerebrasBrain(model=settings.cerebras_model)
+            config = GenerationConfig(max_tokens=260, temperature=0.1, stream=False)
+            result = brain.generate([Message(role="user", content=prompt)], config=config)
+            if not isinstance(result, str) or looks_like_model_error(result):
+                return ""
+            return result.strip()
+        except Exception as exc:
+            print(f"[ShortTermV2] STM-Zusammenfassung fehlgeschlagen: {exc}")
+            return ""
+
+    def _add_summary_entry(self, summary: str, batch: List[ShortTermEntry]) -> None:
+        now = datetime.now(timezone.utc)
+        expires = now + timedelta(hours=self.ttl_hours)
+        source_ids = [entry.id for entry in batch]
+        for entry in batch:
+            entry.summarized = True
+        self.entries.append(
+            ShortTermEntry(
+                id=str(uuid.uuid4()),
+                content=summary,
+                category="summary",
+                importance="high",
+                created_at=now.isoformat(),
+                expires_at=expires.isoformat(),
+                migrated=False,
+                summarized=False,
+                summary_source_ids=source_ids,
+            )
+        )
     
     def migrate_expired_entries(self) -> int:
         """
@@ -184,7 +271,7 @@ class ShortTermMemoryV2:
                 if expires.tzinfo is None:
                     expires = expires.replace(tzinfo=timezone.utc)
                     
-                if now > expires:
+                if now > expires and entry.category == "summary":
                     try:
                         self.memory_engine.add_memory(
                             content=entry.content,
@@ -216,6 +303,7 @@ class ShortTermMemoryV2:
         Returns:
             Formatierter String
         """
+        self.summarize_overflow()
         entries = self.get_active_entries(query=query)
         
         if not entries:

@@ -36,6 +36,7 @@ def _settings_snapshot() -> SettingsSnapshot:
         query_extraction_vllm_model=settings.query_extraction_vllm_model,
         query_extraction_nvidia_model=settings.query_extraction_nvidia_model,
         query_extraction_cerebras_model=settings.query_extraction_cerebras_model,
+        query_extraction_min_words_for_llm=settings.query_extraction_min_words_for_llm,
         emotion_analysis_model=settings.emotion_analysis_model,
         emotion_analysis_host=settings.emotion_analysis_host,
         embedding_model=settings.embedding_model,
@@ -51,8 +52,18 @@ def _settings_snapshot() -> SettingsSnapshot:
         steering_model=settings.steering_model,
         temperature=settings.temperature,
         max_tokens=settings.max_tokens,
+        chappie_thinking_token_limit=settings.chappie_thinking_token_limit,
+        chappie_answer_token_limit=settings.chappie_answer_token_limit,
         chain_of_thought=settings.chain_of_thought,
         enable_two_step_processing=settings.enable_two_step_processing,
+        stm_summary_threshold=settings.stm_summary_threshold,
+        stm_summary_batch_size=settings.stm_summary_batch_size,
+        cerebras_requests_per_minute=settings.cerebras_requests_per_minute,
+        cerebras_requests_per_hour=settings.cerebras_requests_per_hour,
+        cerebras_requests_per_day=settings.cerebras_requests_per_day,
+        cerebras_tokens_per_minute=settings.cerebras_tokens_per_minute,
+        cerebras_tokens_per_hour=settings.cerebras_tokens_per_hour,
+        cerebras_tokens_per_day=settings.cerebras_tokens_per_day,
     )
 
 

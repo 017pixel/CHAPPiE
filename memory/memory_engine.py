@@ -475,7 +475,7 @@ class MemoryEngine:
 
         words = user_input.split()
         
-        if len(words) < 10:
+        if len(words) < int(getattr(settings, "query_extraction_min_words_for_llm", 7)):
             extracted = self._build_keyword_query(user_input, max_terms=10)
             if extracted:
                 if settings.debug:
@@ -543,7 +543,13 @@ class MemoryEngine:
         """Extrahiert einfach Schluesselwoerter ohne LLM."""
         return self._build_keyword_query(text, max_terms=15)
 
-    def search_memory(self, query: str, top_k: Optional[int] = None, min_relevance: float = 0.0) -> list[Memory]:
+    def search_memory(
+        self,
+        query: str,
+        top_k: Optional[int] = None,
+        min_relevance: float = 0.0,
+        optimize_query: bool = True,
+    ) -> list[Memory]:
         """
         Sucht nach relevanten Erinnerungen.
         
@@ -582,8 +588,8 @@ class MemoryEngine:
                 if self.collection.count() == 0:
                     return []
 
-                # Smart Query Extraction: Optimiere den Query vor der Vektorisierung
-                optimized_query = self.extract_search_query(query)
+                # Smart Query Extraction: Optimiere den Query vor der Vektorisierung.
+                optimized_query = self.extract_search_query(query) if optimize_query else query
 
                 # Erstelle Query-Embedding mit Fehlerbehandlung
                 try:

@@ -14,21 +14,24 @@ CHAPPiE soll primaer lokal mit Qwen-3.5-Modellen laufen. APIs sind nur der Fallb
 
 | Datei | Zweck |
 |---|---|
-| `config/config.py` | Laufzeit-Settings und Provider-Auswahl |
+| `CHAPPIE_CONFIG.json` | lokale Laufzeitkonfiguration mit API-Keys, Modellwahl, Memory und Generation |
+| `CHAPPIE_CONFIG.example.json` | Vorlage fuer die lokale Konfiguration |
+| `config/config.py` | Loader und Runtime-Objekt fuer die Root-Konfiguration |
 | `config/brain_config.py` | Modellverteilung der Brain-Agenten |
-| `config/secrets_example.py` | Beispielwerte fuer lokale oder API-Setups |
 | `brain/__init__.py` | Provider-Fabrik |
 
 ## Empfohlene lokale Grundidee
 
 ```python
-LLM_PROVIDER = "vllm"
-VLLM_URL = "http://localhost:8000/v1"
-VLLM_MODEL = "Qwen/Qwen3.5-4B"
-VLLM_FORCE_SINGLE_MODEL = True
+local_models.llm_provider = "vllm"
+local_models.vllm_url = "http://localhost:8000/v1"
+local_models.vllm_model = "Qwen/Qwen3.5-4B"
+local_models.vllm_force_single_model = true
 
-INTENT_PROCESSOR_MODEL_VLLM = "Qwen/Qwen3.5-4B"
-QUERY_EXTRACTION_VLLM_MODEL = "Qwen/Qwen3.5-4B"
+small_tasks.intent_provider = "cerebras"
+small_tasks.intent_processor_model_cerebras = "llama-3.1-8b"
+small_tasks.query_extraction_provider = "cerebras"
+small_tasks.query_extraction_cerebras_model = "llama-3.1-8b"
 ```
 
 Wichtig:
@@ -36,7 +39,8 @@ Wichtig:
 1. `VLLM_URL` muss auf den steering-faehigen lokalen Endpoint zeigen.
 2. `VLLM_MODEL` ist das Hauptmodell fuer Antwortgenerierung.
 3. `VLLM_FORCE_SINGLE_MODEL = True` ist fuer einen einzelnen lokalen Endpoint robust.
-4. Runtime-Settings werden jetzt ueber API und Frontend gepflegt.
+4. `api.cerebras_api_key` muss in `CHAPPIE_CONFIG.json` gesetzt sein, damit Intent, Query Extraction und STM-Zusammenfassungen ueber Cerebras laufen.
+5. Runtime-Settings werden ueber `CHAPPIE_CONFIG.json`, API und Frontend gepflegt.
 
 ## Praxis-Hinweise
 

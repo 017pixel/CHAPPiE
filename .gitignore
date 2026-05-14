@@ -157,6 +157,7 @@ training_daemon.log.*
 *.log
 
 # Secrets and User Overrides (CRITICAL)
+CHAPPIE_CONFIG.json
 config/secrets.py
 config/addSecrets.py
 
