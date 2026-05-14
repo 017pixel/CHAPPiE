@@ -128,7 +128,7 @@ class Settings:
         self.cli_debug_always_on = True
         self.web_debug_default = False
 
-        self.max_tokens = int(self._get_val("MAX_TOKENS", 1024))
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 2048))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))
         self.stream = bool(self._get_val("STREAM", True))
         self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))

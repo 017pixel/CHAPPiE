@@ -196,20 +196,32 @@ class OllamaBrain(BaseBrain):
             stream = self._chat(messages=messages, options=options, stream=True)
             saw_thinking = False
             saw_content = False
-            
+            think_opened = False
+
             for chunk in stream:
                 message = self._response_message(chunk)
-                content = self._message_content(message)
                 thinking = self._message_thinking(message)
                 if thinking:
+                    if not think_opened:
+                        yield "<think>"
+                        think_opened = True
                     saw_thinking = True
+                    yield thinking
+                    continue
+                content = self._message_content(message)
                 if content:
+                    if think_opened:
+                        yield "</think>"
+                        think_opened = False
                     saw_content = True
                     yield content
 
+            if think_opened:
+                yield "</think>"
+
             if not saw_content:
                 yield self._empty_response_error(thinking="1" if saw_thinking else "")
-                        
+
         except Exception as e:
             yield f"\nOllama Fehler: {str(e)}"
     

@@ -82,7 +82,7 @@ class VLLMBrain(BaseBrain):
         config: GenerationConfig,
         extra_body: Dict[str, Any]
     ) -> Generator[str, None, None]:
-        """Streaming-Generierung."""
+        """Streaming-Generierung mit Reasoning-Yielding."""
         try:
             stream = self.client.chat.completions.create(
                 model=self.model,
@@ -95,20 +95,33 @@ class VLLMBrain(BaseBrain):
 
             emitted_text = False
             reasoning_chars = 0
+            think_opened = False
 
             for chunk in stream:
                 if not chunk.choices:
                     continue
 
                 delta = chunk.choices[0].delta
+                reasoning = self._extract_reasoning_content(delta)
+                if reasoning:
+                    if not think_opened:
+                        yield "<think>"
+                        think_opened = True
+                    reasoning_chars += len(reasoning)
+                    yield reasoning
+                    continue
+
                 content = self._normalize_content(getattr(delta, "content", None))
                 if content:
+                    if think_opened:
+                        yield "</think>"
+                        think_opened = False
                     emitted_text = True
                     yield content
                     continue
 
-                reasoning = self._extract_reasoning_content(delta)
-                reasoning_chars += len(reasoning)
+            if think_opened:
+                yield "</think>"
 
             if not emitted_text:
                 if reasoning_chars > 0:

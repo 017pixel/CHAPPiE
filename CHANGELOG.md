@@ -2,6 +2,32 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [0.10.3] - 2026-05-14
+
+### Erstellt
+- Reasoning-Tokens werden live im Stream ausgegeben (vorher nur gezählt aber nie gesendet)
+
+### Verändert
+- max_tokens von 1024 auf 2048 erhöht für ausreichenden Platz bei aktivem Thinking-Modus
+
+### Gelöscht
+- (keine)
+
+---
+
+## [0.10.2] - 2026-05-14
+
+### Erstellt
+- Explizite CORS-Header im Streaming-Response für bessere Browser-Kompatibilität
+
+### Verändert
+- (keine)
+
+### Gelöscht
+- (keine)
+
+---
+
 ## [0.10.1] - 2026-05-14
 
 ### Erstellt
