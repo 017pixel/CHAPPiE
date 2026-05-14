@@ -60,6 +60,7 @@ export function ChatPage() {
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
   const [reasoningContent, setReasoningContent] = useState("");
   const [loadedOnce, setLoadedOnce] = useState(false);
+  const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef(false);
 
@@ -211,13 +212,14 @@ export function ChatPage() {
         } else if (event.event === "turn_finished") {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
           const finalReasoning = streamedReasoning;
+          const finalMeta = event.data?.assistant_message?.metadata || {};
           if (finalContent) {
             setDisplayMessages(prev => {
               const updated = [...prev];
               while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
                 updated.pop();
               }
-              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent, metadata: { reasoning: finalReasoning || undefined } });
+              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent, metadata: { ...finalMeta, reasoning: finalReasoning || undefined } });
               return updated;
             });
           }
@@ -365,31 +367,168 @@ export function ChatPage() {
                   <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{(entry.metadata as any).reasoning}</div>
                 </div>
               )}
-              <div
-                className={`max-w-[85%] rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
-                  entry.role === "assistant"
-                    ? "bg-night border-white/10 text-mist"
-                    : "bg-ember border-ember/20 text-white"
-                } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
-              >
-                <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">{entry.role}</p>
-                {entry.id === "streaming" ? (
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {entry.content}
+              <div className="flex items-start gap-2 max-w-[85%]">
+                <div
+                  className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
+                    entry.role === "assistant"
+                      ? "bg-night border-white/10 text-mist"
+                      : "bg-ember border-ember/20 text-white"
+                  } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
+                >
+                  <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">{entry.role}</p>
+                  {entry.id === "streaming" ? (
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {entry.content}
+                    </div>
+                  ) : entry.id === "reasoning-live" ? (
+                    <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{entry.content}</div>
+                  ) : (
+                    <div
+                      className="text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: parseEmotionalText(entry.content).replace(/\n/g, "<br/>") }}
+                    />
+                  )}
+                </div>
+                {/* Info Button */}
+                {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && entry.metadata && (
+                  <div className="relative group shrink-0">
+                    <button
+                      onClick={() => setPopupMsg(entry)}
+                      className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[10px] text-slate transition-all hover:bg-ember hover:text-white hover:border-ember/30"
+                      title="Details anzeigen"
+                    >
+                      i
+                    </button>
+                    {/* Hover-Preview */}
+                    <div className="pointer-events-none absolute left-0 bottom-full mb-1 z-50 hidden group-hover:block">
+                      <div className="rounded-none border border-white/10 bg-night/95 p-3 shadow-glass w-64">
+                        <p className="mb-1.5 text-[9px] uppercase tracking-widest text-ember">Preview</p>
+                        {(() => {
+                          const meta = entry.metadata as any;
+                          const memories = meta.rag_memories || [];
+                          const topMem = memories.slice(0, 3);
+                          const deltas = meta.emotions_delta || {};
+                          const deltaKeys = Object.keys(deltas).filter(k => deltas[k]?.change !== 0);
+                          const previewLines: string[] = [];
+                          if (memories.length > 0) previewLines.push(`${memories.length} LTM-Erinnerungen (top: ${topMem.length > 0 ? Math.round((topMem[0].relevance_score || 0) * 100) : 0}% Relevanz)`);
+                          if (deltaKeys.length > 0) previewLines.push(`Emotionen: ${deltaKeys.slice(0, 2).map(k => `${k} ${deltas[k]?.change > 0 ? "+" : ""}${deltas[k]?.change}`).join(", ")}`);
+                          previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
+                          if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
+                          previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
+                          return previewLines.slice(0, 5).map((line, i) => (
+                            <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
                   </div>
-                ) : entry.id === "reasoning-live" ? (
-                  <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{entry.content}</div>
-                ) : (
-                  <div
-                    className="text-sm leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: parseEmotionalText(entry.content).replace(/\n/g, "<br/>") }}
-                  />
                 )}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Info Popup Modal */}
+      {popupMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setPopupMsg(null)}>
+          <div className="max-h-[80vh] w-[560px] overflow-y-auto rounded-none border border-white/10 bg-night p-6 shadow-glass" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-mist">Verarbeitungsdetails</h2>
+              <button onClick={() => setPopupMsg(null)} className="text-slate hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            {(() => {
+              const meta = (popupMsg.metadata || {}) as any;
+              const memories = meta.rag_memories || [];
+              const deltas = meta.emotions_delta || {};
+              const before = meta.emotions_before || {};
+              const steering = meta.emotion_steering || {};
+              const trace = meta.memory_trace || {};
+              const causal = meta.causal_trace || [];
+              return (
+                <div className="space-y-4 text-xs text-slate">
+                  {/* Langzeitgedächtnis */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Langzeitgedächtnis-Erinnerungen ({memories.length})</p>
+                    {memories.length === 0 ? (
+                      <p className="text-slate/50 italic">Keine relevanten Erinnerungen gefunden</p>
+                    ) : (
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                        {memories.map((mem: any, i: number) => (
+                          <div key={i} className="border-l-2 border-white/10 pl-3">
+                            <div className="flex gap-2 items-baseline">
+                              <span className="text-[9px] uppercase text-slate/40">{mem.role}</span>
+                              <span className="text-[9px] text-ember font-bold">{Math.round((mem.relevance_score || 0) * 100)}%</span>
+                              <span className="text-[9px] text-slate/30">{mem.label}</span>
+                            </div>
+                            <div className="text-[10px] leading-relaxed text-slate/70 mt-0.5 line-clamp-2">{mem.content}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Emotion-Deltas */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotionen vorher → nachher</p>
+                    {Object.keys(deltas).length === 0 ? (
+                      <p className="text-slate/50 italic">Keine Änderungen</p>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {Object.entries(deltas).map(([key, val]: [string, any]) => {
+                          const change = val?.change || 0;
+                          const color = change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-slate/50";
+                          return (
+                            <div key={key} className="border border-white/5 bg-white/[0.02] px-2 py-1.5 text-center">
+                              <div className="text-[9px] uppercase text-slate/40">{key}</div>
+                              <div className="text-[11px]">
+                                <span className="text-slate/60">{val?.before ?? (before[key] ?? "?")}</span>
+                                <span className="mx-1 text-slate/30">→</span>
+                                <span className="text-slate/70">{val?.after ?? (before[key] ?? "?")}</span>
+                                <span className={`ml-1 ${color}`}>{change > 0 ? "+" : ""}{change}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Steering Info */}
+                  {steering.steering_active && (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotion-Steering aktiv</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div className="text-[10px] text-slate/50">Dominant: <span className="text-slate/70">{steering.dominant_vector}</span></div>
+                        <div className="text-[10px] text-slate/50">Stärke: <span className="text-slate/70">{steering.dominant_strength}</span></div>
+                        <div className="text-[10px] text-slate/50">Mode: <span className="text-slate/70">{steering.summary}</span></div>
+                        <div className="text-[10px] text-slate/50">Vektoren: <span className="text-slate/70">{steering.active_vectors?.length || 0}</span></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Allgemein */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Allgemein</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="text-[10px] text-slate/50">Intent: <span className="text-slate/70">{meta.intent_type || "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Confidence: <span className="text-slate/70">{meta.intent_confidence != null ? Math.round(meta.intent_confidence * 100) + "%" : "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Provider: <span className="text-slate/70">{meta.provider || "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Modell: <span className="text-slate/70">{meta.model || "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Dauer: <span className="text-slate/70">{meta.processing_time_ms ? (meta.processing_time_ms / 1000).toFixed(1) + "s" : "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Tone: <span className="text-slate/70">{meta.tone_decision?.tone || "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Short-Term: <span className="text-slate/70">{meta.short_term_count ?? "?"}</span></div>
+                      <div className="text-[10px] text-slate/50">Tool Calls: <span className="text-slate/70">{meta.tool_calls_executed ?? "0"}</span></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Input Section */}
       <div className="shrink-0 space-y-4">

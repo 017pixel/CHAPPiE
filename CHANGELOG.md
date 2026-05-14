@@ -2,6 +2,22 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [0.10.1] - 2026-05-14
+
+### Erstellt
+- Info-Button (i) pro Chat-Nachricht mit Hover-Preview und Detail-Popup
+- Detail-Popup zeigt LTM-Erinnerungen mit Relevanz-Prozent, Emotion-Deltas und Steering-Info
+- Memory-Limit auf 12 Erinnerungen reduziert für schnellere Kontext-Verarbeitung
+
+### Verändert
+- Metadata jetzt vollständig im Frontend gespeichert für Info-Popup-Zugriff
+- LTM/STM-Anhängung im Prompt geprüft und als korrekt bestätigt
+
+### Gelöscht
+- (keine)
+
+---
+
 ## [0.10.0] - 2026-05-14
 
 ### Erstellt
