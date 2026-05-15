@@ -176,6 +176,12 @@ export function ChatPage() {
 
     processingRef.current = true;
 
+    const isClearCommand = text.trim().toLowerCase() === "/clear" || text.trim().toLowerCase() === "/new";
+    if (isClearCommand) {
+      setDisplayMessages([]);
+      setQueue([]);
+    }
+
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -243,7 +249,17 @@ export function ChatPage() {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
           const finalReasoning = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
           const finalMeta = event.data?.assistant_message?.metadata || {};
-          if (finalContent) {
+          const newSessionId = event.data?.session_id || "";
+          if (newSessionId && newSessionId !== currentSessionId) {
+            setCurrentSessionId(newSessionId);
+            setDisplayMessages(prev => {
+              const last = prev[prev.length - 1];
+              if (last && last.role === "user" && last.content.trim().startsWith("/")) {
+                return [{ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent || "Chat geleert.", metadata: { ...finalMeta, reasoning: finalReasoning || undefined } }];
+              }
+              return prev;
+            });
+          } else if (finalContent) {
             setDisplayMessages(prev => {
               const updated = [...prev];
               while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {

@@ -9,7 +9,7 @@ HELP_TEXT = """**CHAPPiE Commands:**
 - **/sleep** - Startet die Traum-Phase (konsolidiert Erinnerungen)
 - **/think [thema]** - Einfacher Reflektionsmodus (10 Schritte)
 - **/deep think [anzahl]** - Rekursive Selbstreflexion, Standard 10 Schritte
-- **/clear** - Startet eine neue Chat-Sitzung
+- **/clear /new** - Startet eine neue Chat-Sitzung
 - **/stats** - Zeigt System-Statistiken
 - **/config** - Zeigt Hinweis auf die Settings-Ansicht
 - **/daily** - Zeigt Kurzzeitgedaechtnis
@@ -137,7 +137,7 @@ def execute_slash_command(command: str, backend) -> Dict[str, Any]:
         return _base_result(backend, _build_stats_text(backend))
     if lower == "/config":
         return _base_result(backend, "Die Konfiguration liegt jetzt im React-Frontend unter der Settings-Ansicht und in der API unter `/settings`.")
-    if lower == "/clear":
+    if lower in ("/clear", "/new"):
         new_session_id = backend.chat_manager.create_session()
         backend.chat_manager.set_active_session(new_session_id)
         return _base_result(backend, "Neue Chat-Sitzung gestartet.", replacement_session_id=new_session_id, clear_history=True)
