@@ -192,6 +192,7 @@ class Settings:
         return self.query_extraction_ollama_model
 
     def update_from_ui(self, **kwargs):
+        old_provider = self.llm_provider
         if "llm_provider" in kwargs and kwargs["llm_provider"]:
             try:
                 self.llm_provider = LLMProvider(kwargs["llm_provider"].lower())
@@ -209,14 +210,22 @@ class Settings:
             self.vllm_force_single_model = bool(kwargs["vllm_force_single_model"])
 
         if "intent_provider" in kwargs:
-            self.intent_provider = _parse_provider(kwargs["intent_provider"])
+            parsed = _parse_provider(kwargs["intent_provider"])
+            if old_provider != self.llm_provider and parsed == old_provider:
+                self.intent_provider = None
+            else:
+                self.intent_provider = parsed
         for key in ["intent_processor_model_groq", "intent_processor_model_cerebras", 
                     "intent_processor_model_ollama", "intent_processor_model_vllm", "intent_processor_model_nvidia"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
         if "query_extraction_provider" in kwargs:
-            self.query_extraction_provider = _parse_provider(kwargs["query_extraction_provider"])
+            parsed = _parse_provider(kwargs["query_extraction_provider"])
+            if old_provider != self.llm_provider and parsed == old_provider:
+                self.query_extraction_provider = None
+            else:
+                self.query_extraction_provider = parsed
         for key in [
             "query_extraction_groq_model",
             "query_extraction_ollama_model",

@@ -274,6 +274,7 @@ export function ChatPage() {
           id: `assistant-${Date.now()}`,
           role: "assistant",
           content: assistantContent,
+          metadata: result?.assistant_message?.metadata || result?.metadata || {},
         }]);
       } catch (syncErr: any) {
         setDisplayMessages(prev => [...prev, {

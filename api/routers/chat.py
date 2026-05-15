@@ -100,6 +100,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     def event_stream() -> Generator[str, None, None]:
+        nonlocal session_id, message_id
         yield _format_sse("turn_started", {"session_id": session_id, "message_id": message_id})
 
         # Slash commands are fast and don't need streaming

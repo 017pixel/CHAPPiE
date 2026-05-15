@@ -8,7 +8,8 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from config.config import LLMProvider, USER_SETTINGS_PATH, settings
+from config.config import LLMProvider, settings
+from config.root_config import ROOT_CONFIG_PATH as USER_SETTINGS_PATH
 from brain.response_parser import looks_like_model_error
 from life.service import LifeSimulationService
 
@@ -17,7 +18,6 @@ TRACKED_SETTINGS = (
     "llm_provider",
     "intent_provider",
     "query_extraction_provider",
-    "_needs_reload",
 )
 
 
