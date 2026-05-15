@@ -3,7 +3,7 @@ import { SectionCard } from "../components/section-card";
 import { api } from "../services/api";
 
 export function LifePage() {
-  const query = useQuery({ queryKey: ["life"], queryFn: api.getLife });
+  const query = useQuery({ queryKey: ["life"], queryFn: api.getLife, refetchInterval: 3000 });
   const snapshot = (query.data ?? {}) as any;
   const needs = snapshot.homeostasis?.active_needs ?? [];
 

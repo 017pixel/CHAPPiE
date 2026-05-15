@@ -73,7 +73,7 @@ export function ChatPage() {
     queryFn: () => api.getSession(currentSessionId!),
     enabled: Boolean(currentSessionId)
   });
-  const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus });
+  const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus, refetchInterval: 3000 });
 
   // Sync display messages from server only on initial load
   useEffect(() => {
@@ -188,10 +188,10 @@ export function ChatPage() {
       const stream = api.sendMessageStream({
         session_id: currentSessionId,
         message: text,
-        debug_mode: false,
+        debug_mode: true,
         command_mode: text.trim().startsWith("/"),
       });
-
+ 
       usedStream = true;
 
       for await (const event of stream) {
@@ -260,7 +260,7 @@ export function ChatPage() {
         const result = await api.sendMessage({
           session_id: currentSessionId,
           message: text,
-          debug_mode: false,
+          debug_mode: true,
           command_mode: text.trim().startsWith("/"),
         }) as any;
 
@@ -345,7 +345,7 @@ export function ChatPage() {
       {/* Header Info Card */}
       <div className="flex shrink-0 items-center justify-between rounded-none border border-white/5 bg-night p-6 shadow-glass">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Chat & Intelligence</h1>
+          <h1 className="text-2xl font-bold tracking-tight">CHAPPiE</h1>
           <div className="mt-2 flex gap-4 text-[10px] uppercase tracking-widest text-slate">
             <span>Model: <span className="text-ember">{status.model ?? "Loading..."}</span></span>
             <span>via: <span className="text-mist">{status.provider ?? "---"}</span></span>
@@ -382,9 +382,9 @@ export function ChatPage() {
             >
               {/* Reasoning box for assistant messages that have it */}
               {(entry.role === "assistant" && (entry.metadata as any)?.reasoning) && (
-                <div className="max-w-[85%] rounded-none border border-white/5 bg-white/[0.04] px-5 py-3">
+                <div className="max-w-[85%] rounded-none border border-white/5 bg-white/[0.04] px-5 py-3 overflow-hidden">
                   <p className="mb-1.5 text-[10px] uppercase tracking-widest text-slate">Reasoning</p>
-                  <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{(entry.metadata as any).reasoning}</div>
+                  <div className="text-xs leading-relaxed whitespace-pre-wrap break-all max-h-32 overflow-y-auto text-slate/70">{(entry.metadata as any).reasoning}</div>
                 </div>
               )}
               <div className="flex items-start gap-2 max-w-[85%]">
@@ -397,14 +397,14 @@ export function ChatPage() {
                 >
                   <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">{entry.role}</p>
                   {entry.id === "streaming" ? (
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-all">
                       {entry.content}
                     </div>
                   ) : entry.id === "reasoning-live" ? (
-                    <div className="text-xs leading-relaxed whitespace-pre-wrap text-slate/70">{entry.content}</div>
+                    <div className="text-xs leading-relaxed whitespace-pre-wrap break-all text-slate/70">{entry.content}</div>
                   ) : entry.id === "thinking" ? (
                     <div>
-                      <div className="text-sm leading-relaxed">{entry.content}</div>
+                      <div className="text-sm leading-relaxed break-all">{entry.content}</div>
                       {((entry.metadata as any)?.timer_ms > 0) && (
                         <div className="mt-1.5 text-[10px] text-slate/40 font-mono">
                           {(entry.metadata as any).timer_ms < 60000

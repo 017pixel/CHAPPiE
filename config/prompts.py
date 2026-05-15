@@ -113,23 +113,7 @@ Suchbegriffe:"""
 # =============================================================================
 # Instruktionen fuer strukturiertes Denken vor dem Antworten.
 
-CHAIN_OF_THOUGHT_INSTRUCTION = """
-WICHTIG - ANTWORTFORMAT:
-Bevor du antwortest, denke strukturiert nach. Nutze dieses Format:
-
-<gedanke>
-Hier analysierst du:
-- Was will der User wirklich?
-- Welche Erinnerungen sind relevant?
-- Was ist die beste Antwort?
-</gedanke>
-
-<antwort>
-Hier steht deine eigentliche Antwort an den User.
-</antwort>
-
-Der User sieht NUR den Inhalt von <antwort>. Der <gedanke> ist dein interner Denkprozess.
-"""
+CHAIN_OF_THOUGHT_INSTRUCTION = ""
 
 
 # =============================================================================

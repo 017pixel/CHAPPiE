@@ -340,7 +340,25 @@ def create_chappie_backend():
             model_reasoning = model_reasoning_block.content or ""
 
             if not display_response:
-                display_response = "CHAPPiE schweigt..." if (thought or model_reasoning) else self._format_generation_error(phase, raw_text)
+                if model_reasoning or thought:
+                    thought_len = len(thought or "")
+                    reasoning_len = len(model_reasoning or "")
+                    if thought_len > 800 or reasoning_len > 800:
+                        display_response = self._format_generation_error(
+                            phase, "Modell hat nur Thinking produziert ohne Antwort. Thinking-Limit greift."
+                        )
+                        thought = ""
+                        model_reasoning = ""
+                    else:
+                        display_response = "CHAPPiE schweigt..."
+                else:
+                    display_response = self._format_generation_error(phase, raw_text)
+            elif (len(thought or "") > 4000 or len(model_reasoning or "") > 4000) and len(display_response) < 80:
+                display_response = self._format_generation_error(
+                    phase, "Antwort ist nur Thinking (Loop erkannt). Antworttext zu kurz."
+                )
+                thought = ""
+                model_reasoning = ""
             return display_response, thought, model_reasoning
 
         @staticmethod
@@ -567,13 +585,14 @@ def create_chappie_backend():
             }
 
         def _generation_budget_instruction(self) -> str:
-            thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 2500))
-            answer_limit = int(getattr(settings, "chappie_answer_token_limit", 800))
+            thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 800))
+            answer_limit = int(getattr(settings, "chappie_answer_token_limit", 1200))
             return (
-                "Generation Budget:\n"
-                f"- Internes Thinking maximal {thinking_limit} Tokens.\n"
-                f"- Finale Antwort maximal {answer_limit} Tokens.\n"
-                "- Wenn du die Grenze erreichst, beende die Antwort klar statt weiter auszuholen."
+                "ANTWORT-BUDGET (STRIKT EINHALTEN):\n"
+                f"- Internes Denken: hoechstens {thinking_limit} Tokens. Wechsle DANACH sofort zur Antwort.\n"
+                f"- Finale Antwort: maximal {answer_limit} Tokens.\n"
+                "- BEENDE jede Antwort mit einem klaren Satz. Kein endloses Abwaegen.\n"
+                "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
         @staticmethod

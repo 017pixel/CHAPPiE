@@ -11,6 +11,7 @@ Perfekt fuer:
 Benoetigt: lokaler OpenAI-kompatibler Server laufend (Standard: http://localhost:8000/v1)
 """
 
+import re
 from typing import Generator, Optional, Any, Dict
 from openai import OpenAI
 
@@ -76,13 +77,28 @@ class VLLMBrain(BaseBrain):
             return self._stream_generate(openai_messages, config, extra_body)
         return self._sync_generate(openai_messages, config, extra_body)
 
+    _REASONING_CHAR_LIMIT = 3200
+    _CHARS_PER_TOKEN_ESTIMATE = 4.2
+
+    @classmethod
+    def _reasoning_token_estimate(cls, chars: int) -> int:
+        return max(1, round(chars / cls._CHARS_PER_TOKEN_ESTIMATE))
+
+    @staticmethod
+    def _normalize_reasoning_text(text: str) -> str:
+        """Fuegt Leerzeichen in zusammenhangloses Reasoning ein."""
+        result = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+        result = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', result)
+        result = re.sub(r'([.,!?;:])([A-Za-z])', r'\1 \2', result)
+        return result
+
     def _stream_generate(
         self,
         messages: list[dict],
         config: GenerationConfig,
         extra_body: Dict[str, Any]
     ) -> Generator[str, None, None]:
-        """Streaming-Generierung mit Reasoning-Yielding."""
+        """Streaming-Generierung mit Reasoning-Yielding und Reasoning-Cap."""
         try:
             stream = self.client.chat.completions.create(
                 model=self.model,
@@ -96,6 +112,7 @@ class VLLMBrain(BaseBrain):
             emitted_text = False
             reasoning_chars = 0
             think_opened = False
+            reasoning_capped = False
 
             for chunk in stream:
                 if not chunk.choices:
@@ -103,12 +120,26 @@ class VLLMBrain(BaseBrain):
 
                 delta = chunk.choices[0].delta
                 reasoning = self._extract_reasoning_content(delta)
-                if reasoning:
+                if reasoning and not reasoning_capped:
+                    if reasoning_chars >= self._REASONING_CHAR_LIMIT:
+                        if think_opened:
+                            yield "</think>"
+                            think_opened = False
+                        reasoning_capped = True
+                        continue
+
                     if not think_opened:
                         yield "<think>"
                         think_opened = True
+                    normalized_reasoning = self._normalize_reasoning_text(reasoning)
                     reasoning_chars += len(reasoning)
-                    yield reasoning
+                    yield normalized_reasoning
+
+                    if reasoning_chars >= self._REASONING_CHAR_LIMIT:
+                        if think_opened:
+                            yield "</think>"
+                            think_opened = False
+                        reasoning_capped = True
                     continue
 
                 content = self._normalize_content(getattr(delta, "content", None))
@@ -159,7 +190,7 @@ class VLLMBrain(BaseBrain):
             first_choice = choices[0]
             message = getattr(first_choice, "message", None)
             content = self._normalize_content(getattr(message, "content", None))
-            reasoning = self._extract_reasoning_content(message)
+            reasoning = self._normalize_reasoning_text(self._extract_reasoning_content(message))
             if content and reasoning:
                 return self._format_reasoning_response(reasoning, answer=content)
             if content:

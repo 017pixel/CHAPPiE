@@ -36,7 +36,7 @@ export function MemoriesPage() {
 
   const cleanupMutation = useMutation({
     mutationFn: api.cleanupShortTermMemories,
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       shortTermQuery.refetch();
       longTermQuery.refetch();
       healthQuery.refetch();
@@ -45,7 +45,7 @@ export function MemoriesPage() {
 
   const clearMutation = useMutation({
     mutationFn: api.clearMemories,
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       longTermQuery.refetch();
       healthQuery.refetch();
     }
@@ -62,7 +62,7 @@ export function MemoriesPage() {
       <aside className="space-y-6">
         <div className="rounded-none border border-white/5 bg-night p-6 shadow-glass">
           <h2 className="text-xs font-bold uppercase tracking-[0.25em] text-slate">Session History</h2>
-          <div className="mt-6 flex flex-col gap-3">
+          <div className="mt-6 flex max-h-[38rem] flex-col gap-3 overflow-y-auto">
             {sessions.length === 0 ? (
               <p className="text-xs text-slate/50">No sessions found.</p>
             ) : (
@@ -140,6 +140,12 @@ export function MemoriesPage() {
               {clearMutation.isPending ? "Wiping..." : "Wipe LTM"}
             </button>
           </div>
+          {(cleanupMutation.isSuccess || clearMutation.isSuccess) && (
+            <div className="mt-2 rounded-none border border-pine/30 bg-pine/10 px-4 py-2 text-[10px] uppercase tracking-widest text-pine">
+              {cleanupMutation.isSuccess ? `STM cleaned — ${(cleanupMutation.data as any)?.migrated ?? 0} entries migrated` : ""}
+              {clearMutation.isSuccess ? "LTM wiped completely" : ""}
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -165,3 +165,9 @@ config/addSecrets.py
 # Die API-Dateien mit echten Keys sollten nicht gepusht werden
 config/APIs/groq_api.py
 config/APIs/cerebras_api.py
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+.DS_Store

@@ -3,7 +3,7 @@ import { SectionCard } from "../components/section-card";
 import { api } from "../services/api";
 
 export function GrowthPage() {
-  const query = useQuery({ queryKey: ["growth"], queryFn: api.getGrowth });
+  const query = useQuery({ queryKey: ["growth"], queryFn: api.getGrowth, refetchInterval: 3000 });
   const data = (query.data ?? {}) as any;
 
   return (

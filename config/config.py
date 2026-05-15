@@ -136,12 +136,12 @@ class Settings:
         self.cli_debug_always_on = True
         self.web_debug_default = False
 
-        self.max_tokens = int(self._get_val("MAX_TOKENS", 3300))
-        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 2500))
-        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 800))
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 2200))
+        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 800))
+        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 1200))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))
         self.stream = bool(self._get_val("STREAM", True))
-        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))
+        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", False))
         self.debug = bool(self._get_val("DEBUG", True))
 
         self.cerebras_requests_per_minute = int(self._get_val("CEREBRAS_REQUESTS_PER_MINUTE", 5))

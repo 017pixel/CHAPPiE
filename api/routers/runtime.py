@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from typing import Dict
+
 from fastapi import APIRouter, Depends
 
 from api.dependencies import get_backend
-from api.schemas import EmotionLayerUpdate, SettingsSnapshot, SettingsUpdate
+from api.schemas import EmotionLayerUpdate, EmotionStateUpdate, SettingsSnapshot, SettingsUpdate
 from config.config import settings
 
 router = APIRouter(tags=["runtime"])
@@ -94,3 +96,26 @@ def update_emotion_layer_config(request: EmotionLayerUpdate, backend=Depends(get
         request.default_alpha,
     )
     return backend.get_emotion_layer_config()
+
+
+@router.get("/emotions/state")
+def get_emotion_state(backend=Depends(get_backend)):
+    emotions = backend._get_emotions_snapshot()
+    steering_report = backend.steering_manager.build_debug_report(emotions)
+    return {
+        "emotions": emotions,
+        "steering": steering_report,
+    }
+
+
+@router.post("/emotions/state")
+def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend)):
+    updates = request.model_dump(exclude_none=True)
+    for emotion_name, value in updates.items():
+        backend.emotions.set_emotion(emotion_name, value)
+    emotions = backend._get_emotions_snapshot()
+    steering_report = backend.steering_manager.build_debug_report(emotions)
+    return {
+        "emotions": emotions,
+        "steering": steering_report,
+    }

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useUiStore } from "../store/ui";
 
 const items = [
@@ -15,6 +15,7 @@ const items = [
 
 export function AppShell() {
   const { isSidebarOpen, toggleSidebar } = useUiStore();
+  const location = useLocation();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-ink text-mist">
@@ -60,22 +61,28 @@ export function AppShell() {
         </div>
 
         {isSidebarOpen && (
-          <div className="m-4 rounded-none bg-pine/20 p-4 text-[10px] text-slate border border-pine/10">
+          <a
+            href={import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="m-4 block rounded-none bg-pine/20 p-4 text-[10px] text-slate border border-pine/10 hover:bg-pine/30 hover:border-pine/30 transition-all"
+          >
             <p className="font-bold uppercase tracking-widest text-pine">API-Target</p>
-            <p className="mt-1 break-all opacity-80">{import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8010"}</p>
-          </div>
+            <p className="mt-1 break-all opacity-80">{import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}</p>
+          </a>
         )}
       </aside>
 
       {/* Main Content Area */}
       <main className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {/* Subtle top bar for tablet/mobile or just status */}
-        <header className="flex h-20 items-center justify-between px-8 lg:h-24">
-          <h2 className="text-sm font-medium uppercase tracking-[0.2em] text-slate">System Overview</h2>
-          <div className="flex items-center gap-4">
-            <div className="h-2 w-2 animate-pulse rounded-none bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-            <span className="text-[10px] uppercase tracking-widest text-slate">Online</span>
-          </div>
+        <header className="flex h-20 items-center justify-end px-8 lg:h-24">
+          {location.pathname === "/" && (
+            <div className="flex items-center gap-4">
+              <div className="h-2 w-2 animate-pulse rounded-none bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+              <span className="text-[10px] uppercase tracking-widest text-slate">Online</span>
+            </div>
+          )}
         </header>
 
         <div className="mx-auto w-full max-w-[95%] px-6 pb-12 lg:px-12">

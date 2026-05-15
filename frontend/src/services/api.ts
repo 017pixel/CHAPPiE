@@ -9,12 +9,15 @@ function deriveApiBaseUrl(): string {
   }
 
   if (typeof window === "undefined") {
-    return "http://127.0.0.1:8010";
+    return "http://100.105.94.71:8010";
   }
 
   const { protocol, hostname, port, origin } = window.location;
   if (port === "8010") {
     return trimTrailingSlash(origin);
+  }
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://100.105.94.71:8010";
   }
 
   return `${protocol}//${hostname}:8010`;
@@ -112,6 +115,9 @@ export const api = {
   getEmotionLayerConfig: () => request("/emotion-layer-config"),
   updateEmotionLayerConfig: (payload: Record<string, unknown>) =>
     request("/emotion-layer-config", { method: "POST", body: JSON.stringify(payload) }),
+  getEmotionState: () => request("/emotions/state"),
+  setEmotionState: (payload: Record<string, number>) =>
+    request("/emotions/state", { method: "POST", body: JSON.stringify(payload) }),
   getTrainingStatus: () => request("/training/status"),
   getTrainingConfig: () => request("/training/config"),
   saveTrainingConfig: (payload: Record<string, unknown>) => request("/training/config", { method: "POST", body: JSON.stringify(payload) }),

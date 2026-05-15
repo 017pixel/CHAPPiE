@@ -81,6 +81,16 @@ class EmotionLayerUpdate(BaseModel):
     default_alpha: float
 
 
+class EmotionStateUpdate(BaseModel):
+    happiness: Optional[int] = None
+    trust: Optional[int] = None
+    energy: Optional[int] = None
+    curiosity: Optional[int] = None
+    frustration: Optional[int] = None
+    motivation: Optional[int] = None
+    sadness: Optional[int] = None
+
+
 class TrainingActionRequest(BaseModel):
     action: Literal["start", "stop", "restart", "logs", "clear_logs"]
     focus: Optional[str] = None

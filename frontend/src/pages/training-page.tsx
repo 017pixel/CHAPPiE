@@ -4,7 +4,7 @@ import { SectionCard } from "../components/section-card";
 import { api } from "../services/api";
 
 export function TrainingPage() {
-  const statusQuery = useQuery({ queryKey: ["training-status"], queryFn: api.getTrainingStatus });
+  const statusQuery = useQuery({ queryKey: ["training-status"], queryFn: api.getTrainingStatus, refetchInterval: 5000 });
   const configQuery = useQuery({ queryKey: ["training-config"], queryFn: api.getTrainingConfig });
   const [draft, setDraft] = useState<Record<string, unknown>>({});
 
