@@ -216,13 +216,11 @@ class VLLMBrain(BaseBrain):
         """Bereitet provider-spezifische Optionen vor."""
         payload = dict(extra_body or {})
 
-        # Thinking-Mode aktivieren fuer lebendigere Antworten.
-        # vLLM liefert reasoning_content als separates Feld, das wir extrahieren.
         if self.model.lower().startswith("qwen/qwen3.5"):
             chat_kwargs = payload.get("chat_template_kwargs")
             if not isinstance(chat_kwargs, dict):
                 chat_kwargs = {}
-            chat_kwargs.setdefault("enable_thinking", True)
+            chat_kwargs.setdefault("enable_thinking", False)
             payload["chat_template_kwargs"] = chat_kwargs
 
         return payload

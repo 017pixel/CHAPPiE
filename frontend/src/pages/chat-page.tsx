@@ -202,7 +202,8 @@ export function ChatPage() {
           const tokenType = event.data.token_type || "answer";
           if (tokenType === "reasoning") {
             streamedReasoning += event.data.content || "";
-            setReasoningContent(streamedReasoning);
+            const truncated = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
+            setReasoningContent(truncated);
           } else {
             streamedContent += event.data.content || "";
             setStreamingContent(streamedContent);
@@ -228,7 +229,7 @@ export function ChatPage() {
           break;
         } else if (event.event === "turn_finished") {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
-          const finalReasoning = streamedReasoning;
+          const finalReasoning = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
           const finalMeta = event.data?.assistant_message?.metadata || {};
           if (finalContent) {
             setDisplayMessages(prev => {
@@ -382,9 +383,14 @@ export function ChatPage() {
             >
               {/* Reasoning box for assistant messages that have it */}
               {(entry.role === "assistant" && (entry.metadata as any)?.reasoning) && (
-                <div className="max-w-[85%] rounded-none border border-white/5 bg-white/[0.04] px-5 py-3 overflow-hidden">
+                <div className="max-w-[85%] w-full rounded-none border border-white/5 bg-white/[0.04] px-5 py-3 overflow-hidden">
                   <p className="mb-1.5 text-[10px] uppercase tracking-widest text-slate">Reasoning</p>
-                  <div className="text-xs leading-relaxed whitespace-pre-wrap break-all max-h-32 overflow-y-auto text-slate/70">{(entry.metadata as any).reasoning}</div>
+                  <div className="text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-normal">
+                    {(() => {
+                      const raw = (entry.metadata as any).reasoning as string;
+                      return raw.length > 3000 ? raw.slice(0, 3000) + "\n\n... (truncated)" : raw;
+                    })()}
+                  </div>
                 </div>
               )}
               <div className="flex items-start gap-2 max-w-[85%]">
