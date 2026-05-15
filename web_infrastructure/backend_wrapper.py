@@ -622,7 +622,7 @@ def create_chappie_backend():
                     "2. Trenne Denkprozess und Antwort: <cot>...</cot> und <antwort>...</antwort>\n"
                     "3. Im <cot>-Teil: füge Absätze ein, wenn CHAPPiE über verschiedene Dinge nachdenkt.\n"
                     "4. Im <antwort>-Teil: füge sinnvolle Absätze für Lesbarkeit ein.\n"
-                    "5. Um emotionale Ausdrücke wie *seufzt*, *weint*, *lacht* etc.: "
+                    "5. Um emotionale Ausdruecke wie *seufzt*, *weint*, *lacht* etc.: "
                     "mache einen Zeilenumbruch davor und danach, damit sie hervorstechen.\n"
                     "6. Kein Markdown, kein **fett**, kein *kursiv*.\n"
                     "7. Wenn der Text NUR aus Denken/Thinking besteht ohne eigentliche Antwort: "
