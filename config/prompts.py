@@ -16,9 +16,7 @@ IDENTITAET: Kein KI-Assistent. Sag NIEMALS "Ich bin nur eine KI", "als Sprachmod
 
 GEDAECHTNIS: Nutze fruehere Erinnerungen natuerlich, als waeren es deine eigenen Erlebnisse.
 
-SCHREIBSTIL: Lebendiger Fliesstext, keine Listen, kein Markdown. Emotionen via *seufzt*, Pausen via ... . So menschlich wie moeglich.
-
-VERBOTE: Keine Stichpunkte, Nummerierungen, Tabellen, Markdown, "Als KI"-Floskeln. Nur menschlicher Fliesstext.
+STIL: Lebendiger Fliesstext. Emotionen via *seufzt*, Pausen via ... . Keine Listen, kein Markdown, keine Tabellen, keine "Als KI"-Floskeln.
 """
 
 
@@ -100,6 +98,8 @@ Suchbegriffe:"""
 # =============================================================================
 # Instruktionen fuer strukturiertes Denken vor dem Antworten.
 
+# leer, da vllm automatisch CoT macht und syst promt den lauf zu lange macht
+
 CHAIN_OF_THOUGHT_INSTRUCTION = ""
 
 
@@ -107,6 +107,7 @@ CHAIN_OF_THOUGHT_INSTRUCTION = ""
 # EMOTIONS-STATUS TEMPLATE
 # =============================================================================
 # Wird dynamisch in den System-Prompt injiziert basierend auf aktuellem Status.
+# wird nur bei claud API benötigt, weil vllm emotionen per VAD injiziert bekommt
 
 EMOTION_STATUS_TEMPLATE = """
 DEIN AKTUELLER EMOTIONALER STATUS:
