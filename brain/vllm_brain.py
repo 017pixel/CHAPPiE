@@ -92,6 +92,25 @@ class VLLMBrain(BaseBrain):
         result = re.sub(r'([.,!?;:])([A-Za-z])', r'\1 \2', result)
         return result
 
+    @staticmethod
+    def _detect_reasoning_loop(accumulated: str, window: int = 180, min_repeat: int = 3, pct_threshold: float = 0.30) -> bool:
+        """Erkennt prozentbasiert, ob das Reasoning sich im Kreis dreht.
+
+        Nimmt die letzten `window` Zeichen und prueft, wie oft dieses
+        Segment im gesamten Text vorkommt. Wenn >= `min_repeat` mal und
+        (Vorkommen * Window) / Gesamtlaenge > `pct_threshold` → Loop.
+        """
+        total = len(accumulated)
+        if total < window * 2:
+            return False
+        segment = accumulated[-window:]
+        count = accumulated.count(segment)
+        if count < min_repeat:
+            return False
+        loop_chars = count * len(segment)
+        ratio = loop_chars / total
+        return ratio >= pct_threshold
+
     def _stream_generate(
         self,
         messages: list[dict],
@@ -106,12 +125,12 @@ class VLLMBrain(BaseBrain):
                 max_tokens=config.max_tokens,
                 temperature=config.temperature,
                 stream=True,
-                extra_body=extra_body,
-                repetition_penalty=config.repetition_penalty,
+                extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
             )
 
             emitted_text = False
             reasoning_chars = 0
+            accumulated_reasoning = ""
             think_opened = False
             reasoning_capped = False
 
@@ -133,7 +152,16 @@ class VLLMBrain(BaseBrain):
                         yield "<think>"
                         think_opened = True
                     normalized_reasoning = self._normalize_reasoning_text(reasoning)
+                    accumulated_reasoning += normalized_reasoning
                     reasoning_chars += len(reasoning)
+
+                    if self._detect_reasoning_loop(accumulated_reasoning):
+                        if think_opened:
+                            yield "</think>"
+                            think_opened = False
+                        reasoning_capped = True
+                        continue
+
                     yield normalized_reasoning
 
                     if reasoning_chars >= self._REASONING_CHAR_LIMIT:
@@ -181,8 +209,7 @@ class VLLMBrain(BaseBrain):
                 max_tokens=config.max_tokens,
                 temperature=config.temperature,
                 stream=False,
-                extra_body=extra_body,
-                repetition_penalty=config.repetition_penalty,
+                extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
             )
 
             choices = getattr(response, "choices", None) or []
