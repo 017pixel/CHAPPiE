@@ -249,23 +249,25 @@ export function ChatPage() {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
           const finalReasoning = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
           const finalMeta = event.data?.assistant_message?.metadata || {};
+          const displayContent = finalMeta.formatted_answer || finalContent;
           const newSessionId = event.data?.session_id || "";
+          const mergedMeta = { ...finalMeta, reasoning: finalReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined };
           if (newSessionId && newSessionId !== currentSessionId) {
             setCurrentSessionId(newSessionId);
             setDisplayMessages(prev => {
               const last = prev[prev.length - 1];
               if (last && last.role === "user" && last.content.trim().startsWith("/")) {
-                return [{ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent || "Chat geleert.", metadata: { ...finalMeta, reasoning: finalReasoning || undefined } }];
+                return [{ id: `assistant-${Date.now()}`, role: "assistant", content: displayContent || "Chat geleert.", metadata: mergedMeta }];
               }
               return prev;
             });
-          } else if (finalContent) {
+          } else {
             setDisplayMessages(prev => {
               const updated = [...prev];
               while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
                 updated.pop();
               }
-              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: finalContent, metadata: { ...finalMeta, reasoning: finalReasoning || undefined } });
+              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: displayContent || finalContent, metadata: mergedMeta });
               return updated;
             });
           }
@@ -294,6 +296,8 @@ export function ChatPage() {
         }) as any;
 
         const assistantContent = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
+        const assistantMeta = result?.assistant_message?.metadata || result?.metadata || {};
+        const displayContent = (assistantMeta as any).formatted_answer || assistantContent;
         const sessionId = result?.session_id || result?.replacement_session_id;
         if (sessionId && sessionId !== currentSessionId) {
           setCurrentSessionId(sessionId);
@@ -302,8 +306,8 @@ export function ChatPage() {
         setDisplayMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          content: assistantContent,
-          metadata: result?.assistant_message?.metadata || result?.metadata || {},
+          content: displayContent,
+          metadata: assistantMeta,
         }]);
       } catch (syncErr: any) {
         setDisplayMessages(prev => [...prev, {
@@ -409,20 +413,20 @@ export function ChatPage() {
               key={entry.id ?? idx}
               className={`flex flex-col gap-2 ${entry.role === "assistant" ? "items-start" : "items-end"}`}
             >
-              {/* Reasoning box for assistant messages that have it */}
-              {(entry.role === "assistant" && (entry.metadata as any)?.reasoning) && (
+              {/* CoT box for assistant messages that have formatted_cot or reasoning */}
+              {entry.role === "assistant" && ((entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning) && (
                 <div className="max-w-[85%] w-full rounded-none border border-pine/20 bg-pine/[0.06] overflow-hidden">
                   <div className="flex items-center justify-between px-5 py-2 border-b border-pine/10">
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-[12px] text-pine">psychology</span>
-                      <p className="text-[10px] uppercase tracking-widest text-pine font-bold">Reasoning</p>
+                      <p className="text-[10px] uppercase tracking-widest text-pine font-bold">CoT</p>
                     </div>
-                    <span className="text-[9px] text-slate/60">{(entry.metadata as any).reasoning.length} chars</span>
+                    <span className="text-[9px] text-slate/60">{(entry.metadata as any).formatted_cot ? "formatted" : "raw"}</span>
                   </div>
-                  <div className="px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-normal">
+                  <div className="px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-pre-line">
                     {(() => {
-                      const raw = (entry.metadata as any).reasoning as string;
-                      return raw.length > 3000 ? raw.slice(0, 3000) + "\n\n... (truncated)" : raw;
+                      const cot = (entry.metadata as any).formatted_cot || (entry.metadata as any).reasoning || "";
+                      return cot.length > 4000 ? cot.slice(0, 4000) + "\n\n... (truncated)" : cot;
                     })()}
                   </div>
                 </div>
@@ -437,7 +441,7 @@ export function ChatPage() {
                   } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
                 >
                   <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">
-                    {entry.role === "assistant" && (entry.metadata as any)?.reasoning ? "Output" : entry.role}
+                    {entry.role === "assistant" && ((entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning) ? "Antwort" : entry.role}
                   </p>
                   {entry.id === "streaming" ? (
                     <div className="text-sm leading-relaxed whitespace-pre-wrap break-all">

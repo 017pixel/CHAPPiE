@@ -201,6 +201,8 @@ def create_chappie_backend():
                 "pending": False,
                 "status_text": "",
                 "retry_history": result.get("retry_history", []),
+                "formatted_cot": result.get("formatted_cot", ""),
+                "formatted_answer": result.get("formatted_answer", ""),
             }
             assistant_msg = {
                 "role": "assistant",
@@ -594,6 +596,62 @@ def create_chappie_backend():
                 "- BEENDE jede Antwort mit einem klaren Satz. Kein endloses Abwaegen.\n"
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
+
+        CEREBRAS_FORMAT_MODEL = "openai/gpt-oss-120b"
+
+        def _format_via_cerebras(self, raw_text: str) -> Dict[str, str]:
+            if not raw_text.strip():
+                return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber..."}
+            if not settings.cerebras_api_key:
+                return {"cot": "", "answer": raw_text}
+            try:
+                import openai
+
+                client = openai.OpenAI(
+                    base_url="https://api.cerebras.ai/v1",
+                    api_key=settings.cerebras_api_key,
+                )
+                system_prompt = (
+                    "Du bist ein reiner Text-Formatierer. Deine Aufgabe: den folgenden CHAPPiE-Output "
+                    "lesbar formatieren, ohne EINEN Buchstaben inhaltlich zu verändern.\n\n"
+                    "ABSOLUTES VERBOT: Keine Rechtschreibkorrekturen. Keine Grammatikkorrekturen. "
+                    "Keine stilistischen Änderungen. Keine inhaltlichen Änderungen. "
+                    "Der Text muss Buchstabe für Buchstabe identisch bleiben.\n\n"
+                    "FORMATIERUNGSREGELN:\n"
+                    "1. Füge Leerzeichen zwischen zusammenhängenden Wörtern ein.\n"
+                    "2. Trenne Denkprozess und Antwort: <cot>...</cot> und <antwort>...</antwort>\n"
+                    "3. Im <cot>-Teil: füge Absätze ein, wenn CHAPPiE über verschiedene Dinge nachdenkt.\n"
+                    "4. Im <antwort>-Teil: füge sinnvolle Absätze für Lesbarkeit ein.\n"
+                    "5. Um emotionale Ausdrücke wie *seufzt*, *weint*, *lacht* etc.: "
+                    "mache einen Zeilenumbruch davor und danach, damit sie hervorstechen.\n"
+                    "6. Kein Markdown, kein **fett**, kein *kursiv*.\n"
+                    "7. Wenn der Text NUR aus Denken/Thinking besteht ohne eigentliche Antwort: "
+                    "schreibe in <antwort> exakt: CHAPPiE hat nachgedacht, schweigt aber...\n\n"
+                    "AUSGABEFORMAT STRENG:\n"
+                    "<cot>\n[formatierter Denkprozess]\n</cot>\n"
+                    "<antwort>\n[formatierte Antwort]\n</antwort>"
+                )
+                response = client.chat.completions.create(
+                    model=self.CEREBRAS_FORMAT_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": raw_text[:12000]},
+                    ],
+                    max_tokens=2048,
+                    temperature=0.3,
+                    stream=False,
+                )
+                formatted = response.choices[0].message.content or ""
+                cot_block = extract_tagged_block(formatted, ["cot"])
+                answer_block = extract_tagged_block(formatted, ["antwort"])
+                cot = (cot_block.content or "").strip()
+                answer = (answer_block.content or "").strip()
+                if not answer:
+                    answer = "CHAPPiE hat nachgedacht, schweigt aber..."
+                return {"cot": cot, "answer": answer}
+            except Exception as e:
+                print(f"[Cerebras Format] Fehler: {e}")
+                return {"cot": "", "answer": raw_text.replace("<think>", "").replace("</think>", "")}
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -1055,6 +1113,8 @@ def create_chappie_backend():
             
             return {
                 "response_text": response_data["response_text"],
+                "formatted_cot": response_data.get("formatted_cot", ""),
+                "formatted_answer": response_data.get("formatted_answer", ""),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -1377,6 +1437,7 @@ def create_chappie_backend():
             
             raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
+            formatted = self._format_via_cerebras(raw_response)
             self.debug_logger.log_info(
                 "MODEL_OUTPUT",
                 "Schritt-2-Ausgabe ausgewertet",
@@ -1390,6 +1451,8 @@ def create_chappie_backend():
             
             return {
                 "response_text": display_response,
+                "formatted_cot": formatted.get("cot", ""),
+                "formatted_answer": formatted.get("answer", ""),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
@@ -1927,6 +1990,7 @@ def create_chappie_backend():
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
+                formatted_stream = self._format_via_cerebras(raw_response)
                 self.debug_logger.log_info(
                     "MODEL_OUTPUT",
                     "Schritt-2-Ausgabe ausgewertet",
@@ -1944,6 +2008,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
+                formatted_stream = {"cot": "", "answer": ""}
 
             final_life_snapshot = self.life_simulation.finalize_turn(
                 user_input=user_input,
@@ -1994,6 +2059,8 @@ def create_chappie_backend():
 
             result = {
                 "response_text": display_response,
+                "formatted_cot": formatted_stream.get("cot", ""),
+                "formatted_answer": formatted_stream.get("answer", ""),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
