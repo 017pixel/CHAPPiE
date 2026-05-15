@@ -106,7 +106,8 @@ class VLLMBrain(BaseBrain):
                 max_tokens=config.max_tokens,
                 temperature=config.temperature,
                 stream=True,
-                extra_body=extra_body
+                extra_body=extra_body,
+                repetition_penalty=config.repetition_penalty,
             )
 
             emitted_text = False
@@ -180,7 +181,8 @@ class VLLMBrain(BaseBrain):
                 max_tokens=config.max_tokens,
                 temperature=config.temperature,
                 stream=False,
-                extra_body=extra_body
+                extra_body=extra_body,
+                repetition_penalty=config.repetition_penalty,
             )
 
             choices = getattr(response, "choices", None) or []
@@ -216,11 +218,12 @@ class VLLMBrain(BaseBrain):
         """Bereitet provider-spezifische Optionen vor."""
         payload = dict(extra_body or {})
 
+        # Thinking-Mode fuer lebendigere Antworten mit repetition_penalty-Schutz.
         if self.model.lower().startswith("qwen/qwen3.5"):
             chat_kwargs = payload.get("chat_template_kwargs")
             if not isinstance(chat_kwargs, dict):
                 chat_kwargs = {}
-            chat_kwargs.setdefault("enable_thinking", False)
+            chat_kwargs.setdefault("enable_thinking", True)
             payload["chat_template_kwargs"] = chat_kwargs
 
         return payload

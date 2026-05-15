@@ -139,7 +139,8 @@ class Settings:
         self.max_tokens = int(self._get_val("MAX_TOKENS", 2200))
         self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 800))
         self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 1200))
-        self.temperature = float(self._get_val("TEMPERATURE", 0.7))
+        self.temperature = float(self._get_val("TEMPERATURE", 0.85))
+        self.repetition_penalty = float(self._get_val("REPETITION_PENALTY", 1.15))
         self.stream = bool(self._get_val("STREAM", True))
         self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", False))
         self.debug = bool(self._get_val("DEBUG", True))
@@ -261,13 +262,13 @@ class Settings:
             self.training_trainer_model = kwargs["training_trainer_model"]
 
         for key in [
-            "temperature", "max_tokens", "chain_of_thought", "memory_top_k",
-            "memory_min_relevance", "chappie_thinking_token_limit",
-            "chappie_answer_token_limit", "stm_summary_threshold",
-            "stm_summary_batch_size", "cerebras_requests_per_minute",
-            "cerebras_requests_per_hour", "cerebras_requests_per_day",
-            "cerebras_tokens_per_minute", "cerebras_tokens_per_hour",
-            "cerebras_tokens_per_day",
+            "temperature", "repetition_penalty", "max_tokens", "chain_of_thought",
+            "memory_top_k", "memory_min_relevance",
+            "chappie_thinking_token_limit", "chappie_answer_token_limit",
+            "stm_summary_threshold", "stm_summary_batch_size",
+            "cerebras_requests_per_minute", "cerebras_requests_per_hour",
+            "cerebras_requests_per_day", "cerebras_tokens_per_minute",
+            "cerebras_tokens_per_hour", "cerebras_tokens_per_day",
         ]:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
@@ -320,6 +321,7 @@ class Settings:
             "CHAPPIE_THINKING_TOKEN_LIMIT": self.chappie_thinking_token_limit,
             "CHAPPIE_ANSWER_TOKEN_LIMIT": self.chappie_answer_token_limit,
             "TEMPERATURE": self.temperature,
+            "REPETITION_PENALTY": self.repetition_penalty,
             "STREAM": self.stream,
             "CHAIN_OF_THOUGHT": self.chain_of_thought,
             "ENABLE_STEERING": self.enable_steering,

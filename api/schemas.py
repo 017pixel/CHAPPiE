@@ -143,6 +143,7 @@ class SettingsSnapshot(BaseModel):
     steering_provider: Optional[str]
     steering_model: str
     temperature: float
+    repetition_penalty: float
     max_tokens: int
     chappie_thinking_token_limit: int
     chappie_answer_token_limit: int
@@ -198,6 +199,7 @@ class SettingsUpdate(BaseModel):
     steering_provider: Optional[str] = None
     steering_model: Optional[str] = None
     temperature: Optional[float] = None
+    repetition_penalty: Optional[float] = None
     max_tokens: Optional[int] = None
     chappie_thinking_token_limit: Optional[int] = None
     chappie_answer_token_limit: Optional[int] = None

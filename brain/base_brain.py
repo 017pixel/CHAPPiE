@@ -27,6 +27,7 @@ class GenerationConfig:
     stream: bool = True
     stop_sequences: Optional[list[str]] = None
     extra_body: Optional[Dict[str, Any]] = None  # Fuer Steering-Vektoren und spezifische Parameter
+    repetition_penalty: float = 1.1  # >1.0 bestraft Wiederholungen, 1.0 = deaktiviert
 
 
 class BaseBrain(ABC):

@@ -383,9 +383,15 @@ export function ChatPage() {
             >
               {/* Reasoning box for assistant messages that have it */}
               {(entry.role === "assistant" && (entry.metadata as any)?.reasoning) && (
-                <div className="max-w-[85%] w-full rounded-none border border-white/5 bg-white/[0.04] px-5 py-3 overflow-hidden">
-                  <p className="mb-1.5 text-[10px] uppercase tracking-widest text-slate">Reasoning</p>
-                  <div className="text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-normal">
+                <div className="max-w-[85%] w-full rounded-none border border-pine/20 bg-pine/[0.06] overflow-hidden">
+                  <div className="flex items-center justify-between px-5 py-2 border-b border-pine/10">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[12px] text-pine">psychology</span>
+                      <p className="text-[10px] uppercase tracking-widest text-pine font-bold">Reasoning</p>
+                    </div>
+                    <span className="text-[9px] text-slate/60">{(entry.metadata as any).reasoning.length} chars</span>
+                  </div>
+                  <div className="px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-normal">
                     {(() => {
                       const raw = (entry.metadata as any).reasoning as string;
                       return raw.length > 3000 ? raw.slice(0, 3000) + "\n\n... (truncated)" : raw;
@@ -393,7 +399,8 @@ export function ChatPage() {
                   </div>
                 </div>
               )}
-              <div className="flex items-start gap-2 max-w-[85%]">
+              {/* Output box */}
+              <div className="flex items-start gap-2 max-w-[85%] w-full">
                 <div
                   className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
                     entry.role === "assistant"
@@ -401,7 +408,9 @@ export function ChatPage() {
                       : "bg-ember border-ember/20 text-white"
                   } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
                 >
-                  <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">{entry.role}</p>
+                  <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">
+                    {entry.role === "assistant" && (entry.metadata as any)?.reasoning ? "Output" : entry.role}
+                  </p>
                   {entry.id === "streaming" ? (
                     <div className="text-sm leading-relaxed whitespace-pre-wrap break-all">
                       {entry.content}

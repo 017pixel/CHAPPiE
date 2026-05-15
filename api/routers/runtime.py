@@ -53,6 +53,7 @@ def _settings_snapshot() -> SettingsSnapshot:
         steering_provider=_enum_value(settings.steering_provider),
         steering_model=settings.steering_model,
         temperature=settings.temperature,
+        repetition_penalty=settings.repetition_penalty,
         max_tokens=settings.max_tokens,
         chappie_thinking_token_limit=settings.chappie_thinking_token_limit,
         chappie_answer_token_limit=settings.chappie_answer_token_limit,

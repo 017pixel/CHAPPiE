@@ -1370,6 +1370,7 @@ def create_chappie_backend():
             gen_config = GenerationConfig(
                 max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
+                repetition_penalty=settings.repetition_penalty,
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
@@ -1524,6 +1525,7 @@ def create_chappie_backend():
             gen_config = GenerationConfig(
                 max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
                 temperature=settings.temperature,
+                repetition_penalty=settings.repetition_penalty,
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
