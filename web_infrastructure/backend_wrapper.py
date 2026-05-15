@@ -599,11 +599,30 @@ def create_chappie_backend():
 
         CEREBRAS_FORMAT_MODEL = "openai/gpt-oss-120b"
 
+        @staticmethod
+        def _clean_raw_text(raw_text: str) -> str:
+            """Entfernt vLLM/Provider-Fehlermeldungen aus dem Roh-Output."""
+            text = raw_text.strip()
+            if not text:
+                return ""
+            error_prefixes = (
+                "vLLM Fehler:", "VLLM Fehler:", "Ollama Fehler:",
+                "Groq Fehler:", "Cerebras Fehler:", "NVIDIA Fehler:",
+            )
+            lines = text.splitlines()
+            cleaned = [l for l in lines if not l.strip().startswith(error_prefixes)]
+            result = "\n".join(cleaned).strip()
+            if not result:
+                # Alles war Fehler — nimm den ersten Fehlertext als Info
+                result = lines[-1] if lines else ""
+            return result
+
         def _format_via_cerebras(self, raw_text: str) -> Dict[str, str]:
-            if not raw_text.strip():
+            clean_text = self._clean_raw_text(raw_text)
+            if not clean_text:
                 return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber..."}
             if not settings.cerebras_api_key:
-                return {"cot": "", "answer": raw_text}
+                return {"cot": "", "answer": clean_text.replace("<think>", "").replace("</think>", "")}
             try:
                 import openai
 
@@ -623,10 +642,13 @@ def create_chappie_backend():
                     "3. Im <cot>-Teil: füge Absätze ein, wenn CHAPPiE über verschiedene Dinge nachdenkt.\n"
                     "4. Im <antwort>-Teil: füge sinnvolle Absätze für Lesbarkeit ein.\n"
                     "5. Um emotionale Ausdruecke wie *seufzt*, *weint*, *lacht* etc.: "
-                    "mache einen Zeilenumbruch davor und danach, damit sie hervorstechen.\n"
+                    "mache einen Zeilenumbruch davor und danach.\n"
                     "6. Kein Markdown, kein **fett**, kein *kursiv*.\n"
                     "7. Wenn der Text NUR aus Denken/Thinking besteht ohne eigentliche Antwort: "
-                    "schreibe in <antwort> exakt: CHAPPiE hat nachgedacht, schweigt aber...\n\n"
+                    "schreibe in <antwort> exakt: CHAPPiE hat nachgedacht, schweigt aber...\n"
+                    "8. Wenn die Antwort mitten im Satz abbricht oder unvollstaendig endet: "
+                    "setze am Ende der <antwort> folgenden Text in eckigen Klammern: "
+                    "[CHAPPiE hat diese Antwort am Ende abgebrochen]\n\n"
                     "AUSGABEFORMAT STRENG:\n"
                     "<cot>\n[formatierter Denkprozess]\n</cot>\n"
                     "<antwort>\n[formatierte Antwort]\n</antwort>"
@@ -635,7 +657,7 @@ def create_chappie_backend():
                     model=self.CEREBRAS_FORMAT_MODEL,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": raw_text[:12000]},
+                        {"role": "user", "content": clean_text[:12000]},
                     ],
                     max_tokens=2048,
                     temperature=0.3,
@@ -651,7 +673,7 @@ def create_chappie_backend():
                 return {"cot": cot, "answer": answer}
             except Exception as e:
                 print(f"[Cerebras Format] Fehler: {e}")
-                return {"cot": "", "answer": raw_text.replace("<think>", "").replace("</think>", "")}
+                return {"cot": "", "answer": clean_text.replace("<think>", "").replace("</think>", "")}
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
