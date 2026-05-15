@@ -64,6 +64,7 @@ export function ChatPage() {
   const [genStartTime, setGenStartTime] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true); // true = User ist am Ende, auto-scroll aktiv
   const processingRef = useRef(false);
 
   const sessionsQuery = useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
@@ -104,9 +105,19 @@ export function ChatPage() {
     setLoadedOnce(false);
   }, [currentSessionId]);
 
-  // Auto-scroll
+  // Auto-scroll: nur wenn User am Ende ist, sonst nicht stören
   useEffect(() => {
-    if (scrollRef.current) {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const onScroll = () => {
+      autoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (autoScrollRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [displayMessages, streamingContent, thinkingIndex]);
@@ -172,6 +183,7 @@ export function ChatPage() {
     };
 
     setDisplayMessages(prev => [...prev, userMsg]);
+    autoScrollRef.current = true;
     setMessage("");
     setStreamingContent("");
     setReasoningContent("");
