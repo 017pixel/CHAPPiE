@@ -490,49 +490,50 @@ export function ChatPage() {
                     />
                   )}
                 </div>
-                {/* Info Button */}
+                {/* Info + Raw Buttons */}
                 {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && entry.metadata && (
-                  <div className="relative group shrink-0">
-                    <button
-                      onClick={() => setPopupMsg(entry)}
-                      className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[10px] text-slate transition-all hover:bg-ember hover:text-white hover:border-ember/30"
-                      title="Details anzeigen"
-                    >
-                      i
-                    </button>
-                    {/* Hover-Preview */}
-                    <div className="pointer-events-none absolute left-0 bottom-full mb-1 z-50 hidden group-hover:block">
-                      <div className="rounded-none border border-white/10 bg-night/95 p-3 shadow-glass w-64">
-                        <p className="mb-1.5 text-[9px] uppercase tracking-widest text-ember">Preview</p>
-                        {(() => {
-                          const meta = entry.metadata as any;
-                          const memories = meta.rag_memories || [];
-                          const topMem = memories.slice(0, 3);
-                          const deltas = meta.emotions_delta || {};
-                          const deltaKeys = Object.keys(deltas).filter(k => deltas[k]?.change !== 0);
-                          const previewLines: string[] = [];
-                          if (memories.length > 0) previewLines.push(`${memories.length} LTM-Erinnerungen (top: ${topMem.length > 0 ? Math.round((topMem[0].relevance_score || 0) * 100) : 0}% Relevanz)`);
-                          if (deltaKeys.length > 0) previewLines.push(`Emotionen: ${deltaKeys.slice(0, 2).map(k => `${k} ${deltas[k]?.change > 0 ? "+" : ""}${deltas[k]?.change}`).join(", ")}`);
-                          previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
-                          if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
-                          previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
-                          return previewLines.slice(0, 5).map((line, i) => (
-                            <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
-                          ));
-                        })()}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <div className="relative group">
+                      <button
+                        onClick={() => setPopupMsg(entry)}
+                        className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[10px] text-slate transition-all hover:bg-ember hover:text-white hover:border-ember/30"
+                        title="Details anzeigen"
+                      >
+                        i
+                      </button>
+                      {/* Hover-Preview */}
+                      <div className="pointer-events-none absolute left-0 bottom-full mb-1 z-50 hidden group-hover:block">
+                        <div className="rounded-none border border-white/10 bg-night/95 p-3 shadow-glass w-64">
+                          <p className="mb-1.5 text-[9px] uppercase tracking-widest text-ember">Preview</p>
+                          {(() => {
+                            const meta = entry.metadata as any;
+                            const memories = meta.rag_memories || [];
+                            const topMem = memories.slice(0, 3);
+                            const deltas = meta.emotions_delta || {};
+                            const deltaKeys = Object.keys(deltas).filter(k => deltas[k]?.change !== 0);
+                            const previewLines: string[] = [];
+                            if (memories.length > 0) previewLines.push(`${memories.length} LTM-Erinnerungen (top: ${topMem.length > 0 ? Math.round((topMem[0].relevance_score || 0) * 100) : 0}% Relevanz)`);
+                            if (deltaKeys.length > 0) previewLines.push(`Emotionen: ${deltaKeys.slice(0, 2).map(k => `${k} ${deltas[k]?.change > 0 ? "+" : ""}${deltas[k]?.change}`).join(", ")}`);
+                            previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
+                            if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
+                            previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
+                            return previewLines.slice(0, 5).map((line, i) => (
+                              <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
+                            ));
+                          })()}
+                        </div>
                       </div>
                     </div>
+                    {(entry.metadata as any)?.raw_response && (
+                      <button
+                        onClick={() => setRawPopupMsg(entry)}
+                        className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[8px] font-bold text-slate transition-all hover:bg-pine hover:text-white hover:border-pine/30"
+                        title="Raw Output anzeigen"
+                      >
+                        R
+                      </button>
+                    )}
                   </div>
-                )}
-                {/* Raw Button */}
-                {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (entry.metadata as any)?.raw_response && (
-                  <button
-                    onClick={() => setRawPopupMsg(entry)}
-                    className="shrink-0 flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[8px] font-bold text-slate transition-all hover:bg-pine hover:text-white hover:border-pine/30"
-                    title="Raw Output anzeigen"
-                  >
-                    R
-                  </button>
                 )}
               </div>
             </div>
