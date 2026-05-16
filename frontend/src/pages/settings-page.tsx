@@ -122,7 +122,6 @@ export function SettingsPage() {
   const [emotionValues, setEmotionValues] = useState<Record<string, number>>({});
   const [layerEdits, setLayerEdits] = useState<Record<string, { layer_start: number; layer_end: number; default_alpha: number }>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const emotionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saveMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => api.saveSettings(payload),
@@ -175,12 +174,16 @@ export function SettingsPage() {
 
   const handleEmotionChange = useCallback(
     (emotion: string, value: number) => {
-      const updated = { ...emotionValues, [emotion]: value };
-      setEmotionValues(updated);
-      if (emotionTimer.current) clearTimeout(emotionTimer.current);
-      emotionTimer.current = setTimeout(() => {
-        emotionMutation.mutate(updated);
-      }, 300);
+      setEmotionValues((prev) => ({ ...prev, [emotion]: value }));
+    },
+    [],
+  );
+
+  const applyEmotion = useCallback(
+    (emotion: string) => {
+      const value = emotionValues[emotion];
+      if (value === undefined) return;
+      emotionMutation.mutate({ [emotion]: value });
     },
     [emotionValues, emotionMutation],
   );
@@ -261,31 +264,37 @@ export function SettingsPage() {
       </div>
 
       {/* Manual Emotion Control */}
-      <SectionCard eyebrow="Live Emotion Control" title="Manual Emotion Steering" subtitle="Set CHAPPiE's emotional state directly. Values update instantly and reflect in the chat.">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <SectionCard eyebrow="Live Emotion Control" title="Manual Emotion Steering" subtitle="Set CHAPPiE's emotional state directly. Adjust the slider, then click Apply to update each emotion.">
+        <div className="space-y-2">
           {Object.entries(EMOTION_META).map(([key, meta]) => (
-            <div key={key} className="rounded-none border border-white/5 bg-white/[0.02] p-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div key={key} className="flex items-center gap-4 rounded-none border border-white/5 bg-white/[0.02] px-4 py-3">
+              <div className="flex items-center gap-2 w-32 shrink-0">
                 <span className="material-symbols-outlined text-sm" style={{ color: meta.color }}>{meta.icon}</span>
                 <span className="text-[10px] uppercase tracking-widest text-slate">{meta.label}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={emotionValues[key] ?? 50}
-                  onChange={(e) => handleEmotionChange(key, Number(e.target.value))}
-                  className="flex-1 h-1 accent-ember"
-                  style={{ accentColor: meta.color }}
-                />
-                <span className="w-8 text-right text-xs font-mono text-mist">{emotionValues[key] ?? 50}</span>
-              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={emotionValues[key] ?? 50}
+                onChange={(e) => handleEmotionChange(key, Number(e.target.value))}
+                className="flex-1 h-1"
+                style={{ accentColor: meta.color }}
+              />
+              <span className="w-10 text-right text-xs font-mono text-mist shrink-0">{emotionValues[key] ?? 50}</span>
+              <button
+                onClick={() => applyEmotion(key)}
+                disabled={emotionMutation.isPending}
+                className="shrink-0 rounded-none px-4 py-1.5 text-[10px] font-bold text-white uppercase tracking-widest transition-all hover:brightness-110 disabled:opacity-50"
+                style={{ backgroundColor: meta.color, color: key === "sadness" || key === "happiness" ? "#1a1a2e" : "#fff" }}
+              >
+                Apply
+              </button>
             </div>
           ))}
         </div>
         {emotionMutation.isPending && (
-          <p className="mt-2 text-[10px] text-slate/70">Applying emotions...</p>
+          <p className="mt-2 text-[10px] text-slate/70">Applying emotion...</p>
         )}
         {emotionState.steering && (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-[10px]">

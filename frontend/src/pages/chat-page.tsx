@@ -413,20 +413,27 @@ export function ChatPage() {
               key={entry.id ?? idx}
               className={`flex flex-col gap-2 ${entry.role === "assistant" ? "items-start" : "items-end"}`}
             >
-              {/* CoT box for assistant messages that have formatted_cot or reasoning */}
-              {entry.role === "assistant" && ((entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning) && (
-                <div className="max-w-[85%] w-full rounded-none border border-pine/20 bg-pine/[0.06] overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-2 border-b border-pine/10">
+              {/* CoT box — immer anzeigen fuer abgeschlossene Assistant-Nachrichten */}
+              {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
+                <div className={`max-w-[85%] w-full rounded-none border overflow-hidden ${(entry.metadata as any)?.formatting_failed ? 'border-ember/30 bg-ember/[0.04]' : 'border-pine/20 bg-pine/[0.06]'}`}>
+                  <div className={`flex items-center justify-between px-5 py-2 border-b ${(entry.metadata as any)?.formatting_failed ? 'border-ember/20' : 'border-pine/10'}`}>
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[12px] text-pine">psychology</span>
-                      <p className="text-[10px] uppercase tracking-widest text-pine font-bold">CoT</p>
+                       <span className={`material-symbols-outlined text-[12px] ${(entry.metadata as any)?.formatting_failed ? 'text-ember' : 'text-pine'}`}>psychology</span>
+                      <p className={`text-[10px] uppercase tracking-widest font-bold ${(entry.metadata as any)?.formatting_failed ? 'text-ember' : 'text-pine'}`}>CHAPPiEs Gedanken <span className="opacity-50 font-normal">(CoT)</span></p>
                     </div>
-                    <span className="text-[9px] text-slate/60">{(entry.metadata as any).formatted_cot ? "formatted" : "raw"}</span>
+                    {(entry.metadata as any)?.formatting_failed ? (
+                      <span className="text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen</span>
+                    ) : (
+                      <span className="text-[9px] text-slate/60">{(entry.metadata as any).formatted_cot ? "formatted" : "raw"}</span>
+                    )}
                   </div>
-                  <div className="px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden text-slate/70 whitespace-pre-line">
+                  <div className={`px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-line ${(entry.metadata as any)?.formatting_failed ? 'text-ember/70' : 'text-slate/70'}`}>
                     {(() => {
-                      const cot = (entry.metadata as any).formatted_cot || (entry.metadata as any).reasoning || "";
-                      return cot.length > 4000 ? cot.slice(0, 4000) + "\n\n... (truncated)" : cot;
+                      const cot = (entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning || "";
+                      if (cot) {
+                        return cot.length > 4000 ? cot.slice(0, 4000) + "\n\n... (truncated)" : cot;
+                      }
+                      return "CHAPPiE hat nicht darüber nachgedacht und sofort geantwortet.";
                     })()}
                   </div>
                 </div>
@@ -436,13 +443,18 @@ export function ChatPage() {
                 <div
                   className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
                     entry.role === "assistant"
-                      ? "bg-night border-white/10 text-mist"
+                      ? (entry.metadata as any)?.formatting_failed
+                        ? "bg-night border-ember/30 text-ember/80"
+                        : "bg-night border-white/10 text-mist"
                       : "bg-ember border-ember/20 text-white"
                   } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
                 >
                   <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">
-                    {entry.role === "assistant" && ((entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning) ? "Antwort" : entry.role}
+                    {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") ? "CHAPPiEs Antwort" : entry.role}
                   </p>
+                  {entry.role === "assistant" && (entry.metadata as any)?.formatting_failed && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
+                    <p className="mb-1 text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen — Rohtext</p>
+                  )}
                   {entry.id === "streaming" ? (
                     <div className="text-sm leading-relaxed whitespace-pre-wrap break-all">
                       {entry.content}

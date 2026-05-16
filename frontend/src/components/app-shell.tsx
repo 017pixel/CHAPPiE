@@ -60,7 +60,7 @@ export function AppShell() {
           </button>
         </div>
 
-        {isSidebarOpen && (
+        {isSidebarOpen ? (
           <a
             href={import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}
             target="_blank"
@@ -69,6 +69,17 @@ export function AppShell() {
           >
             <p className="font-bold uppercase tracking-widest text-pine">API-Target</p>
             <p className="mt-1 break-all opacity-80">{import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}</p>
+          </a>
+        ) : (
+          <a
+            href={import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}
+            className="mx-2 mb-4 flex flex-col items-center gap-1 rounded-none bg-pine/20 p-2 text-[8px] text-pine border border-pine/10 hover:bg-pine/30 hover:border-pine/30 transition-all"
+          >
+            <span className="material-symbols-outlined text-[16px] leading-none">dns</span>
+            <p className="font-bold uppercase tracking-widest leading-none">Endpoint</p>
           </a>
         )}
       </aside>

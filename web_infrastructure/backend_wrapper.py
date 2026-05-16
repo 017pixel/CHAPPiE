@@ -203,6 +203,7 @@ def create_chappie_backend():
                 "retry_history": result.get("retry_history", []),
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
+                "formatting_failed": result.get("formatting_failed", False),
             }
             assistant_msg = {
                 "role": "assistant",
@@ -341,26 +342,21 @@ def create_chappie_backend():
             thought = parsed.thought or alt_parsed.thought or ""
             model_reasoning = model_reasoning_block.content or ""
 
+            # Strip <think>/<thinking> tags from display_response — these are internal markers,
+            # never user-visible. ALWAYS remove them, even if no answer tag was found.
+            display_response = display_response.replace("<think>", "").replace("</think>", "").replace("<thinking>", "").replace("</thinking>", "").strip()
+
             if not display_response:
                 if model_reasoning or thought:
-                    thought_len = len(thought or "")
-                    reasoning_len = len(model_reasoning or "")
-                    if thought_len > 800 or reasoning_len > 800:
-                        display_response = self._format_generation_error(
-                            phase, "Modell hat nur Thinking produziert ohne Antwort. Thinking-Limit greift."
-                        )
-                        thought = ""
-                        model_reasoning = ""
-                    else:
-                        display_response = "CHAPPiE schweigt..."
+                    # Keep thought/model_reasoning for CoT display — don't clear them
+                    display_response = "CHAPPiE schweigt..."
                 else:
                     display_response = self._format_generation_error(phase, raw_text)
             elif (len(thought or "") > 4000 or len(model_reasoning or "") > 4000) and len(display_response) < 80:
+                # Loop detection: mark answer as error but keep thought/model_reasoning for CoT
                 display_response = self._format_generation_error(
                     phase, "Antwort ist nur Thinking (Loop erkannt). Antworttext zu kurz."
                 )
-                thought = ""
-                model_reasoning = ""
             return display_response, thought, model_reasoning
 
         @staticmethod
@@ -617,12 +613,14 @@ def create_chappie_backend():
                 result = lines[-1] if lines else ""
             return result
 
-        def _format_via_cerebras(self, raw_text: str) -> Dict[str, str]:
+        def _format_via_cerebras(self, raw_text: str) -> Dict[str, Any]:
+            """Sendet Rohtext an Cerebras zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
-                return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber..."}
+                return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber...", "formatting_failed": False}
             if not settings.cerebras_api_key:
-                return {"cot": "", "answer": clean_text.replace("<think>", "").replace("</think>", "")}
+                # Kein API-Key: parse <think>/<gedanke>-Tags lokal, um cot nicht leer zu lassen
+                return self._local_format_fallback(clean_text, formatting_failed=False)
             try:
                 import openai
 
@@ -646,7 +644,9 @@ def create_chappie_backend():
                     "6. Kein Markdown, kein **fett**, kein *kursiv*.\n"
                     "7. Wenn der Text NUR aus Denken/Thinking besteht ohne eigentliche Antwort: "
                     "schreibe in <antwort> exakt: CHAPPiE hat nachgedacht, schweigt aber...\n"
-                    "8. Wenn die Antwort mitten im Satz abbricht oder unvollstaendig endet: "
+                    "8. Wenn der Text NUR aus Antwort ohne Denken/Thinking besteht: "
+                    "schreibe in <cot> exakt: CHAPPiE hat nicht darüber nachgedacht und sofort geantwortet.\n"
+                    "9. Wenn die Antwort mitten im Satz abbricht oder unvollstaendig endet: "
                     "setze am Ende der <antwort> folgenden Text in eckigen Klammern: "
                     "[CHAPPiE hat diese Antwort am Ende abgebrochen]\n\n"
                     "AUSGABEFORMAT STRENG:\n"
@@ -662,6 +662,7 @@ def create_chappie_backend():
                     max_tokens=2048,
                     temperature=0.3,
                     stream=False,
+                    timeout=8.0,
                 )
                 formatted = response.choices[0].message.content or ""
                 cot_block = extract_tagged_block(formatted, ["cot"])
@@ -670,10 +671,54 @@ def create_chappie_backend():
                 answer = (answer_block.content or "").strip()
                 if not answer:
                     answer = "CHAPPiE hat nachgedacht, schweigt aber..."
-                return {"cot": cot, "answer": answer}
+                # Falls Cerebras kein <cot> produziert hat, parse lokal als Fallback
+                if not cot:
+                    parsed = parse_thinking_tags(clean_text)
+                    cot_parsed = parse_chain_of_thought(clean_text)
+                    thought = parsed.thought or cot_parsed.thought or ""
+                    if thought:
+                        cot = thought
+                return {"cot": cot, "answer": answer, "formatting_failed": False}
             except Exception as e:
                 print(f"[Cerebras Format] Fehler: {e}")
-                return {"cot": "", "answer": clean_text.replace("<think>", "").replace("</think>", "")}
+                return self._local_format_fallback(clean_text, formatting_failed=True)
+
+        @staticmethod
+        def _local_format_fallback(clean_text: str, formatting_failed: bool = False) -> Dict[str, Any]:
+            """Lokaler Formatierungs-Fallback: parsed <think>/<gedanke>-Tags aus dem Rohtext."""
+            parsed_thinking = parse_thinking_tags(clean_text)
+            parsed_cot = parse_chain_of_thought(clean_text)
+            thought = parsed_thinking.thought or parsed_cot.thought or ""
+            answer_text = parsed_thinking.answer or parsed_cot.answer or ""
+
+            # Wurde ein expliziter <antwort>/<answer>-Tag gefunden?
+            has_explicit_answer_tag = (parsed_thinking.answer and parsed_thinking.answer != clean_text) or \
+                                       (parsed_cot.answer and parsed_cot.answer != clean_text)
+
+            if not has_explicit_answer_tag:
+                # Kein answer-tag gefunden. Extrahiere text nach letztem </think> als Antwort.
+                after_think = clean_text
+                stripped = clean_text.replace("<think>", "").replace("</think>", "").replace("<thinking>", "").replace("</thinking>", "").strip()
+
+                # Finde text nach dem letzten think-close-tag
+                for close_tag in ("</think>", "</thinking>"):
+                    idx = after_think.rfind(close_tag)
+                    if idx != -1:
+                        after_think = after_think[idx + len(close_tag):].strip()
+                        break
+
+                if after_think and after_think != clean_text:
+                    answer_text = after_think
+                elif stripped and thought and stripped.strip() != thought.strip():
+                    # Text ausserhalb der think-Blöcke, aber nicht gleich dem thought
+                    answer_text = stripped
+                elif thought:
+                    # Nur think-Inhalt, kein echtes answer
+                    answer_text = "CHAPPiE hat nachgedacht, schweigt aber..."
+                else:
+                    answer_text = stripped
+
+            return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed}
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -1468,13 +1513,19 @@ def create_chappie_backend():
                     "model_reasoning_chars": len(model_reasoning or ""),
                     "thought_chars": len(thought or ""),
                     "looks_like_error": looks_like_model_error(display_response or ""),
+                    "formatting_failed": formatted.get("formatting_failed", False),
                 },
             )
             
+            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            safe_cot = formatted.get("cot", "") or thought or model_reasoning or ""
+            safe_answer = formatted.get("answer", "") or display_response
+            
             return {
                 "response_text": display_response,
-                "formatted_cot": formatted.get("cot", ""),
-                "formatted_answer": formatted.get("answer", ""),
+                "formatted_cot": safe_cot,
+                "formatted_answer": safe_answer,
+                "formatting_failed": formatted.get("formatting_failed", False),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
@@ -1511,6 +1562,7 @@ def create_chappie_backend():
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
                 "rag_memories": memories,
+                "raw_response": raw_response,
             }
 
         def _calculate_emotion_delta(self, before: Dict[str, int], 
@@ -1623,6 +1675,9 @@ def create_chappie_backend():
             )
             display_response = legacy_response["response_text"]
             thought = legacy_response.get("thought_process", "")
+            model_reasoning = legacy_response.get("model_reasoning", "")
+            raw_response = legacy_response.get("raw_response", display_response)
+            formatted_legacy = self._format_via_cerebras(raw_response)
             self.debug_logger.log_info(
                 "LEGACY",
                 "Legacy-Antwort generiert",
@@ -1630,6 +1685,7 @@ def create_chappie_backend():
                     "response_chars": len(display_response or ""),
                     "thought_chars": len(thought or ""),
                     "memories_found": len(legacy_response.get("rag_memories") or []),
+                    "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 },
             )
             
@@ -1681,8 +1737,15 @@ def create_chappie_backend():
             )
             sleep_result = self._schedule_sleep_phase_if_due()
             
+            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            safe_cot = formatted_legacy.get("cot", "") or thought or model_reasoning or ""
+            safe_answer = formatted_legacy.get("answer", "") or display_response
+
             return {
                 "response_text": display_response,
+                "formatted_cot": safe_cot,
+                "formatted_answer": safe_answer,
+                "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
@@ -2021,6 +2084,7 @@ def create_chappie_backend():
                         "model_reasoning_chars": len(model_reasoning or ""),
                         "thought_chars": len(thought or ""),
                         "looks_like_error": looks_like_model_error(display_response or ""),
+                        "formatting_failed": formatted_stream.get("formatting_failed", False),
                     },
                 )
 
@@ -2030,7 +2094,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
-                formatted_stream = {"cot": "", "answer": ""}
+                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": False}
 
             final_life_snapshot = self.life_simulation.finalize_turn(
                 user_input=user_input,
@@ -2079,10 +2143,15 @@ def create_chappie_backend():
             if hasattr(self, '_processing_start_time'):
                 processing_time_ms = (start_time_dt - self._processing_start_time).total_seconds() * 1000
 
+            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            safe_cot = formatted_stream.get("cot", "") or thought or model_reasoning or ""
+            safe_answer = formatted_stream.get("answer", "") or display_response
+
             result = {
                 "response_text": display_response,
-                "formatted_cot": formatted_stream.get("cot", ""),
-                "formatted_answer": formatted_stream.get("answer", ""),
+                "formatted_cot": safe_cot,
+                "formatted_answer": safe_answer,
+                "formatting_failed": formatted_stream.get("formatting_failed", False),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -2208,12 +2277,14 @@ def create_chappie_backend():
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
+                formatted_legacy = self._format_via_cerebras(raw_response)
                 self.debug_logger.log_info(
                     "LEGACY",
                     "Legacy-Antwort generiert",
                     {
                         "response_chars": len(display_response or ""),
                         "thought_chars": len(thought or ""),
+                        "formatting_failed": formatted_legacy.get("formatting_failed", False),
                     },
                 )
 
@@ -2223,6 +2294,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
+                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": False}
 
             self.memory.add_memory(user_input, role="user")
             if display_response.strip() and not looks_like_model_error(display_response):
@@ -2267,6 +2339,9 @@ def create_chappie_backend():
 
             result = {
                 "response_text": display_response,
+                "formatted_cot": formatted_legacy.get("cot", "") or thought or model_reasoning or "",
+                "formatted_answer": formatted_legacy.get("answer", "") or display_response,
+                "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
