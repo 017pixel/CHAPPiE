@@ -593,7 +593,7 @@ def create_chappie_backend():
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
-        CEREBRAS_FORMAT_MODEL = "llama-3.1-8b"
+        CEREBRAS_FORMAT_MODEL = "gpt-oss-120b"
 
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
@@ -631,7 +631,7 @@ def create_chappie_backend():
                 system_prompt = (
                     "Du bist ein reiner Text-Formatierer. Deine Aufgabe: den folgenden CHAPPiE-Output "
                     "lesbar formatieren, ohne EINEN Buchstaben inhaltlich zu verändern.\n\n"
-                    "ABSOLUTES VERBOT: Keine Rechtschreibkorrekturen. Keine Grammatikkorrekturen. "
+                    "ABSOLUTES VERBOT: Keine Rechtschreibkorrekturen. Keine Grammatikkorrekturen. Auch, wenn sätze oder Wörter unverständlich oder falsch geschrieben sind, müssen sie genau so bleiben. Wenn wörter oder Sätze mehrfach geschrieben oder unvollständig sind, müssen sie genauso bleiben."
                     "Keine stilistischen Änderungen. Keine inhaltlichen Änderungen. "
                     "Der Text muss Buchstabe für Buchstabe identisch bleiben.\n\n"
                     "FORMATIERUNGSREGELN:\n"
