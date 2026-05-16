@@ -163,7 +163,7 @@ def test_api_models_keep_prompt_emotion_rules():
         settings.groq_model = original_model
 
 
-def test_local_ollama_models_do_not_use_prompt_emotions_anymore():
+def test_local_ollama_models_use_prompt_emotions():
     original_provider = settings.llm_provider
     original_model = settings.ollama_model
     try:
@@ -172,7 +172,7 @@ def test_local_ollama_models_do_not_use_prompt_emotions_anymore():
         manager = SteeringManager()
 
         assert manager.should_force_local_emotion_steering() is False
-        assert manager.should_use_prompt_emotions() is False
+        assert manager.should_use_prompt_emotions() is True
     finally:
         settings.llm_provider = original_provider
         settings.ollama_model = original_model

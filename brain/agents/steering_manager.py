@@ -411,7 +411,9 @@ class SteeringManager:
 
     def should_use_prompt_emotions(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
         effective_provider = self._effective_provider(provider)
-        return effective_provider in (LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA)
+        # vLLM steuert Emotionen via VAD-Layer → keine Prompt-Emotionen
+        # Ollama und Cloud-APIs brauchen Emotionen im System-Prompt
+        return effective_provider in (LLMProvider.OLLAMA, LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA)
 
     def _get_vector_alpha_scale(self, emotion: str) -> float:
         sv = self.vectors.get(emotion)
