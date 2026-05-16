@@ -82,7 +82,17 @@ export function ChatPage() {
     if (loadedOnce) return;
     const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
     if (rawMessages.length === 0) return;
-    const cleanMessages = rawMessages.filter(msg => !isPending(msg) && !msg.content.startsWith("_CHAPPiE"));
+    const cleanMessages = rawMessages
+      .filter(msg => !isPending(msg) && !msg.content.startsWith("_CHAPPiE"))
+      .map(msg => {
+        if (msg.role === "assistant") {
+          const formatted = (msg.metadata as any)?.formatted_answer;
+          if (formatted) {
+            return { ...msg, content: formatted };
+          }
+        }
+        return msg;
+      });
     if (cleanMessages.length > 0) {
       setDisplayMessages(cleanMessages);
       setLoadedOnce(true);
