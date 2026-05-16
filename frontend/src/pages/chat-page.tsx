@@ -61,6 +61,7 @@ export function ChatPage() {
   const [reasoningContent, setReasoningContent] = useState("");
   const [loadedOnce, setLoadedOnce] = useState(false);
   const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
+  const [rawPopupMsg, setRawPopupMsg] = useState<ChatMessage | null>(null);
   const [genStartTime, setGenStartTime] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,7 +89,7 @@ export function ChatPage() {
         if (msg.role === "assistant") {
           const formatted = (msg.metadata as any)?.formatted_answer;
           if (formatted) {
-            return { ...msg, content: formatted };
+            return { ...msg, content: formatted, metadata: { ...msg.metadata, raw_response: msg.content } };
           }
         }
         return msg;
@@ -261,7 +262,7 @@ export function ChatPage() {
           const finalMeta = event.data?.assistant_message?.metadata || {};
           const displayContent = finalMeta.formatted_answer || finalContent;
           const newSessionId = event.data?.session_id || "";
-          const mergedMeta = { ...finalMeta, reasoning: finalReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined };
+          const mergedMeta = { ...finalMeta, reasoning: finalReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalContent || undefined };
           if (newSessionId && newSessionId !== currentSessionId) {
             setCurrentSessionId(newSessionId);
             setDisplayMessages(prev => {
@@ -460,7 +461,7 @@ export function ChatPage() {
                   } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
                 >
                   <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">
-                    {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") ? "CHAPPiEs Antwort" : entry.role}
+                    {entry.role === "assistant" ? (!["streaming", "thinking", "reasoning-live"].includes(entry.id || "") ? "CHAPPiEs Antwort" : "CHAPPiE") : entry.role}
                   </p>
                   {entry.role === "assistant" && (entry.metadata as any)?.formatting_failed && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
                     <p className="mb-1 text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen — Rohtext</p>
@@ -522,6 +523,16 @@ export function ChatPage() {
                       </div>
                     </div>
                   </div>
+                )}
+                {/* Raw Button */}
+                {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (entry.metadata as any)?.raw_response && (
+                  <button
+                    onClick={() => setRawPopupMsg(entry)}
+                    className="shrink-0 flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[8px] font-bold text-slate transition-all hover:bg-pine hover:text-white hover:border-pine/30"
+                    title="Raw Output anzeigen"
+                  >
+                    R
+                  </button>
                 )}
               </div>
             </div>
@@ -638,6 +649,40 @@ export function ChatPage() {
                       <div className="text-[10px] text-slate/50">Short-Term: <span className="text-slate/70">{meta.short_term_count ?? "?"}</span></div>
                       <div className="text-[10px] text-slate/50">Tool Calls: <span className="text-slate/70">{meta.tool_calls_executed ?? "0"}</span></div>
                     </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Raw Output Popup Modal */}
+      {rawPopupMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setRawPopupMsg(null)}>
+          <div className="max-h-[85vh] w-[640px] overflow-y-auto rounded-none border border-pine/20 bg-night p-6 shadow-glass" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-pine">Raw Output (Unformatted)</h2>
+              <button onClick={() => setRawPopupMsg(null)} className="text-slate hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            {(() => {
+              const meta = (rawPopupMsg.metadata || {}) as any;
+              const rawText = meta.raw_response || rawPopupMsg.content || "";
+              const fmtModel = meta.formatting_model || "llama-3.1-8b";
+              return (
+                <div className="space-y-4">
+                  <div className="rounded-none border border-pine/10 bg-pine/[0.04] p-4">
+                    <p className="text-[10px] leading-relaxed text-slate/70">
+                      Dies ist CHAPPiEs interne Antwort <strong className="text-pine">vor</strong> der Formatierung — unuebersichtlich, ohne Leerzeichen und mit allen Rohdaten.
+                      Das KI-Modell <strong className="text-pine">{fmtModel}</strong> wurde verwendet, um Chain-of-Thought und Antwort lesbar zu strukturieren.
+                      Dabei koennen kleine Details verloren gehen, Wiederholungen herausgeschnitten oder Rechtschreibfehler korrigiert werden.
+                      Hier siehst du den originalen Roh-Output.
+                    </p>
+                  </div>
+                  <div className="max-h-[55vh] overflow-y-auto rounded-none border border-white/5 bg-white/[0.02] p-4">
+                    <pre className="text-[10px] leading-relaxed text-slate/60 whitespace-pre-wrap break-words font-mono">{rawText}</pre>
                   </div>
                 </div>
               );

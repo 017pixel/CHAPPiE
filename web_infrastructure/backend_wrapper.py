@@ -204,6 +204,7 @@ def create_chappie_backend():
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
                 "formatting_failed": result.get("formatting_failed", False),
+                "formatting_model": self.CEREBRAS_FORMAT_MODEL,
             }
             assistant_msg = {
                 "role": "assistant",
