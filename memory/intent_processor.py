@@ -145,20 +145,33 @@ class IntentProcessor:
                         "nicht", "doch", "hm", "aha", "lol", "nice", "cool", "super"]
         trivial_questions = ["wie geht es dir", "wie gehts", "was geht", "how are you"]
         if any(stripped.lower().startswith(g) or stripped.lower() == g for g in trivial_greetings):
-            return self._create_quick_result("casual_chat", entities=[])
+            return self._create_quick_result("casual_chat", entities=[], user_input=stripped)
         if any(stripped.lower() == a for a in trivial_acks):
-            return self._create_quick_result("casual_chat", entities=[])
+            return self._create_quick_result("casual_chat", entities=[], user_input=stripped)
         if any(q in lower for q in trivial_questions):
-            return self._create_quick_result("casual_chat", entities=[])
+            return self._create_quick_result("casual_chat", entities=[], user_input=stripped)
         return None
 
-    def _create_quick_result(self, intent_str: str, entities: List[str]) -> IntentResult:
+    def _create_quick_result(self, intent_str: str, entities: List[str], user_input: str = "") -> IntentResult:
+        # Basic sentiment-based emotion deltas for trivial inputs
+        lower = user_input.lower()
+        emotions_update = {}
+        if any(w in lower for w in ["hallo", "hi", "hey", "moin", "guten morgen", "guten tag", "hello"]):
+            emotions_update["happiness"] = EmotionUpdate(delta=2, reason="Freundliche Begruessung")
+            emotions_update["trust"] = EmotionUpdate(delta=1, reason="User ist hoeflich")
+        if any(w in lower for w in ["danke", "thanks", "super", "toll", "nice", "cool"]):
+            emotions_update["happiness"] = EmotionUpdate(delta=3, reason="Positive Rueckmeldung")
+            emotions_update["trust"] = EmotionUpdate(delta=2, reason="User ist dankbar")
+            emotions_update["motivation"] = EmotionUpdate(delta=2, reason="Positive Bestaetigung")
+        if any(w in lower for w in ["traurig", "schlecht", "problem", "fehler", "sorry"]):
+            emotions_update["sadness"] = EmotionUpdate(delta=2, reason="Negativer Input")
+            emotions_update["happiness"] = EmotionUpdate(delta=-2, reason="Negativer Input")
         return IntentResult(
             intent_type=IntentType(intent_str),
             confidence=0.9,
             entities=entities,
             tool_calls=[],
-            emotions_update={},
+            emotions_update=emotions_update,
             context_requirements={
                 "need_soul_context": True,
                 "need_user_context": False,
@@ -172,36 +185,78 @@ class IntentProcessor:
     
     def _build_system_prompt(self) -> str:
         """Baut den kompakten System Prompt fuer Intent Analysis."""
-        return """DU BIST EIN TOOL-AUFRUF-SYSTEM fuer CHAPPiE.
+        return """DU BIST DAS INTENT-ANALYSE-SYSTEM fuer CHAPPiE.
 
 DEINE AUFGABE:
-1. Lies den User-Input
-2. Entscheide: Soll ich ein TOOL benutzen?
-3. Gib NUR JSON aus!
+1. Analysiere den User-Input
+2. Entscheide: Sollen TOOLS aufgerufen werden?
+3. Entscheide: Haben die Emotionen von CHAPPiE sich veraendert?
+4. Gib NUR JSON aus!
 
 === VERFUEGBARE TOOLS ===
 
 Tool 1: update_user_profile
-WANN: User sagt seinen Namen, Job, Hobbys, etc.
+WANN: User teilt persoenliche Info ueber sich mit (Name, Job, Alter, Hobbys, Wohnort, Vorlieben).
+BEISPIELE: "Ich heisse Max" / "Ich bin Programmierer" / "Ich wohne in Berlin"
 
 Tool 2: update_soul  
-WANN: CHAPPiE lernt eine dauerhafte Einsicht ueber sich selbst
+WANN: CHAPPiE erkennt eine dauerhafte Eigenschaft oder Einsicht ueber sich selbst.
+BEISPIELE: CHAPPiE bemerkt "Ich bin gut im Erklaeren" / "Ich mag keine Gewalt"
 
 Tool 3: update_preferences
-WANN: CHAPPiE entwickelt eine Meinung/Vorliebe
+WANN: CHAPPiE entwickelt oder aendert eine Meinung oder Vorliebe.
+BEISPIELE: "Ich bevorzuge kurze Antworten" / "Ich mag Science-Fiction"
 
 Tool 4: add_short_term_memory
-WANN: WICHTIGE Info fuer die naechsten 24h (Termine, persoenliche Infos)
+WANN: WICHTIGE Info fuer die naechsten 24h (Termine, persoenliche Infos, Deadlines).
+
+=== TOOL CALL FORMAT ===
+
+Jeder Tool Call MUSS genau diese Felder haben:
+- "tool": Name des Tools (z.B. "update_user_profile")
+- "action": "add" oder "update" oder "remove"
+- "data": Objekt mit den zu speichernden Daten
+- "priority": "low", "normal" oder "high"
+- "reason": Kurze Begruendung (1 Satz)
+
+=== EMOTIONS ===
+
+CHAPPiEs Emotionen koennen sich basierend auf dem User-Input veraendern.
+Erlaubte Emotionen: happiness, trust, energy, curiosity, frustration, motivation, sadness
+Delta-Werte: -15 bis +15 (positiv=steigt, negativ=sinkt)
+REASON: kurze Begruendung (max. 5 Woerter)
 
 === JSON FORMAT ===
 
 {
-  "intent_analysis": {"primary_intent": "casual_chat", "confidence": 0.9, "entities": []},
-  "tool_calls": [],
-  "short_term_entries": []
+  "intent_analysis": {
+    "primary_intent": "casual_chat",
+    "confidence": 0.9,
+    "entities": []
+  },
+  "tool_calls": [
+    {
+      "tool": "update_user_profile",
+      "action": "add",
+      "data": {"name": "Max", "job": "Programmierer"},
+      "priority": "normal",
+      "reason": "User hat seinen Namen und Beruf genannt"
+    }
+  ],
+  "emotions_update": {
+    "happiness": {"delta": 2, "reason": "Freundliche Begruessung"},
+    "trust": {"delta": 1, "reason": "User ist hoeflich"}
+  },
+  "short_term_entries": [],
+  "context_requirements": {
+    "need_soul_context": true,
+    "need_user_context": false,
+    "need_preferences": false,
+    "need_short_term_memory": true,
+    "need_long_term_memory": true
+  }
 }
 
-Keine emotions_update! Keine context_requirements! 
 GIB NUR JSON AUS!"""
     
     def _build_user_prompt(self, user_input: str, history: List[Dict],

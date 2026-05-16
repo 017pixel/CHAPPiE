@@ -1117,7 +1117,18 @@ def create_chappie_backend():
             for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
-            emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
+
+            # Fallback: wenn LLM+Homeostasis keine non-zero Deltas liefern → keyword-basierte Sentiment-Analyse
+            has_any_delta = any(
+                (getattr(u, "delta", u.get("delta", 0) if isinstance(u, dict) else 0) != 0)
+                for u in combined_updates.values()
+            )
+            if not has_any_delta:
+                self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
+                emotions_after = self._get_emotions_snapshot()
+                emotion_transitions = self._calculate_emotion_delta(emotions_before, emotions_after)
+            else:
+                emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
             
             # === AUSFUEHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
@@ -1969,7 +1980,18 @@ def create_chappie_backend():
             for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
-            emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
+
+            # Fallback: wenn LLM+Homeostasis keine non-zero Deltas liefern → keyword-basierte Sentiment-Analyse
+            has_any_delta = any(
+                (getattr(u, "delta", u.get("delta", 0) if isinstance(u, dict) else 0) != 0)
+                for u in combined_updates.values()
+            )
+            if not has_any_delta:
+                self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
+                emotions_after = self._get_emotions_snapshot()
+                emotion_transitions = self._calculate_emotion_delta(emotions_before, emotions_after)
+            else:
+                emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
 
             # === AUSFUEHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
