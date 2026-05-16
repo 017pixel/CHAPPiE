@@ -593,7 +593,7 @@ def create_chappie_backend():
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
-        CEREBRAS_FORMAT_MODEL = "llama-3.1-8b"
+        CEREBRAS_FORMAT_MODEL = "qwen-3-235b-a22b-instruct-2507"
 
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
