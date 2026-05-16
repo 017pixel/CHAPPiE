@@ -593,7 +593,7 @@ def create_chappie_backend():
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
-        CEREBRAS_FORMAT_MODEL = "gpt-oss-120b"
+        CEREBRAS_FORMAT_MODEL = "llama-3.1-8b"
 
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
