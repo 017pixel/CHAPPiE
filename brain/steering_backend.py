@@ -444,7 +444,10 @@ class LocalSteeringEngine:
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         model_config = AutoConfig.from_pretrained(model_name, **self._build_loader_kwargs())
-        model_config.max_position_embeddings = min(model_config.max_position_embeddings or 32768, context_length)
+        max_pos = getattr(model_config, "max_position_embeddings", None)
+        if max_pos is None:
+            max_pos = context_length
+        model_config.max_position_embeddings = min(max_pos, context_length)
         LOGGER.info("Steering-Modell %s: max_position_embeddings auf %d begrenzt (KV-Cache-Schutz).",
                      model_name, model_config.max_position_embeddings)
         try:
