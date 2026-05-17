@@ -52,11 +52,11 @@ Sollen die Python-Requirements aus requirements.txt installiert werden?
 Wenn `.service`-Dateien geändert wurden (z.B. `chappie-vllm.service`, `chappie-web.service`):
 ```bash
 # Geänderte Service-Dateien nach /etc/systemd/system/ kopieren
-sudo cp chappie-vllm.service /etc/systemd/system/
-sudo cp chappie-web.service /etc/systemd/system/
-sudo cp chappie-frontend.service /etc/systemd/system/
+sudo cp deploy/chappie-vllm.service /etc/systemd/system/
+sudo cp deploy/chappie-web.service /etc/systemd/system/
+sudo cp deploy/chappie-frontend.service /etc/systemd/system/
 # Training-Service NUR kopieren, NICHT aktivieren
-sudo cp chappie-training.service /etc/systemd/system/
+sudo cp deploy/chappie-training.service /etc/systemd/system/
 # Danach daemon-reload, damit systemd die Änderungen erkennt
 sudo systemctl daemon-reload
 ```

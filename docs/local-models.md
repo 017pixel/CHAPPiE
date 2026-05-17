@@ -84,7 +84,7 @@ Fuer den bevorzugten lokalen Pfad gilt:
 Wenn Provider-Prioritaet oder Modellpfade sich aendern, mindestens pruefen:
 
 - `README.md`
-- `agent.md`
+- `AGENTS.md`
 - `docs/local-models.md`
 - `docs/vLLM-Setup.md`
 - `config/secrets_example.py`

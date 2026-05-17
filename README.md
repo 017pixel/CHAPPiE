@@ -180,7 +180,7 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 
 ## Schnellnavigation
 
-- [Agent-Guide](agent.md)
+- [Agent-Guide](AGENTS.md)
 - [Dokumentationsindex](docs/README.md)
 - [Architektur & Gehirn-Metapher](docs/architecture.md)
 - [Workflows](docs/workflows.md)
@@ -228,4 +228,4 @@ Die Provider NVIDIA NIM und Groq wurden entfernt.
 
 ## Legacy-Hinweis
 
-[`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken. Die aktuelle Hauptdokumentation ist `README.md`, `agent.md` und `docs/`.
+[`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken. Die aktuelle Hauptdokumentation ist `README.md`, `AGENTS.md` und `docs/`.

@@ -5,7 +5,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 ## Schnellnavigation
 
 - [Projektüberblick](../README.md)
-- [Agent-Arbeitsanweisung](../agent.md)
+- [Agent-Arbeitsanweisung](../AGENTS.md)
 - [Architektur & Gehirn-Metapher](architecture.md)
 - [Workflows](workflows.md)
 - [Lokale Modelle & Fallbacks](local-models.md)
@@ -24,7 +24,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 5. [Testing](testing.md)
 
 ### Für KI-Agents
-1. [agent.md](../agent.md)
+1. [AGENTS.md](../AGENTS.md)
 2. [README.md](../README.md)
 3. [Projektkarte](project-map.md)
 4. [Architektur](architecture.md)
@@ -41,7 +41,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 | Datei | Zweck |
 |---|---|
 | `README.md` | Produkt- und Projektüberblick, Einstieg, Links |
-| `agent.md` | Arbeitsregeln für Agents vor Änderungen oder Pushes |
+| `AGENTS.md` | Arbeitsregeln für Agents vor Änderungen oder Pushes |
 | `docs/architecture.md` | Gehirn-Metapher, Systemschichten, Quellpfade |
 | `docs/workflows.md` | Ablauf einer Anfrage, Schlafphase, Training, UI-Flows |
 | `docs/local-models.md` | Qwen-3.5-Strategie, vLLM/Ollama/API-Rollen |
@@ -61,7 +61,7 @@ Diese Dokumentation ist der zentrale Einstieg für Menschen und KI-Agents, die d
 
 ## Legacy-Hinweis
 
-Einige ältere Dateien in `Info Dateien/` bleiben als kurze Brücken erhalten. Die inhaltliche Hauptquelle ist jetzt jedoch `docs/` plus `README.md` und `agent.md`.
+Einige ältere Dateien in `Info Dateien/` bleiben als kurze Brücken erhalten. Die inhaltliche Hauptquelle ist jetzt jedoch `docs/` plus `README.md` und `AGENTS.md`.
 ## Trace-Hinweis
 
 Die Debug-Doku soll die Ursache-Wirkung-Kette klar lesbar machen: Input, Memory, Emotion, Steering und Ton gehoeren gemeinsam beschrieben, nicht getrennt als Rohdatenliste.

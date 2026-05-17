@@ -1,9 +1,14 @@
 #!/bin/bash
 # CHAPPiE Training, API und Frontend Deployment Script
 
-SERVER_USER="bbecker"
-SERVER_HOST="100.105.94.71"
-PROJECT_PATH="/home/bbecker/CHAPPiE"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/server_config" ]; then
+    source "$SCRIPT_DIR/server_config"
+fi
+
+SERVER_USER="${SERVER_USER:-bbecker}"
+SERVER_HOST="${SERVER_HOST:-100.105.94.71}"
+PROJECT_PATH="${PROJECT_PATH:-/home/bbecker/CHAPPiE}"
 
 function colors() {
     GREEN='\033[0;32m'
