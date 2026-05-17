@@ -127,7 +127,7 @@ class ShortTermMemoryV2Tests(unittest.TestCase):
         self.assertEqual(len(active_ids), 2)
         self.assertTrue(any(entry_id.startswith("raw-") for entry_id in active_ids))
 
-    def test_only_summary_entries_migrate_to_ltm(self):
+    def test_expired_entries_migrate_to_ltm_by_category(self):
         class MemorySink:
             def __init__(self):
                 self.items = []
@@ -164,8 +164,8 @@ class ShortTermMemoryV2Tests(unittest.TestCase):
             finally:
                 stm_module.DATA_DIR = original_data_dir
 
-        self.assertEqual(migrated, 1)
-        self.assertEqual([item["content"] for item in sink.items], ["summary"])
+        self.assertEqual(migrated, 2)
+        self.assertEqual([item["content"] for item in sink.items], ["raw", "summary"])
 
 
 if __name__ == "__main__":
