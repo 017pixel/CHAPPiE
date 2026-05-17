@@ -133,6 +133,8 @@ class SettingsSnapshot(BaseModel):
     training_trainer_model: str
     memory_top_k: int
     memory_min_relevance: float
+    memory_consolidation_enabled: bool
+    memory_consolidation_max_tokens: int
     enable_steering: bool
     steering_provider: Optional[str]
     steering_model: str
@@ -141,6 +143,9 @@ class SettingsSnapshot(BaseModel):
     max_tokens: int
     chappie_thinking_token_limit: int
     chappie_answer_token_limit: int
+    history_max_messages: int
+    context_token_limit: int
+    context_token_warning_threshold: int
     chain_of_thought: bool
     enable_two_step_processing: bool
     stm_summary_threshold: int
@@ -181,6 +186,8 @@ class SettingsUpdate(BaseModel):
     training_trainer_model: Optional[str] = None
     memory_top_k: Optional[int] = None
     memory_min_relevance: Optional[float] = None
+    memory_consolidation_enabled: Optional[bool] = None
+    memory_consolidation_max_tokens: Optional[int] = None
     enable_steering: Optional[bool] = None
     steering_provider: Optional[str] = None
     steering_model: Optional[str] = None
@@ -189,6 +196,9 @@ class SettingsUpdate(BaseModel):
     max_tokens: Optional[int] = None
     chappie_thinking_token_limit: Optional[int] = None
     chappie_answer_token_limit: Optional[int] = None
+    history_max_messages: Optional[int] = None
+    context_token_limit: Optional[int] = None
+    context_token_warning_threshold: Optional[int] = None
     chain_of_thought: Optional[bool] = None
     enable_two_step_processing: Optional[bool] = None
     stm_summary_threshold: Optional[int] = None

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 
 
 LOGGER = logging.getLogger(__name__)
@@ -431,8 +431,9 @@ class ActivationVectorResolver:
 
 
 class LocalSteeringEngine:
-    def __init__(self, model_name: str, cache_dir: Optional[Path] = None):
+    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192):
         self.model_name = model_name
+        self.context_length = context_length
         self.device = self._select_device()
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
@@ -440,9 +441,14 @@ class LocalSteeringEngine:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, **self._build_loader_kwargs())
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        model_config = AutoConfig.from_pretrained(model_name, **self._build_loader_kwargs())
+        model_config.max_position_embeddings = min(model_config.max_position_embeddings or 32768, context_length)
+        LOGGER.info("Steering-Modell %s: max_position_embeddings auf %d begrenzt (KV-Cache-Schutz).",
+                     model_name, model_config.max_position_embeddings)
         try:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
+                config=model_config,
                 torch_dtype=self.dtype,
                 attn_implementation="sdpa",
                 **self._build_loader_kwargs(),
@@ -450,6 +456,7 @@ class LocalSteeringEngine:
         except TypeError:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
+                config=model_config,
                 torch_dtype=self.dtype,
                 **self._build_loader_kwargs(),
             )
@@ -487,7 +494,13 @@ class LocalSteeringEngine:
             billions = float(match.group(1))
         except ValueError:
             return 0.0
-        return billions * 2.2
+        weights_gib = billions * 2.2
+        kv_cache_gib = billions * 0.08 * (self.context_length / 1024)
+        overhead_gib = 1.5
+        total_gib = weights_gib + kv_cache_gib + overhead_gib
+        LOGGER.debug("GPU-Speicher-Schaetzung fuer %s (ctx %d): %.2f GiB (%.2f weights + %.2f KV-cache + %.2f overhead).",
+                      self.model_name, self.context_length, total_gib, weights_gib, kv_cache_gib, overhead_gib)
+        return total_gib
 
     @staticmethod
     def _cuda_total_gib() -> float:

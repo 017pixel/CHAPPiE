@@ -88,7 +88,7 @@ class BaseBrain(ABC):
         """
         pass
     
-    def build_prompt(self, system: str, memories: str, user_input: str, history: list[dict] = None) -> list[Message]:
+    def build_prompt(self, system: str, memories: str, user_input: str, history: list[dict] = None, max_history: int = 0) -> list[Message]:
         """
         Baut die Nachrichten-Liste fuer den Chat-Prompt.
         
@@ -97,6 +97,7 @@ class BaseBrain(ABC):
             memories: Formatierte Erinnerungen aus dem Memory
             user_input: Aktuelle User-Eingabe
             history: Chat-Verlauf (Liste von Dicts mit 'role' und 'content')
+            max_history: Maximale Anzahl History-Messages (0 = unbegrenzt)
         
         Returns:
             Liste von Message-Objekten
@@ -112,7 +113,8 @@ class BaseBrain(ABC):
         
         # Chat-Verlauf hinzufuegen (wenn vorhanden)
         if history:
-            for msg in history:
+            recent = history[-max_history:] if max_history > 0 and len(history) > max_history else history
+            for msg in recent:
                 messages.append(Message(role=msg["role"], content=msg["content"]))
         
         messages.append(Message(role="user", content=user_input))

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8K Context Optimierung — CHAPPiE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            night: '#0a0e14',
+            ink:   '#14191f',
+            ember: '#e05a2d',
+            pine:  '#3cb878',
+            mist:  '#b3b9c1',
+            ash:   '#2d333b',
+            coal:  '#1c2128',
+          },
+          fontFamily: {
+            mono: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', 'monospace'],
+            sans: ['"Public Sans"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap');
+    * { scroll-behavior: smooth; box-sizing: border-box; }
+    body { background: #0a0e14; color: #b3b9c1; font-family: 'Public Sans', system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0e14; }
+    ::-webkit-scrollbar-thumb { background: #2d333b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #e05a2d; }
+    .glow-ember { box-shadow: 0 0 20px rgba(224,90,45,0.15); }
+    .glow-pine  { box-shadow: 0 0 20px rgba(60,184,120,0.12); }
+    .border-ash { border-color: #2d333b; }
+    .token-bar { transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+    pre { font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.6; }
+    code { font-family: 'IBM Plex Mono', 'JetBrains Mono', monospace; }
+    .pipeline-arrow { color: #e05a2d; font-weight: 600; }
+    .pipeline-arrow-pine { color: #3cb878; font-weight: 600; }
+    details summary { cursor: pointer; list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary::before { content: '▸ '; color: #e05a2d; font-family: 'IBM Plex Mono', monospace; transition: transform 0.2s; display: inline-block; }
+    details[open] summary::before { content: '▾ '; color: #3cb878; }
+    .card-ash { background: #14191f; border: 1px solid #2d333b; }
+    .card-coal { background: #1c2128; border: 1px solid #2d333b; }
+    .badge-ember { background: rgba(224,90,45,0.15); color: #e05a2d; border: 1px solid rgba(224,90,45,0.3); }
+    .badge-pine  { background: rgba(60,184,120,0.12); color: #3cb878; border: 1px solid rgba(60,184,120,0.25); }
+    .badge-high  { background: rgba(224,90,45,0.18); color: #e05a2d; border: 1px solid rgba(224,90,45,0.35); }
+    .badge-mid   { background: rgba(245,186,35,0.15); color: #f5ba23; border: 1px solid rgba(245,186,35,0.3); }
+    .badge-low   { background: rgba(60,184,120,0.12); color: #3cb878; border: 1px solid rgba(60,184,120,0.25); }
+    .file-path { color: #3cb878; font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+    .line-ref { color: #e05a2d; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; }
+    .grid-line { background: repeating-linear-gradient(0deg, transparent, transparent 7px, rgba(45,51,59,0.4) 7px, rgba(45,51,59,0.4) 8px); }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<div class="max-w-6xl mx-auto px-6 py-10">
+
+  <!-- HEADER -->
+  <header class="mb-10">
+    <div class="flex items-center gap-4 flex-wrap">
+      <span class="text-[11px] uppercase tracking-[0.25em] text-mist/50 font-mono">Plan 02</span>
+      <span class="badge-ember px-3 py-0.5 rounded text-[10px] uppercase tracking-widest font-semibold">Optimierung</span>
+      <span class="badge-pine px-3 py-0.5 rounded text-[10px] uppercase tracking-widest font-semibold">Memory &amp; Context</span>
+      <span class="badge-high px-3 py-0.5 rounded text-[10px] uppercase tracking-widest font-semibold">Prio Hoch</span>
+    </div>
+    <h1 class="text-4xl font-bold text-white mt-3 tracking-tight">8K Context-Fenster Optimierung</h1>
+    <p class="text-mist mt-2 max-w-3xl text-base leading-relaxed">
+      CHAPPiEs Steering-Server (Qwen3.5-4B) wurde auf 8K <code class="text-ember">max_position_embeddings</code> begrenzt,
+      um CUDA-OOM auf der Tesla T4 zu verhindern. Dieser Plan optimiert die gesamte Prompt-Pipeline,
+      damit der Agent auch mit 10–15 Long-Term-Memories, Short-Term-Memory und langen Chat-Sessions
+      <span class="text-white font-medium">garantiert unter 8K Tokens</span> bleibt.
+    </p>
+  </header>
+
+  <!-- PROBLEM VISUALIZATION -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-ember inline-block"></span> Problem: Token-Verbrauch vor / nach Optimierung
+    </h2>
+    <div class="card-ash rounded p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- BEFORE -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs uppercase tracking-widest text-mist/60 font-mono">Vorher (20 Turns)</span>
+            <span class="badge-high px-2 py-0.5 rounded text-[10px] font-semibold">~8400 Tokens ❌</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">System-Prompt + Context Files + STM</span><span class="font-mono text-ember">~1185</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:14%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Action Response + Budget + RAG (12)</span><span class="font-mono text-ember">~920</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:11%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Chat-History (20 Turns = 40 Msg)</span><span class="font-mono text-ember">~5400</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:64%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Output Budget (max_tokens)</span><span class="font-mono text-ember">~900</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:11%"></div></div>
+            <div class="mt-3 pt-3 border-t border-ash flex justify-between text-sm font-semibold"><span class="text-white">Gesamt</span><span class="font-mono text-ember">~8405 Tokens</span></div>
+            <div class="w-full bg-coal rounded h-3"><div class="bg-ember h-3 rounded token-bar" style="width:100%"></div></div>
+            <div class="flex justify-between text-[10px] text-mist/50 mt-0.5"><span>0</span><span>8K Limit</span><span>10K+</span></div>
+          </div>
+        </div>
+        <!-- AFTER -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs uppercase tracking-widest text-mist/60 font-mono">Nachher (20 Turns)</span>
+            <span class="badge-pine px-2 py-0.5 rounded text-[10px] font-semibold">~5850 Tokens ✅</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">System-Prompt + Context Files + STM</span><span class="font-mono text-pine">~1185</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:20%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Action Response + Budget + RAG konsolidiert</span><span class="font-mono text-pine">~420</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:7%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Chat-History gecapped (20 Msg)</span><span class="font-mono text-pine">~2700</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:46%"></div></div>
+            <div class="flex items-center justify-between text-xs"><span class="text-mist">Output Budget</span><span class="font-mono text-pine">~900</span></div>
+            <div class="w-full bg-coal rounded h-2.5"><div class="bg-ash h-2.5 rounded token-bar" style="width:15%"></div></div>
+            <div class="mt-3 pt-3 border-t border-ash flex justify-between text-sm font-semibold"><span class="text-white">Gesamt</span><span class="font-mono text-pine">~5205 Tokens</span></div>
+            <div class="w-full bg-coal rounded h-3"><div class="bg-pine h-3 rounded token-bar" style="width:65%"></div></div>
+            <div class="flex justify-between text-[10px] text-mist/50 mt-0.5"><span>0</span><span>8K Limit</span><span>10K+</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-mist/50 mt-4 font-mono">* Schätzung: ~135 Tokens / Message-Paar, ~100 Tokens / RAG-Memory, Context-Files je ~350 Tokens, STM ~430 Tokens</p>
+    </div>
+  </section>
+
+  <!-- 3 OPTIMIZATION LAYERS -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-pine inline-block"></span> Drei Optimierungs-Schichten
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- LAYER 1 -->
+      <div class="card-ash rounded p-5 glow-ember">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-[10px] uppercase tracking-widest text-ember/70 font-mono">Schicht 1</span>
+          <span class="badge-high px-2 py-0.5 rounded text-[10px] font-semibold">SoFix</span>
+        </div>
+        <h3 class="text-base font-semibold text-white mb-1">Chat-History Capping</h3>
+        <p class="text-xs text-mist/80 leading-relaxed mb-3">Begrenzt die History auf die letzten <span class="text-white font-mono">N</span> Messages &mdash; verhindert unbegrenztes Wachstum.</p>
+        <div class="text-[11px] text-mist/60 space-y-1">
+          <div class="flex justify-between"><span>Standard</span><span class="font-mono text-mist">20 Messages</span></div>
+          <div class="flex justify-between"><span>bei 20 Turns</span><span class="font-mono text-pine">~−2700 Tokens</span></div>
+          <div class="flex justify-between"><span>bei 100 Turns</span><span class="font-mono text-pine">~−10800 Tokens</span></div>
+        </div>
+        <div class="mt-3 pt-3 border-t border-ash">
+          <div class="file-path">backend_wrapper.py</div>
+          <div class="line-ref">→ build_prompt() nur letzte N</div>
+        </div>
+      </div>
+
+      <!-- LAYER 2 -->
+      <div class="card-ash rounded p-5 glow-pine">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-[10px] uppercase tracking-widest text-pine/70 font-mono">Schicht 2</span>
+          <span class="badge-mid px-2 py-0.5 rounded text-[10px] font-semibold">Konditional</span>
+        </div>
+        <h3 class="text-base font-semibold text-white mb-1">LTM-RAG Konsolidierung</h3>
+        <p class="text-xs text-mist/80 leading-relaxed mb-3">Wenn &gt;5 RAG-Memories gefunden: Cerebras fasst alle zu <span class="text-white font-mono">EINEM</span> kompakten Paragrafen zusammen.</p>
+        <div class="text-[11px] text-mist/60 space-y-1">
+          <div class="flex justify-between"><span>Schwelle</span><span class="font-mono text-mist">>5 Memories</span></div>
+          <div class="flex justify-between"><span>API-Call</span><span class="font-mono text-mist">1x llama-3.1-8b</span></div>
+          <div class="flex justify-between"><span>Einsparung</span><span class="font-mono text-pine">~−500 Tokens</span></div>
+        </div>
+        <div class="mt-3 pt-3 border-t border-ash">
+          <div class="file-path">backend_wrapper.py</div>
+          <div class="line-ref">→ _consolidate_ltm_for_prompt()</div>
+        </div>
+      </div>
+
+      <!-- LAYER 3 -->
+      <div class="card-ash rounded p-5">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-[10px] uppercase tracking-widest text-mist/50 font-mono">Schicht 3</span>
+          <span class="badge-low px-2 py-0.5 rounded text-[10px] font-semibold">Safety Net</span>
+        </div>
+        <h3 class="text-base font-semibold text-white mb-1">Token-Budget Monitor</h3>
+        <p class="text-xs text-mist/80 leading-relaxed mb-3">Prüft vor jedem Generation-Call die geschätzte Token-Zahl. Triggert Trimming + <span class="text-white font-mono">UI-Warnung</span> bei Überschreitung.</p>
+        <div class="text-[11px] text-mist/60 space-y-1">
+          <div class="flex justify-between"><span>Warn-Schwelle</span><span class="font-mono text-mist">6500 Tokens</span></div>
+          <div class="flex justify-between"><span>Trim-Schwelle</span><span class="font-mono text-ember">7000 Tokens</span></div>
+          <div class="flex justify-between"><span>UI-Feedback</span><span class="font-mono text-pine">Toast + Badge</span></div>
+        </div>
+        <div class="mt-3 pt-3 border-t border-ash">
+          <div class="file-path">backend_wrapper.py</div>
+          <div class="line-ref">→ _enforce_context_budget()</div>
+          <div class="file-path mt-1">chat-page.tsx</div>
+          <div class="line-ref">→ ContextLimitWarning</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- PIPELINE FLOW -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-ember inline-block"></span> Neue Pipeline (mit allen Optimierungen)
+    </h2>
+    <div class="card-ash rounded p-6 overflow-x-auto">
+      <div class="flex items-center gap-1 text-xs flex-nowrap min-w-max">
+        <div class="card-coal rounded p-3 text-center min-w-[100px]">
+          <div class="text-mist/50 text-[10px] uppercase tracking-widest mb-1">Input</div>
+          <div class="text-white font-semibold text-sm">User Message</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[110px]">
+          <div class="text-mist/50 text-[10px] uppercase tracking-widest mb-1">Step 1</div>
+          <div class="text-white font-semibold text-sm">Cerebras<br>Intent</div>
+          <div class="text-[10px] text-pine mt-1">llama-3.1-8b</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[110px]">
+          <div class="text-mist/50 text-[10px] uppercase tracking-widest mb-1">Context</div>
+          <div class="text-white font-semibold text-sm">Build<br>Context</div>
+          <div class="text-[10px] text-mist/60 mt-1">soul + user + STM</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[120px] border border-ember/30">
+          <div class="text-ember/70 text-[10px] uppercase tracking-widest mb-1">NEU: Schicht 2</div>
+          <div class="text-white font-semibold text-sm">RAG 🠖 Cerebras<br>Consolidate</div>
+          <div class="text-[10px] text-ember mt-1">wenn >5 Memories</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[110px]">
+          <div class="text-mist/50 text-[10px] uppercase tracking-widest mb-1">System Prompt</div>
+          <div class="text-white font-semibold text-sm">Assemble<br>All Layers</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[120px] border border-ember/30">
+          <div class="text-ember/70 text-[10px] uppercase tracking-widest mb-1">NEU: Schicht 1</div>
+          <div class="text-white font-semibold text-sm">History<br>Cap → N Msg</div>
+          <div class="text-[10px] text-ember mt-1">default: 20</div>
+        </div>
+        <span class="pipeline-arrow text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[120px] border border-pine/30">
+          <div class="text-pine/70 text-[10px] uppercase tracking-widest mb-1">NEU: Schicht 3</div>
+          <div class="text-white font-semibold text-sm">Budget<br>Check</div>
+          <div class="text-[10px] text-pine mt-1">trim >7K Tokens</div>
+        </div>
+        <span class="pipeline-arrow-pine text-lg px-1">→</span>
+        <div class="card-coal rounded p-3 text-center min-w-[100px]">
+          <div class="text-mist/50 text-[10px] uppercase tracking-widest mb-1">Generate</div>
+          <div class="text-white font-semibold text-sm">Steering<br>Server</div>
+          <div class="text-[10px] text-pine mt-1">≤8K ✅</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPLEMENTATION DETAILS -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-pine inline-block"></span> Implementierung — Details pro Datei
+    </h2>
+
+    <!-- DETAIL 1: History Capping -->
+    <details class="card-ash rounded p-5 mb-3">
+      <summary class="font-semibold text-white text-sm">
+        Schicht 1 — Chat-History Capping
+        <span class="badge-high ml-3 px-2 py-0.5 rounded text-[10px]">backend_wrapper.py + base_brain.py</span>
+      </summary>
+      <div class="mt-4 space-y-4 text-sm">
+        <div>
+          <p class="text-mist/70 mb-2">Neues Setting in <span class="file-path">root_config.py</span>:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">"generation": {
+    "history_max_messages": 20,  // NEU: maximale Chat-History-Messages im Prompt
+    ...
+}</pre>
+        </div>
+        <div>
+          <p class="text-mist/70 mb-2">In <span class="file-path">brain/base_brain.py</span> — <code>build_prompt()</code> cappt History:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">def build_prompt(self, system, memories, user_input, history=None, max_history=20):
+    messages = [Message(role="system", content=full_system)]
+    if history:
+        # NUR die letzten max_history Messages
+        recent = history[-max_history:] if len(history) > max_history else history
+        for msg in recent:
+            messages.append(Message(role=msg["role"], content=msg["content"]))
+    messages.append(Message(role="user", content=user_input))
+    return messages</pre>
+        </div>
+        <div class="text-xs text-pine font-mono">Kein Datenverlust — alle Messages bleiben in Session gespeichert. Nur der Prompt wird getrimmt.</div>
+      </div>
+    </details>
+
+    <!-- DETAIL 2: RAG Consolidation -->
+    <details class="card-ash rounded p-5 mb-3">
+      <summary class="font-semibold text-white text-sm">
+        Schicht 2 — LTM-RAG Konsolidierung via Cerebras
+        <span class="badge-mid ml-3 px-2 py-0.5 rounded text-[10px]">backend_wrapper.py</span>
+      </summary>
+      <div class="mt-4 space-y-4 text-sm">
+        <div>
+          <p class="text-mist/70 mb-2">Neue Settings in <span class="file-path">root_config.py</span>:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">"memory": {
+    "ltm_consolidation_threshold": 5,      // NEU: ab wievielen Memories konsolidieren
+    "ltm_consolidation_model": "cerebras", // NEU: Provider (cerebras, vllm)
+    ...
+}</pre>
+        </div>
+        <div>
+          <p class="text-mist/70 mb-2">Neue Methode in <span class="file-path">backend_wrapper.py</span>:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">def _consolidate_ltm_for_prompt(self, memories: list, user_input: str) -> str:
+    """Konsolidiert 6+ RAG-Memories via Cerebras zu einem kompakten Paragrafen."""
+    if len(memories) <= settings.ltm_consolidation_threshold:
+        return self.memory_engine.format_memories_for_prompt(memories)  # original
+
+    # Baue Prompt mit allen Memory-Inhalten
+    entries = "\n---\n".join(f"[{m.role}] {m.content}" for m in memories)
+    prompt = (
+        "Fasse diese Erinnerungen fuer CHAPPiE zu EINEM kompakten Paragrafen zusammen.\n"
+        "Extrahiere: Fakten ueber den Nutzer, wichtige Entscheidungen, emotionale Muster,\n"
+        "aktuelle Kontexte. Keine Aufzaehlung – ein fliessender Text, max 600 Zeichen.\n\n"
+        f"{entries}"
+    )
+    brain = CerebrasBrain(model=settings.cerebras_model)  # llama-3.1-8b
+    config = GenerationConfig(max_tokens=300, temperature=0.1, stream=False)
+    result = brain.generate([Message(role="user", content=prompt)], config=config)
+    return "=== KONSOLIDIERTE ERINNERUNGEN ===\n\n" + result.strip()</pre>
+        </div>
+        <div class="text-xs text-pine font-mono">API-Call nur wenn >5 Memories. ~$0.0002 pro Call. Reduziert ~1250 Tokens auf ~250.</div>
+      </div>
+    </details>
+
+    <!-- DETAIL 3: Token Budget Monitor -->
+    <details class="card-ash rounded p-5 mb-3">
+      <summary class="font-semibold text-white text-sm">
+        Schicht 3 — Token-Budget Monitor mit UI-Feedback
+        <span class="badge-low ml-3 px-2 py-0.5 rounded text-[10px]">backend_wrapper.py + chat-page.tsx</span>
+      </summary>
+      <div class="mt-4 space-y-4 text-sm">
+        <div>
+          <p class="text-mist/70 mb-2">Neue Settings:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">"generation": {
+    "context_token_limit": 7000,          // NEU: Hard-Limit vor Trim
+    "context_token_warning_threshold": 6500, // NEU: UI-Warnung ab hier
+    ...
+}</pre>
+        </div>
+        <div>
+          <p class="text-mist/70 mb-2">Methode in <span class="file-path">backend_wrapper.py</span> (vor brain.generate() aufrufen):</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">def _enforce_context_budget(self, messages: list, system_prompt: str) -> tuple[list, dict]:
+    """Prueft Token-Budget und trimmt bei Ueberschreitung. Return (messages, budget_info)."""
+    estimated = self._estimate_total_tokens(messages)
+    budget_info = {"estimated_tokens": estimated, "was_trimmed": False, "trim_details": []}
+
+    if estimated <= settings.context_token_warning_threshold:
+        return messages, budget_info
+
+    if estimated > settings.context_token_limit:
+        # Trim-Prioritaet: Context-Files > STM > Alte History-Messages
+        trimmed, details = self._trim_messages_by_priority(messages, settings.context_token_limit)
+        budget_info["was_trimmed"] = True
+        budget_info["trim_details"] = details
+        return trimmed, budget_info
+
+    budget_info["near_limit"] = True
+    return messages, budget_info
+
+def _estimate_total_tokens(self, messages: list) -> int:
+    # Grobe Schaetzung: 1 Token ~ 4 chars (wie CerebrasRateLimiter)
+    total_chars = sum(len(str(m.get("content", ""))) for m in messages)
+    return total_chars // 4</pre>
+        </div>
+        <div>
+          <p class="text-mist/70 mb-2">Trimming-Priorität (niedrigste zuerst kürzen):</p>
+          <div class="card-coal rounded p-3 text-xs font-mono space-y-1">
+            <div class="flex justify-between text-mist/60"><span>6. Context-Files (soul/user/prefs)</span><span>→ kürzen auf 500 Zeichen je</span></div>
+            <div class="flex justify-between text-mist/60"><span>5. STM-Einträge</span><span>→ auf 10 Einträge reduzieren</span></div>
+            <div class="flex justify-between text-mist/60"><span>4. Ältere History-Messages</span><span>→ älteste zuerst entfernen</span></div>
+            <div class="flex justify-between text-white/40"><span>3. RAG-Memories (konsolidiert)</span><span>→ behalten</span></div>
+            <div class="flex justify-between text-white/40"><span>2. Aktuelle User-Input</span><span>→ immer behalten</span></div>
+            <div class="flex justify-between text-white/40"><span>1. System-Prompt (Core)</span><span>→ immer behalten</span></div>
+          </div>
+        </div>
+        <div>
+          <p class="text-mist/70 mb-2">UI-Feedback in <span class="file-path">frontend/src/pages/chat-page.tsx</span>:</p>
+          <pre class="bg-coal rounded p-3 text-mist text-xs overflow-x-auto">// Im turn_finished-Event / Metadata:
+if (metadata.context_was_trimmed) {
+  showToast({
+    type: "warning",
+    title: "Kontext-Fenster erreicht",
+    message: `Der Prompt wurde von ${metadata.original_tokens} auf
+              ${metadata.trimmed_tokens} Tokens gekuerzt.`
+  });
+}
+// Persistente Badge im Chat-Header:
+{contextNearLimit && <span class="context-warning-badge">
+  Kontext: {estimatedTokens}/7000 Tokens
+</span>}</pre>
+        </div>
+      </div>
+    </details>
+
+    <!-- DETAIL 4: Frontend Changes -->
+    <details class="card-ash rounded p-5 mb-3">
+      <summary class="font-semibold text-white text-sm">
+        Frontend — Context Limit UI-Komponente
+        <span class="badge-low ml-3 px-2 py-0.5 rounded text-[10px]">chat-page.tsx</span>
+      </summary>
+      <div class="mt-4 space-y-4 text-sm">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card-coal rounded p-4">
+            <p class="text-[10px] uppercase tracking-widest text-mist/50 mb-2">Toast-Warnung (wenn getrimmt)</p>
+            <div class="bg-night border border-ember/40 rounded p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-ember text-lg">⚠</span>
+                <div>
+                  <div class="text-xs font-semibold text-ember">Kontext-Fenster erreicht</div>
+                  <div class="text-[10px] text-mist/70">Prompt von 8200 auf 6800 Tokens gekürzt (älteste Messages entfernt).</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card-coal rounded p-4">
+            <p class="text-[10px] uppercase tracking-widest text-mist/50 mb-2">Header-Badge (bei >6500 Tokens)</p>
+            <div class="bg-night border border-ash rounded p-3 flex items-center justify-between">
+              <span class="text-[11px] text-mist">💬 Chat mit CHAPPiE</span>
+              <span class="badge-ember px-2 py-0.5 rounded text-[10px] font-mono">Kontext: 6800/7000</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- FILE CHANGES SUMMARY -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-ember inline-block"></span> Betroffene Dateien
+    </h2>
+    <div class="card-ash rounded overflow-hidden">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="border-b border-ash text-mist/50 uppercase tracking-widest text-[10px]">
+            <th class="text-left px-4 py-3 font-semibold">Datei</th>
+            <th class="text-left px-4 py-3 font-semibold">Änderung</th>
+            <th class="text-center px-4 py-3 font-semibold">Schicht</th>
+          </tr>
+        </thead>
+        <tbody class="text-mist">
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">config/root_config.py</span></td>
+            <td class="px-4 py-3">+4 neue Settings (history_max_messages, ltm_consolidation_threshold, context_token_limit, context_token_warning_threshold)</td>
+            <td class="px-4 py-3 text-center"><span class="badge-emerald px-2 py-0.5 rounded text-[10px]">1+2+3</span></td>
+          </tr>
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">config/config.py</span></td>
+            <td class="px-4 py-3">+4 Fallback-Werte + Property-Zugriffe für neue Settings</td>
+            <td class="px-4 py-3 text-center"><span class="badge-emerald px-2 py-0.5 rounded text-[10px]">1+2+3</span></td>
+          </tr>
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">brain/base_brain.py</span></td>
+            <td class="px-4 py-3">build_prompt() erhält max_history-Parameter, cappt History-Liste</td>
+            <td class="px-4 py-3 text-center"><span class="badge-high px-2 py-0.5 rounded text-[10px]">1</span></td>
+          </tr>
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">web_infrastructure/backend_wrapper.py</span></td>
+            <td class="px-4 py-3">+_consolidate_ltm_for_prompt(), +_enforce_context_budget(), +_estimate_total_tokens(), +_trim_messages_by_priority(); übergibt max_history an build_prompt(); budget_info in turn_finished-Metadaten</td>
+            <td class="px-4 py-3 text-center"><span class="badge-emerald px-2 py-0.5 rounded text-[10px]">1+2+3</span></td>
+          </tr>
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">frontend/src/pages/chat-page.tsx</span></td>
+            <td class="px-4 py-3">Toast-Warnung bei context_was_trimmed; Context-Badge im Header bei near_limit</td>
+            <td class="px-4 py-3 text-center"><span class="badge-low px-2 py-0.5 rounded text-[10px]">3</span></td>
+          </tr>
+          <tr class="border-b border-ash/50">
+            <td class="px-4 py-3"><span class="file-path">frontend/src/lib/types.ts</span></td>
+            <td class="px-4 py-3">+context_budget_info in TurnFinishedMetadata</td>
+            <td class="px-4 py-3 text-center"><span class="badge-low px-2 py-0.5 rounded text-[10px]">3</span></td>
+          </tr>
+          <tr>
+            <td class="px-4 py-3"><span class="file-path">api/schemas.py</span></td>
+            <td class="px-4 py-3">+context_budget Felder in ChatResponse</td>
+            <td class="px-4 py-3 text-center"><span class="badge-low px-2 py-0.5 rounded text-[10px]">3</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- WAS NICHT GEÄNDERT WIRD -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-ash inline-block"></span> Unangetastet (bewusste Entscheidung)
+    </h2>
+    <div class="card-ash rounded p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <div class="card-coal rounded p-3 flex items-start gap-3">
+          <span class="text-mist/30 text-lg mt-0.5">—</span>
+          <div>
+            <span class="text-white font-medium">Cerebras Formatting-Call</span>
+            <p class="text-xs text-mist/60 mt-0.5">qwen-3-235b post-processing bleibt unverändert. Ist orthogonal zum Context-Problem.</p>
+          </div>
+        </div>
+        <div class="card-coal rounded p-3 flex items-start gap-3">
+          <span class="text-mist/30 text-lg mt-0.5">—</span>
+          <div>
+            <span class="text-white font-medium">Periodische Chat-Konsolidierung</span>
+            <p class="text-xs text-mist/60 mt-0.5">Nicht nötig — History-Capping löst das Problem ohne Extra-API-Calls.</p>
+          </div>
+        </div>
+        <div class="card-coal rounded p-3 flex items-start gap-3">
+          <span class="text-mist/30 text-lg mt-0.5">—</span>
+          <div>
+            <span class="text-white font-medium">Short-Term Memory (STM v2)</span>
+            <p class="text-xs text-mist/60 mt-0.5">Bleibt im JSON-Format, unverändert. Hat bereits 20er-Cap + Overflow-Summarization.</p>
+          </div>
+        </div>
+        <div class="card-coal rounded p-3 flex items-start gap-3">
+          <span class="text-mist/30 text-lg mt-0.5">—</span>
+          <div>
+            <span class="text-white font-medium">Sleep Phase / Neocortex</span>
+            <p class="text-xs text-mist/60 mt-0.5">Langfristige Konsolidierung unverändert. Dieser Plan ist für die Per-Turn-Pipeline.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHECKLISTE -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <span class="w-1.5 h-5 bg-pine inline-block"></span> Checkliste — Umsetzung
+    </h2>
+    <div class="card-ash rounded p-5 space-y-2">
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">root_config.py</span> + <span class="file-path">config.py</span>: 4 neue Settings anlegen mit Defaults</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">base_brain.py</span>: <code>build_prompt()</code> um max_history-Parameter erweitern</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">backend_wrapper.py</span>: <code>_consolidate_ltm_for_prompt()</code> implementieren</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">backend_wrapper.py</span>: <code>_enforce_context_budget()</code> implementieren</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">backend_wrapper.py</span>: Budget-Info in turn_finished-Metadaten einweben</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">api/schemas.py</span>: context_budget Felder in Response-Schema</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span><span class="file-path">chat-page.tsx</span>: Toast + Context-Badge Komponente</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span>Tests: Token-Schätzung, History-Cap, Budget-Trimming, LTM-Konsolidierung</span>
+      </label>
+      <label class="flex items-center gap-3 text-sm text-mist cursor-pointer">
+        <input type="checkbox" class="accent-ember w-4 h-4 rounded">
+        <span>Steering-Server neustarten und Health-Check mit langer Session testen</span>
+      </label>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-ash pt-6 flex justify-between items-center text-xs text-mist/40">
+    <span>Plan erstellt am 17.05.2026 · Datei: <span class="font-mono">02_8K-Context-Optimierung.html</span></span>
+    <span class="font-mono">CHAPPiE v1.x → Steering-Server Qwen3.5-4B @ 8K</span>
+  </footer>
+
+</div>
+
+<!-- Copy-as-Prompt Button -->
+<div class="fixed bottom-6 right-6">
+  <button onclick="copyPrompt()"
+          class="bg-ember text-white px-4 py-2.5 shadow-lg hover:bg-ember/90 text-xs font-semibold tracking-wider
+                 uppercase transition-colors flex items-center gap-2">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+    Copy as Prompt
+  </button>
+</div>
+
+<script>
+function copyPrompt() {
+  const decision = `CHAPPiE 8K Context Optimization — Umsetzung:
+
+1. Chat-History Capping (Schicht 1)
+   - config/root_config.py: "history_max_messages": 20
+   - brain/base_brain.py: build_prompt() nur letzte N Messages
+   - web_infrastructure/backend_wrapper.py: max_history an build_prompt() uebergeben
+
+2. LTM-RAG Konsolidierung via Cerebras (Schicht 2)
+   - config/root_config.py: "ltm_consolidation_threshold": 5
+   - backend_wrapper.py: _consolidate_ltm_for_prompt() — wenn >5 Memories,
+     Cerebras llama-3.1-8b fasst zu EINEM Paragrafen zusammen
+
+3. Token-Budget Monitor + UI (Schicht 3)
+   - Neue Settings: context_token_limit: 7000, context_token_warning_threshold: 6500
+   - backend_wrapper.py: _enforce_context_budget() vor jedem brain.generate()
+   - Trim-Prioritaet: Context-Files > STM > alte History
+   - api/schemas.py: context_budget Felder in Response
+   - chat-page.tsx: Toast bei Trim, Badge bei >6500 Tokens
+
+Unangetastet: Formatting-Call, STM v2, Sleep Phase`;
+  navigator.clipboard.writeText(decision);
+  const btn = event.target.closest('button');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '✓ Kopiert';
+  btn.classList.add('bg-pine');
+  setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('bg-pine'); }, 2000);
+}
+</script>
+
+</body>
+</html>

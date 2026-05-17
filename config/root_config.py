@@ -51,9 +51,12 @@ DEFAULT_ROOT_CONFIG: Dict[str, Dict[str, Any]] = {
         "temperature": 0.7,
         "stream": True,
         "chain_of_thought": True,
+        "history_max_messages": 20,
+        "context_token_limit": 7000,
+        "context_token_warning_threshold": 6500,
     },
     "memory": {
-        "memory_top_k": 12,
+        "memory_top_k": 40,
         "memory_min_relevance": 0.2,
         "chroma_collection": "chapie_memory",
         "embedding_model": "all-MiniLM-L6-v2",
@@ -61,6 +64,9 @@ DEFAULT_ROOT_CONFIG: Dict[str, Dict[str, Any]] = {
         "stm_summary_threshold": 5,
         "stm_summary_batch_size": 5,
         "auto_consolidate": True,
+        "memory_consolidation_enabled": True,
+        "memory_consolidation_cerebras_model": "qwen-3-235b-a22b-instruct-2507",
+        "memory_consolidation_max_tokens": 1500,
     },
     "cerebras_limits": {
         "requests_per_minute": 5,

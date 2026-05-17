@@ -104,6 +104,9 @@ class Settings:
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 12))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
+        self.memory_consolidation_enabled = self._get_val("MEMORY_CONSOLIDATION_ENABLED", True)
+        self.memory_consolidation_cerebras_model = self._get_val("MEMORY_CONSOLIDATION_CEREBRAS_MODEL", "qwen-3-235b-a22b-instruct-2507")
+        self.memory_consolidation_max_tokens = int(self._get_val("MEMORY_CONSOLIDATION_MAX_TOKENS", 1500))
 
         self.daily_info_path = self._get_val("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
         self.personality_path = self._get_val("PERSONALITY_PATH", str(DATA_DIR / "personality.md"))
@@ -133,6 +136,9 @@ class Settings:
         self.stream = bool(self._get_val("STREAM", True))
         self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", False))
         self.debug = bool(self._get_val("DEBUG", True))
+        self.history_max_messages = int(self._get_val("HISTORY_MAX_MESSAGES", 20))
+        self.context_token_limit = int(self._get_val("CONTEXT_TOKEN_LIMIT", 7000))
+        self.context_token_warning_threshold = int(self._get_val("CONTEXT_TOKEN_WARNING_THRESHOLD", 6500))
 
         self.cerebras_requests_per_minute = int(self._get_val("CEREBRAS_REQUESTS_PER_MINUTE", 5))
         self.cerebras_requests_per_hour = int(self._get_val("CEREBRAS_REQUESTS_PER_HOUR", 150))
@@ -185,7 +191,8 @@ class Settings:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
 
-        for key in ["cerebras_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host"]:
+        for key in ["cerebras_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host",
+                     "memory_consolidation_cerebras_model"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
         if "vllm_force_single_model" in kwargs:
@@ -243,7 +250,9 @@ class Settings:
         for key in [
             "temperature", "repetition_penalty", "max_tokens", "chain_of_thought",
             "memory_top_k", "memory_min_relevance",
+            "memory_consolidation_enabled", "memory_consolidation_max_tokens",
             "chappie_thinking_token_limit", "chappie_answer_token_limit",
+            "history_max_messages", "context_token_limit", "context_token_warning_threshold",
             "stm_summary_threshold", "stm_summary_batch_size",
             "cerebras_requests_per_minute", "cerebras_requests_per_hour",
             "cerebras_requests_per_day", "cerebras_tokens_per_minute",
@@ -284,6 +293,9 @@ class Settings:
             "MEMORY_TOP_K": self.memory_top_k,
             "MEMORY_MIN_RELEVANCE": self.memory_min_relevance,
             "CHROMA_COLLECTION": self.chroma_collection_name,
+            "MEMORY_CONSOLIDATION_ENABLED": self.memory_consolidation_enabled,
+            "MEMORY_CONSOLIDATION_CEREBRAS_MODEL": self.memory_consolidation_cerebras_model,
+            "MEMORY_CONSOLIDATION_MAX_TOKENS": self.memory_consolidation_max_tokens,
             "SHORT_TERM_TTL_HOURS": self.short_term_ttl_hours,
             "STM_SUMMARY_THRESHOLD": self.stm_summary_threshold,
             "STM_SUMMARY_BATCH_SIZE": self.stm_summary_batch_size,
@@ -310,6 +322,9 @@ class Settings:
             "TRAINING_TRAINER_MODEL": self.training_trainer_model,
             "DEBUG": self.debug,
             "ENABLE_FUNCTIONS": self.enable_functions,
+            "HISTORY_MAX_MESSAGES": self.history_max_messages,
+            "CONTEXT_TOKEN_LIMIT": self.context_token_limit,
+            "CONTEXT_TOKEN_WARNING_THRESHOLD": self.context_token_warning_threshold,
             "CEREBRAS_REQUESTS_PER_MINUTE": self.cerebras_requests_per_minute,
             "CEREBRAS_REQUESTS_PER_HOUR": self.cerebras_requests_per_hour,
             "CEREBRAS_REQUESTS_PER_DAY": self.cerebras_requests_per_day,

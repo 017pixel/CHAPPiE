@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 import threading
 from datetime import datetime, timezone
 
@@ -8,7 +9,7 @@ from typing import Dict, Any, List, Callable, Optional, Generator
 
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
-from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction
+from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
 from memory.chat_manager import ChatManager
@@ -1276,6 +1277,8 @@ def create_chappie_backend():
                 "model": get_active_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
+                "memory_consolidation": response_data.get("memory_consolidation", {}),
+                "context_budget": response_data.get("context_budget", {}),
             }
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
@@ -1419,6 +1422,109 @@ def create_chappie_backend():
                         f"Fehler beim Hinzufuegen: {str(e)}"
                     )
 
+        def _consolidate_memories_for_prompt(
+            self, ltm_memories: list, stm_entries: list
+        ) -> tuple[str, dict]:
+            """Konsolidiert LTM + STM via Cerebras qwen-3-235b zu strukturiertem JSON.
+            Returns (formatted_prompt_str, consolidation_meta)."""
+            if not ltm_memories and not stm_entries:
+                return "", {"ltm_loaded": 0, "stm_loaded": 0}
+
+            ltm_raw = []
+            for m in ltm_memories:
+                ltm_raw.append({
+                    "id": str(getattr(m, "id", "")),
+                    "date": str(getattr(m, "created_at", "") or getattr(m, "timestamp", "")),
+                    "role": str(getattr(m, "role", "unknown")),
+                    "relevance": float(getattr(m, "relevance_score", 0.0) or 0.0),
+                    "content": str(getattr(m, "content", "")),
+                })
+            stm_raw = []
+            for e in stm_entries:
+                stm_raw.append({
+                    "id": f"stm_{getattr(e, 'id', '')}",
+                    "date": str(getattr(e, "created_at", "")),
+                    "category": str(getattr(e, "category", "general")),
+                    "importance": str(getattr(e, "importance", "medium")),
+                    "content": str(getattr(e, "content", "")),
+                })
+
+            prompt = (
+                "Konsolidiere folgende Erinnerungen gemaess System-Prompt in ein JSON-Array.\n\n"
+                + json.dumps({"ltm": ltm_raw, "stm": stm_raw}, ensure_ascii=False, indent=2)
+            )
+            messages = [{"role": "user", "content": prompt}]
+
+            try:
+                import openai
+                client = openai.OpenAI(
+                    base_url="https://api.cerebras.ai/v1",
+                    api_key=settings.cerebras_api_key,
+                    timeout=20.0,
+                )
+                response = client.chat.completions.create(
+                    model=settings.memory_consolidation_cerebras_model,
+                    messages=messages,
+                    max_tokens=settings.memory_consolidation_max_tokens,
+                    temperature=0.1,
+                    stream=False,
+                )
+                raw = response.choices[0].message.content or ""
+                parsed = json.loads(raw)
+            except Exception:
+                parsed = {}
+
+            formatted = format_consolidated_memories(parsed) if parsed else ""
+            meta = {
+                "ltm_loaded": len(ltm_raw),
+                "stm_loaded": len(stm_raw),
+                "ltm_consolidated": len(parsed.get("ltm_consolidated", [])),
+                "stm_consolidated": len(parsed.get("stm_consolidated", [])),
+                "duplicates_merged": parsed.get("meta", {}).get("duplicates_merged", 0),
+                "critical_events": parsed.get("meta", {}).get("critical_events_found", 0),
+                "raw_ltm": [{"id": e["id"], "relevance": e["relevance"], "content": e["content"][:200]} for e in ltm_raw],
+                "raw_stm": [{"id": e["id"], "category": e["category"], "content": e["content"][:200]} for e in stm_raw],
+                "consolidated_json": parsed,
+            }
+            return formatted, meta
+
+        def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
+            """Prueft Token-Budget und trimmt Messages bei Ueberschreitung.
+            Returns (messages, budget_info)."""
+            estimated = self._estimate_total_tokens(messages)
+            budget_info = {
+                "estimated_tokens": estimated,
+                "was_trimmed": False,
+                "near_limit": estimated > settings.context_token_warning_threshold,
+            }
+            if estimated <= settings.context_token_limit:
+                return messages, budget_info
+
+            # Trim by removing oldest non-system messages first
+            trimmed = [messages[0]]  # Keep system message
+            target_tokens = settings.context_token_limit - self._estimate_msg_tokens(messages[0])
+            for msg in messages[1:-1]:  # Skip last (current user input)
+                if target_tokens <= 0:
+                    break
+                msg_tokens = self._estimate_msg_tokens(msg)
+                if target_tokens - msg_tokens >= 0:
+                    trimmed.append(msg)
+                    target_tokens -= msg_tokens
+            trimmed.append(messages[-1])  # Always keep current user input
+            budget_info["was_trimmed"] = len(trimmed) < len(messages)
+            budget_info["original_tokens"] = estimated
+            budget_info["trimmed_tokens"] = self._estimate_total_tokens(trimmed)
+            budget_info["removed_messages"] = len(messages) - len(trimmed)
+            return trimmed, budget_info
+
+        @staticmethod
+        def _estimate_total_tokens(messages: list) -> int:
+            return sum(len(str(m.get("content", ""))) // 4 for m in messages)
+
+        @staticmethod
+        def _estimate_msg_tokens(msg) -> int:
+            return len(str(msg.get("content", ""))) // 4
+
         def _build_context(self, requirements: Dict[str, bool]) -> str:
             """Baut den Context String basierend auf Requirements."""
             context_parts = []
@@ -1465,6 +1571,31 @@ def create_chappie_backend():
                 limit=settings.memory_top_k,
             )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            
+            # === LTM+STM KONSOLIDIERUNG (via Cerebras qwen-3-235b) ===
+            stm_entries = []
+            consolidation_meta = {}
+            if settings.memory_consolidation_enabled:
+                stm_entries = self.short_term_memory_v2.get_active_entries() if hasattr(self, 'short_term_memory_v2') and self.short_term_memory_v2 else []
+                consolidated_prompt, consolidation_meta = self._consolidate_memories_for_prompt(
+                    ltm_memories=memories or [],
+                    stm_entries=stm_entries or [],
+                )
+                if consolidated_prompt:
+                    memories_for_prompt = consolidated_prompt
+                    if context and "=== AKTUELLE SHORT-TERM ERINNERUNGEN" in context:
+                        context = re.sub(
+                            r"=== AKTUELLE SHORT-TERM ERINNERUNGEN.*?(?=\n\n===|\n\n\[|\Z)",
+                            "",
+                            context,
+                            flags=re.DOTALL,
+                        ).strip()
+                self.debug_logger.log_info(
+                    "MEMORY_CONSOLIDATION",
+                    "LTM+STM via Cerebras konsolidiert",
+                    consolidation_meta if consolidation_meta else {"enabled": False},
+                )
+
             memory_trace = {
                 "seed": memory_trace_seed or {},
                 "generation": self._build_memory_trace(
@@ -1552,8 +1683,20 @@ def create_chappie_backend():
             if memories_for_prompt:
                 system_prompt += f"\\n\\n{memories_for_prompt}"
             
-            # Messages bauen
-            messages = self.brain.build_prompt(system_prompt, "", user_input, history)
+            # Messages bauen — Chat-History gecapped
+            messages = self.brain.build_prompt(
+                system_prompt, "", user_input, history,
+                max_history=settings.history_max_messages,
+            )
+            
+            # === TOKEN-BUDGET MONITOR ===
+            messages, budget_info = self._enforce_context_budget(messages)
+            if budget_info.get("near_limit") or budget_info.get("was_trimmed"):
+                self.debug_logger.log_info(
+                    "CONTEXT_BUDGET",
+                    "Token-Budget geprueft",
+                    budget_info,
+                )
             
             # Generierung
             gen_config = GenerationConfig(
@@ -1593,6 +1736,8 @@ def create_chappie_backend():
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
                 "rag_memories": memories,
                 "memory_trace": memory_trace,
+                "memory_consolidation": consolidation_meta,
+                "context_budget": budget_info,
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "tone_decision": tone_decision,
@@ -1718,7 +1863,7 @@ def create_chappie_backend():
             )
             system_prompt += "\n\n" + self._generation_budget_instruction()
             
-            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
+            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             
             # Generierung
             gen_config = GenerationConfig(
@@ -1899,7 +2044,7 @@ def create_chappie_backend():
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
 
-            messages = self.brain.build_prompt(system_prompt, "", user_input, history)
+            messages = self.brain.build_prompt(system_prompt, "", user_input, history, max_history=settings.history_max_messages)
 
             gen_config = GenerationConfig(
                 max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
@@ -2330,7 +2475,7 @@ def create_chappie_backend():
             )
             system_prompt += "\n\n" + self._generation_budget_instruction()
 
-            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history)
+            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
 
             gen_config = GenerationConfig(
                 max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),

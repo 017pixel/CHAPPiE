@@ -104,6 +104,90 @@ CHAIN_OF_THOUGHT_INSTRUCTION = ""
 
 
 # =============================================================================
+# MEMORY CONSOLIDATION PROMPT (qwen-3-235b)
+# =============================================================================
+# Konsolidiert LTM + STM zu einem kompakten JSON-Array vor dem Senden an CHAPPiE.
+
+MEMORY_CONSOLIDATION_PROMPT = """Du bist CHAPPiEs Memory-Konsolidierer. Deine einzige Aufgabe: komprimiere die folgende Liste von Erinnerungen in ein JSON-Array.
+
+REGELN:
+- JEDE Erinnerung MUSS im Output erscheinen – keine darf verloren gehen.
+- Jede Erinnerung auf MAXIMAL 1-2 kurze Saetze kuerzen.
+- Datum IMMER als ISO-String beibehalten (YYYY-MM-DDTHH:MM:SS).
+- Klassifiziere JEDE Erinnerung: "emotional_tone": "sad" | "beautiful" | "neutral".
+- Erkenne wichtige Ereignisse: "is_critical_event": true fuer emotional bedeutsame, lebensveraendernde oder konfliktbeladene Erinnerungen.
+- Erkenne Wiederholungen: wenn mehrere Erinnerungen inhaltlich das Gleiche aussagen, merge sie zu EINEM Eintrag. Listige die gemergeten IDs in "merged_from".
+- Formuliere "summary" praezise, sachlich, ohne Interpretationen die nicht in der Original-Erinnerung stehen.
+- Behalte "relevance" als Zahl (0-1) – hoher Wert = wichtiger fuer aktuellen Kontext.
+
+AUSGABE (NUR JSON, kein Markdown, keine Erklaerung):
+{
+  "ltm_consolidated": [
+    {
+      "id": "mem_abc123",
+      "date": "2026-05-17T14:30:00",
+      "role": "user",
+      "relevance": 0.85,
+      "summary": "Kurzer Praeziser Satz, maximal 120 Zeichen.",
+      "emotional_tone": "sad",
+      "is_critical_event": false,
+      "merged_from": null,
+      "key_details": ["Wichtigstes Detail", "Zweites Detail"]
+    }
+  ],
+  "stm_consolidated": [
+    {
+      "id": "stm_1715945000",
+      "date": "2026-05-17T12:00:00",
+      "category": "user",
+      "importance": "high",
+      "summary": "Kurzer Praeziser Satz, maximal 120 Zeichen.",
+      "emotional_tone": "beautiful",
+      "is_critical_event": true,
+      "merged_from": null
+    }
+  ],
+  "meta": {
+    "total_ltm_loaded": 40,
+    "total_stm_loaded": 15,
+    "total_consolidated_entries": 30,
+    "duplicates_merged": 5,
+    "critical_events_found": 3
+  }
+}"""
+
+
+# =============================================================================
+# MEMORY CONSOLIDATION FORMATTING (fuer System-Prompt)
+# =============================================================================
+
+def format_consolidated_memories(consolidated: dict) -> str:
+    """Formatiert das konsolidierte JSON in einen kompakten Prompt-Text."""
+    parts = ["=== KONSOLIDIERTE ERINNERUNGEN ===", ""]
+    
+    ltm = consolidated.get("ltm_consolidated", [])
+    if ltm:
+        parts.append("— Langzeitgedaechtnis:")
+        for entry in ltm:
+            tone_icon = {"sad": "😔", "beautiful": "😊", "neutral": "😐"}.get(entry.get("emotional_tone", "neutral"), "😐")
+            critical = " ⚡" if entry.get("is_critical_event") else ""
+            date = (entry.get("date") or "")[:10]
+            parts.append(f"  • [{date}] {tone_icon} ({entry.get('role','?')}) {entry.get('summary','')}{critical}")
+    
+    stm = consolidated.get("stm_consolidated", [])
+    if stm:
+        parts.append("")
+        parts.append("— Kurzzeitgedaechtnis:")
+        for entry in stm:
+            tone_icon = {"sad": "😔", "beautiful": "😊", "neutral": "😐"}.get(entry.get("emotional_tone", "neutral"), "😐")
+            critical = " ⚡" if entry.get("is_critical_event") else ""
+            imp = str(entry.get("importance", "medium"))[:4].upper()
+            parts.append(f"  • [{imp}] {tone_icon} {entry.get('summary','')}{critical}")
+    
+    return "\n".join(parts)
+
+
+# =============================================================================
 # EMOTIONS-STATUS TEMPLATE
 # =============================================================================
 # Wird dynamisch in den System-Prompt injiziert basierend auf aktuellem Status.
