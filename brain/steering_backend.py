@@ -525,7 +525,7 @@ class LocalSteeringEngine:
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
-        kwargs["enable_thinking"] = False
+        kwargs.setdefault("enable_thinking", False)
         prompt_messages = [dict(message) for message in messages]
         style_instruction = build_style_instruction(steering_payload)
         if style_instruction:
@@ -547,14 +547,41 @@ class LocalSteeringEngine:
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         input_len = int(inputs["input_ids"].shape[1])
-        text = self.tokenizer.decode(generated[0][input_len:], skip_special_tokens=True).strip()
+        new_ids = generated[0][input_len:]
+        reasoning, answer = self._split_thinking_output(new_ids)
         completion_tokens = max(0, int(generated[0].shape[0] - input_len))
-        return {
-            "text": text,
+        result: Dict[str, Any] = {
+            "text": answer if answer else self.tokenizer.decode(new_ids, skip_special_tokens=True).strip(),
             "prompt_tokens": int(inputs["input_ids"].shape[1]),
             "completion_tokens": completion_tokens,
             "prompt": prompt,
         }
+        if reasoning:
+            result["reasoning"] = reasoning
+        return result
+
+    def _split_thinking_output(self, token_ids: torch.Tensor) -> tuple[str, str]:
+        """Trennt Reasoning und Answer aus Qwen3.5 Thinking-Output.
+        Nutzt die Token 151667 (`) und 151668 (``) als Marker.
+        Returns (reasoning_text, answer_text)."""
+        if token_ids.numel() == 0:
+            return "", ""
+        ids_list = token_ids.tolist()
+        think_start = 151667
+        think_end = 151668
+        try:
+            if think_start in ids_list and think_end in ids_list:
+                idx_start = ids_list.index(think_start)
+                idx_end = ids_list.index(think_end, idx_start + 1 if idx_start < len(ids_list) - 1 else idx_start)
+                if idx_start < idx_end:
+                    reasoning_ids = token_ids[idx_start + 1:idx_end]
+                    answer_ids = token_ids[idx_end + 1:]
+                    reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True).strip()
+                    answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+                    return reasoning_text, answer_text
+        except Exception:
+            pass
+        return "", self.tokenizer.decode(token_ids, skip_special_tokens=True).strip()
 
     def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None) -> Iterator[str]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)

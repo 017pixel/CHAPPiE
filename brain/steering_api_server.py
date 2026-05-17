@@ -102,7 +102,15 @@ def create_app(model_name: str, context_length: int = 8192) -> FastAPI:
             "object": "chat.completion",
             "created": created,
             "model": model,
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": result["text"]}, "finish_reason": "stop"}],
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": result["text"],
+                    **({"reasoning_content": result["reasoning"]} if result.get("reasoning") else {}),
+                },
+                "finish_reason": "stop",
+            }],
             "usage": {
                 "prompt_tokens": result["prompt_tokens"],
                 "completion_tokens": result["completion_tokens"],
