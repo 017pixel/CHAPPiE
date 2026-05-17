@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { startTransition, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { api } from "../services/api";
 import { useUiStore } from "../store/ui";
@@ -23,6 +24,7 @@ export function MemoriesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const currentSessionId = useUiStore((state) => state.currentSessionId);
   const setCurrentSessionId = useUiStore((state) => state.setCurrentSessionId);
+  const navigate = useNavigate();
 
   const params = new URLSearchParams();
   if (query) params.set("q", query);
@@ -40,6 +42,9 @@ export function MemoriesPage() {
       shortTermQuery.refetch();
       longTermQuery.refetch();
       healthQuery.refetch();
+      if (data?.should_reset_chat) {
+        startTransition(() => navigate("/"));
+      }
     }
   });
 

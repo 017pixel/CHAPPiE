@@ -95,7 +95,7 @@ def get_short_term_memories(
 @router.post("/memories/short-term/cleanup")
 def cleanup_short_term_memories(backend=Depends(get_backend)):
     migrated = backend.short_term_memory_v2.migrate_expired_entries()
-    return {"migrated": migrated, "count": backend.short_term_memory_v2.get_count()}
+    return {"migrated": migrated, "count": backend.short_term_memory_v2.get_count(), "should_reset_chat": True}
 
 
 @router.delete("/memories")

@@ -424,6 +424,8 @@ class ActivationVectorResolver:
         window = max(1, min(8, int(assistant_ids["input_ids"].shape[1])))
         with torch.inference_mode():
             outputs = self.model(**encoded, output_hidden_states=True, use_cache=False)
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
         return {
             layer: outputs.hidden_states[layer + 1][0, -window:, :].mean(dim=0).detach().float().cpu()
             for layer in range(self.num_layers)
@@ -539,6 +541,8 @@ class LocalSteeringEngine:
             with self._apply_activation_plan(steering_payload):
                 with torch.inference_mode():
                     generated = self.model.generate(**generation_kwargs)
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
         input_len = int(inputs["input_ids"].shape[1])
         text = self.tokenizer.decode(generated[0][input_len:], skip_special_tokens=True).strip()
         completion_tokens = max(0, int(generated[0].shape[0] - input_len))
@@ -572,14 +576,18 @@ class LocalSteeringEngine:
             if chunk:
                 yield chunk
         thread.join()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
         if error_box:
             raise error_box["error"]
 
     def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float) -> Dict[str, Any]:
         do_sample = float(temperature or 0.0) > 0.01
+        input_len = int(inputs["input_ids"].shape[1])
         kwargs: Dict[str, Any] = {
             **inputs,
             "max_new_tokens": int(max_tokens),
+            "max_length": min(input_len + int(max_tokens), getattr(self, 'context_length', 8192)),
             "do_sample": do_sample,
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.tokenizer.eos_token_id,
@@ -603,6 +611,9 @@ class LocalSteeringEngine:
         finally:
             for handle in handles:
                 handle.remove()
+            handles.clear()
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
 
     @staticmethod
     def _pre_hook_factory(vector: torch.Tensor) -> Callable[..., Any]:

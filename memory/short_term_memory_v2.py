@@ -271,11 +271,12 @@ class ShortTermMemoryV2:
                 if expires.tzinfo is None:
                     expires = expires.replace(tzinfo=timezone.utc)
                     
-                if now > expires and entry.category == "summary":
+                if now > expires and entry.category in ("summary", "chat", "user", "system", "context"):
                     try:
+                        role = "assistant" if entry.content.startswith("CHAPPiE:") else "user"
                         self.memory_engine.add_memory(
                             content=entry.content,
-                            role="system",
+                            role=role,
                             mem_type="short_term_migration",
                             label=f"{entry.category}_{entry.importance}",
                             source="short_term_memory"
