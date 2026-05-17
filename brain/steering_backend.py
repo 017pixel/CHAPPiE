@@ -525,7 +525,7 @@ class LocalSteeringEngine:
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
-        kwargs.setdefault("enable_thinking", False)
+        kwargs["enable_thinking"] = False
         prompt_messages = [dict(message) for message in messages]
         style_instruction = build_style_instruction(steering_payload)
         if style_instruction:
