@@ -124,6 +124,8 @@ class Settings:
         self.enable_steering = self._get_val("ENABLE_STEERING", True)
         self.steering_provider = _parse_provider(self._get_val("STEERING_PROVIDER", "vllm"))
         self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3.5-4B")
+        self.steering_quantize = bool(self._get_val("STEERING_QUANTIZE", True))
+        self.steering_context_length = int(self._get_val("STEERING_CONTEXT_LENGTH", 4096))
 
         self.cli_debug_always_on = True
         self.web_debug_default = False
@@ -235,6 +237,10 @@ class Settings:
             self.steering_provider = _parse_provider(kwargs["steering_provider"])
         if "steering_model" in kwargs and kwargs["steering_model"]:
             self.steering_model = kwargs["steering_model"]
+        if "steering_quantize" in kwargs:
+            self.steering_quantize = bool(kwargs["steering_quantize"])
+        if "steering_context_length" in kwargs and kwargs["steering_context_length"] is not None:
+            self.steering_context_length = int(kwargs["steering_context_length"])
 
         if "training_use_global_settings" in kwargs:
             self.training_use_global_settings = kwargs["training_use_global_settings"]
@@ -310,6 +316,8 @@ class Settings:
             "ENABLE_STEERING": self.enable_steering,
             "STEERING_PROVIDER": provider_value(self.steering_provider),
             "STEERING_MODEL": self.steering_model,
+            "STEERING_QUANTIZE": self.steering_quantize,
+            "STEERING_CONTEXT_LENGTH": self.steering_context_length,
             "DAILY_INFO_PATH": self.daily_info_path,
             "PERSONALITY_PATH": self.personality_path,
             "SOUL_PATH": self.soul_path,

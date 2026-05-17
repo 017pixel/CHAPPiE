@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 
 
 LOGGER = logging.getLogger(__name__)
@@ -73,6 +73,7 @@ STYLE_SUMMARIES = {
 }
 EMOTION_ORDER = ("happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy")
 FORCE_CPU_ENV = "CHAPPIE_STEERING_FORCE_CPU"
+QUANTIZE_ENV = "CHAPPIE_STEERING_QUANTIZE"
 EMOTION_LABELS = {
     "happiness": "Freude",
     "sadness": "Traurigkeit",
@@ -433,9 +434,10 @@ class ActivationVectorResolver:
 
 
 class LocalSteeringEngine:
-    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192):
+    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192, quantize: Optional[bool] = None):
         self.model_name = model_name
         self.context_length = context_length
+        self.quantize = self._resolve_quantize(quantize)
         self.device = self._select_device()
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
@@ -450,22 +452,30 @@ class LocalSteeringEngine:
         model_config.max_position_embeddings = min(max_pos, context_length)
         LOGGER.info("Steering-Modell %s: max_position_embeddings auf %d begrenzt (KV-Cache-Schutz).",
                      model_name, model_config.max_position_embeddings)
+        quantization_config = self._build_quantization_config() if self.quantize else None
+        loader_kwargs = self._build_loader_kwargs()
+        if quantization_config is not None:
+            loader_kwargs["quantization_config"] = quantization_config
+        if not self.quantize:
+            loader_kwargs["torch_dtype"] = self.dtype
         try:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 config=model_config,
-                torch_dtype=self.dtype,
                 attn_implementation="sdpa",
-                **self._build_loader_kwargs(),
+                **loader_kwargs,
             )
         except TypeError:
+            fallback_kwargs = dict(loader_kwargs)
+            fallback_kwargs.pop("quantization_config", None)
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 config=model_config,
                 torch_dtype=self.dtype,
-                **self._build_loader_kwargs(),
+                **fallback_kwargs,
             )
-        self.model.to(self.device)
+        if not self.quantize:
+            self.model.to(self.device)
         self.model.eval()
         self.layers = list(getattr(getattr(self.model, "model", self.model), "layers"))
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
@@ -490,6 +500,32 @@ class LocalSteeringEngine:
             return torch.device("cpu")
         return torch.device("cuda:0")
 
+    @staticmethod
+    def _resolve_quantize(explicit: Optional[bool]) -> bool:
+        if explicit is not None:
+            return explicit
+        env_val = os.getenv(QUANTIZE_ENV, "").strip().lower()
+        if env_val in {"1", "true", "yes", "on"}:
+            return True
+        if env_val in {"0", "false", "no", "off"}:
+            return False
+        if not torch.cuda.is_available():
+            return False
+        try:
+            total_gib = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+            return total_gib < 24.0
+        except Exception:
+            return False
+
+    def _build_quantization_config(self) -> BitsAndBytesConfig:
+        LOGGER.info("Steering-Backend: NF4 4-bit Quantisierung aktiviert fuer %s.", self.model_name)
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+        )
+
     def _estimate_required_gpu_gib(self) -> float:
         model_lower = (self.model_name or "").lower()
         match = re.search(r"qwen/qwen3(?:\.5)?-(\d+)b", model_lower)
@@ -499,12 +535,13 @@ class LocalSteeringEngine:
             billions = float(match.group(1))
         except ValueError:
             return 0.0
-        weights_gib = billions * 2.2
+        per_billion = 0.6 if self.quantize else 2.2
+        weights_gib = billions * per_billion
         kv_cache_gib = billions * 0.08 * (self.context_length / 1024)
-        overhead_gib = 1.5
+        overhead_gib = 1.0 if self.quantize else 1.5
         total_gib = weights_gib + kv_cache_gib + overhead_gib
-        LOGGER.debug("GPU-Speicher-Schaetzung fuer %s (ctx %d): %.2f GiB (%.2f weights + %.2f KV-cache + %.2f overhead).",
-                      self.model_name, self.context_length, total_gib, weights_gib, kv_cache_gib, overhead_gib)
+        LOGGER.debug("GPU-Speicher-Schaetzung fuer %s (ctx %d, quantize=%s): %.2f GiB (%.2f weights + %.2f KV-cache + %.2f overhead).",
+                      self.model_name, self.context_length, self.quantize, total_gib, weights_gib, kv_cache_gib, overhead_gib)
         return total_gib
 
     @staticmethod

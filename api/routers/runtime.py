@@ -48,6 +48,8 @@ def _settings_snapshot() -> SettingsSnapshot:
         enable_steering=settings.enable_steering,
         steering_provider=_enum_value(settings.steering_provider),
         steering_model=settings.steering_model,
+        steering_quantize=settings.steering_quantize,
+        steering_context_length=settings.steering_context_length,
         temperature=settings.temperature,
         repetition_penalty=settings.repetition_penalty,
         max_tokens=settings.max_tokens,

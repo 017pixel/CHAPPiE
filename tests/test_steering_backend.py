@@ -172,18 +172,24 @@ def test_steering_manager_includes_anti_safeguard_vector():
 def test_local_steering_engine_uses_trust_remote_code_for_qwen35():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3.5-9B"
+    engine.quantize = False
+    engine.context_length = 8192
     assert engine._build_loader_kwargs() == {"trust_remote_code": True}
 
 
 def test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3-4B-Instruct-2507"
+    engine.quantize = False
+    engine.context_length = 8192
     assert engine._build_loader_kwargs() == {}
 
 
 def test_local_steering_engine_falls_back_to_cpu_for_small_gpu():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3.5-9B"
+    engine.quantize = False
+    engine.context_length = 8192
 
     class _Props:
         total_memory = int(15.56 * (1024 ** 3))
@@ -197,10 +203,55 @@ def test_local_steering_engine_falls_back_to_cpu_for_small_gpu():
 def test_local_steering_engine_force_cpu_env_wins_over_gpu():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3.5-9B"
+    engine.quantize = False
+    engine.context_length = 8192
 
     with patch.dict(os.environ, {"CHAPPIE_STEERING_FORCE_CPU": "1"}, clear=False):
         with patch("brain.steering_backend.torch.cuda.is_available", return_value=True):
             assert engine._select_device().type == "cpu"
+
+
+def test_local_steering_engine_quantize_reduces_gpu_estimate():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.context_length = 4096
+    engine.quantize = False
+    no_quant = engine._estimate_required_gpu_gib()
+    engine.quantize = True
+    with_quant = engine._estimate_required_gpu_gib()
+    assert with_quant < no_quant, f"Quantized ({with_quant}) should be smaller than unquantized ({no_quant})"
+    assert with_quant < 6.0, f"Quantized 4B estimate too high: {with_quant}"
+
+
+def test_local_steering_engine_resolve_quantize_auto_detects_small_gpu():
+    with patch.dict(os.environ, {}, clear=False):
+        with patch("brain.steering_backend.torch.cuda.is_available", return_value=False):
+            result = LocalSteeringEngine._resolve_quantize(None)
+            assert result is False, "Should not quantize when no GPU"
+
+    with patch.dict(os.environ, {"CHAPPIE_STEERING_QUANTIZE": "1"}, clear=False):
+        result = LocalSteeringEngine._resolve_quantize(None)
+        assert result is True, "Should quantize when env=1"
+
+    with patch.dict(os.environ, {"CHAPPIE_STEERING_QUANTIZE": "0"}, clear=False):
+        result = LocalSteeringEngine._resolve_quantize(None)
+        assert result is False, "Should not quantize when env=0"
+
+
+def test_local_steering_engine_quantize_on_gpu_fit():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.quantize = True
+    engine.context_length = 4096
+
+    class _Props24:
+        total_memory = int(24.0 * (1024 ** 3))
+
+    with patch.dict(os.environ, {}, clear=False):
+        with patch("brain.steering_backend.torch.cuda.is_available", return_value=True):
+            with patch("brain.steering_backend.torch.cuda.get_device_properties", return_value=_Props24()):
+                device = engine._select_device()
+                assert device.type == "cuda", f"Quantized 4B should fit on 24GiB GPU, got {device}"
 
 
 if __name__ == "__main__":
@@ -217,4 +268,7 @@ if __name__ == "__main__":
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()
     test_local_steering_engine_falls_back_to_cpu_for_small_gpu()
     test_local_steering_engine_force_cpu_env_wins_over_gpu()
+    test_local_steering_engine_quantize_reduces_gpu_estimate()
+    test_local_steering_engine_resolve_quantize_auto_detects_small_gpu()
+    test_local_steering_engine_quantize_on_gpu_fit()
     print("OK: steering backend")

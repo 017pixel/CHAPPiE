@@ -12,6 +12,7 @@ Benoetigt: lokaler OpenAI-kompatibler Server laufend (Standard: http://localhost
 """
 
 import re
+import time
 from typing import Generator, Optional, Any, Dict
 from openai import OpenAI
 
@@ -26,6 +27,9 @@ class VLLMBrain(BaseBrain):
     Nutzt ein OpenAI-kompatibles API-Interface.
     Unterstuetzt Activation Steering ueber 'extra_body'.
     """
+
+    MAX_RETRIES = 3
+    RETRY_BACKOFF_BASE = 2
 
     def __init__(self, model: Optional[str] = None, url: Optional[str] = None):
         """
@@ -117,17 +121,34 @@ class VLLMBrain(BaseBrain):
         config: GenerationConfig,
         extra_body: Dict[str, Any]
     ) -> Generator[str, None, None]:
-        """Streaming-Generierung mit Reasoning-Yielding und Reasoning-Cap."""
-        try:
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
-                stream=True,
-                extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
-            )
+        """Streaming-Generierung mit Reasoning-Yielding, Reasoning-Cap und automatischem Retry bei Connection-Errors."""
+        stream = None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                stream = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                    stream=True,
+                    extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
+                )
+                break
+            except Exception as conn_err:
+                is_connection_error = any(kw in str(conn_err).lower() for kw in ("connection", "connect", "refused", "timeout", "503"))
+                if is_connection_error and attempt < self.MAX_RETRIES - 1:
+                    wait = self.RETRY_BACKOFF_BASE ** attempt
+                    print(f"vLLM Connection Error (Versuch {attempt + 1}/{self.MAX_RETRIES}), warte {wait}s...")
+                    time.sleep(wait)
+                    continue
+                yield f"\nvLLM Fehler: {str(conn_err)}"
+                return
 
+        if stream is None:
+            yield "\nvLLM Fehler: Konnte keine Verbindung zum Steering-Server herstellen."
+            return
+
+        try:
             emitted_text = False
             reasoning_chars = 0
             accumulated_reasoning = ""
@@ -201,17 +222,31 @@ class VLLMBrain(BaseBrain):
         config: GenerationConfig,
         extra_body: Dict[str, Any]
     ) -> str:
-        """Synchrone Generierung."""
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
-                stream=False,
-                extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
-            )
+        """Synchrone Generierung mit Retry bei Connection-Errors."""
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=config.max_tokens,
+                    temperature=config.temperature,
+                    stream=False,
+                    extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
+                )
+                break
+            except Exception as conn_err:
+                is_connection_error = any(kw in str(conn_err).lower() for kw in ("connection", "connect", "refused", "timeout", "503"))
+                if is_connection_error and attempt < self.MAX_RETRIES - 1:
+                    wait = self.RETRY_BACKOFF_BASE ** attempt
+                    print(f"vLLM Connection Error (Versuch {attempt + 1}/{self.MAX_RETRIES}), warte {wait}s...")
+                    time.sleep(wait)
+                    continue
+                return f"vLLM Fehler: {str(conn_err)}"
 
+        if response is None:
+            return "vLLM Fehler: Konnte keine Verbindung zum Steering-Server herstellen."
+
+        try:
             choices = getattr(response, "choices", None) or []
             if not choices:
                 return "vLLM Fehler: API lieferte keine choices."

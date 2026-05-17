@@ -5,11 +5,21 @@ description: Führt ein vollständiges CHAPPiE-Update durch: git pull, Dienste n
 
 # CHAPPiE Update Workflow
 
+Universeller Update-Workflow für CHAPPiE. Dieser Skill beschreibt **exakt** was wann zu tun ist — und was **nicht** zu tun ist.
+
 ## Voraussetzungen
-- Systemd-Services: `chappie-web` (Backend), `chappie-frontend` (Frontend)
+- Systemd-Services: `chappie-vllm` (Steering-Server), `chappie-web` (Backend), `chappie-frontend` (Frontend), `chappie-training` (Training-Daemon)
 - Tests: `python3 tests/<test-datei>.py` (Einzeltests, kein pytest)
 - Remote-IP: `100.105.94.71`
-- Sudo-Passwort: erfragen, nicht hartcoden
+- Sudo-Passwort: erfragen, nicht hartcodieren
+
+## WICHTIG: Was NICHT zu tun ist
+
+- **Training-Daemon NICHT neustarten**, es sei denn der User fragt explizit danach. `chappie-training` ist standardmäßig **deaktiviert** und bleibt deaktiviert nach Updates.
+- **Keine** Config-Werte in `CHAPPIE_CONFIG.json` ändern, es sei denn der User verlangt es.
+- **Keine** manuellen pip-installs außerhalb von `requirements.txt`.
+- Vorbestehende Fehler nicht beheben (separates Issue).
+- Sudo-Passwort niemals hartcoden.
 
 ## Bevor der Agent startet: IMMER zuerst fragen
 
@@ -38,21 +48,47 @@ Sollen die Python-Requirements aus requirements.txt installiert werden?
 - **Python**: Wenn der User in Frage 2 "yes" gewählt hat: venv aktivieren (falls vorhanden), dann `pip install -r requirements.txt`
 - **Frontend**: `cd frontend && npm install`
 
-### 3. Frontend bauen
+### 3. Service-Dateien prüfen und aktualisieren
+Wenn `.service`-Dateien geändert wurden (z.B. `chappie-vllm.service`, `chappie-web.service`):
+```bash
+# Geänderte Service-Dateien nach /etc/systemd/system/ kopieren
+sudo cp chappie-vllm.service /etc/systemd/system/
+sudo cp chappie-web.service /etc/systemd/system/
+sudo cp chappie-frontend.service /etc/systemd/system/
+# Training-Service NUR kopieren, NICHT aktivieren
+sudo cp chappie-training.service /etc/systemd/system/
+# Danach daemon-reload, damit systemd die Änderungen erkennt
+sudo systemctl daemon-reload
+```
+**Wichtig**: `systemctl daemon-reload` ist PFLICHT nach jeder .service-Änderung, sonst werden die neuen Environment-Variablen oder ExecStart-Parameter nicht übernommen.
+
+### 4. Frontend bauen
 ```bash
 cd frontend && npm run build
 ```
 **Wichtig**: Der `dist/`-Ordner wird nicht via Git versioniert. Nach jedem Pull MUSS das Frontend neu gebaut werden, sonst sind UI-Änderungen nicht sichtbar.
 
-### 4. Backend neustarten
+### 5. Dienste neustarten (Reihenfolge ist wichtig!)
+Steering-Server (vLLM) MUSS zuerst starten, da chappie-web davon abhängt:
 ```bash
-sudo systemctl restart chappie-web
-```
+# 1. Steering-Server (lädt GPU-Modell, dauert ~30-60s mit Quantisierung)
+sudo systemctl restart chappie-vllm
+# Kurz warten, bis Modell geladen ist
+sleep 10
+# Health-Check: Steering-Server bereit?
+curl -sf http://localhost:8000/health && echo " vLLM OK" || echo " vLLM noch nicht bereit"
 
-### 5. Frontend neustarten
-```bash
+# 2. Backend (abhängt von vLLM)
+sudo systemctl restart chappie-web
+
+# 3. Frontend
 sudo systemctl restart chappie-frontend
+
+# 4. Training: NICHT neustarten! Standardmäßig deaktiviert.
+# Nur neustarten wenn der User explizit danach fragt:
+# sudo systemctl restart chappie-training
 ```
+Falls der vLLM-Health-Check fehlschlägt: weitere 20s warten und erneut prüfen. Das Modell laden kann auf der T4 mit NF4-Quantisierung 30-60s dauern.
 
 ### 6. Tests durchführen (je nach gewähltem Modus)
 
@@ -91,7 +127,6 @@ python3 tests/test_context_files_manager.py
 python3 tests/test_emotion_transition_rules.py
 python3 tests/test_integration.py
 python3 tests/test_memory_query_extraction_german.py
-python3 tests/test_integration.py
 python3 tests/test_query_extraction.py
 python3 tests/test_repetition_penalty.py
 python3 tests/test_steering_backend.py
@@ -105,9 +140,13 @@ python3 tests/test_sleep_phase_context_updates.py
 - **Nicht** eigenmächtig Dinge ändern, die vorher schon kaputt waren
 
 ### 8. Health-Check
-Prüfen, ob beide Dienste erreichbar sind:
-- Frontend: `curl -sf http://100.105.94.71:4173/` oder `curl -sf http://localhost:4173/`
+Prüfen, ob alle Dienste erreichbar sind:
+- Steering-Server: `curl -sf http://localhost:8000/health` (muss `{"status":"ok",...}` liefern)
 - Backend: `curl -sf http://100.105.94.71:8010/` oder `curl -sf http://localhost:8010/`
+- Frontend: `curl -sf http://100.105.94.71:4173/` oder `curl -sf http://localhost:4173/`
+- Training: **Nicht prüfen** (standardmäßig deaktiviert)
+
+Falls der Steering-Server nicht antwortet: Logs checken mit `journalctl -u chappie-vllm --no-pager -n 50` und prüfen ob das Modell korrekt geladen wurde (sollte "NF4 4-bit Quantisierung aktiviert" oder "Steering-Modell geladen" zeigen).
 
 ### 9. Bestätigung
 Dem User mitteilen:
@@ -121,3 +160,8 @@ Dem User mitteilen:
 - Bei unklaren Fehlern: den User um Entscheidung bitten
 - **Niemals** Sudo-Passwort hartcoden — vor jedem sudo-Befehl erfragen
 - Frontend NACH Pull und Dependencies bauen, VOR Service-Neustart
+- **Steering-Server (chappie-vllm) IMMER vor chappie-web neustarten** — Web hängt von vLLM ab
+- Nach .service-Datei-Änderungen: IMMER `systemctl daemon-reload` ausführen
+- Falls `CHAPPIE_STEERING_QUANTIZE` geändert wurde: vLLM-Service MUSS neugestartet werden (Env-Variablen in systemd werden nur beim Start gelesen)
+- Falls `CHAPPIE_STEERING_CONTEXT_LENGTH` geändert wurde: ebenfalls vLLM neustarten
+- **Training-Daemon (chappie-training) standardmäßig NICHT neustarten** — ist deaktiviert und bleibt deaktiviert nach Updates

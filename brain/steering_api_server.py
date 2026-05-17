@@ -7,20 +7,20 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from .steering_backend import LocalSteeringEngine, extract_steering_payload
+from .steering_backend import LocalSteeringEngine, extract_steering_payload, QUANTIZE_ENV
 
 
-def create_app(model_name: str, context_length: int = 8192) -> FastAPI:
+def create_app(model_name: str, context_length: int = 8192, quantize: Optional[bool] = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.engine = LocalSteeringEngine(model_name, context_length=context_length)
+        app.state.engine = LocalSteeringEngine(model_name, context_length=context_length, quantize=quantize)
         yield
 
     app = FastAPI(title="CHAPPiE Steering API", version="1.0.0", lifespan=lifespan)
@@ -128,8 +128,11 @@ def main() -> None:
     parser.add_argument("--model", default=os.getenv("CHAPPIE_STEERING_MODEL", "Qwen/Qwen3.5-4B"))
     parser.add_argument("--context-length", type=int, default=int(os.getenv("CHAPPIE_STEERING_CONTEXT_LENGTH", "8192")),
                         help="max_position_embeddings cap to limit KV-cache VRAM (default: 8192)")
+    parser.add_argument("--quantize", type=lambda v: v.lower() in ("1", "true", "yes", "on"),
+                        default=os.getenv(QUANTIZE_ENV, "").strip().lower() in ("1", "true", "yes", "on") if os.getenv(QUANTIZE_ENV) else None,
+                        help="Enable NF4 4-bit quantization to reduce VRAM (default: auto-detect)")
     args = parser.parse_args()
-    uvicorn.run(create_app(args.model, args.context_length), host=args.host, port=args.port, log_level="info")
+    uvicorn.run(create_app(args.model, args.context_length, quantize=args.quantize), host=args.host, port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

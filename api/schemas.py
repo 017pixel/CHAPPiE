@@ -138,6 +138,8 @@ class SettingsSnapshot(BaseModel):
     enable_steering: bool
     steering_provider: Optional[str]
     steering_model: str
+    steering_quantize: bool
+    steering_context_length: int
     temperature: float
     repetition_penalty: float
     max_tokens: int
@@ -191,6 +193,8 @@ class SettingsUpdate(BaseModel):
     enable_steering: Optional[bool] = None
     steering_provider: Optional[str] = None
     steering_model: Optional[str] = None
+    steering_quantize: Optional[bool] = None
+    steering_context_length: Optional[int] = None
     temperature: Optional[float] = None
     repetition_penalty: Optional[float] = None
     max_tokens: Optional[int] = None

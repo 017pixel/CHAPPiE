@@ -13,12 +13,11 @@ for mod in (
     "brain.groq_brain", "brain.nvidia_brain",
     "brain.steering_api_server", "brain.steering_backend",
     "brain.deep_think", "brain.global_workspace",
-    "brain.action_response", "brain.cerebras_limits",
-    "memory.emotions_engine", "memory.chat_manager",
-    "memory.short_term_memory", "memory.short_term_memory_v2",
-    "memory.personality_manager", "memory.function_registry",
-    "memory.intent_processor", "memory.debug_logger",
-    "sentence_transformers",
+    "brain.cerebras_limits", "memory.emotions_engine",
+    "memory.chat_manager", "memory.short_term_memory",
+    "memory.short_term_memory_v2", "memory.personality_manager",
+    "memory.function_registry", "memory.intent_processor",
+    "memory.debug_logger", "sentence_transformers",
 ):
     if mod not in sys.modules:
         sys.modules[mod] = MagicMock()
