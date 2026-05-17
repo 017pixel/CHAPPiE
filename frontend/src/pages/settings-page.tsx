@@ -6,9 +6,7 @@ import { api } from "../services/api";
 const PROVIDER_OPTIONS = [
   { value: "vllm", label: "vLLM (Local GPU)" },
   { value: "ollama", label: "Ollama (Local)" },
-  { value: "groq", label: "Groq (Cloud)" },
   { value: "cerebras", label: "Cerebras (Cloud)" },
-  { value: "nvidia", label: "NVIDIA (Cloud)" },
 ];
 
 interface SettingDef {
@@ -36,9 +34,7 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "vllm_force_single_model", label: "Force Single Model", type: "boolean", group: "provider", icon: "lock" },
   { key: "ollama_model", label: "Ollama Model", type: "string", group: "provider", icon: "smart_toy" },
   { key: "ollama_host", label: "Ollama Host", type: "string", group: "provider", icon: "dns" },
-  { key: "groq_model", label: "Groq Model", type: "string", group: "provider", icon: "cloud" },
   { key: "cerebras_model", label: "Cerebras Model", type: "string", group: "provider", icon: "cloud" },
-  { key: "nvidia_model", label: "NVIDIA Model", type: "string", group: "provider", icon: "cloud" },
 
   { key: "temperature", label: "Temperature", type: "number", group: "generation", icon: "thermostat" },
   { key: "max_tokens", label: "Max Tokens", type: "number", group: "generation", icon: "token" },

@@ -4,7 +4,7 @@ CHAPPiE - Steering Manager (Representation Engineering)
 Professionelle neuronale Steuerung fuer lokale LLM-Modelle.
 
 Architektur:
-- Cloud-Modelle (Groq, NVIDIA, Cerebras): Emotionen werden via System-Prompt gesteuert.
+- Cloud-Modelle (Cerebras): Emotionen werden via System-Prompt gesteuert.
 - Lokale Modelle (vLLM, Ollama): Emotionen werden direkt ueber Steering-Vektoren
   in die neuronalen Schichten des Modells injiziert (Representation Engineering).
 
@@ -237,12 +237,8 @@ class SteeringManager:
                 return getattr(settings, "vllm_model", "")
             if self._effective_provider() == LLMProvider.OLLAMA:
                 return getattr(settings, "ollama_model", "")
-            if self._effective_provider() == LLMProvider.GROQ:
-                return getattr(settings, "groq_model", "")
             if self._effective_provider() == LLMProvider.CEREBRAS:
                 return getattr(settings, "cerebras_model", "")
-            if self._effective_provider() == LLMProvider.NVIDIA:
-                return getattr(settings, "nvidia_model", "")
             return ""
 
     def refresh_runtime_profile(self, model: Optional[str] = None):
@@ -413,7 +409,7 @@ class SteeringManager:
         effective_provider = self._effective_provider(provider)
         # vLLM steuert Emotionen via VAD-Layer → keine Prompt-Emotionen
         # Ollama und Cloud-APIs brauchen Emotionen im System-Prompt
-        return effective_provider in (LLMProvider.OLLAMA, LLMProvider.GROQ, LLMProvider.CEREBRAS, LLMProvider.NVIDIA)
+        return effective_provider in (LLMProvider.OLLAMA, LLMProvider.CEREBRAS)
 
     def _get_vector_alpha_scale(self, emotion: str) -> float:
         sv = self.vectors.get(emotion)

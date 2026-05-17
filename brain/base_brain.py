@@ -4,7 +4,7 @@ CHAPiE - Brain Base Class
 Abstrakte Basisklasse fuer alle LLM-Backends.
 
 Ermoeglicht einfachen Wechsel zwischen verschiedenen Providern
-(Ollama, Groq, vLLM, etc.) ohne Aenderungen am restlichen Code.
+(Ollama, vLLM, etc.) ohne Aenderungen am restlichen Code.
 """
 
 from abc import ABC, abstractmethod

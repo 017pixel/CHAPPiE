@@ -1,8 +1,6 @@
 {
   "api": {
-    "groq_api_key": "",
-    "cerebras_api_key": "DEIN_CEREBRAS_API_KEY_HIER",
-    "nvidia_api_key": ""
+    "cerebras_api_key": "DEIN_CEREBRAS_API_KEY_HIER"
   },
   "local_models": {
     "llm_provider": "vllm",
@@ -16,24 +14,18 @@
     "steering_model": "Qwen/Qwen3.5-4B"
   },
   "cloud_models": {
-    "cerebras_model": "llama-3.1-8b",
-    "groq_model": "moonshotai/kimi-k2-instruct-0905",
-    "nvidia_model": "deepseek-ai/deepseek-v3.1-terminus"
+    "cerebras_model": "llama-3.1-8b"
   },
   "small_tasks": {
     "intent_provider": "cerebras",
     "intent_processor_model_cerebras": "llama-3.1-8b",
-    "intent_processor_model_groq": "openai/gpt-oss-120b",
     "intent_processor_model_ollama": "qwen3.5:9b",
     "intent_processor_model_vllm": "Qwen/Qwen3.5-4B",
-    "intent_processor_model_nvidia": "deepseek-ai/deepseek-v3.1-terminus",
     "enable_two_step_processing": true,
     "query_extraction_provider": "cerebras",
     "query_extraction_cerebras_model": "llama-3.1-8b",
-    "query_extraction_groq_model": "llama-3.1-8b-instant",
     "query_extraction_ollama_model": "llama3.2:1b",
     "query_extraction_vllm_model": "Qwen/Qwen3.5-4B",
-    "query_extraction_nvidia_model": "meta/llama-3.1-8b-instruct",
     "enable_query_extraction": true,
     "query_extraction_min_words_for_llm": 7
   },

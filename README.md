@@ -145,6 +145,7 @@ Empfohlen:
 - lokaler Endpoint auf `http://localhost:8000/v1`
 - Qwen-3.5-4B lokal fuer Antworten
 - Cerebras `llama-3.1-8b` fuer Intent, Query Extraction und STM-Zusammenfassungen
+- Cerebras `qwen-3-235b-a22b-instruct-2507` fuer anspruchsvolle Intent-Analysen
 
 Details: [docs/local-models.md](docs/local-models.md)
 
@@ -188,6 +189,22 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 - [Projektkarte](docs/project-map.md)
 - [Testing](docs/testing.md)
 - [Deployment](docs/deployment.md)
+
+---
+
+## Provider-Architektur (3 Provider)
+
+CHAPPiE unterstuetzt genau **drei LLM-Provider**:
+
+| Provider | Typ | Brain | Steering |
+|---|---|---|---|
+| **vLLM** | Lokal, Standard | `brain/vllm_brain.py` | Layer Steering (VAD) |
+| **Ollama** | Lokal, Alternative | `brain/ollama_brain.py` | Prompt-Emotionen |
+| **Cerebras** | Einzige Cloud-API | `brain/cerebras_brain.py` | Prompt-Emotionen |
+
+Cerebras-Modelle: `llama-3.1-8b` (schnell) und `qwen-3-235b-a22b-instruct-2507` (Reasoning).
+
+Die Provider NVIDIA NIM und Groq wurden entfernt.
 
 ---
 

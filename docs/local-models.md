@@ -8,7 +8,7 @@ CHAPPiE soll primaer lokal mit Qwen-3.5-Modellen laufen. APIs sind nur der Fallb
 
 1. `vllm` plus Qwen-3.5
 2. Ollama fuer leichtere lokale Setups
-3. NVIDIA, Groq oder Cerebras als Fallback
+3. Cerebras als Fallback
 
 ## Relevante Konfigurationsdateien
 

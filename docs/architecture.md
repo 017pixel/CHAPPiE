@@ -76,7 +76,7 @@ Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Mo
 4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
 5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
 
-Bei Cloud-Providern (Groq, NVIDIA, Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
+Bei Cloud-Providern (Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
 
 Relevante Dateien:
 

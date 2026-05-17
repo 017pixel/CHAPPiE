@@ -4,7 +4,7 @@ CHAPPiE Training Setup Wizard
 Interaktiver Setup für das autonome Training von CHAPPiE.
 
 Features:
-- Auswahl des KI-Backends (vLLM, Ollama, Groq, Cerebras)
+- Auswahl des KI-Backends (vLLM, Ollama, Cerebras)
 - Modell-Auswahl für jeden Provider
 - Trainer-Persona Konfiguration
 - Curriculum-Erstellung mit mehreren Themen
@@ -33,18 +33,9 @@ console = Console()
 
 
 # === Verfügbare Modelle pro Provider ===
-GROQ_MODELS = {
-    "1": ("moonshotai/kimi-k2-instruct-0905", "Kimi K2 - MoonshotAI (Empfohlen)"),
-    "2": ("llama-3.1-70b-versatile", "Llama 3.1 70B - Meta"),
-    "3": ("llama-3.1-8b-instant", "Llama 3.1 8B - Schnell"),
-    "4": ("mixtral-8x7b-32768", "Mixtral 8x7B - MoE"),
-    "5": ("gemma2-9b-it", "Gemma 2 9B - Google"),
-}
-
 CEREBRAS_MODELS = {
-    "1": ("llama-3.3-70b", "Llama 3.3 70B - Leistungsstark (Empfohlen)"),
-    "2": ("llama-3.1-8b", "Llama 3.1 8B - Schnell & Kompakt"),
-    "3": ("qwen-3-32b", "Qwen 3 32B - Alibaba"),
+    "1": ("llama-3.1-8b", "Llama 3.1 8B - Schnell & Kompakt (Empfohlen)"),
+    "2": ("qwen-3-235b-a22b-instruct-2507", "Qwen 3 235B - Hochwertiges Reasoning"),
 }
 
 OLLAMA_MODELS = {
@@ -115,20 +106,17 @@ def select_provider() -> LLMProvider:
     
     table.add_row("1", "[Lokal] vLLM", "Lokal - Qwen 3.5 bevorzugt (empfohlen)")
     table.add_row("2", "[Lokal] Ollama", "Lokal - Privat & Offline")
-    table.add_row("3", "[API] Groq", "Cloud - Schnell & Gratis Tier")
-    table.add_row("4", "[API] Cerebras", "Cloud - Ultra-High-Speed (2000+ tok/s)")
+    table.add_row("3", "[API] Cerebras", "Cloud - Ultra-High-Speed (2000+ tok/s)")
     
     console.print(table)
     console.print()
     
-    choice = Prompt.ask("Provider wählen", choices=["1", "2", "3", "4"], default="1")
+    choice = Prompt.ask("Provider wählen", choices=["1", "2", "3"], default="1")
     
     if choice == "1":
         return LLMProvider.VLLM
     elif choice == "2":
         return LLMProvider.OLLAMA
-    elif choice == "3":
-        return LLMProvider.GROQ
     else:
         return LLMProvider.CEREBRAS
 
@@ -139,8 +127,6 @@ def select_model(provider: LLMProvider) -> str:
     
     if provider == LLMProvider.VLLM:
         models = VLLM_MODELS
-    elif provider == LLMProvider.GROQ:
-        models = GROQ_MODELS
     elif provider == LLMProvider.CEREBRAS:
         models = CEREBRAS_MODELS
     else:
@@ -176,14 +162,9 @@ def check_api_key(provider: LLMProvider) -> str:
     
     console.print(f"\n[bold]Schritt 3: API Key prüfen[/bold]\n")
     
-    if provider == LLMProvider.GROQ:
-        existing_key = settings.groq_api_key
-        key_name = "Groq"
-        key_url = "https://console.groq.com/keys"
-    else:  # CEREBRAS
-        existing_key = settings.cerebras_api_key
-        key_name = "Cerebras"
-        key_url = "https://cloud.cerebras.ai"
+    existing_key = settings.cerebras_api_key
+    key_name = "Cerebras"
+    key_url = "https://cloud.cerebras.ai"
     
     if existing_key and len(existing_key) > 10:
         masked = existing_key[:8] + "..." + existing_key[-4:]
@@ -198,11 +179,7 @@ def check_api_key(provider: LLMProvider) -> str:
     new_key = Prompt.ask(f"{key_name} API Key eingeben")
     
     if new_key:
-        # Den Key auch in die Settings übernehmen
-        if provider == LLMProvider.GROQ:
-            settings.groq_api_key = new_key
-        else:
-            settings.cerebras_api_key = new_key
+        settings.cerebras_api_key = new_key
         
         console.print(f"[green]✓[/green] API Key gesetzt!")
     
@@ -323,8 +300,6 @@ def save_configuration(provider: LLMProvider, model: str, trainer_config: dict):
     
     if provider == LLMProvider.VLLM:
         settings.vllm_model = model
-    elif provider == LLMProvider.GROQ:
-        settings.groq_model = model
     elif provider == LLMProvider.CEREBRAS:
         settings.cerebras_model = model
     else:

@@ -193,9 +193,8 @@ class CerebrasBrain(BaseBrain):
 
 # === Verfügbare Cerebras Modelle (Stand: Januar 2026) ===
 CEREBRAS_MODELS = {
-    "llama-3.3-70b": "Llama 3.3 70B - Leistungsstark & Schnell",
-    "llama-3.1-8b": "Llama 3.1 8B - Kompakt & Effizient",
-    "qwen-3-32b": "Qwen 3 32B - Alibaba's Modell",
+    "llama-3.1-8b": "Llama 3.1 8B - Schnell & Effizient",
+    "qwen-3-235b-a22b-instruct-2507": "Qwen 3 235B - Hochwertiges Reasoning",
 }
 
 

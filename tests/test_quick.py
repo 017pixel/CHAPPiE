@@ -8,7 +8,26 @@ Run with: python tests/test_quick.py
 
 import sys
 import os
+from unittest.mock import MagicMock
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+for mod in (
+    "chromadb", "chromadb.config", "requests", "openai",
+    "brain.groq_brain", "brain.nvidia_brain",
+    "brain.steering_api_server", "brain.steering_backend",
+    "brain.deep_think", "brain.global_workspace",
+    "brain.action_response", "brain.response_parser",
+    "brain.cerebras_limits", "life", "memory.emotions_engine",
+    "memory.chat_manager", "memory.short_term_memory",
+    "memory.short_term_memory_v2", "memory.personality_manager",
+    "memory.function_registry", "memory.intent_processor", "memory.debug_logger",
+    "sentence_transformers",
+):
+    if mod not in sys.modules:
+        sys.modules[mod] = MagicMock()
+
+sys.modules["ollama"] = MagicMock()
 
 print("=" * 60)
 print("CHAPPiE Quick Tests (No API Calls)")
@@ -19,8 +38,8 @@ def test_imports():
     try:
         from config.config import settings, LLMProvider
         print(f"  [OK] Provider: {settings.llm_provider.value}")
-        print(f"  [OK] NVIDIA Model: {settings.nvidia_model}")
-        print(f"  [OK] NVIDIA Key: {'SET' if settings.nvidia_api_key else 'NOT SET'}")
+        print(f"  [OK] Cerebras Model: {settings.cerebras_model}")
+        print(f"  [OK] Cerebras Key: {'SET' if settings.cerebras_api_key else 'NOT SET'}")
         
         from config.brain_config import BRAIN_AGENT_CONFIGS
         print(f"  [OK] Brain configs: {len(BRAIN_AGENT_CONFIGS)} agents")
@@ -163,24 +182,57 @@ def test_api_key_format():
     try:
         from config.config import settings
         
-        if settings.groq_api_key:
-            print("  [OK] Groq key: SET")
-        else:
-            print("  [INFO] Groq key not set")
-        
         if settings.cerebras_api_key:
             print("  [OK] Cerebras key: SET")
         else:
             print("  [INFO] Cerebras key not set")
         
-        if settings.nvidia_api_key:
-            print("  [OK] NVIDIA key: SET")
-        else:
-            print("  [INFO] NVIDIA key not set")
+        return True
+    except Exception as e:
+        print(f"  [FAIL] {e}")
+        return False
+
+
+def test_provider_enum():
+    print("\nTEST 7: Testing provider enum...")
+    try:
+        from config.config import LLMProvider
+        
+        providers = list(LLMProvider)
+        names = [p.value for p in providers]
+        print(f"  [OK] Providers: {names}")
+        
+        assert "vllm" in names, "vLLM missing"
+        assert "ollama" in names, "Ollama missing"
+        assert "cerebras" in names, "Cerebras missing"
+        assert "groq" not in names, "Groq should be removed"
+        assert "nvidia" not in names, "NVIDIA should be removed"
+        assert len(providers) == 3, f"Expected 3 providers, got {len(providers)}"
         
         return True
     except Exception as e:
         print(f"  [FAIL] {e}")
+        return False
+
+
+def test_cerebras_brain_import():
+    print("\nTEST 8: Testing Cerebras brain import...")
+    try:
+        from brain.cerebras_brain import CerebrasBrain, CEREBRAS_MODELS
+        
+        assert len(CEREBRAS_MODELS) == 2, "Cerebras models dict should have exactly 2 entries"
+        assert "llama-3.1-8b" in CEREBRAS_MODELS
+        assert "qwen-3-235b-a22b-instruct-2507" in CEREBRAS_MODELS
+        
+        brain = CerebrasBrain(api_key="test-key", model="llama-3.1-8b")
+        info = brain.get_model_info()
+        print(f"  [OK] CerebrasBrain created: {info}")
+        
+        return True
+    except Exception as e:
+        print(f"  [FAIL] {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -192,6 +244,8 @@ def run_tests():
         test_pipeline,
         test_forgetting_curve_math,
         test_api_key_format,
+        test_provider_enum,
+        test_cerebras_brain_import,
     ]
     
     results = []

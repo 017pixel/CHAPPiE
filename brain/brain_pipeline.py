@@ -29,7 +29,7 @@ from brain.global_workspace import GlobalWorkspace
 from life import get_life_simulation_service
 from memory.sleep_phase import get_sleep_phase_handler
 from memory.forgetting_curve import get_forgetting_curve, get_decay_manager
-from config.config import settings, LLMProvider
+from config.config import settings, LLMProvider, get_active_model
 
 
 class BrainPipeline:
@@ -348,7 +348,7 @@ class BrainPipeline:
             "processing_count": self._processing_count,
             "sleep_status": self.sleep_handler.get_status(),
             "provider": settings.llm_provider.value,
-            "model": settings.nvidia_model if settings.llm_provider == LLMProvider.NVIDIA else "unknown",
+            "model": get_active_model(),
             "life_state": self.life_simulation.get_snapshot(),
         }
 

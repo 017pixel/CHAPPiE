@@ -193,8 +193,7 @@ class TrainingLoop:
             try:
                 response = func(*args, **kwargs)
                 
-                # Check ob GroqBrain einen Fehler als String zurückgegeben hat
-                if isinstance(response, str) and response.strip().startswith("Groq Fehler"):
+                if isinstance(response, str) and response.strip().startswith("Cerebras Fehler"):
                     error_msg = response
                     error_type = self._classify_error(error_msg)
                     consecutive_errors += 1
@@ -789,7 +788,7 @@ class TrainingLoop:
         response_lower = response.lower()
         error_indicators = [
             "fehler", "error", "exception",
-            "groq fehler", "ollama fehler",
+            "ollama fehler",
             "429", "500", "timeout", "context",
             "rate limit", "quota", "rpd", "rpm"
         ]

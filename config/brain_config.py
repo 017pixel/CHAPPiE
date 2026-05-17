@@ -73,25 +73,6 @@ BRAIN_AGENT_CONFIGS: Dict[str, AgentModelConfig] = {
     ),
 }
 
-# Cloud/API fallback catalogue for optional remote execution
-NVIDIA_MODEL_CATEGORIES = {
-    "flagship_reasoning": [
-        ("z-ai/glm5", "GLM 5 - 744B MoE, best for complex reasoning"),
-    ],
-    "high_quality": [
-        ("nvidia/llama-3.1-nemotron-70b", "Nemotron 70B - NVIDIA optimized"),
-        ("meta/llama-3.3-70b-instruct", "Llama 3.3 70B - balanced quality"),
-        ("deepseek-ai/deepseek-v3.1-terminus", "DeepSeek V3.1 - reasoning focused"),
-    ],
-    "multimodal": [
-        ("moonshotai/kimi-k2.5", "Kimi K2.5 - multimodal understanding"),
-        ("nvidia/nemotron-nano-12b-v2-vl", "Nemotron Nano VL - vision-language"),
-    ],
-    "reasoning": [
-        ("deepseek-ai/deepseek-r1", "DeepSeek R1 - chain-of-thought reasoning"),
-    ],
-}
-
 SLEEP_PHASE_CONFIG = {
     "triggers": {
         "time_based": {

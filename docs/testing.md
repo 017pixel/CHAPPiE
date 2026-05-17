@@ -47,6 +47,13 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 - `python tests/test_api_contract.py`
 - `python tests/test_chat_ui_formatting.py`
 - `python tests/test_training_config_ui.py`
+- `python tests/test_provider_factory.py`
+- `python tests/test_settings_integrity.py`
+- `python tests/test_cerebras_brain_unit.py`
+- `python tests/test_cerebras_limits.py`
+- `python tests/test_quick.py`
+- `python tests/test_runtime_switching.py`
+- `python tests/test_root_config.py`
 - `python tests/manual/test_compatibility.py`
 - `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py`
 - `cd frontend && npm run build`

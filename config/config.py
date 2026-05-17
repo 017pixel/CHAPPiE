@@ -19,9 +19,7 @@ CHROMA_DB_DIR.mkdir(exist_ok=True)
 
 class LLMProvider(str, Enum):
     OLLAMA = "ollama"
-    GROQ = "groq"
     CEREBRAS = "cerebras"
-    NVIDIA = "nvidia"
     VLLM = "vllm"
 
 
@@ -75,28 +73,19 @@ class Settings:
         self.vllm_url = self._get_val("VLLM_URL", "http://localhost:8000/v1")
         self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-4B")
         self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
-        self.groq_api_key = self._get_val("GROQ_API_KEY", "")
-        self.groq_model = self._get_val("GROQ_MODEL", "moonshotai/kimi-k2-instruct-0905")
         
         self.cerebras_api_key = self._get_val("CEREBRAS_API_KEY", "")
         self.cerebras_model = self._get_val("CEREBRAS_MODEL", "llama-3.1-8b")
-        
-        self.nvidia_api_key = self._get_val("NVIDIA_API_KEY", "")
-        self.nvidia_model = self._get_val("NVIDIA_MODEL", "deepseek-ai/deepseek-v3.1-terminus")
 
         self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "cerebras"))
-        self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-120b")
         self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen3.5:9b")
         self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-4B")
-        self.intent_processor_model_nvidia = self._get_val("INTENT_PROCESSOR_MODEL_NVIDIA", "deepseek-ai/deepseek-v3.1-terminus")
         self.enable_two_step_processing = self._get_val("ENABLE_TWO_STEP_PROCESSING", True)
 
         self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "cerebras"))
-        self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
         self.query_extraction_vllm_model = self._get_val("QUERY_EXTRACTION_VLLM_MODEL", "Qwen/Qwen3.5-4B")
-        self.query_extraction_nvidia_model = self._get_val("QUERY_EXTRACTION_NVIDIA_MODEL", "meta/llama-3.1-8b-instruct")
         self.query_extraction_cerebras_model = self._get_val("QUERY_EXTRACTION_CEREBRAS_MODEL", "llama-3.1-8b")
         self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
         self.query_extraction_min_words_for_llm = int(self._get_val("QUERY_EXTRACTION_MIN_WORDS_FOR_LLM", 7))
@@ -170,23 +159,15 @@ class Settings:
 
     def get_intent_model(self, provider=None):
         effective = self.get_effective_provider(provider if provider != "auto" else None)
-        if effective == LLMProvider.GROQ:
-            return self.intent_processor_model_groq
-        elif effective == LLMProvider.CEREBRAS:
+        if effective == LLMProvider.CEREBRAS:
             return self.intent_processor_model_cerebras
-        elif effective == LLMProvider.NVIDIA:
-            return self.intent_processor_model_nvidia
         elif effective == LLMProvider.VLLM:
             return self.resolve_vllm_runtime_model(self.intent_processor_model_vllm)
         return self.intent_processor_model_ollama
 
     def get_query_extraction_model(self, provider=None):
         effective = self.get_effective_provider(provider if provider != "auto" else None)
-        if effective == LLMProvider.GROQ:
-            return self.query_extraction_groq_model
-        elif effective == LLMProvider.NVIDIA:
-            return self.query_extraction_nvidia_model
-        elif effective == LLMProvider.CEREBRAS:
+        if effective == LLMProvider.CEREBRAS:
             return self.query_extraction_cerebras_model
         elif effective == LLMProvider.VLLM:
             return self.resolve_vllm_runtime_model(self.query_extraction_vllm_model)
@@ -200,11 +181,11 @@ class Settings:
             except:
                 pass
 
-        for key in ["groq_api_key", "cerebras_api_key", "nvidia_api_key"]:
+        for key in ["cerebras_api_key"]:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
 
-        for key in ["groq_model", "cerebras_model", "nvidia_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host"]:
+        for key in ["cerebras_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
         if "vllm_force_single_model" in kwargs:
@@ -216,8 +197,8 @@ class Settings:
                 self.intent_provider = None
             else:
                 self.intent_provider = parsed
-        for key in ["intent_processor_model_groq", "intent_processor_model_cerebras", 
-                    "intent_processor_model_ollama", "intent_processor_model_vllm", "intent_processor_model_nvidia"]:
+        for key in ["intent_processor_model_cerebras", 
+                    "intent_processor_model_ollama", "intent_processor_model_vllm"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
@@ -228,10 +209,8 @@ class Settings:
             else:
                 self.query_extraction_provider = parsed
         for key in [
-            "query_extraction_groq_model",
             "query_extraction_ollama_model",
             "query_extraction_vllm_model",
-            "query_extraction_nvidia_model",
             "query_extraction_cerebras_model",
         ]:
             if key in kwargs and kwargs[key]:
@@ -283,29 +262,21 @@ class Settings:
             return value.value if value is not None else "auto"
         return {
             "LLM_PROVIDER": self.llm_provider.value,
-            "GROQ_API_KEY": self.groq_api_key,
             "CEREBRAS_API_KEY": self.cerebras_api_key,
-            "NVIDIA_API_KEY": self.nvidia_api_key,
-            "GROQ_MODEL": self.groq_model,
             "CEREBRAS_MODEL": self.cerebras_model,
-            "NVIDIA_MODEL": self.nvidia_model,
             "VLLM_MODEL": self.vllm_model,
             "VLLM_URL": self.vllm_url,
             "VLLM_FORCE_SINGLE_MODEL": self.vllm_force_single_model,
             "OLLAMA_MODEL": self.ollama_model,
             "OLLAMA_HOST": self.ollama_host,
             "INTENT_PROVIDER": provider_value(self.intent_provider),
-            "INTENT_PROCESSOR_MODEL_GROQ": self.intent_processor_model_groq,
             "INTENT_PROCESSOR_MODEL_CEREBRAS": self.intent_processor_model_cerebras,
             "INTENT_PROCESSOR_MODEL_OLLAMA": self.intent_processor_model_ollama,
             "INTENT_PROCESSOR_MODEL_VLLM": self.intent_processor_model_vllm,
-            "INTENT_PROCESSOR_MODEL_NVIDIA": self.intent_processor_model_nvidia,
             "ENABLE_TWO_STEP_PROCESSING": self.enable_two_step_processing,
             "QUERY_EXTRACTION_PROVIDER": provider_value(self.query_extraction_provider),
-            "QUERY_EXTRACTION_GROQ_MODEL": self.query_extraction_groq_model,
             "QUERY_EXTRACTION_OLLAMA_MODEL": self.query_extraction_ollama_model,
             "QUERY_EXTRACTION_VLLM_MODEL": self.query_extraction_vllm_model,
-            "QUERY_EXTRACTION_NVIDIA_MODEL": self.query_extraction_nvidia_model,
             "QUERY_EXTRACTION_CEREBRAS_MODEL": self.query_extraction_cerebras_model,
             "ENABLE_QUERY_EXTRACTION": self.enable_query_extraction,
             "QUERY_EXTRACTION_MIN_WORDS_FOR_LLM": self.query_extraction_min_words_for_llm,
@@ -361,12 +332,8 @@ settings = Settings()
 
 
 def get_active_model() -> str:
-    if settings.llm_provider == LLMProvider.GROQ:
-        return settings.groq_model
-    elif settings.llm_provider == LLMProvider.CEREBRAS:
+    if settings.llm_provider == LLMProvider.CEREBRAS:
         return settings.cerebras_model
-    elif settings.llm_provider == LLMProvider.NVIDIA:
-        return settings.nvidia_model
     elif settings.llm_provider == LLMProvider.VLLM:
         return settings.vllm_model
     return settings.ollama_model

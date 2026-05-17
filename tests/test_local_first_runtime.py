@@ -2,10 +2,28 @@
 
 import os
 import sys
+from unittest.mock import MagicMock
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
+
+for mod in (
+    "chromadb", "chromadb.config", "requests", "openai",
+    "brain.groq_brain", "brain.nvidia_brain",
+    "brain.steering_api_server", "brain.steering_backend",
+    "brain.deep_think", "brain.global_workspace",
+    "brain.action_response", "brain.cerebras_limits",
+    "memory.emotions_engine", "memory.chat_manager",
+    "memory.short_term_memory", "memory.short_term_memory_v2",
+    "memory.personality_manager", "memory.function_registry",
+    "memory.intent_processor", "memory.debug_logger",
+    "sentence_transformers",
+):
+    if mod not in sys.modules:
+        sys.modules[mod] = MagicMock()
+
+sys.modules["ollama"] = MagicMock()
 
 from brain import get_brain
 from brain.action_response import ActionResponseLayer
@@ -147,10 +165,10 @@ def test_local_qwen_prefers_layer_only_emotion_mode():
 
 def test_api_models_keep_prompt_emotion_rules():
     original_provider = settings.llm_provider
-    original_model = settings.groq_model
+    original_model = settings.cerebras_model
     try:
-        settings.llm_provider = LLMProvider.GROQ
-        settings.groq_model = "openai/gpt-oss-120b"
+        settings.llm_provider = LLMProvider.CEREBRAS
+        settings.cerebras_model = "llama-3.1-8b"
         manager = SteeringManager()
 
         assert manager.should_force_local_emotion_steering() is False
@@ -160,7 +178,7 @@ def test_api_models_keep_prompt_emotion_rules():
         assert "DEIN AKTUELLER EMOTIONALER STATUS" in prompt
     finally:
         settings.llm_provider = original_provider
-        settings.groq_model = original_model
+        settings.cerebras_model = original_model
 
 
 def test_local_ollama_models_use_prompt_emotions():
@@ -288,6 +306,63 @@ def test_action_response_suffix_can_skip_fixed_tone_directives():
     assert "Antworte direkt." in suffix
 
 
+def test_cerebras_provider_resolves_correct_model():
+    original_provider = settings.llm_provider
+    original_model = settings.cerebras_model
+    try:
+        settings.llm_provider = LLMProvider.CEREBRAS
+        settings.cerebras_model = "qwen-3-235b-a22b-instruct-2507"
+        assert get_active_model() == "qwen-3-235b-a22b-instruct-2507"
+    finally:
+        settings.llm_provider = original_provider
+        settings.cerebras_model = original_model
+
+
+def test_get_brain_for_cerebras_returns_cerebras_brain():
+    from brain.cerebras_brain import CerebrasBrain
+    original_provider = settings.llm_provider
+    try:
+        settings.llm_provider = LLMProvider.CEREBRAS
+        brain = get_brain()
+        assert isinstance(brain, CerebrasBrain)
+    finally:
+        settings.llm_provider = original_provider
+
+
+def test_cerebras_is_not_local_provider():
+    manager = SteeringManager()
+    assert manager.is_local_provider(LLMProvider.CEREBRAS) is False
+    assert manager.is_local_provider(LLMProvider.VLLM) is True
+    assert manager.is_local_provider(LLMProvider.OLLAMA) is True
+
+
+def test_cerebras_does_not_support_activation_steering():
+    manager = SteeringManager()
+    assert manager.supports_activation_steering(LLMProvider.CEREBRAS) is False
+    assert manager.supports_activation_steering(LLMProvider.VLLM) is True
+    assert manager.supports_activation_steering(LLMProvider.OLLAMA) is False
+
+
+def test_cerebras_uses_prompt_emotions():
+    manager = SteeringManager()
+    assert manager.should_use_prompt_emotions(LLMProvider.CEREBRAS) is True
+    assert manager.should_use_prompt_emotions(LLMProvider.OLLAMA) is True
+    assert manager.should_use_prompt_emotions(LLMProvider.VLLM) is False
+
+
+def test_get_intent_model_for_cerebras():
+    original_provider = settings.llm_provider
+    original_intent = settings.intent_provider
+    try:
+        settings.llm_provider = LLMProvider.CEREBRAS
+        settings.intent_provider = LLMProvider.CEREBRAS
+        model = settings.get_intent_model()
+        assert model == settings.intent_processor_model_cerebras
+    finally:
+        settings.llm_provider = original_provider
+        settings.intent_provider = original_intent
+
+
 if __name__ == "__main__":
     test_agents_use_brain_config_defaults()
     test_get_active_model_supports_vllm()
@@ -296,9 +371,15 @@ if __name__ == "__main__":
     test_vllm_multi_model_mode_keeps_requested_runtime_models()
     test_local_qwen_prefers_layer_only_emotion_mode()
     test_api_models_keep_prompt_emotion_rules()
-    test_local_ollama_models_do_not_use_prompt_emotions_anymore()
+    test_local_ollama_models_use_prompt_emotions()
     test_layer_config_exposes_per_emotion_alpha_and_layers()
     test_runtime_layer_config_clamps_outdated_saved_ranges()
     test_qwen35_4b_runtime_profile_exposes_expected_layer_window()
     test_action_response_suffix_can_skip_fixed_tone_directives()
+    test_cerebras_provider_resolves_correct_model()
+    test_get_brain_for_cerebras_returns_cerebras_brain()
+    test_cerebras_is_not_local_provider()
+    test_cerebras_does_not_support_activation_steering()
+    test_cerebras_uses_prompt_emotions()
+    test_get_intent_model_for_cerebras()
     print("OK: local-first runtime configuration is consistent")

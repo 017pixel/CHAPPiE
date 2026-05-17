@@ -11,8 +11,8 @@ PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
 for mod in (
-    "ollama", "groq", "chromadb", "chromadb.config", "requests", "openai",
-    "brain.groq_brain", "brain.cerebras_brain", "brain.nvidia_brain",
+    "ollama", "chromadb", "chromadb.config", "requests", "openai",
+    "brain.cerebras_brain",
     "brain.ollama_brain", "brain.brain_pipeline", "brain.steering_api_server",
     "brain.steering_backend", "brain.deep_think", "brain.global_workspace",
     "brain.action_response", "brain.response_parser", "brain.agents",

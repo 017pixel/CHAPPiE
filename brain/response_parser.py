@@ -102,9 +102,7 @@ def looks_like_model_error(response: str) -> bool:
     stripped = response.strip()
     error_prefixes = (
         "Ollama Fehler",
-        "Groq Fehler",
         "Cerebras Fehler",
-        "NVIDIA Fehler",
         "vLLM Fehler",
         "VLLM Fehler",
     )

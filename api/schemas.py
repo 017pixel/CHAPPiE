@@ -113,20 +113,14 @@ class SettingsSnapshot(BaseModel):
     vllm_url: str
     vllm_model: str
     vllm_force_single_model: bool
-    groq_model: str
     cerebras_model: str
-    nvidia_model: str
     intent_provider: Optional[str]
-    intent_processor_model_groq: str
     intent_processor_model_cerebras: str
     intent_processor_model_ollama: str
     intent_processor_model_vllm: str
-    intent_processor_model_nvidia: str
     query_extraction_provider: Optional[str]
-    query_extraction_groq_model: str
     query_extraction_ollama_model: str
     query_extraction_vllm_model: str
-    query_extraction_nvidia_model: str
     query_extraction_cerebras_model: str
     query_extraction_min_words_for_llm: int
     emotion_analysis_model: str
@@ -161,28 +155,20 @@ class SettingsSnapshot(BaseModel):
 
 class SettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None
-    groq_api_key: Optional[str] = None
     cerebras_api_key: Optional[str] = None
-    nvidia_api_key: Optional[str] = None
-    groq_model: Optional[str] = None
     cerebras_model: Optional[str] = None
-    nvidia_model: Optional[str] = None
     vllm_model: Optional[str] = None
     vllm_url: Optional[str] = None
     vllm_force_single_model: Optional[bool] = None
     ollama_model: Optional[str] = None
     ollama_host: Optional[str] = None
     intent_provider: Optional[str] = None
-    intent_processor_model_groq: Optional[str] = None
     intent_processor_model_cerebras: Optional[str] = None
     intent_processor_model_ollama: Optional[str] = None
     intent_processor_model_vllm: Optional[str] = None
-    intent_processor_model_nvidia: Optional[str] = None
     query_extraction_provider: Optional[str] = None
-    query_extraction_groq_model: Optional[str] = None
     query_extraction_ollama_model: Optional[str] = None
     query_extraction_vllm_model: Optional[str] = None
-    query_extraction_nvidia_model: Optional[str] = None
     query_extraction_cerebras_model: Optional[str] = None
     query_extraction_min_words_for_llm: Optional[int] = None
     emotion_analysis_model: Optional[str] = None

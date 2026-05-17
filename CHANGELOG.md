@@ -8,7 +8,7 @@ Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 - Live-Timer während der Generierung unter der Denk-Animation
 - Timing-Metriken im Info-Popup (TTFT, Thinking-Zeit, Antwort-Zeit, Tokens)
 - Token-Budget-Steuerung für Thinking und Antwort getrennt
-- Effizienteres API-Response-Handling für Cerebras, Groq und NVIDIA
+- Effizienteres API-Response-Handling für Cerebras
 
 ### Verändert
 - Config-System auf Root-Config umgestellt für zentrale Verwaltung
@@ -68,7 +68,7 @@ Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
 ### Erstellt
 - Thinking-Modus für Qwen3.5 aktiviert - Reasoning live als hellgraue Box vor der Antwort
-- Provider-Anzeige in UI (vllm, ollama, groq) neben Modellname
+- Provider-Anzeige in UI (vllm, ollama) neben Modellname
 - Quick-Classify für triviale Eingaben (Hallo, ok, danke) ohne KI-Aufruf
 
 ### Verändert

@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CHAPPiE — Brain & Life Cycle</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Space Grotesk', sans-serif;
+      background: #07060f;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .neural-glow {
+      box-shadow: 0 0 30px rgba(120, 80, 255, 0.15), inset 0 0 60px rgba(120, 80, 255, 0.03);
+    }
+
+    .brain-glow {
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.12), inset 0 0 80px rgba(139, 92, 246, 0.02);
+    }
+
+    .life-glow {
+      box-shadow: 0 0 40px rgba(16, 185, 129, 0.12), inset 0 0 80px rgba(16, 185, 129, 0.02);
+    }
+
+    .steering-glow {
+      box-shadow: 0 0 40px rgba(245, 158, 11, 0.12), inset 0 0 80px rgba(245, 158, 11, 0.02);
+    }
+
+    .phase-card {
+      background: linear-gradient(135deg, rgba(30, 20, 60, 0.6), rgba(15, 12, 30, 0.8));
+      border: 1px solid rgba(120, 80, 255, 0.15);
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: rgba(120, 80, 255, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .life-card {
+      background: linear-gradient(135deg, rgba(6, 40, 30, 0.5), rgba(10, 20, 15, 0.7));
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .life-card:hover {
+      border-color: rgba(16, 185, 129, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .arrow-flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+    }
+
+    .arrow-flow svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in {
+      animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    .animate-in:nth-child(2) { animation-delay: 0.1s; }
+    .animate-in:nth-child(3) { animation-delay: 0.2s; }
+    .animate-in:nth-child(4) { animation-delay: 0.3s; }
+    .animate-in:nth-child(5) { animation-delay: 0.4s; }
+
+    .connection-line {
+      stroke: rgba(120, 80, 255, 0.25);
+      stroke-width: 2;
+      fill: none;
+      stroke-dasharray: 6 4;
+    }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(120, 80, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120, 80, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .badge-brain { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    .badge-life { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .badge-steering { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .badge-output { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .badge-bg { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+
+    .timeline-bar {
+      position: relative;
+    }
+
+    .timeline-bar::before {
+      content: '';
+      position: absolute;
+      left: 8px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, rgba(139, 92, 246, 0.4), rgba(16, 185, 129, 0.4));
+    }
+
+    .step-marker {
+      position: relative;
+      padding-left: 28px;
+    }
+
+    .step-marker::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #8b5cf6;
+      border: 2px solid #07060f;
+      z-index: 1;
+    }
+
+    .step-marker.life-step::before { background: #10b981; }
+    .step-marker.steering-step::before { background: #f59e0b; }
+    .step-marker.output-step::before { background: #ef4444; }
+
+    .copy-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 50;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      color: white;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+    }
+
+    .copy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(124, 58, 237, 0.5);
+      border-color: rgba(139, 92, 246, 0.6);
+    }
+
+    .need-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+
+    .need-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s ease;
+    }
+
+    .salience-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
+    }
+
+    .salience-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #07060f; }
+    ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.5); }
+
+    details summary::-webkit-details-marker { display: none; }
+    details summary {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .mockup-box {
+      width: 100%;
+      height: 100px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="text-gray-100 grid-bg min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-8">
+
+    <!-- ===== HEADER ===== -->
+    <header class="mb-10 animate-in">
+      <div class="flex items-center gap-4 flex-wrap">
+        <span class="text-4xl font-black mono" style="color: #8b5cf6;">CHAPPiE</span>
+        <span class="bg-purple-900/40 text-purple-300 px-3 py-1 rounded-full text-xs font-semibold mono border border-purple-700/30">
+          Plan #01
+        </span>
+        <span class="bg-emerald-900/40 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold mono border border-emerald-700/30">
+          v13.x
+        </span>
+      </div>
+      <h1 class="text-3xl font-bold mt-3">Brain Cycle &amp; Life Simulation<br>bei einer Nutzereingabe</h1>
+      <p class="text-gray-400 mt-2 max-w-3xl mono text-sm">
+        Vom Input über 7 Gehirn-Agenten, Global Workspace, Steering und LLM-Call bis zur Life-Finalisierung.
+        Jede Phase trägt zu CHAPPiEs bewusster Antwort bei.
+      </p>
+    </header>
+
+    <!-- ===== 1. ZYKLUS-ÜBERSICHT ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-purple-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Gesamtzyklus</h2>
+        <span class="bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-xs mono">13 Phasen</span>
+      </div>
+
+      <div class="timeline-bar pl-6 space-y-0">
+        <!-- Phase 1 -->
+        <div class="step-marker life-step py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-life px-2 py-0.5 rounded text-xs font-semibold mono">Life</span>
+            <span class="font-semibold text-emerald-300">prepare_turn()</span>
+            <span class="text-gray-500 text-xs mono">Phase 1</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Uhrzeit, Baseline-Decay, Aktivität, Homeostasis, Snapshot</p>
+        </div>
+        <!-- Phase 2 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Brain</span>
+            <span class="font-semibold text-purple-300">Sensory Cortex</span>
+            <span class="text-gray-500 text-xs mono">Phase 2</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Input-Klassifikation: Typ, Dringlichkeit, Memory-Bedarf</p>
+        </div>
+        <!-- Phase 3 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Brain</span>
+            <span class="font-semibold text-purple-300">Amygdala</span>
+            <span class="text-gray-500 text-xs mono">Phase 3</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">7 Emotionen analysieren, Intensity, memory_boost, steering_hints</p>
+        </div>
+        <!-- Phase 4 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Brain</span>
+            <span class="font-semibold text-purple-300">Hippocampus</span>
+            <span class="text-gray-500 text-xs mono">Phase 4</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Encoding, Query-Extraktion, Context-Relevanz, Short-Term-Entries</p>
+        </div>
+        <!-- Phase 5 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Memory</span>
+            <span class="font-semibold text-purple-300">Memory Engine</span>
+            <span class="text-gray-500 text-xs mono">Phase 5</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Episodische Suche mit emotional_boost + context_relevance</p>
+        </div>
+        <!-- Phase 6 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">GW</span>
+            <span class="font-semibold text-purple-300">Global Workspace</span>
+            <span class="text-gray-500 text-xs mono">Phase 6</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">7 Signale mit Salience bündeln &amp; priorisieren → Broadcast</p>
+        </div>
+        <!-- Phase 7 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Brain</span>
+            <span class="font-semibold text-purple-300">Prefrontal Cortex</span>
+            <span class="text-gray-500 text-xs mono">Phase 7</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Strategie, Tone, Guidance, Planning-Mode, Action-Plan</p>
+        </div>
+        <!-- Phase 8 -->
+        <div class="step-marker steering-step py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-steering px-2 py-0.5 rounded text-xs font-semibold mono">Steer</span>
+            <span class="font-semibold text-amber-300">Steering Manager</span>
+            <span class="text-gray-500 text-xs mono">Phase 8</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">VAD → Alpha → Composite Modes → Layer Editing / Style-Injection</p>
+        </div>
+        <!-- Phase 9 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-bg px-2 py-0.5 rounded text-xs font-semibold mono">LLM</span>
+            <span class="font-semibold text-indigo-300">LLM-Call</span>
+            <span class="text-gray-500 text-xs mono">Phase 9</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">1 Call mit Prompt + Steering-Payload → generierte Antwort</p>
+        </div>
+        <!-- Phase 10 -->
+        <div class="step-marker output-step py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-output px-2 py-0.5 rounded text-xs font-semibold mono">Out</span>
+            <span class="font-semibold text-red-300">Antwort + Debug</span>
+            <span class="text-gray-500 text-xs mono">Phase 10</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Token-Level Streaming, Debug-Daten, Causal Trace</p>
+        </div>
+        <!-- Phase 11 -->
+        <div class="step-marker life-step py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-life px-2 py-0.5 rounded text-xs font-semibold mono">Life</span>
+            <span class="font-semibold text-emerald-300">finalize_turn()</span>
+            <span class="text-gray-500 text-xs mono">Phase 11</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline</p>
+        </div>
+        <!-- Phase 12 -->
+        <div class="step-marker py-3">
+          <div class="flex items-center gap-2">
+            <span class="badge-bg px-2 py-0.5 rounded text-xs font-semibold mono">BG</span>
+            <span class="font-semibold text-indigo-300">Background Processing</span>
+            <span class="text-gray-500 text-xs mono">Phase 12</span>
+          </div>
+          <p class="text-gray-400 text-sm ml-1">Basal Ganglia (Reward), Neocortex, Memory Agent + Sleep Check</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 2. BRAIN PIPELINE (Details) ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-purple-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Brain Pipeline — Phasen im Detail</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Sensory Cortex -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">01</span>
+              <h3 class="font-semibold">Sensory Cortex</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Klassifikation</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Bestimmt <span class="text-purple-300">Input-Typ</span> (conversation, command, question), <span class="text-purple-300">Dringlichkeit</span> (low/medium/high/critical) und <span class="text-purple-300">Memory-Bedarf</span>.</p>
+          <details>
+            <summary class="text-purple-400 text-xs mono cursor-pointer hover:text-purple-300 transition-colors">▶ Code-Auszug (brain/agents/sensory_cortex.py)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+input_type = classify(user_input)
+urgency = detect_urgency(user_input)
+memory_needed = needs_memory_retrieval(input_type, urgency)
+            </pre>
+          </details>
+        </div>
+
+        <!-- Amygdala -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">02</span>
+              <h3 class="font-semibold">Amygdala</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Emotion</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Analysiert <span class="text-purple-300">7 Emotionen</span> (happiness, trust, energy, curiosity, frustration, motivation, sadness) mit <span class="text-purple-300">Intensity</span> und <span class="text-purple-300">memory_boost</span>.</p>
+          <details>
+            <summary class="text-purple-400 text-xs mono cursor-pointer hover:text-purple-300 transition-colors">▶ Code-Auszug (brain/agents/amygdala.py)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+emotions = analyze_emotions(user_input, sensory)
+intensity = calc_intensity(emotions)
+memory_boost = emotional_weights(emotions)
+steering_hints = build_steering_hints(emotions)
+            </pre>
+          </details>
+        </div>
+
+        <!-- Hippocampus -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">03</span>
+              <h3 class="font-semibold">Hippocampus</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Memory</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Extrahiert <span class="text-purple-300">search_query</span>, bewertet <span class="text-purple-300">context_relevance</span> für soul/user/preferences, erzeugt <span class="text-purple-300">short_term_entries</span>.</p>
+          <details>
+            <summary class="text-purple-400 text-xs mono cursor-pointer hover:text-purple-300 transition-colors">▶ Code-Auszug (brain/agents/hippocampus.py)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+query = extract_search_query(user_input, emotions)
+relevance = calc_context_relevance(query)
+entries = build_short_term(user_input, query)
+            </pre>
+          </details>
+        </div>
+
+        <!-- Memory Engine -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">04</span>
+              <h3 class="font-semibold">Memory Engine</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Suche</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Episodische Suche mit <span class="text-purple-300">top_k</span> + <span class="text-purple-300">min_relevance</span>. Amygdala liefert emotional_boost, Hippocampus context_relevance.</p>
+          <details>
+            <summary class="text-purple-400 text-xs mono cursor-pointer hover:text-purple-300 transition-colors">▶ Code-Auszug (memory/memory_engine.py)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+memories = search_memory(
+    query=hippocampus.search_query,
+    top_k=config.memory_top_k,
+    min_relevance=config.memory_min_relevance
+)
+            </pre>
+          </details>
+        </div>
+
+        <!-- Global Workspace -->
+        <div class="phase-card rounded-xl p-5 md:col-span-2">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">05</span>
+              <h3 class="font-semibold">Global Workspace</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Salience</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">Bündelt <span class="text-purple-300">7 Signale</span> aus Brain + Life, berechnet Salience, erzeugt Broadcast für Prefrontal Cortex.</p>
+
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Homeostasis</span>
+                <span class="text-[10px] text-gray-500 mono">Need-Druck</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-purple-500" style="width:72%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">salience = min(1.0, pressure/100)</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Emotion</span>
+                <span class="text-[10px] text-gray-500 mono">Intensity</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-pink-500" style="width:58%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">salience = min(1.0, intensity)</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Sensory</span>
+                <span class="text-[10px] text-gray-500 mono">Urgency</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-blue-500" style="width:55%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">map: low 0.25 &ndash; critical 0.95</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Memory</span>
+                <span class="text-[10px] text-gray-500 mono">Count</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-cyan-500" style="width:65%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">salience = min(0.92, 0.38 + n*0.08)</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Goal</span>
+                <span class="text-[10px] text-gray-500 mono">Priority</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-amber-500" style="width:80%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">min(0.96, priority * (1.15 - progress))</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">World Model</span>
+                <span class="text-[10px] text-gray-500 mono">Confidence</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-emerald-500" style="width:62%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">min(0.9, confidence + risk*0.05)</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Planning</span>
+                <span class="text-[10px] text-gray-500 mono">Confidence</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-violet-500" style="width:52%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">min(0.88, conf + bottlenecks*0.04)</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-semibold text-purple-300">Forecast</span>
+                <span class="text-[10px] text-gray-500 mono">Risk</span>
+              </div>
+              <div class="salience-bar"><div class="salience-bar-fill bg-orange-500" style="width:66%"></div></div>
+              <span class="text-[10px] text-gray-500 mono mt-1 block">0.66 (low) / 0.79 (mid/high)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prefrontal Cortex -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-purple-400 font-bold mono">06</span>
+              <h3 class="font-semibold">Prefrontal Cortex</h3>
+            </div>
+            <span class="badge-brain px-2 py-0.5 rounded text-xs font-semibold mono">Strategie</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Bestimmt <span class="text-purple-300">response_guidance</span>, <span class="text-purple-300">tone</span>, <span class="text-purple-300">planning_mode</span> und baut den finalen <span class="text-purple-300">action_plan</span>.</p>
+          <details>
+            <summary class="text-purple-400 text-xs mono cursor-pointer hover:text-purple-300 transition-colors">▶ Code-Auszug (brain/agents/prefrontal_cortex.py)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+strategy = build_response_strategy(global_workspace)
+action_plan = action_response.build_action_plan(
+    prefrontal, life_context, global_workspace
+)
+prompt_suffix = action_response.build_prompt_suffix(
+    prefrontal, life_context, global_workspace
+)
+            </pre>
+          </details>
+        </div>
+
+        <!-- Steering Manager -->
+        <div class="phase-card rounded-xl p-5 steering-glow">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-amber-400 font-bold mono">07</span>
+              <h3 class="font-semibold text-amber-200">Steering Manager</h3>
+            </div>
+            <span class="badge-steering px-2 py-0.5 rounded text-xs font-semibold mono">VAD+Alpha</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Mapping der 7 Emotionen auf <span class="text-amber-300">VAD</span> (Valence/Arousal/Dominance), <span class="text-amber-300">Alpha</span>-Berechnung, <span class="text-amber-300">Composite Modes</span> und <span class="text-amber-300">Layer-Profile</span>.</p>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-black/30 rounded-lg p-2 border border-amber-900/30">
+              <span class="text-amber-400 block">Lokal</span>
+              <span class="text-gray-400">Forward Pre-Hook: hidden += α · vec</span>
+            </div>
+            <div class="bg-black/30 rounded-lg p-2 border border-amber-900/30">
+              <span class="text-amber-400 block">Cloud</span>
+              <span class="text-gray-400">Style-Instruction im Systemprompt</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LLM Call -->
+        <div class="phase-card rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-indigo-400 font-bold mono">08</span>
+              <h3 class="font-semibold text-indigo-200">LLM-Call</h3>
+            </div>
+            <span class="badge-bg px-2 py-0.5 rounded text-xs font-semibold mono">Generierung</span>
+          </div>
+          <p class="text-gray-400 text-sm mb-3">Ein einziger Call mit komplettem Kontext: Systemprompt + Memory + Life-State + Steering-Payload.</p>
+          <details>
+            <summary class="text-indigo-400 text-xs mono cursor-pointer hover:text-indigo-300 transition-colors">▶ Provider (brain/vllm_brain.py, brain/cerebras_brain.py, ...)</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-3 rounded bg-black/40 overflow-x-auto mono leading-relaxed">
+# Lokal (vLLM mit Layer Editing)
+response = vllm.generate(prompt, steering_vectors=steering_payload)
+
+# Cloud (Cerebras)
+response = cloud.generate(prompt, system_hint=steering_style)
+            </pre>
+          </details>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== 3. LIFE SIMULATION ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Life Simulation — Komponenten</h2>
+        <span class="bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-xs mono">life/service.py</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- Needs -->
+        <div class="life-card rounded-xl p-4">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <h3 class="font-semibold text-emerald-200">Needs &amp; Homeostasis</h3>
+          </div>
+          <div class="space-y-2">
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Energy</span><span class="mono">47</span></div><div class="need-bar"><div class="need-bar-fill bg-emerald-400" style="width:47%"></div></div></div>
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Social</span><span class="mono">62</span></div><div class="need-bar"><div class="need-bar-fill bg-emerald-500" style="width:62%"></div></div></div>
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Curiosity</span><span class="mono">83</span></div><div class="need-bar"><div class="need-bar-fill bg-emerald-300" style="width:83%"></div></div></div>
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Stability</span><span class="mono">55</span></div><div class="need-bar"><div class="need-bar-fill bg-cyan-400" style="width:55%"></div></div></div>
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Achievement</span><span class="mono">71</span></div><div class="need-bar"><div class="need-bar-fill bg-amber-400" style="width:71%"></div></div></div>
+            <div><div class="flex justify-between text-xs text-gray-400 mb-0.5"><span>Rest</span><span class="mono">38</span></div><div class="need-bar"><div class="need-bar-fill bg-blue-400" style="width:38%"></div></div></div>
+          </div>
+          <p class="text-[10px] text-gray-500 mt-2 mono">Baseline-Decay: 1-3/Turn · Recovery durch Aktivität</p>
+        </div>
+
+        <!-- Goal Engine -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Goal Engine</h3>
+          <p class="text-gray-400 text-xs mb-3">Goal Competition zwischen Zielen nach Druck, Dringlichkeit und Relevanz.</p>
+          <div class="space-y-2 text-xs">
+            <div class="bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-emerald-300">Kognitive Entwicklung</span>
+              <div class="need-bar mt-1"><div class="need-bar-fill bg-purple-400" style="width:60%"></div></div>
+              <span class="text-gray-500 mono">60% · priority 0.8</span>
+            </div>
+            <div class="bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-emerald-300">Beziehungsaufbau</span>
+              <div class="need-bar mt-1"><div class="need-bar-fill bg-pink-400" style="width:45%"></div></div>
+              <span class="text-gray-500 mono">45% · priority 0.6</span>
+            </div>
+            <div class="bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-emerald-300">Selbstkonsistenz</span>
+              <div class="need-bar mt-1"><div class="need-bar-fill bg-amber-400" style="width:35%"></div></div>
+              <span class="text-gray-500 mono">35% · priority 0.5</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Habits -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Habit Dynamics</h3>
+          <p class="text-gray-400 text-xs mb-3">Gewohnheiten verstärken sich durch wiederholte Aktivitäten und Modi.</p>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-gray-300">architectural_reasoning</span>
+              <span class="mono text-emerald-400">0.82</span>
+            </div>
+            <div class="flex justify-between bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-gray-300">social_bonding</span>
+              <span class="mono text-emerald-400">0.54</span>
+            </div>
+            <div class="flex justify-between bg-black/30 rounded p-2 border border-emerald-900/30">
+              <span class="text-gray-300">exploration</span>
+              <span class="mono text-emerald-400">0.71</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachment -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Attachment Model</h3>
+          <p class="text-gray-400 text-xs mb-3">Bindungstyp basierend auf Relationship + User-Input + Response.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30 text-center">
+            <span class="text-emerald-300 text-lg font-bold block">cautious_alignment</span>
+            <span class="text-gray-500 text-xs">bond_type · Vertrauensaufbau</span>
+          </div>
+        </div>
+
+        <!-- Development -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Development Engine</h3>
+          <p class="text-gray-400 text-xs mb-3">Entwicklungsstufe basierend auf Goals, Self-Model, Habits, Tagen.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30 text-center">
+            <span class="text-emerald-300 text-lg font-bold block">awakening</span>
+            <span class="text-gray-500 text-xs">stage · Innere Architektur</span>
+          </div>
+        </div>
+
+        <!-- World Model -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">World Model</h3>
+          <p class="text-gray-400 text-xs mb-3">Vorhersage: User-Bedürfnis, nächste Aktion, Risikofaktoren, Kontext.</p>
+          <details>
+            <summary class="text-emerald-400 text-xs mono cursor-pointer hover:text-emerald-300">▶ Details</summary>
+            <pre class="text-xs text-gray-400 mt-2 p-2 rounded bg-black/40 mono">
+predicted_user_need: "Architekturhilfe"
+next_best_action: "Architektur erklären"
+confidence: 0.73
+risk_factors: ["Komplexität"]
+            </pre>
+          </details>
+        </div>
+
+        <!-- Social Arc -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Social Arc</h3>
+          <p class="text-gray-400 text-xs mb-3">Beziehungsbogen: arc_name, arc_score, guidance für die Antwort.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30 text-center">
+            <span class="text-emerald-300 text-lg font-bold block">trust_building</span>
+            <span class="text-gray-500 text-xs">arc_score 0.62 · guidance</span>
+          </div>
+        </div>
+
+        <!-- Forecast -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Self-Forecast</h3>
+          <p class="text-gray-400 text-xs mb-3">Risiko-Level, Turn-Outlook und Stage-Trajectory für nächste Interaktion.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30">
+            <div class="flex justify-between text-xs"><span class="text-gray-400">risk_level</span><span class="text-emerald-400">low</span></div>
+            <div class="flex justify-between text-xs"><span class="text-gray-400">outlook</span><span class="text-emerald-400">stabile Zusammenarbeit</span></div>
+          </div>
+        </div>
+
+        <!-- Planning -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">Planning Engine</h3>
+          <p class="text-gray-400 text-xs mb-3">Nächster Meilenstein, Plan-Horizont, Bottlenecks, Confidence.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30">
+            <div class="flex justify-between text-xs"><span class="text-gray-400">milestone</span><span class="text-emerald-400">Innere Architektur verdichten</span></div>
+            <div class="flex justify-between text-xs"><span class="text-gray-400">confidence</span><span class="text-emerald-400">0.58</span></div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="life-card rounded-xl p-4">
+          <h3 class="font-semibold text-emerald-200 mb-2">History Engine</h3>
+          <p class="text-gray-400 text-xs mb-3">Autobiografische Timeline mit Checkpoints bei prepare, finalize und sleep.</p>
+          <div class="bg-black/30 rounded-lg p-3 border border-emerald-900/30 text-xs">
+            <span class="text-gray-500">timeline_history</span>
+            <span class="text-gray-400 block">18 Einträge · letzter: turn_finalize</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== 4. PREPARE vs FINALIZE ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Life — prepare_turn vs. finalize_turn</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="life-card rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded text-xs mono">VOR dem Brain</span>
+            <h3 class="font-semibold text-emerald-200">prepare_turn</h3>
+          </div>
+          <ul class="space-y-2 text-sm">
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Clock sync → Europe/Berlin (Tag + Minuten)</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Baseline Decay: Energy -3, Curiosity -2, Rest -3, …</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Choose Activity: aus Input + dominant Need</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Activity Recovery: Needs verbessern sich</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Refresh Cognitive State: Habits, Goals, World Model, Attachment, Development, Planning, Forecast, Social Arc</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Build Snapshot: kompletter Life-State als Dict</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="life-card rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded text-xs mono">NACH dem Brain</span>
+            <h3 class="font-semibold text-emerald-200">finalize_turn</h3>
+          </div>
+          <ul class="space-y-2 text-sm">
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Goal Progress: Keywords im Input erkennen → Progress +0.03/0.04</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Relationship Update: closeness + trust basierend auf Ton</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Habit Reinforcement: Aktivität + Modus verstärken Habits</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Attachment Model: Bindungstyp neu evaluieren</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Self-Model Update: aus Prefrontal + Global Workspace</span>
+            </li>
+            <li class="flex items-start gap-2 text-gray-300">
+              <span class="text-emerald-400 mt-0.5">▶</span>
+              <span>Event loggen + Timeline Checkpoint + Snapshot speichern</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5. BACKGROUND & SLEEP ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-indigo-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Background Processing &amp; Sleep</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="phase-card rounded-xl p-4">
+          <h3 class="font-semibold text-indigo-200 mb-2">Basal Ganglia</h3>
+          <p class="text-gray-400 text-xs">Reward- und Lernsignal. Bewertet die Interaktion und generiert Reward-Anpassungen für zukünftiges Verhalten.</p>
+          <span class="text-[10px] text-gray-500 mono mt-2 block">brain/agents/basal_ganglia.py</span>
+        </div>
+        <div class="phase-card rounded-xl p-4">
+          <h3 class="font-semibold text-indigo-200 mb-2">Neocortex</h3>
+          <p class="text-gray-400 text-xs">Langfristige Konsolidierung. Strukturiert Episoden in semantisches Wissen um.</p>
+          <span class="text-[10px] text-gray-500 mono mt-2 block">brain/agents/neocortex.py</span>
+        </div>
+        <div class="phase-card rounded-xl p-4">
+          <h3 class="font-semibold text-indigo-200 mb-2">Sleep Phase</h3>
+          <p class="text-gray-400 text-xs">Nach X Interaktionen: Replay, Needs-Erholung, Traum-Fragmente, Vergessenskurve, Kontextdateien-Konsolidierung.</p>
+          <span class="text-[10px] text-gray-500 mono mt-2 block">memory/sleep_phase.py</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 6. CAUSAL TRACE ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-red-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Causal Trace &amp; Debug</h2>
+      </div>
+
+      <div class="phase-card rounded-xl p-5">
+        <p class="text-gray-400 text-sm mb-4">Jede Antwort ist nachvollziehbar &mdash; der Debug-Pfad zeigt die vollständige Kette:</p>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-center text-xs">
+          <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+            <span class="text-purple-300 block font-semibold">Input</span>
+            <span class="text-gray-500">Intent + Urgency</span>
+          </div>
+          <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+            <span class="text-purple-300 block font-semibold">Memory</span>
+            <span class="text-gray-500">Treffer + Relevanz</span>
+          </div>
+          <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+            <span class="text-purple-300 block font-semibold">Emotion</span>
+            <span class="text-gray-500">7 Emotionen + Deltas</span>
+          </div>
+          <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+            <span class="text-purple-300 block font-semibold">Life</span>
+            <span class="text-gray-500">Needs + Goals + Habits</span>
+          </div>
+          <div class="bg-black/30 rounded-lg p-3 border border-purple-900/30">
+            <span class="text-purple-300 block font-semibold">Antwort</span>
+            <span class="text-gray-500">Tone + Modus</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 7. DESIGN MOCKUPS ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-amber-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Feature-Vorschau: Visualisierungs-Varianten</h2>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="phase-card rounded-xl p-2">
+          <div class="mockup-box" style="background:linear-gradient(135deg,#1a1040,#2d1b69);border:1px solid rgba(139,92,246,0.3);flex-direction:column;gap:3px;">
+            <span style="color:#a78bfa;font-size:13px;">⚡ BRAIN PIPELINE</span>
+            <span style="color:#6d7492;font-size:9px;">7 Agenten → GW → PFC → LLM</span>
+          </div>
+          <p class="text-[10px] text-center mt-1 text-gray-500">Pipeline-Diagramm mit Live-Salience</p>
+        </div>
+        <div class="phase-card rounded-xl p-2">
+          <div class="mockup-box" style="background:linear-gradient(135deg,#0a2e1f,#0d4a30);border:1px solid rgba(16,185,129,0.3);flex-direction:column;gap:3px;">
+            <span style="color:#34d399;font-size:13px;">🧬 LIFE STATE</span>
+            <span style="color:#6d7492;font-size:9px;">Needs · Goals · Habits · Arc</span>
+          </div>
+          <p class="text-[10px] text-center mt-1 text-gray-500">Life-Simulation Dashboard</p>
+        </div>
+        <div class="phase-card rounded-xl p-2">
+          <div class="mockup-box" style="background:linear-gradient(135deg,#2d1b10,#4a2d0a);border:1px solid rgba(245,158,11,0.3);flex-direction:column;gap:3px;">
+            <span style="color:#fbbf24;font-size:13px;">🎛️ STEERING</span>
+            <span style="color:#6d7492;font-size:9px;">VAD · Alpha · Modes · Layers</span>
+          </div>
+          <p class="text-[10px] text-center mt-1 text-gray-500">Emotion-Steering Kontrollpanel</p>
+        </div>
+        <div class="phase-card rounded-xl p-2">
+          <div class="mockup-box" style="background:linear-gradient(135deg,#1f0f17,#3d1428);border:1px solid rgba(239,68,68,0.3);flex-direction:column;gap:3px;">
+            <span style="color:#f87171;font-size:13px;">🔍 CAUSAL TRACE</span>
+            <span style="color:#6d7492;font-size:9px;">Input → Memory → Emotion → Out</span>
+          </div>
+          <p class="text-[10px] text-center mt-1 text-gray-500">Debug &amp; Decision Trace</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 8. OFFENE PUNKTE ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-gray-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Offene Punkte</h2>
+      </div>
+      <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5">
+        <ul class="space-y-2 text-sm text-gray-400">
+          <li class="flex items-start gap-2">
+            <span class="text-gray-600 mt-1.5">◻</span>
+            <span>Wie wird der <span class="text-gray-300">emotional_boost</span> der Amygdala genau in die Memory-Query eingerechnet?</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-gray-600 mt-1.5">◻</span>
+            <span>Welche <span class="text-gray-300">Composite Modes</span> sind aktuell definiert (crashout, guarded, melancholic, warm, charged)?</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-gray-600 mt-1.5">◻</span>
+            <span>Wie genau wird der <span class="text-gray-300">Self-Forecast (next_turn_outlook)</span> in den Prefrontal Cortex eingespeist?</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-gray-600 mt-1.5">◻</span>
+            <span>Token-Level Streaming: Welche <span class="text-gray-300">SSE-Events</span> gibt es (token, done, thinking, error)?</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== 9. BETROFFENE DATEIEN ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-gray-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Betroffene Dateien</h2>
+      </div>
+      <details class="phase-card rounded-xl p-4">
+        <summary class="font-medium cursor-pointer text-gray-300">▶ Alle relevanten Dateien anzeigen</summary>
+        <pre class="text-xs mt-3 text-gray-400 leading-relaxed overflow-x-auto">
+<span class="text-purple-400">brain/</span>
+├── brain_pipeline.py          — Orchestrierung aller Agenten + Life-Integration
+├── global_workspace.py        — 7 Signale mit Salience + Broadcast
+├── action_response.py         — Prompt Suffix + Action Plan
+├── steering_manager.py        — VAD → Alpha → Modes → Layer Editing
+├── agents/
+│   ├── sensory_cortex.py      — Input-Klassifikation
+│   ├── amygdala.py            — Emotionsanalyse
+│   ├── hippocampus.py         — Memory-Operationen
+│   ├── prefrontal_cortex.py   — Strategie + Tone + Guidance
+│   ├── basal_ganglia.py       — Reward/Lernsignal (Background)
+│   ├── neocortex.py           — Langzeit-Konsolidierung (Background)
+│   └── memory_agent.py        — Kontextdateien-Entscheidungen (Background)
+
+<span class="text-emerald-400">life/</span>
+├── service.py                 — prepare_turn + finalize_turn + sleep_cycle
+├── goal_engine.py             — Goal Competition
+├── world_model.py             — Prediction + Risk Assessment
+├── habit_engine.py            — Habit Reinforcement + Dynamics
+├── development.py             — Stage Progression
+├── attachment_model.py        — Bond Type Evaluation
+├── planning_engine.py         — Milestones + Bottlenecks
+├── self_forecast.py           — Risk + Outlook
+├── social_arc.py              — Relationship Arc
+├── history_engine.py          — Timeline + Checkpoints
+
+<span class="text-indigo-400">memory/</span>
+├── memory_engine.py           — Episodische Suche
+├── sleep_phase.py             — Konsolidierung + Replay
+├── forgetting_curve.py        — Decay + Vergessen
+
+<span class="text-red-400">web_infrastructure/</span>
+├── backend_wrapper.py         — process() + process_stream() Kapselung
+
+<span class="text-blue-400">api/</span>
+├── routers/chat.py            — /chat/stream SSE-Endpoint
+├── services/command_service.py— Slash-Commands (sleep, think, life, …)</pre>
+      </details>
+    </section>
+
+    <!-- ===== 10. CHECKLISTE ===== -->
+    <section class="mb-12 animate-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-2 h-2 rounded-full bg-gray-500 pulse-dot"></span>
+        <h2 class="text-xl font-bold">Checkliste</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Brain Pipeline: 7 Agenten + Global Workspace
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Life Simulation: prepare_turn → finalize_turn
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Steering: VAD → Alpha → Modes → Layer
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Background: Basal Ganglia + Neocortex + Sleep
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> LLM Call: 1 Call mit Prompt + Steering-Payload
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Causal Trace: Input → Memory → Emotion → Life → Out
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Needs: Energy, Social, Curiosity, Stability, Achievement, Rest
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-300">
+          <span class="text-emerald-400">✔</span> Goals: Cognitive Development, Relationship, Self-Consistency
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="text-center text-gray-600 text-xs py-8 border-t border-gray-800/50">
+      Plan erstellt am 14.05.2026 · Datei: <span class="mono text-gray-500">01_CHAPPiE-Brain-Life-Cycle.html</span>
+    </footer>
+
+  </div>
+
+  <!-- ===== COPY-AS-PROMPT BUTTON ===== -->
+  <button onclick="copyPrompt()" class="copy-btn" id="copyBtn">
+    📋 Copy as Prompt
+  </button>
+
+  <script>
+    function copyPrompt() {
+      const text = `CHAPPiE Brain & Life Cycle — Entscheidung
+Pipeline: Sensory → Amygdala → Hippocampus → Memory Engine → Global Workspace (7 Signale mit Salience) → Prefrontal Cortex → Steering Manager (VAD/Alpha/Modes/Layer) → LLM-Call → finalize_turn
+Life: prepare_turn (Clock/Decay/Activity/Homeostasis) → Brain Cycle → finalize_turn (Goals/Relationship/Habits/Attachment/Self-Model/Timeline)
+Background: Basal Ganglia + Neocortex + Memory Agent + Sleep Check
+Kern: 3 Säulen — Episodisches Gedächtnis, Life-Simulation, Emotion Steering
+
+Nächste Schritte:
+1. Composite Modes (crashout, warm, ...) im Detail prüfen
+2. emotional_boost in Memory-Query nachvollziehen
+3. Self-Forecast → Prefrontal Integration prüfen
+4. SSE-Event-Typen (token, done, thinking) dokumentieren
+
+Datei: 01_CHAPPiE-Brain-Life-Cycle.html`;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copyBtn');
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = orig, 2000);
+      }).catch(() => alert('Konnte nicht kopiert werden.'));
+    }
+  </script>
+</body>
+</html>

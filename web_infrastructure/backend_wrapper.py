@@ -232,12 +232,8 @@ def create_chappie_backend():
                 return (provider.value, model, settings.ollama_host)
             if provider == LLMProvider.VLLM:
                 return (provider.value, model, settings.vllm_url)
-            if provider == LLMProvider.GROQ:
-                return (provider.value, model, settings.groq_api_key)
             if provider == LLMProvider.CEREBRAS:
                 return (provider.value, model, settings.cerebras_api_key)
-            if provider == LLMProvider.NVIDIA:
-                return (provider.value, model, settings.nvidia_api_key)
             return (provider.value, model)
 
         def _build_brain_signature(self):
@@ -283,12 +279,8 @@ def create_chappie_backend():
         def _error_prefix_for_active_provider(self) -> str:
             if settings.llm_provider == LLMProvider.OLLAMA:
                 return "Ollama Fehler"
-            if settings.llm_provider == LLMProvider.GROQ:
-                return "Groq Fehler"
             if settings.llm_provider == LLMProvider.CEREBRAS:
                 return "Cerebras Fehler"
-            if settings.llm_provider == LLMProvider.NVIDIA:
-                return "NVIDIA Fehler"
             if settings.llm_provider == LLMProvider.VLLM:
                 return "vLLM Fehler"
             return "LLM Fehler"
@@ -604,7 +596,7 @@ def create_chappie_backend():
                 return ""
             error_prefixes = (
                 "vLLM Fehler:", "VLLM Fehler:", "Ollama Fehler:",
-                "Groq Fehler:", "Cerebras Fehler:", "NVIDIA Fehler:",
+                "Cerebras Fehler:",
             )
             lines = text.splitlines()
             cleaned = [l for l in lines if not l.strip().startswith(error_prefixes)]

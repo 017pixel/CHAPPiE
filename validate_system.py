@@ -14,20 +14,10 @@ from memory.memory_engine import MemoryEngine
 def _provider_summary() -> list[str]:
     provider = settings.llm_provider
     lines = [f"  LLM Provider: {provider.value}"]
-    if provider == LLMProvider.NVIDIA:
-        lines.extend([
-            f"  NVIDIA API Key: {'JA' if settings.nvidia_api_key else 'NEIN (SETZE KEY!)'}",
-            f"  NVIDIA Model: {settings.nvidia_model}",
-        ])
-    elif provider == LLMProvider.CEREBRAS:
+    if provider == LLMProvider.CEREBRAS:
         lines.extend([
             f"  Cerebras API Key: {'JA' if settings.cerebras_api_key else 'NEIN (SETZE KEY!)'}",
             f"  Cerebras Model: {settings.cerebras_model}",
-        ])
-    elif provider == LLMProvider.GROQ:
-        lines.extend([
-            f"  Groq API Key: {'JA' if settings.groq_api_key else 'NEIN (SETZE KEY!)'}",
-            f"  Groq Model: {settings.groq_model}",
         ])
     elif provider == LLMProvider.VLLM:
         lines.extend([
@@ -44,12 +34,8 @@ def _provider_summary() -> list[str]:
 
 
 def _active_provider_has_credentials() -> bool:
-    if settings.llm_provider == LLMProvider.NVIDIA:
-        return bool(settings.nvidia_api_key)
     if settings.llm_provider == LLMProvider.CEREBRAS:
         return bool(settings.cerebras_api_key)
-    if settings.llm_provider == LLMProvider.GROQ:
-        return bool(settings.groq_api_key)
     return True
 
 

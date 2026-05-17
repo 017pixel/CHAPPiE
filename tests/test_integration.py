@@ -33,8 +33,6 @@ def test_full_conversation():
         
         print(f"\nConfiguration:")
         print(f"  Provider: {settings.llm_provider.value}")
-        if settings.llm_provider == LLMProvider.NVIDIA:
-            print(f"  Model: {settings.nvidia_model}")
         
         test_messages = [
             "Hallo, ich heisse Benjamin!",
@@ -94,52 +92,6 @@ def test_full_conversation():
         return False
 
 
-def test_nvidia_connection():
-    """Test NVIDIA API connection directly."""
-    print("\nTEST: NVIDIA API Connection")
-    print("-" * 40)
-    
-    try:
-        from brain.nvidia_brain import NVIDIABrain
-        from brain.base_brain import Message, GenerationConfig
-        
-        brain = NVIDIABrain()
-        print(f"  [INFO] Model: {brain.model}")
-        
-        if not brain.is_available():
-            print("  [FAIL] NVIDIA API not available - check API key")
-            return False
-        
-        print("  [OK] NVIDIA API is available")
-        
-        messages = [
-            Message(role="system", content="Du bist CHAPPiE, ein freundlicher AI-Assistent. Antworte kurz auf Deutsch."),
-            Message(role="user", content="Sag 'Hallo' in einem Satz.")
-        ]
-        
-        config = GenerationConfig(
-            max_tokens=50,
-            temperature=0.7,
-            stream=False
-        )
-        
-        print("  [INFO] Sending test message...")
-        response = brain.generate(messages, config)
-        
-        if isinstance(response, str) and not response.startswith("NVIDIA Fehler"):
-            print(f"  [OK] Response: {response[:100]}...")
-            return True
-        else:
-            print(f"  [FAIL] Error in response: {response[:100]}")
-            return False
-            
-    except Exception as e:
-        print(f"  [FAIL] NVIDIA connection error: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
 def test_context_files():
     """Test context files functionality."""
     print("\nTEST: Context Files")
@@ -174,7 +126,6 @@ def test_context_files():
 def run_integration_tests():
     """Run all integration tests."""
     tests = [
-        ("NVIDIA Connection", test_nvidia_connection),
         ("Context Files", test_context_files),
         ("Full Conversation", test_full_conversation),
     ]

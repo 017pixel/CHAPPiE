@@ -27,8 +27,6 @@ type QueuedMessage = {
   text: string;
 };
 
-type ProcessingState = "idle" | "thinking" | "streaming" | "error";
-
 const THINKING_MESSAGES = [
   "CHAPPiE denkt nach...",
   "Hmm, warte, ich ueberlege noch...",
@@ -51,21 +49,32 @@ function isPending(msg: ChatMessage): boolean {
 export function ChatPage() {
   const currentSessionId = useUiStore((state) => state.currentSessionId);
   const setCurrentSessionId = useUiStore((state) => state.setCurrentSessionId);
+  const processingState = useUiStore((state) => state.processingState);
+  const setProcessingState = useUiStore((state) => state.setProcessingState);
+  const streamingContent = useUiStore((state) => state.streamingContent);
+  const setStreamingContent = useUiStore((state) => state.setStreamingContent);
+  const reasoningContent = useUiStore((state) => state.reasoningContent);
+  const setReasoningContent = useUiStore((state) => state.setReasoningContent);
+  const displayMessages = useUiStore((state) => state.displayMessages);
+  const setDisplayMessages = useUiStore((state) => state.setDisplayMessages);
+  const isProcessing = useUiStore((state) => state.isProcessing);
+  const setIsProcessing = useUiStore((state) => state.setIsProcessing);
+  const genStartTime = useUiStore((state) => state.genStartTime);
+  const setGenStartTime = useUiStore((state) => state.setGenStartTime);
+  const elapsedMs = useUiStore((state) => state.elapsedMs);
+  const setElapsedMs = useUiStore((state) => state.setElapsedMs);
+  const loadedOnce = useUiStore((state) => state.loadedOnce);
+  const setLoadedOnce = useUiStore((state) => state.setLoadedOnce);
+  const resetStreamingState = useUiStore((state) => state.resetStreamingState);
+
   const [message, setMessage] = useState("");
   const [commandsExpanded, setCommandsExpanded] = useState(false);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
-  const [processingState, setProcessingState] = useState<ProcessingState>("idle");
-  const [streamingContent, setStreamingContent] = useState("");
   const [thinkingIndex, setThinkingIndex] = useState(0);
-  const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
-  const [reasoningContent, setReasoningContent] = useState("");
-  const [loadedOnce, setLoadedOnce] = useState(false);
   const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
   const [rawPopupMsg, setRawPopupMsg] = useState<ChatMessage | null>(null);
-  const [genStartTime, setGenStartTime] = useState<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const autoScrollRef = useRef(true); // true = User ist am Ende, auto-scroll aktiv
+  const autoScrollRef = useRef(true);
   const processingRef = useRef(false);
 
   const sessionsQuery = useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
@@ -77,10 +86,11 @@ export function ChatPage() {
   });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus, refetchInterval: 3000 });
 
-  // Sync display messages from server only on initial load
+  // Sync display messages from server on initial load, but only when idle
   useEffect(() => {
-    if (processingState !== "idle") return;
-    if (loadedOnce) return;
+    const storeProcessing = useUiStore.getState().processingState;
+    if (storeProcessing !== "idle") return;
+    if (useUiStore.getState().loadedOnce) return;
     const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
     if (rawMessages.length === 0) return;
     const cleanMessages = rawMessages
@@ -98,7 +108,7 @@ export function ChatPage() {
       setDisplayMessages(cleanMessages);
       setLoadedOnce(true);
     }
-  }, [sessionQuery.data, processingState, loadedOnce]);
+  }, [sessionQuery.data]);
 
   // Initialize session
   useEffect(() => {
@@ -114,9 +124,9 @@ export function ChatPage() {
   // Reset loadedOnce when session changes
   useEffect(() => {
     setLoadedOnce(false);
-  }, [currentSessionId]);
+  }, [currentSessionId, setLoadedOnce]);
 
-  // Auto-scroll: nur wenn User am Ende ist, sonst nicht stören
+  // Auto-scroll
   useEffect(() => {
     if (!scrollRef.current) return;
     const el = scrollRef.current;
@@ -149,12 +159,24 @@ export function ChatPage() {
       return;
     }
     const timer = setInterval(() => {
-      if (genStartTime) {
-        setElapsedMs(Date.now() - genStartTime);
+      const startTime = useUiStore.getState().genStartTime;
+      if (startTime) {
+        setElapsedMs(Date.now() - startTime);
       }
     }, 100);
     return () => clearInterval(timer);
-  }, [processingState, genStartTime]);
+  }, [processingState, setElapsedMs]);
+
+  // On mount: if there's active processing, show it to avoid blank screen
+  useEffect(() => {
+    const storeState = useUiStore.getState();
+    if (storeState.processingState !== "idle" && storeState.displayMessages.length > 0) {
+      // Store has active streaming — restore from store, don't overwrite with session
+      setLoadedOnce(true);
+    }
+    // Also set processingRef from store on mount in case we navigate back mid-stream
+    processingRef.current = storeState.isProcessing;
+  }, []);
 
   // Auto-send from queue when idle
   useEffect(() => {
@@ -186,6 +208,7 @@ export function ChatPage() {
     if (!text.trim() || processingRef.current) return;
 
     processingRef.current = true;
+    setIsProcessing(true);
 
     const isClearCommand = text.trim().toLowerCase() === "/clear" || text.trim().toLowerCase() === "/new";
     if (isClearCommand) {
@@ -212,7 +235,6 @@ export function ChatPage() {
     let streamedContent = "";
     let streamedReasoning = "";
 
-    // Try streaming first
     try {
       const stream = api.sendMessageStream({
         session_id: currentSessionId,
@@ -220,12 +242,12 @@ export function ChatPage() {
         debug_mode: true,
         command_mode: text.trim().startsWith("/"),
       });
- 
+
       usedStream = true;
 
       for await (const event of stream) {
         if (event.event === "token") {
-          if (processingState === "thinking") {
+          if (useUiStore.getState().processingState === "thinking") {
             setProcessingState("streaming");
           }
           const tokenType = event.data.token_type || "answer";
@@ -236,25 +258,24 @@ export function ChatPage() {
           } else {
             streamedContent += event.data.content || "";
             setStreamingContent(streamedContent);
-            setDisplayMessages(prev => {
-              const updated = [...prev];
-              while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
-                updated.pop();
-              }
-              updated.push({ id: "streaming", role: "assistant", content: streamedContent });
-              return updated;
-            });
-          }
-        } else if (event.event === "turn_error") {
-          streamedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
-          setDisplayMessages(prev => {
-            const updated = [...prev];
+            // Update displayMessages via store directly for navigation-resilience
+            const currentMsgs = useUiStore.getState().displayMessages;
+            const updated = [...currentMsgs];
             while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
               updated.pop();
             }
-            updated.push({ id: `error-${Date.now()}`, role: "assistant", content: streamedContent });
-            return updated;
-          });
+            updated.push({ id: "streaming", role: "assistant", content: streamedContent });
+            setDisplayMessages(updated);
+          }
+        } else if (event.event === "turn_error") {
+          streamedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
+          const currentMsgs = useUiStore.getState().displayMessages;
+          const updated = [...currentMsgs];
+          while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
+            updated.pop();
+          }
+          updated.push({ id: `error-${Date.now()}`, role: "assistant", content: streamedContent });
+          setDisplayMessages(updated);
           break;
         } else if (event.event === "turn_finished") {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
@@ -286,10 +307,8 @@ export function ChatPage() {
         }
       }
     } catch (streamErr) {
-      // Streaming failed, fall back to synchronous endpoint
       console.warn("Streaming failed, falling back to synchronous endpoint:", streamErr);
 
-      // Remove the thinking placeholder
       setDisplayMessages(prev => {
         const updated = [...prev];
         while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "thinking")) {
@@ -329,10 +348,7 @@ export function ChatPage() {
       }
     } finally {
       processingRef.current = false;
-      setProcessingState("idle");
-      setStreamingContent("");
-      setReasoningContent("");
-      setGenStartTime(null);
+      useUiStore.getState().resetStreamingState();
       statusQuery.refetch();
     }
   }
@@ -369,8 +385,6 @@ export function ChatPage() {
       metadata: { timer_ms: elapsedMs },
     }];
   } else if (processingState === "streaming") {
-    // Streaming messages are already in displayMessages, don't double-add
-    // Add a reasoning entry if reasoning content is live
     if (reasoningContent) {
       finalMessages = [...finalMessages, {
         id: "reasoning-live",
@@ -381,7 +395,6 @@ export function ChatPage() {
     }
   }
 
-  const isProcessing = processingRef.current;
   const hasLiveReasoning = processingState === "streaming" && reasoningContent;
 
   return (
@@ -424,7 +437,7 @@ export function ChatPage() {
               key={entry.id ?? idx}
               className={`flex flex-col gap-2 ${entry.role === "assistant" ? "items-start" : "items-end"}`}
             >
-              {/* CoT box — immer anzeigen fuer abgeschlossene Assistant-Nachrichten */}
+              {/* CoT box */}
               {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
                 <div className={`max-w-[85%] w-full rounded-none border overflow-hidden ${(entry.metadata as any)?.formatting_failed ? 'border-ember/30 bg-ember/[0.04]' : 'border-pine/20 bg-pine/[0.06]'}`}>
                   <div className={`flex items-center justify-between px-5 py-2 border-b ${(entry.metadata as any)?.formatting_failed ? 'border-ember/20' : 'border-pine/10'}`}>
@@ -501,7 +514,6 @@ export function ChatPage() {
                       >
                         i
                       </button>
-                      {/* Hover-Preview */}
                       <div className="pointer-events-none absolute left-0 bottom-full mb-1 z-50 hidden group-hover:block">
                         <div className="rounded-none border border-white/10 bg-night/95 p-3 shadow-glass w-64">
                           <p className="mb-1.5 text-[9px] uppercase tracking-widest text-ember">Preview</p>
@@ -561,7 +573,6 @@ export function ChatPage() {
               const causal = meta.causal_trace || [];
               return (
                 <div className="space-y-4 text-xs text-slate">
-                  {/* Langzeitgedächtnis */}
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Langzeitgedächtnis-Erinnerungen ({memories.length})</p>
                     {memories.length === 0 ? (
@@ -582,7 +593,6 @@ export function ChatPage() {
                     )}
                   </div>
 
-                  {/* Emotion-Deltas */}
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotionen vorher → nachher</p>
                     {Object.keys(deltas).length === 0 ? (
@@ -608,7 +618,6 @@ export function ChatPage() {
                     )}
                   </div>
 
-                  {/* Steering Info */}
                   {steering.steering_active && (
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotion-Steering aktiv</p>
@@ -621,7 +630,6 @@ export function ChatPage() {
                     </div>
                   )}
 
-                  {/* Timing */}
                   {meta.timing && (
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Timing</p>
@@ -637,7 +645,6 @@ export function ChatPage() {
                     </div>
                   )}
 
-                  {/* Allgemein */}
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Allgemein</p>
                     <div className="grid grid-cols-2 gap-1.5">
