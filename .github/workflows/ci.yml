@@ -71,7 +71,8 @@ jobs:
             config/prompts.py \
             memory/chat_manager.py \
             web_infrastructure/backend_wrapper.py \
-            web_infrastructure/ui_utils.py
+            web_infrastructure/ui_utils.py \
+            chappie_brain_cli.py
 
       - name: Run quick tests
         shell: bash
