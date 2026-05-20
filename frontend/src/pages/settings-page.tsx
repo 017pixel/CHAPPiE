@@ -37,6 +37,7 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "cerebras_model", label: "Cerebras Model", type: "string", group: "provider", icon: "cloud" },
 
   { key: "temperature", label: "Temperature", type: "number", group: "generation", icon: "thermostat" },
+  { key: "repetition_penalty", label: "Repetition Penalty", type: "number", group: "generation", icon: "repeat" },
   { key: "max_tokens", label: "Max Tokens", type: "number", group: "generation", icon: "token" },
   { key: "chappie_thinking_token_limit", label: "Thinking Token Limit", type: "number", group: "generation", icon: "psychology" },
   { key: "chappie_answer_token_limit", label: "Answer Token Limit", type: "number", group: "generation", icon: "chat" },
@@ -45,15 +46,23 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "memory_top_k", label: "Memory Top-K", type: "number", group: "memory", icon: "reorder" },
   { key: "memory_min_relevance", label: "Min Relevance", type: "number", group: "memory", icon: "filter_alt" },
   { key: "enable_two_step_processing", label: "Two-Step Processing", type: "boolean", group: "memory", icon: "stairs" },
+  { key: "memory_consolidation_enabled", label: "Consolidation", type: "boolean", group: "memory", icon: "merge" },
+  { key: "memory_consolidation_max_tokens", label: "Consolidation Tokens", type: "number", group: "memory", icon: "data_usage" },
   { key: "stm_summary_threshold", label: "STM Summary Threshold", type: "number", group: "memory", icon: "summarize" },
   { key: "stm_summary_batch_size", label: "STM Batch Size", type: "number", group: "memory", icon: "batch_prediction" },
+  { key: "history_max_messages", label: "Max History Messages", type: "number", group: "memory", icon: "history" },
+  { key: "context_token_limit", label: "Context Token Limit", type: "number", group: "memory", icon: "data_object" },
+  { key: "context_token_warning_threshold", label: "Token Warning Threshold", type: "number", group: "memory", icon: "warning" },
 
   { key: "enable_steering", label: "Enable Steering", type: "boolean", group: "steering", icon: "tune" },
   { key: "steering_model", label: "Steering Model", type: "string", group: "steering", icon: "model_training" },
+  { key: "steering_quantize", label: "Steering Quantize (NF4)", type: "boolean", group: "steering", icon: "compress" },
+  { key: "steering_context_length", label: "Steering Context Length", type: "number", group: "steering", icon: "straighten" },
 
   { key: "intent_provider", label: "Intent Provider", type: "provider", group: "intent", icon: "psychology" },
   { key: "intent_processor_model_vllm", label: "Intent Model (vLLM)", type: "string", group: "intent", icon: "smart_toy" },
   { key: "intent_processor_model_cerebras", label: "Intent Model (Cerebras)", type: "string", group: "intent", icon: "cloud" },
+  { key: "intent_processor_model_ollama", label: "Intent Model (Ollama)", type: "string", group: "intent", icon: "smart_toy" },
   { key: "query_extraction_provider", label: "Query Extract. Provider", type: "provider", group: "intent", icon: "search" },
 
   { key: "training_use_global_settings", label: "Use Global Settings", type: "boolean", group: "training", icon: "settings" },

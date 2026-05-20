@@ -101,7 +101,7 @@ class Settings:
         self.training_trainer_provider = _parse_provider(self._get_val("TRAINING_TRAINER_PROVIDER", "auto"))
         self.training_trainer_model = self._get_val("TRAINING_TRAINER_MODEL", "")
 
-        self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 12))
+        self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 40))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
         self.memory_consolidation_enabled = self._get_val("MEMORY_CONSOLIDATION_ENABLED", True)

@@ -706,7 +706,11 @@ export function ChatPage() {
                         <div className="space-y-1">
                           {causal.map((step: any, idx: number) => (
                             <div key={idx} className="text-[10px] text-slate/50 border-l-2 border-white/10 pl-2">
-                              <span className="text-slate/70">{step.step}:</span> {step.detail}
+                              <span className="text-slate/70">{step.phase}:</span> {step.driver}
+                              {step.effect && <span className="text-slate/40"> — {step.effect}</span>}
+                              {step.evidence && (Array.isArray(step.evidence) ? step.evidence.length > 0 : step.evidence) && (
+                                <span className="text-slate/30 ml-1">[{Array.isArray(step.evidence) ? step.evidence.join(", ") : String(step.evidence)}]</span>
+                              )}
                             </div>
                           ))}
                         </div>

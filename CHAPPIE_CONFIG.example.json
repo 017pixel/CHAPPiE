@@ -38,7 +38,7 @@
     "chain_of_thought": true
   },
   "memory": {
-    "memory_top_k": 12,
+    "memory_top_k": 40,
     "memory_min_relevance": 0.2,
     "chroma_collection": "chapie_memory",
     "embedding_model": "all-MiniLM-L6-v2",
