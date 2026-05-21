@@ -290,15 +290,32 @@ def build_activation_plan(
     return combined
 
 
+def _safe_steering_add(hidden: torch.Tensor, vector: torch.Tensor) -> torch.Tensor:
+    if hidden.dim() != 3:
+        LOGGER.warning(
+            "Steering-Addition uebersprungen: hidden dim=%d shape=%s (erwartet 3D). "
+            "Moegliche Broadcast-Explosion vermieden.",
+            hidden.dim(), tuple(hidden.shape),
+        )
+        return hidden
+    if hidden.size(-1) != vector.size(0):
+        LOGGER.warning(
+            "Steering-Addition uebersprungen: hidden_size=%d vs vector_size=%d.",
+            hidden.size(-1), vector.size(0),
+        )
+        return hidden
+    return hidden + vector.view(1, 1, -1).to(device=hidden.device, dtype=hidden.dtype)
+
+
 def add_vector_to_output(outputs: Any, vector: torch.Tensor) -> Any:
     if isinstance(outputs, tuple) and outputs:
         hidden = outputs[0]
         if torch.is_tensor(hidden):
-            updated = hidden + vector.view(1, 1, -1).to(device=hidden.device, dtype=hidden.dtype)
+            updated = _safe_steering_add(hidden, vector)
             return (updated, *outputs[1:])
         return outputs
     if torch.is_tensor(outputs):
-        return outputs + vector.view(1, 1, -1).to(device=outputs.device, dtype=outputs.dtype)
+        return _safe_steering_add(outputs, vector)
     return outputs
 
 
@@ -306,7 +323,7 @@ def add_vector_to_inputs(inputs: Any, vector: torch.Tensor) -> Any:
     if isinstance(inputs, tuple) and inputs:
         hidden = inputs[0]
         if torch.is_tensor(hidden):
-            updated = hidden + vector.view(1, 1, -1).to(device=hidden.device, dtype=hidden.dtype)
+            updated = _safe_steering_add(hidden, vector)
             return (updated, *inputs[1:])
     return inputs
 
@@ -352,7 +369,10 @@ class ActivationVectorResolver:
         path = self._basis_cache_path(item)
         with self._cache_lock:
             if path.exists():
-                return torch.load(path, map_location="cpu")
+                try:
+                    return torch.load(path, map_location="cpu", weights_only=True)
+                except TypeError:
+                    return torch.load(path, map_location="cpu")
             basis = self._build_basis(item)
             torch.save(basis, path)
             return basis
@@ -571,16 +591,32 @@ class LocalSteeringEngine:
             else:
                 prompt_messages.insert(0, {"role": "system", "content": style_instruction})
         prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
-        inputs = self.tokenizer(prompt, return_tensors="pt")
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=self.context_length)
+        actual_len = int(inputs["input_ids"].shape[1])
+        if actual_len > self.context_length:
+            LOGGER.warning("Prompt nach Truncation immer noch %d Token (Limit %d). Das sollte nicht passieren.", actual_len, self.context_length)
         return prompt, {key: value.to(self.device) for key, value in inputs.items()}
+
+    def _log_gpu_stats(self, label: str) -> None:
+        if self.device.type != "cuda":
+            return
+        try:
+            allocated = torch.cuda.memory_allocated() / (1024 ** 3)
+            reserved = torch.cuda.memory_reserved() / (1024 ** 3)
+            max_alloc = torch.cuda.max_memory_allocated() / (1024 ** 3)
+            LOGGER.debug("GPU-Memory [%s]: alloc=%.2f GiB, reserved=%.2f GiB, peak=%.2f GiB", label, allocated, reserved, max_alloc)
+        except Exception:
+            pass
 
     def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
         generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature)
+        self._log_gpu_stats("pre-generate")
         with self._generation_lock:
             with self._apply_activation_plan(steering_payload):
                 with torch.inference_mode():
                     generated = self.model.generate(**generation_kwargs)
+        self._log_gpu_stats("post-generate")
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
         input_len = int(inputs["input_ids"].shape[1])
@@ -626,6 +662,7 @@ class LocalSteeringEngine:
         generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature)
         generation_kwargs["streamer"] = streamer
         error_box: Dict[str, BaseException] = {}
+        self._log_gpu_stats("pre-stream")
 
         def _runner() -> None:
             try:

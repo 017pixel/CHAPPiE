@@ -1519,11 +1519,15 @@ def create_chappie_backend():
 
         @staticmethod
         def _estimate_total_tokens(messages: list) -> int:
-            return sum(len(str(m.get("content", ""))) // 4 for m in messages)
+            return sum(CHAPPiEBackend._estimate_msg_tokens(m) for m in messages)
 
         @staticmethod
         def _estimate_msg_tokens(msg) -> int:
-            return len(str(msg.get("content", ""))) // 4
+            text = str(msg.get("content", ""))
+            char_count = len(text)
+            non_ascii = sum(1 for c in text if ord(c) > 127)
+            ascii_chars = char_count - non_ascii
+            return max(1, (ascii_chars // 3) + non_ascii)
 
         def _build_context(self, requirements: Dict[str, bool]) -> str:
             """Baut den Context String basierend auf Requirements."""

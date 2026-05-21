@@ -364,12 +364,18 @@ class SleepPhaseHandler:
             result["memories_decayed"] = int(decay_result.get("stats", {}).get("update_count", 0))
             result["memories_archived"] = int(decay_result.get("stats", {}).get("archive_count", 0))
             archive_ids = [
-                str(item.get("id", ""))[:8]
-                for item in decay_result.get("archive", [])[:12]
-                if isinstance(item, dict)
+                str(item.get("id", ""))
+                for item in decay_result.get("archive", [])
+                if isinstance(item, dict) and item.get("id")
             ]
             if archive_ids:
-                result["archive_candidates"] = archive_ids
+                result["archive_candidates"] = [aid[:8] for aid in archive_ids[:12]]
+                if hasattr(memory_engine, "delete_memories"):
+                    try:
+                        memory_engine.delete_memories(archive_ids)
+                        result["memories_actually_deleted"] = len(archive_ids)
+                    except Exception as del_err:
+                        result["deletion_error"] = str(del_err)
             update_ids = [
                 str((item.get("memory", {}) or {}).get("id", ""))[:8]
                 for item in decay_result.get("update", [])[:12]
