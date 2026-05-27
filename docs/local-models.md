@@ -8,7 +8,7 @@ CHAPPiE soll primaer lokal mit Qwen-3.5-Modellen laufen. APIs sind nur der Fallb
 
 1. `vllm` plus Qwen-3.5
 2. Ollama fuer leichtere lokale Setups
-3. Cerebras als Fallback
+3. Groq als Fallback
 
 ## Relevante Konfigurationsdateien
 
@@ -28,10 +28,10 @@ local_models.vllm_url = "http://localhost:8000/v1"
 local_models.vllm_model = "Qwen/Qwen3.5-4B"
 local_models.vllm_force_single_model = true
 
-small_tasks.intent_provider = "cerebras"
-small_tasks.intent_processor_model_cerebras = "llama-3.1-8b"
-small_tasks.query_extraction_provider = "cerebras"
-small_tasks.query_extraction_cerebras_model = "llama-3.1-8b"
+small_tasks.intent_provider = "groq"
+small_tasks.intent_processor_model_groq = "llama-3.1-8b-instant"
+small_tasks.query_extraction_provider = "groq"
+small_tasks.query_extraction_groq_model = "llama-3.1-8b-instant"
 ```
 
 Wichtig:
@@ -39,7 +39,7 @@ Wichtig:
 1. `VLLM_URL` muss auf den steering-faehigen lokalen Endpoint zeigen.
 2. `VLLM_MODEL` ist das Hauptmodell fuer Antwortgenerierung.
 3. `VLLM_FORCE_SINGLE_MODEL = True` ist fuer einen einzelnen lokalen Endpoint robust.
-4. `api.cerebras_api_key` muss in `CHAPPIE_CONFIG.json` gesetzt sein, damit Intent, Query Extraction und STM-Zusammenfassungen ueber Cerebras laufen.
+4. `api.groq_api_key` muss in `CHAPPIE_CONFIG.json` gesetzt sein, damit Intent, Query Extraction, Formatierung und STM-Zusammenfassungen ueber Groq laufen.
 5. Runtime-Settings werden ueber `CHAPPIE_CONFIG.json`, API und Frontend gepflegt.
 
 ## Praxis-Hinweise

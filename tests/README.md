@@ -27,10 +27,10 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_training_config_ui.py`
 - `tests/test_training_daemon_lifecycle.py`
 - `tests/test_api_contract.py`
-- `tests/test_cerebras_brain_unit.py`
+- `tests/test_groq_brain_unit.py`
 - `tests/test_provider_factory.py`
 - `tests/test_settings_integrity.py`
-- `tests/test_cerebras_limits.py`
+- `tests/test_groq_limits.py`
 - `tests/test_runtime_switching.py`
 - `tests/test_root_config.py`
 

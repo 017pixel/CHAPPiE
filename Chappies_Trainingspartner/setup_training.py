@@ -4,7 +4,7 @@ CHAPPiE Training Setup Wizard
 Interaktiver Setup für das autonome Training von CHAPPiE.
 
 Features:
-- Auswahl des KI-Backends (vLLM, Ollama, Cerebras)
+- Auswahl des KI-Backends (vLLM, Ollama, Groq)
 - Modell-Auswahl für jeden Provider
 - Trainer-Persona Konfiguration
 - Curriculum-Erstellung mit mehreren Themen
@@ -106,7 +106,7 @@ def select_provider() -> LLMProvider:
     
     table.add_row("1", "[Lokal] vLLM", "Lokal - Qwen 3.5 bevorzugt (empfohlen)")
     table.add_row("2", "[Lokal] Ollama", "Lokal - Privat & Offline")
-    table.add_row("3", "[API] Cerebras", "Cloud - Ultra-High-Speed (2000+ tok/s)")
+    table.add_row("3", "[API] Groq", "Cloud - LPU-beschleunigt (bis 1000+ tok/s)")
     
     console.print(table)
     console.print()
@@ -162,9 +162,9 @@ def check_api_key(provider: LLMProvider) -> str:
     
     console.print(f"\n[bold]Schritt 3: API Key prüfen[/bold]\n")
     
-    existing_key = settings.cerebras_api_key
-    key_name = "Cerebras"
-    key_url = "https://cloud.cerebras.ai"
+    existing_key = settings.groq_api_key
+    key_name = "Groq"
+    key_url = "https://console.groq.com/keys"
     
     if existing_key and len(existing_key) > 10:
         masked = existing_key[:8] + "..." + existing_key[-4:]
@@ -179,7 +179,7 @@ def check_api_key(provider: LLMProvider) -> str:
     new_key = Prompt.ask(f"{key_name} API Key eingeben")
     
     if new_key:
-        settings.cerebras_api_key = new_key
+        settings.groq_api_key = new_key
         
         console.print(f"[green]✓[/green] API Key gesetzt!")
     
@@ -300,8 +300,8 @@ def save_configuration(provider: LLMProvider, model: str, trainer_config: dict):
     
     if provider == LLMProvider.VLLM:
         settings.vllm_model = model
-    elif provider == LLMProvider.CEREBRAS:
-        settings.cerebras_model = model
+    elif provider == LLMProvider.GROQ:
+        settings.groq_model = model
     else:
         settings.ollama_model = model
 

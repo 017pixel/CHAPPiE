@@ -51,8 +51,7 @@ EXCLUDE_FILES = {
 EXCLUDE_SECRET_FILES = {
     'secrets.py',
     'addSecrets.py',
-    'cerebras_api.py',
-    'cerebras_api.py',
+    'groq_api.py',
 }
 
 # ChromaDB Pfad (wird separat behandelt)
@@ -209,8 +208,8 @@ pip install -r requirements.txt
 ## Schritt 3: API-Keys konfigurieren
 1. Kopiere `config/secrets_example.py` nach `config/secrets.py`
 2. Trage deine API-Keys ein:
-   - CEREBRAS_API_KEY (von https://cloud.cerebras.ai)
-   - CEREBRAS_API_KEY (von https://cloud.cerebras.ai)
+   - GROQ_API_KEY (von https://console.groq.com/keys)
+   - GROQ_API_KEY (von https://console.groq.com/keys)
 
 ## Schritt 4: ChromaDB Wiederherstellen (WICHTIG!)
 Falls du das Gedächtnis behalten möchtest:

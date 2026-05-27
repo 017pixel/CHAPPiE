@@ -118,9 +118,9 @@ def get_interactive_config() -> dict:
     print()
     
     # Provider
-    print("Welchen LLM-Provider nutzen? (local/cerebras)")
+    print("Welchen LLM-Provider nutzen? (local/groq)")
     provider = input("Provider [local]: ").strip().lower()
-    if provider not in ["local", "cerebras"]:
+    if provider not in ["local", "groq"]:
         provider = "local"
     print()
     
@@ -287,8 +287,8 @@ Beispiele:
             if settings.training_chappie_provider:
                 settings.llm_provider = settings.training_chappie_provider
                 if settings.training_chappie_model:
-                    if settings.llm_provider == LLMProvider.CEREBRAS:
-                        settings.cerebras_model = settings.training_chappie_model
+                    if settings.llm_provider == LLMProvider.GROQ:
+                        settings.groq_model = settings.training_chappie_model
                     elif settings.llm_provider == LLMProvider.VLLM:
                         settings.vllm_model = settings.training_chappie_model
                     else:
@@ -299,10 +299,10 @@ Beispiele:
                 if normalized_provider == "local":
                     normalized_provider = "vllm"
 
-                if normalized_provider == "cerebras":
-                    settings.llm_provider = LLMProvider.CEREBRAS
+                if normalized_provider == "groq":
+                    settings.llm_provider = LLMProvider.GROQ
                     if model_name:
-                        settings.cerebras_model = model_name
+                        settings.groq_model = model_name
                 elif normalized_provider == "ollama":
                     settings.llm_provider = LLMProvider.OLLAMA
                     if model_name:

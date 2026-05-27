@@ -49,8 +49,8 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 - `python tests/test_training_config_ui.py`
 - `python tests/test_provider_factory.py`
 - `python tests/test_settings_integrity.py`
-- `python tests/test_cerebras_brain_unit.py`
-- `python tests/test_cerebras_limits.py`
+- `python tests/test_groq_brain_unit.py`
+- `python tests/test_groq_limits.py`
 - `python tests/test_quick.py`
 - `python tests/test_runtime_switching.py`
 - `python tests/test_root_config.py`

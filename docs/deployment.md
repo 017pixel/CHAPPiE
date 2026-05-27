@@ -57,7 +57,7 @@ flowchart TD
 
 1. Python-Umgebung vorhanden
 2. Frontend-Dependencies installiert oder Build erzeugt
-3. `CHAPPIE_CONFIG.json` aus der Vorlage angelegt und `api.cerebras_api_key` gesetzt
+3. `CHAPPIE_CONFIG.json` aus der Vorlage angelegt und `api.groq_api_key` gesetzt
 4. `data/` gesichert
 5. `chappie-training.service` auf `training_daemon` geprueft
 6. `Restart=always` und absolute Pfade geprueft

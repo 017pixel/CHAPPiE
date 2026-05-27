@@ -63,7 +63,7 @@ Vor jedem GitHub-Push-Update muss geprüft werden, ob mindestens eine dieser Dat
 
 - **Root** enthält nur Einstiegspunkte: `app.py` (API), `chappie_brain_cli.py` (Terminal), Projekt-Config (`requirements.txt`, `CHAPPIE_CONFIG.example.json`)
 - **`api/`** — FastAPI Backend (Routers, Schemas, Services)
-- **`brain/`** — LLM-Pipeline (vLLM, Cerebras, Ollama, Steering, Global Workspace)
+- **`brain/`** — LLM-Pipeline (vLLM, Groq, Ollama, Steering, Global Workspace)
 - **`config/`** — Zentrale Konfiguration (`config.py`, `prompts.py`, `brain_config.py`)
 - **`data/`** — Laufzeitdaten (ChromaDB, Steering-Vektoren, Personality-Files)
 - **`deploy/`** — Systemd-Services und Deployment-Scripts

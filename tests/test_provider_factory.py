@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 for mod in (
     "chromadb", "chromadb.config", "requests", "openai",
-    "brain.groq_brain", "brain.nvidia_brain",
+    "brain.nvidia_brain",
     "brain.brain_pipeline", "brain.steering_api_server",
     "brain.steering_backend", "brain.deep_think", "brain.global_workspace",
     "brain.action_response", "brain.response_parser", "brain.agents",
@@ -25,12 +25,11 @@ for mod in (
     if mod not in sys.modules:
         sys.modules[mod] = MagicMock()
 
-# ollama muss als Modul gemocked werden, damit brain.ollama_brain importierbar ist
 sys.modules["ollama"] = MagicMock()
 
 from brain import get_brain
 from brain.vllm_brain import VLLMBrain
-from brain.cerebras_brain import CerebrasBrain
+from brain.groq_brain import GroqBrain
 from config.config import LLMProvider, _parse_provider, settings
 
 
@@ -40,9 +39,9 @@ def test_get_brain_vllm_returns_vllmbrain():
     assert brain.model == "Qwen/Qwen3.5-4B"
 
 
-def test_get_brain_cerebras_returns_cerebrasbrain():
-    brain = get_brain(LLMProvider.CEREBRAS, model="llama-3.1-8b")
-    assert isinstance(brain, CerebrasBrain)
+def test_get_brain_groq_returns_groqbrain():
+    brain = get_brain(LLMProvider.GROQ, model="llama-3.1-8b")
+    assert isinstance(brain, GroqBrain)
 
 
 def test_get_brain_ollama_model_name_correct():
@@ -64,7 +63,7 @@ def test_provider_enum_has_exactly_three_values():
     values = list(LLMProvider)
     assert len(values) == 3
     value_set = {v.value for v in values}
-    assert value_set == {"vllm", "ollama", "cerebras"}
+    assert value_set == {"vllm", "ollama", "groq"}
 
 
 def test_parse_provider_valid_vllm():
@@ -76,8 +75,8 @@ def test_parse_provider_valid_ollama():
     assert _parse_provider("ollama") == LLMProvider.OLLAMA
 
 
-def test_parse_provider_valid_cerebras():
-    assert _parse_provider("cerebras") == LLMProvider.CEREBRAS
+def test_parse_provider_valid_groq():
+    assert _parse_provider("groq") == LLMProvider.GROQ
 
 
 def test_parse_provider_auto_returns_none():
@@ -87,7 +86,7 @@ def test_parse_provider_auto_returns_none():
 
 
 def test_parse_provider_groq_returns_none():
-    assert _parse_provider("groq") is None
+    assert _parse_provider("groq") == LLMProvider.GROQ
 
 
 def test_parse_provider_nvidia_returns_none():
@@ -112,13 +111,13 @@ def test_get_brain_uses_settings_provider_when_none():
 if __name__ == "__main__":
     tests = [
         test_get_brain_vllm_returns_vllmbrain,
-        test_get_brain_cerebras_returns_cerebrasbrain,
+        test_get_brain_groq_returns_groqbrain,
         test_get_brain_ollama_model_name_correct,
         test_get_brain_unknown_falls_back_to_ollama,
         test_provider_enum_has_exactly_three_values,
         test_parse_provider_valid_vllm,
         test_parse_provider_valid_ollama,
-        test_parse_provider_valid_cerebras,
+        test_parse_provider_valid_groq,
         test_parse_provider_auto_returns_none,
         test_parse_provider_groq_returns_none,
         test_parse_provider_nvidia_returns_none,

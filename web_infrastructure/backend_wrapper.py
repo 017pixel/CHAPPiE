@@ -205,7 +205,7 @@ def create_chappie_backend():
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
                 "formatting_failed": result.get("formatting_failed", False),
-                "formatting_model": self.CEREBRAS_FORMAT_MODEL,
+                "formatting_model": self.GROQ_FORMAT_MODEL,
             }
             assistant_msg = {
                 "role": "assistant",
@@ -233,8 +233,8 @@ def create_chappie_backend():
                 return (provider.value, model, settings.ollama_host)
             if provider == LLMProvider.VLLM:
                 return (provider.value, model, settings.vllm_url)
-            if provider == LLMProvider.CEREBRAS:
-                return (provider.value, model, settings.cerebras_api_key)
+            if provider == LLMProvider.GROQ:
+                return (provider.value, model, settings.groq_api_key)
             return (provider.value, model)
 
         def _build_brain_signature(self):
@@ -280,8 +280,8 @@ def create_chappie_backend():
         def _error_prefix_for_active_provider(self) -> str:
             if settings.llm_provider == LLMProvider.OLLAMA:
                 return "Ollama Fehler"
-            if settings.llm_provider == LLMProvider.CEREBRAS:
-                return "Cerebras Fehler"
+            if settings.llm_provider == LLMProvider.GROQ:
+                return "Groq Fehler"
             if settings.llm_provider == LLMProvider.VLLM:
                 return "vLLM Fehler"
             return "LLM Fehler"
@@ -587,7 +587,7 @@ def create_chappie_backend():
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
-        CEREBRAS_FORMAT_MODEL = "qwen-3-235b-a22b-instruct-2507"
+        GROQ_FORMAT_MODEL = "openai/gpt-oss-120b"
 
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
@@ -597,7 +597,7 @@ def create_chappie_backend():
                 return ""
             error_prefixes = (
                 "vLLM Fehler:", "VLLM Fehler:", "Ollama Fehler:",
-                "Cerebras Fehler:",
+                "Groq Fehler:",
             )
             lines = text.splitlines()
             cleaned = [l for l in lines if not l.strip().startswith(error_prefixes)]
@@ -607,20 +607,19 @@ def create_chappie_backend():
                 result = lines[-1] if lines else ""
             return result
 
-        def _format_via_cerebras(self, raw_text: str) -> Dict[str, Any]:
-            """Sendet Rohtext an Cerebras zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed'} zurück."""
+        def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
+            """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
                 return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber...", "formatting_failed": False}
-            if not settings.cerebras_api_key:
-                # Kein API-Key: parse <think>/<gedanke>-Tags lokal, um cot nicht leer zu lassen
+            if not settings.groq_api_key:
                 return self._local_format_fallback(clean_text, formatting_failed=False)
             try:
                 import openai
 
                 client = openai.OpenAI(
-                    base_url="https://api.cerebras.ai/v1",
-                    api_key=settings.cerebras_api_key,
+                    base_url="https://api.groq.com/openai/v1",
+                    api_key=settings.groq_api_key,
                 )
                 system_prompt = (
                     "You are a deterministic raw-text formatter.\n\n"
@@ -706,7 +705,7 @@ def create_chappie_backend():
                     "Output ONLY the formatted text."
                 )
                 response = client.chat.completions.create(
-                    model=self.CEREBRAS_FORMAT_MODEL,
+                    model=self.GROQ_FORMAT_MODEL,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": clean_text[:12000]},
@@ -714,7 +713,7 @@ def create_chappie_backend():
                     max_tokens=2048,
                     temperature=0.3,
                     stream=False,
-                    timeout=8.0,
+                    timeout=15.0,
                 )
                 formatted = response.choices[0].message.content or ""
                 cot_block = extract_tagged_block(formatted, ["cot"])
@@ -723,7 +722,6 @@ def create_chappie_backend():
                 answer = (answer_block.content or "").strip()
                 if not answer:
                     answer = "CHAPPiE hat nachgedacht, schweigt aber..."
-                # Falls Cerebras kein <cot> produziert hat, parse lokal als Fallback
                 if not cot:
                     parsed = parse_thinking_tags(clean_text)
                     cot_parsed = parse_chain_of_thought(clean_text)
@@ -732,7 +730,7 @@ def create_chappie_backend():
                         cot = thought
                 return {"cot": cot, "answer": answer, "formatting_failed": False}
             except Exception as e:
-                print(f"[Cerebras Format] Fehler: {e}")
+                print(f"[Groq Format] Fehler: {e}")
                 return self._local_format_fallback(clean_text, formatting_failed=True)
 
         @staticmethod
@@ -1425,7 +1423,7 @@ def create_chappie_backend():
         def _consolidate_memories_for_prompt(
             self, ltm_memories: list, stm_entries: list
         ) -> tuple[str, dict]:
-            """Konsolidiert LTM + STM via Cerebras qwen-3-235b zu strukturiertem JSON.
+            """Konsolidiert LTM + STM via Groq gpt-oss-120b zu strukturiertem JSON.
             Returns (formatted_prompt_str, consolidation_meta)."""
             if not ltm_memories and not stm_entries:
                 return "", {"ltm_loaded": 0, "stm_loaded": 0}
@@ -1458,12 +1456,12 @@ def create_chappie_backend():
             try:
                 import openai
                 client = openai.OpenAI(
-                    base_url="https://api.cerebras.ai/v1",
-                    api_key=settings.cerebras_api_key,
+                    base_url="https://api.groq.com/openai/v1",
+                    api_key=settings.groq_api_key,
                     timeout=20.0,
                 )
                 response = client.chat.completions.create(
-                    model=settings.memory_consolidation_cerebras_model,
+                    model=settings.memory_consolidation_groq_model,
                     messages=messages,
                     max_tokens=settings.memory_consolidation_max_tokens,
                     temperature=0.1,
@@ -1576,7 +1574,7 @@ def create_chappie_backend():
             )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
             
-            # === LTM+STM KONSOLIDIERUNG (via Cerebras qwen-3-235b) ===
+            # === LTM+STM KONSOLIDIERUNG (via Groq gpt-oss-120b) ===
             stm_entries = []
             consolidation_meta = {}
             if settings.memory_consolidation_enabled:
@@ -1596,7 +1594,7 @@ def create_chappie_backend():
                         ).strip()
                 self.debug_logger.log_info(
                     "MEMORY_CONSOLIDATION",
-                    "LTM+STM via Cerebras konsolidiert",
+                    "LTM+STM via Groq konsolidiert",
                     consolidation_meta if consolidation_meta else {"enabled": False},
                 )
 
@@ -1713,20 +1711,9 @@ def create_chappie_backend():
             
             raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
-            formatted = self._format_via_cerebras(raw_response)
-            self.debug_logger.log_info(
-                "MODEL_OUTPUT",
-                "Schritt-2-Ausgabe ausgewertet",
-                {
-                    "response_chars": len(display_response or ""),
-                    "model_reasoning_chars": len(model_reasoning or ""),
-                    "thought_chars": len(thought or ""),
-                    "looks_like_error": looks_like_model_error(display_response or ""),
-                    "formatting_failed": formatted.get("formatting_failed", False),
-                },
-            )
-            
-            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            formatted = self._format_via_groq(raw_response)
+
+            # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted.get("cot", "") or thought or model_reasoning or ""
             safe_answer = formatted.get("answer", "") or display_response
             
@@ -1888,7 +1875,7 @@ def create_chappie_backend():
             thought = legacy_response.get("thought_process", "")
             model_reasoning = legacy_response.get("model_reasoning", "")
             raw_response = legacy_response.get("raw_response", display_response)
-            formatted_legacy = self._format_via_cerebras(raw_response)
+            formatted_legacy = self._format_via_groq(raw_response)
             self.debug_logger.log_info(
                 "LEGACY",
                 "Legacy-Antwort generiert",
@@ -1948,7 +1935,7 @@ def create_chappie_backend():
             )
             sleep_result = self._schedule_sleep_phase_if_due()
             
-            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted_legacy.get("cot", "") or thought or model_reasoning or ""
             safe_answer = formatted_legacy.get("answer", "") or display_response
 
@@ -2297,7 +2284,7 @@ def create_chappie_backend():
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
-                formatted_stream = self._format_via_cerebras(raw_response)
+                formatted_stream = self._format_via_groq(raw_response)
                 self.debug_logger.log_info(
                     "MODEL_OUTPUT",
                     "Schritt-2-Ausgabe ausgewertet",
@@ -2365,7 +2352,7 @@ def create_chappie_backend():
             if hasattr(self, '_processing_start_time'):
                 processing_time_ms = (start_time_dt - self._processing_start_time).total_seconds() * 1000
 
-            # Safety net: wenn Cerebras kein cot liefert, aber thought/model_reasoning existiert
+            # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted_stream.get("cot", "") or thought or model_reasoning or ""
             safe_answer = formatted_stream.get("answer", "") or display_response
 
@@ -2499,7 +2486,7 @@ def create_chappie_backend():
 
                 raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Legacy-Antwortgenerierung")
-                formatted_legacy = self._format_via_cerebras(raw_response)
+                formatted_legacy = self._format_via_groq(raw_response)
                 self.debug_logger.log_info(
                     "LEGACY",
                     "Legacy-Antwort generiert",

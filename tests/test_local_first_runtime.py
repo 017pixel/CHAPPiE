@@ -10,7 +10,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 for mod in (
     "chromadb", "chromadb.config", "requests", "openai",
-    "brain.groq_brain", "brain.nvidia_brain",
+    "brain.nvidia_brain",
     "brain.steering_api_server", "brain.steering_backend",
     "brain.deep_think", "brain.global_workspace",
     "brain.cerebras_limits", "memory.emotions_engine",
@@ -164,10 +164,10 @@ def test_local_qwen_prefers_layer_only_emotion_mode():
 
 def test_api_models_keep_prompt_emotion_rules():
     original_provider = settings.llm_provider
-    original_model = settings.cerebras_model
+    original_model = settings.groq_model
     try:
-        settings.llm_provider = LLMProvider.CEREBRAS
-        settings.cerebras_model = "llama-3.1-8b"
+        settings.llm_provider = LLMProvider.GROQ
+        settings.groq_model = "llama-3.1-8b"
         manager = SteeringManager()
 
         assert manager.should_force_local_emotion_steering() is False
@@ -177,7 +177,7 @@ def test_api_models_keep_prompt_emotion_rules():
         assert "DEIN AKTUELLER EMOTIONALER STATUS" in prompt
     finally:
         settings.llm_provider = original_provider
-        settings.cerebras_model = original_model
+        settings.groq_model = original_model
 
 
 def test_local_ollama_models_use_prompt_emotions():
@@ -262,7 +262,7 @@ def test_runtime_layer_config_clamps_outdated_saved_ranges():
 
         assert row["layer_start"] == 31
         assert row["layer_end"] == 31
-        assert row["default_alpha"] <= 1.5  # clamped to max valid alpha by SteeringManager
+        assert row["default_alpha"] <= 1.5
         assert base_vector["layer_range"] == [31, 31]
         assert payload["steering"]["model_layers"] == 32
     finally:
@@ -305,58 +305,58 @@ def test_action_response_suffix_can_skip_fixed_tone_directives():
     assert "Antworte direkt." in suffix
 
 
-def test_cerebras_provider_resolves_correct_model():
+def test_groq_provider_resolves_correct_model():
     original_provider = settings.llm_provider
-    original_model = settings.cerebras_model
+    original_model = settings.groq_model
     try:
-        settings.llm_provider = LLMProvider.CEREBRAS
-        settings.cerebras_model = "qwen-3-235b-a22b-instruct-2507"
+        settings.llm_provider = LLMProvider.GROQ
+        settings.groq_model = "qwen-3-235b-a22b-instruct-2507"
         assert get_active_model() == "qwen-3-235b-a22b-instruct-2507"
     finally:
         settings.llm_provider = original_provider
-        settings.cerebras_model = original_model
+        settings.groq_model = original_model
 
 
-def test_get_brain_for_cerebras_returns_cerebras_brain():
-    from brain.cerebras_brain import CerebrasBrain
+def test_get_brain_for_groq_returns_groq_brain():
+    from brain.groq_brain import GroqBrain
     original_provider = settings.llm_provider
     try:
-        settings.llm_provider = LLMProvider.CEREBRAS
+        settings.llm_provider = LLMProvider.GROQ
         brain = get_brain()
-        assert isinstance(brain, CerebrasBrain)
+        assert isinstance(brain, GroqBrain)
     finally:
         settings.llm_provider = original_provider
 
 
-def test_cerebras_is_not_local_provider():
+def test_groq_is_not_local_provider():
     manager = SteeringManager()
-    assert manager.is_local_provider(LLMProvider.CEREBRAS) is False
+    assert manager.is_local_provider(LLMProvider.GROQ) is False
     assert manager.is_local_provider(LLMProvider.VLLM) is True
     assert manager.is_local_provider(LLMProvider.OLLAMA) is True
 
 
-def test_cerebras_does_not_support_activation_steering():
+def test_groq_does_not_support_activation_steering():
     manager = SteeringManager()
-    assert manager.supports_activation_steering(LLMProvider.CEREBRAS) is False
+    assert manager.supports_activation_steering(LLMProvider.GROQ) is False
     assert manager.supports_activation_steering(LLMProvider.VLLM) is True
     assert manager.supports_activation_steering(LLMProvider.OLLAMA) is False
 
 
-def test_cerebras_uses_prompt_emotions():
+def test_groq_uses_prompt_emotions():
     manager = SteeringManager()
-    assert manager.should_use_prompt_emotions(LLMProvider.CEREBRAS) is True
+    assert manager.should_use_prompt_emotions(LLMProvider.GROQ) is True
     assert manager.should_use_prompt_emotions(LLMProvider.OLLAMA) is True
     assert manager.should_use_prompt_emotions(LLMProvider.VLLM) is False
 
 
-def test_get_intent_model_for_cerebras():
+def test_get_intent_model_for_groq():
     original_provider = settings.llm_provider
     original_intent = settings.intent_provider
     try:
-        settings.llm_provider = LLMProvider.CEREBRAS
-        settings.intent_provider = LLMProvider.CEREBRAS
+        settings.llm_provider = LLMProvider.GROQ
+        settings.intent_provider = LLMProvider.GROQ
         model = settings.get_intent_model()
-        assert model == settings.intent_processor_model_cerebras
+        assert model == settings.intent_processor_model_groq
     finally:
         settings.llm_provider = original_provider
         settings.intent_provider = original_intent
@@ -375,10 +375,10 @@ if __name__ == "__main__":
     test_runtime_layer_config_clamps_outdated_saved_ranges()
     test_qwen35_4b_runtime_profile_exposes_expected_layer_window()
     test_action_response_suffix_can_skip_fixed_tone_directives()
-    test_cerebras_provider_resolves_correct_model()
-    test_get_brain_for_cerebras_returns_cerebras_brain()
-    test_cerebras_is_not_local_provider()
-    test_cerebras_does_not_support_activation_steering()
-    test_cerebras_uses_prompt_emotions()
-    test_get_intent_model_for_cerebras()
+    test_groq_provider_resolves_correct_model()
+    test_get_brain_for_groq_returns_groq_brain()
+    test_groq_is_not_local_provider()
+    test_groq_does_not_support_activation_steering()
+    test_groq_uses_prompt_emotions()
+    test_get_intent_model_for_groq()
     print("OK: local-first runtime configuration is consistent")

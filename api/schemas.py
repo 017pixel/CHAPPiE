@@ -113,15 +113,17 @@ class SettingsSnapshot(BaseModel):
     vllm_url: str
     vllm_model: str
     vllm_force_single_model: bool
-    cerebras_model: str
+    groq_model: str
+    groq_format_model: str
+    groq_memory_model: str
     intent_provider: Optional[str]
-    intent_processor_model_cerebras: str
+    intent_processor_model_groq: str
     intent_processor_model_ollama: str
     intent_processor_model_vllm: str
     query_extraction_provider: Optional[str]
     query_extraction_ollama_model: str
     query_extraction_vllm_model: str
-    query_extraction_cerebras_model: str
+    query_extraction_groq_model: str
     query_extraction_min_words_for_llm: int
     emotion_analysis_model: str
     emotion_analysis_host: str
@@ -152,31 +154,33 @@ class SettingsSnapshot(BaseModel):
     enable_two_step_processing: bool
     stm_summary_threshold: int
     stm_summary_batch_size: int
-    cerebras_requests_per_minute: int
-    cerebras_requests_per_hour: int
-    cerebras_requests_per_day: int
-    cerebras_tokens_per_minute: int
-    cerebras_tokens_per_hour: int
-    cerebras_tokens_per_day: int
+    groq_requests_per_minute: int
+    groq_requests_per_hour: int
+    groq_requests_per_day: int
+    groq_tokens_per_minute: int
+    groq_tokens_per_hour: int
+    groq_tokens_per_day: int
 
 
 class SettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None
-    cerebras_api_key: Optional[str] = None
-    cerebras_model: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    groq_model: Optional[str] = None
+    groq_format_model: Optional[str] = None
+    groq_memory_model: Optional[str] = None
     vllm_model: Optional[str] = None
     vllm_url: Optional[str] = None
     vllm_force_single_model: Optional[bool] = None
     ollama_model: Optional[str] = None
     ollama_host: Optional[str] = None
     intent_provider: Optional[str] = None
-    intent_processor_model_cerebras: Optional[str] = None
+    intent_processor_model_groq: Optional[str] = None
     intent_processor_model_ollama: Optional[str] = None
     intent_processor_model_vllm: Optional[str] = None
     query_extraction_provider: Optional[str] = None
     query_extraction_ollama_model: Optional[str] = None
     query_extraction_vllm_model: Optional[str] = None
-    query_extraction_cerebras_model: Optional[str] = None
+    query_extraction_groq_model: Optional[str] = None
     query_extraction_min_words_for_llm: Optional[int] = None
     emotion_analysis_model: Optional[str] = None
     emotion_analysis_host: Optional[str] = None
@@ -207,9 +211,9 @@ class SettingsUpdate(BaseModel):
     enable_two_step_processing: Optional[bool] = None
     stm_summary_threshold: Optional[int] = None
     stm_summary_batch_size: Optional[int] = None
-    cerebras_requests_per_minute: Optional[int] = None
-    cerebras_requests_per_hour: Optional[int] = None
-    cerebras_requests_per_day: Optional[int] = None
-    cerebras_tokens_per_minute: Optional[int] = None
-    cerebras_tokens_per_hour: Optional[int] = None
-    cerebras_tokens_per_day: Optional[int] = None
+    groq_requests_per_minute: Optional[int] = None
+    groq_requests_per_hour: Optional[int] = None
+    groq_requests_per_day: Optional[int] = None
+    groq_tokens_per_minute: Optional[int] = None
+    groq_tokens_per_hour: Optional[int] = None
+    groq_tokens_per_day: Optional[int] = None

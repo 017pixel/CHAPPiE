@@ -12,11 +12,11 @@ sys.path.insert(0, PROJECT_ROOT)
 
 for mod in (
     "ollama", "chromadb", "chromadb.config", "requests", "openai",
-    "brain.cerebras_brain",
+    "brain.groq_brain",
     "brain.ollama_brain", "brain.brain_pipeline", "brain.steering_api_server",
     "brain.steering_backend", "brain.deep_think", "brain.global_workspace",
     "brain.action_response", "brain.response_parser", "brain.agents",
-    "brain.cerebras_limits", "life", "memory", "memory.memory_engine",
+    "brain.groq_limits", "life", "memory", "memory.memory_engine",
     "memory.emotions_engine", "memory.sleep_phase", "memory.forgetting_curve",
     "memory.context_files", "memory.chat_manager", "memory.short_term_memory",
     "memory.short_term_memory_v2", "memory.personality_manager",

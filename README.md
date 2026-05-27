@@ -133,19 +133,19 @@ cp CHAPPIE_CONFIG.example.json CHAPPIE_CONFIG.json
 
 Pflicht fuer den aktuellen optimierten Backend-Pfad:
 
-- `api.cerebras_api_key` eintragen
+- `api.groq_api_key` eintragen (oder in `CHAPPIE_CONFIG.json`)
 - `local_models.llm_provider = "vllm"`
 - `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
-- `small_tasks.intent_provider = "cerebras"`
-- `small_tasks.query_extraction_provider = "cerebras"`
+- `small_tasks.intent_provider = "groq"`
+- `small_tasks.query_extraction_provider = "groq"`
 
 Empfohlen:
 
 - lokaler CHAPPiE-Hauptpfad ueber `vllm`
 - lokaler Endpoint auf `http://localhost:8000/v1`
 - Qwen-3.5-4B lokal fuer Antworten
-- Cerebras `llama-3.1-8b` fuer Intent, Query Extraction und STM-Zusammenfassungen
-- Cerebras `qwen-3-235b-a22b-instruct-2507` fuer anspruchsvolle Intent-Analysen
+- Groq `llama-3.1-8b-instant` fuer Intent, Query Extraction und STM-Zusammenfassungen
+- Groq `openai/gpt-oss-120b` fuer Formatierung und Memory-Consolidation
 
 Details: [docs/local-models.md](docs/local-models.md)
 
@@ -200,11 +200,9 @@ CHAPPiE unterstuetzt genau **drei LLM-Provider**:
 |---|---|---|---|
 | **vLLM** | Lokal, Standard | `brain/vllm_brain.py` | Layer Steering (VAD) |
 | **Ollama** | Lokal, Alternative | `brain/ollama_brain.py` | Prompt-Emotionen |
-| **Cerebras** | Einzige Cloud-API | `brain/cerebras_brain.py` | Prompt-Emotionen |
+| **Groq** | Einzige Cloud-API | `brain/groq_brain.py` | Prompt-Emotionen |
 
-Cerebras-Modelle: `llama-3.1-8b` (schnell) und `qwen-3-235b-a22b-instruct-2507` (Reasoning).
-
-Die Provider NVIDIA NIM und Groq wurden entfernt.
+Groq-Modelle: `llama-3.1-8b-instant` (schnell), `llama-3.3-70b-versatile` (Reasoning), `openai/gpt-oss-120b` (Formatierung).
 
 ---
 

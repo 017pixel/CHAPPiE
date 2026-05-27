@@ -39,9 +39,9 @@ Mindestens setzen:
 
 Optional:
 
-- `small_tasks.intent_provider = "cerebras"`
-- `small_tasks.query_extraction_provider = "cerebras"`
-- `api.cerebras_api_key`
+- `small_tasks.intent_provider = "groq"`
+- `small_tasks.query_extraction_provider = "groq"`
+- `api.groq_api_key`
 
 Relevante Dateien:
 

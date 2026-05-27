@@ -19,7 +19,7 @@ CHROMA_DB_DIR.mkdir(exist_ok=True)
 
 class LLMProvider(str, Enum):
     OLLAMA = "ollama"
-    CEREBRAS = "cerebras"
+    GROQ = "groq"
     VLLM = "vllm"
 
 
@@ -74,19 +74,21 @@ class Settings:
         self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-4B")
         self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
         
-        self.cerebras_api_key = self._get_val("CEREBRAS_API_KEY", "")
-        self.cerebras_model = self._get_val("CEREBRAS_MODEL", "llama-3.1-8b")
+        self.groq_api_key = self._get_val("GROQ_API_KEY", "")
+        self.groq_model = self._get_val("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.groq_format_model = self._get_val("GROQ_FORMAT_MODEL", "openai/gpt-oss-120b")
+        self.groq_memory_model = self._get_val("GROQ_MEMORY_MODEL", "openai/gpt-oss-120b")
 
-        self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "cerebras"))
-        self.intent_processor_model_cerebras = self._get_val("INTENT_PROCESSOR_MODEL_CEREBRAS", "qwen-3-235b-a22b-instruct-2507")
+        self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "groq"))
+        self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "llama-3.1-8b-instant")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen3.5:9b")
         self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-4B")
         self.enable_two_step_processing = self._get_val("ENABLE_TWO_STEP_PROCESSING", True)
 
-        self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "cerebras"))
+        self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "groq"))
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
         self.query_extraction_vllm_model = self._get_val("QUERY_EXTRACTION_VLLM_MODEL", "Qwen/Qwen3.5-4B")
-        self.query_extraction_cerebras_model = self._get_val("QUERY_EXTRACTION_CEREBRAS_MODEL", "llama-3.1-8b")
+        self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
         self.enable_query_extraction = self._get_val("ENABLE_QUERY_EXTRACTION", True)
         self.query_extraction_min_words_for_llm = int(self._get_val("QUERY_EXTRACTION_MIN_WORDS_FOR_LLM", 7))
 
@@ -105,7 +107,7 @@ class Settings:
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
         self.memory_consolidation_enabled = self._get_val("MEMORY_CONSOLIDATION_ENABLED", True)
-        self.memory_consolidation_cerebras_model = self._get_val("MEMORY_CONSOLIDATION_CEREBRAS_MODEL", "qwen-3-235b-a22b-instruct-2507")
+        self.memory_consolidation_groq_model = self._get_val("MEMORY_CONSOLIDATION_GROQ_MODEL", "openai/gpt-oss-120b")
         self.memory_consolidation_max_tokens = int(self._get_val("MEMORY_CONSOLIDATION_MAX_TOKENS", 1500))
 
         self.daily_info_path = self._get_val("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
@@ -142,12 +144,12 @@ class Settings:
         self.context_token_limit = int(self._get_val("CONTEXT_TOKEN_LIMIT", 7000))
         self.context_token_warning_threshold = int(self._get_val("CONTEXT_TOKEN_WARNING_THRESHOLD", 6500))
 
-        self.cerebras_requests_per_minute = int(self._get_val("CEREBRAS_REQUESTS_PER_MINUTE", 5))
-        self.cerebras_requests_per_hour = int(self._get_val("CEREBRAS_REQUESTS_PER_HOUR", 150))
-        self.cerebras_requests_per_day = int(self._get_val("CEREBRAS_REQUESTS_PER_DAY", 2400))
-        self.cerebras_tokens_per_minute = int(self._get_val("CEREBRAS_TOKENS_PER_MINUTE", 30000))
-        self.cerebras_tokens_per_hour = int(self._get_val("CEREBRAS_TOKENS_PER_HOUR", 1000000))
-        self.cerebras_tokens_per_day = int(self._get_val("CEREBRAS_TOKENS_PER_DAY", 1000000))
+        self.groq_requests_per_minute = int(self._get_val("GROQ_REQUESTS_PER_MINUTE", 250))
+        self.groq_requests_per_hour = int(self._get_val("GROQ_REQUESTS_PER_HOUR", 6000))
+        self.groq_requests_per_day = int(self._get_val("GROQ_REQUESTS_PER_DAY", 144000))
+        self.groq_tokens_per_minute = int(self._get_val("GROQ_TOKENS_PER_MINUTE", 250000))
+        self.groq_tokens_per_hour = int(self._get_val("GROQ_TOKENS_PER_HOUR", 6000000))
+        self.groq_tokens_per_day = int(self._get_val("GROQ_TOKENS_PER_DAY", 144000000))
 
     def get_effective_provider(self, step_provider=None):
         if step_provider is None or step_provider == "auto":
@@ -167,16 +169,16 @@ class Settings:
 
     def get_intent_model(self, provider=None):
         effective = self.get_effective_provider(provider if provider != "auto" else None)
-        if effective == LLMProvider.CEREBRAS:
-            return self.intent_processor_model_cerebras
+        if effective == LLMProvider.GROQ:
+            return self.intent_processor_model_groq
         elif effective == LLMProvider.VLLM:
             return self.resolve_vllm_runtime_model(self.intent_processor_model_vllm)
         return self.intent_processor_model_ollama
 
     def get_query_extraction_model(self, provider=None):
         effective = self.get_effective_provider(provider if provider != "auto" else None)
-        if effective == LLMProvider.CEREBRAS:
-            return self.query_extraction_cerebras_model
+        if effective == LLMProvider.GROQ:
+            return self.query_extraction_groq_model
         elif effective == LLMProvider.VLLM:
             return self.resolve_vllm_runtime_model(self.query_extraction_vllm_model)
         return self.query_extraction_ollama_model
@@ -189,12 +191,12 @@ class Settings:
             except:
                 pass
 
-        for key in ["cerebras_api_key"]:
+        for key in ["groq_api_key"]:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
 
-        for key in ["cerebras_model", "vllm_model", "vllm_url", "ollama_model", "ollama_host",
-                     "memory_consolidation_cerebras_model"]:
+        for key in ["groq_model", "groq_format_model", "groq_memory_model", "vllm_model", "vllm_url",
+                     "ollama_model", "ollama_host", "memory_consolidation_groq_model"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
         if "vllm_force_single_model" in kwargs:
@@ -206,7 +208,7 @@ class Settings:
                 self.intent_provider = None
             else:
                 self.intent_provider = parsed
-        for key in ["intent_processor_model_cerebras", 
+        for key in ["intent_processor_model_groq",
                     "intent_processor_model_ollama", "intent_processor_model_vllm"]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
@@ -220,7 +222,7 @@ class Settings:
         for key in [
             "query_extraction_ollama_model",
             "query_extraction_vllm_model",
-            "query_extraction_cerebras_model",
+            "query_extraction_groq_model",
         ]:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
@@ -260,9 +262,9 @@ class Settings:
             "chappie_thinking_token_limit", "chappie_answer_token_limit",
             "history_max_messages", "context_token_limit", "context_token_warning_threshold",
             "stm_summary_threshold", "stm_summary_batch_size",
-            "cerebras_requests_per_minute", "cerebras_requests_per_hour",
-            "cerebras_requests_per_day", "cerebras_tokens_per_minute",
-            "cerebras_tokens_per_hour", "cerebras_tokens_per_day",
+            "groq_requests_per_minute", "groq_requests_per_hour",
+            "groq_requests_per_day", "groq_tokens_per_minute",
+            "groq_tokens_per_hour", "groq_tokens_per_day",
         ]:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
@@ -277,22 +279,24 @@ class Settings:
             return value.value if value is not None else "auto"
         return {
             "LLM_PROVIDER": self.llm_provider.value,
-            "CEREBRAS_API_KEY": self.cerebras_api_key,
-            "CEREBRAS_MODEL": self.cerebras_model,
+            "GROQ_API_KEY": self.groq_api_key,
+            "GROQ_MODEL": self.groq_model,
+            "GROQ_FORMAT_MODEL": self.groq_format_model,
+            "GROQ_MEMORY_MODEL": self.groq_memory_model,
             "VLLM_MODEL": self.vllm_model,
             "VLLM_URL": self.vllm_url,
             "VLLM_FORCE_SINGLE_MODEL": self.vllm_force_single_model,
             "OLLAMA_MODEL": self.ollama_model,
             "OLLAMA_HOST": self.ollama_host,
             "INTENT_PROVIDER": provider_value(self.intent_provider),
-            "INTENT_PROCESSOR_MODEL_CEREBRAS": self.intent_processor_model_cerebras,
+            "INTENT_PROCESSOR_MODEL_GROQ": self.intent_processor_model_groq,
             "INTENT_PROCESSOR_MODEL_OLLAMA": self.intent_processor_model_ollama,
             "INTENT_PROCESSOR_MODEL_VLLM": self.intent_processor_model_vllm,
             "ENABLE_TWO_STEP_PROCESSING": self.enable_two_step_processing,
             "QUERY_EXTRACTION_PROVIDER": provider_value(self.query_extraction_provider),
             "QUERY_EXTRACTION_OLLAMA_MODEL": self.query_extraction_ollama_model,
             "QUERY_EXTRACTION_VLLM_MODEL": self.query_extraction_vllm_model,
-            "QUERY_EXTRACTION_CEREBRAS_MODEL": self.query_extraction_cerebras_model,
+            "QUERY_EXTRACTION_GROQ_MODEL": self.query_extraction_groq_model,
             "ENABLE_QUERY_EXTRACTION": self.enable_query_extraction,
             "QUERY_EXTRACTION_MIN_WORDS_FOR_LLM": self.query_extraction_min_words_for_llm,
             "EMBEDDING_MODEL": self.embedding_model,
@@ -300,7 +304,7 @@ class Settings:
             "MEMORY_MIN_RELEVANCE": self.memory_min_relevance,
             "CHROMA_COLLECTION": self.chroma_collection_name,
             "MEMORY_CONSOLIDATION_ENABLED": self.memory_consolidation_enabled,
-            "MEMORY_CONSOLIDATION_CEREBRAS_MODEL": self.memory_consolidation_cerebras_model,
+            "MEMORY_CONSOLIDATION_GROQ_MODEL": self.memory_consolidation_groq_model,
             "MEMORY_CONSOLIDATION_MAX_TOKENS": self.memory_consolidation_max_tokens,
             "SHORT_TERM_TTL_HOURS": self.short_term_ttl_hours,
             "STM_SUMMARY_THRESHOLD": self.stm_summary_threshold,
@@ -333,12 +337,12 @@ class Settings:
             "HISTORY_MAX_MESSAGES": self.history_max_messages,
             "CONTEXT_TOKEN_LIMIT": self.context_token_limit,
             "CONTEXT_TOKEN_WARNING_THRESHOLD": self.context_token_warning_threshold,
-            "CEREBRAS_REQUESTS_PER_MINUTE": self.cerebras_requests_per_minute,
-            "CEREBRAS_REQUESTS_PER_HOUR": self.cerebras_requests_per_hour,
-            "CEREBRAS_REQUESTS_PER_DAY": self.cerebras_requests_per_day,
-            "CEREBRAS_TOKENS_PER_MINUTE": self.cerebras_tokens_per_minute,
-            "CEREBRAS_TOKENS_PER_HOUR": self.cerebras_tokens_per_hour,
-            "CEREBRAS_TOKENS_PER_DAY": self.cerebras_tokens_per_day,
+            "GROQ_REQUESTS_PER_MINUTE": self.groq_requests_per_minute,
+            "GROQ_REQUESTS_PER_HOUR": self.groq_requests_per_hour,
+            "GROQ_REQUESTS_PER_DAY": self.groq_requests_per_day,
+            "GROQ_TOKENS_PER_MINUTE": self.groq_tokens_per_minute,
+            "GROQ_TOKENS_PER_HOUR": self.groq_tokens_per_hour,
+            "GROQ_TOKENS_PER_DAY": self.groq_tokens_per_day,
         }
 
     def _persist_to_root_config(self):
@@ -355,8 +359,8 @@ settings = Settings()
 
 
 def get_active_model() -> str:
-    if settings.llm_provider == LLMProvider.CEREBRAS:
-        return settings.cerebras_model
+    if settings.llm_provider == LLMProvider.GROQ:
+        return settings.groq_model
     elif settings.llm_provider == LLMProvider.VLLM:
         return settings.vllm_model
     return settings.ollama_model

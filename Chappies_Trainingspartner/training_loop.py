@@ -193,7 +193,7 @@ class TrainingLoop:
             try:
                 response = func(*args, **kwargs)
                 
-                if isinstance(response, str) and response.strip().startswith("Cerebras Fehler"):
+                if isinstance(response, str) and response.strip().startswith("Groq Fehler"):
                     error_msg = response
                     error_type = self._classify_error(error_msg)
                     consecutive_errors += 1

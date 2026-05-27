@@ -173,7 +173,7 @@ class ShortTermMemoryV2:
         return active
 
     def summarize_overflow(self) -> int:
-        """Verdichtet aktive STM-Rohdaten in 5er-Batches via Cerebras."""
+        """Verdichtet aktive STM-Rohdaten in 5er-Batches via Groq."""
         from config.config import settings
 
         threshold = int(getattr(settings, "stm_summary_threshold", 5))
@@ -208,7 +208,7 @@ class ShortTermMemoryV2:
     def _summarize_batch(self, batch: List[ShortTermEntry]) -> str:
         try:
             from brain.base_brain import GenerationConfig, Message
-            from brain.cerebras_brain import CerebrasBrain
+            from brain.groq_brain import GroqBrain
             from brain.response_parser import looks_like_model_error
             from config.config import settings
 
@@ -219,7 +219,7 @@ class ShortTermMemoryV2:
                 "Antworte in maximal 5 kurzen Stichpunkten auf Deutsch.\n\n"
                 + "\n".join(lines)
             )
-            brain = CerebrasBrain(model=settings.cerebras_model)
+            brain = GroqBrain(model=settings.groq_model)
             config = GenerationConfig(max_tokens=260, temperature=0.1, stream=False)
             result = brain.generate([Message(role="user", content=prompt)], config=config)
             if not isinstance(result, str) or looks_like_model_error(result):

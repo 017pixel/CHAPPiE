@@ -1,54 +1,45 @@
 """
-CHAPiE - Cerebras Brain
-========================
-LLM-Backend für Cerebras Cloud API.
+CHAPiE - Groq Brain
+====================
+LLM-Backend für Groq Cloud API.
 
-Cerebras bietet:
-- Extrem schnelle Inferenz (bis zu 2000+ Token/Sekunde)
-- Zugang zu großen Modellen (Llama 3.3 70B, Qwen 3 235B)
+Groq bietet:
+- Extrem schnelle Inferenz (LPU-beschleunigt)
+- Zugang zu Llama, Qwen, GPT-OSS Modellen
 - OpenAI-kompatible API
 
-Benötigt: Cerebras API Key (https://cloud.cerebras.ai)
+Benötigt: Groq API Key (https://console.groq.com/keys)
 """
 
 from typing import Generator, Optional
 from openai import OpenAI
 
 from .base_brain import BaseBrain, Message, GenerationConfig
-from .cerebras_limits import get_cerebras_limiter
+from .groq_limits import get_groq_limiter
 from config.config import settings
 
 
-class CerebrasBrain(BaseBrain):
+class GroqBrain(BaseBrain):
     """
-    LLM-Backend für Cerebras Cloud API.
-    
-    Cerebras nutzt eine OpenAI-kompatible API mit eigenem Endpoint.
+    LLM-Backend für Groq Cloud API.
+
+    Groq nutzt eine OpenAI-kompatible API mit eigenem Endpoint.
     Unterstützt Streaming für flüssige Token-Ausgabe.
     """
-    
-    # Cerebras API Base URL
-    BASE_URL = "https://api.cerebras.ai/v1"
-    
+
+    BASE_URL = "https://api.groq.com/openai/v1"
+
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
-        """
-        Initialisiert das Cerebras-Backend.
-        
-        Args:
-            model: Modellname (default: aus Settings)
-            api_key: Cerebras API Key (default: aus Settings)
-        """
-        self.api_key = api_key or getattr(settings, 'cerebras_api_key', '')
-        model_name = model or getattr(settings, 'cerebras_model', 'llama-3.1-8b')
+        self.api_key = api_key or getattr(settings, 'groq_api_key', '')
+        model_name = model or getattr(settings, 'groq_model', 'llama-3.3-70b-versatile')
         super().__init__(model_name)
-        
+
         if self._is_missing_key(self.api_key):
-            print("WARNUNG: Cerebras Brain - Kein API-Key konfiguriert!")
+            print("WARNUNG: Groq Brain - Kein API-Key konfiguriert!")
             print("   Trage deinen Key in CHAPPIE_CONFIG.json ein")
             self._is_initialized = False
             return
-        
-        # OpenAI-kompatiblen Client mit Cerebras Endpoint initialisieren
+
         try:
             self.client = OpenAI(
                 base_url=self.BASE_URL,
@@ -56,50 +47,39 @@ class CerebrasBrain(BaseBrain):
                 timeout=30.0,
             )
             self._is_initialized = True
-            
-            print(f"Cerebras Brain initialisiert")
+
+            print(f"Groq Brain initialisiert")
             print(f"   Cloud API verbunden ({self.BASE_URL})")
             print(f"   Modell: {self.model}")
         except Exception as e:
-            print(f"FEHLER bei Cerebras-Initialisierung: {e}")
+            print(f"FEHLER bei Groq-Initialisierung: {e}")
             self._is_initialized = False
-    
+
     def generate(
         self,
         messages: list[Message],
         config: Optional[GenerationConfig] = None
     ) -> Generator[str, None, None] | str:
-        """
-        Generiert eine Antwort mit Cerebras.
-        
-        Args:
-            messages: Chat-Nachrichten
-            config: Generierungs-Konfiguration
-        
-        Returns:
-            Generator (streaming) oder String (nicht-streaming)
-        """
         if not self._is_initialized:
-            error_msg = "FEHLER: Cerebras nicht initialisiert - API-Key fehlt!"
+            error_msg = "FEHLER: Groq nicht initialisiert - API-Key fehlt!"
             if config and config.stream:
                 def error_gen():
                     yield error_msg
                 return error_gen()
             return error_msg
-        
+
         if config is None:
             config = GenerationConfig(
                 max_tokens=settings.max_tokens,
                 temperature=settings.temperature,
                 stream=settings.stream
             )
-        
-        # Konvertiere Messages zu OpenAI-Format
+
         openai_messages = [
             {"role": msg.role, "content": msg.content}
             for msg in messages
         ]
-        
+
         if config.stream:
             return self._stream_generate(openai_messages, config)
         else:
@@ -108,27 +88,26 @@ class CerebrasBrain(BaseBrain):
     @staticmethod
     def _is_missing_key(api_key: str) -> bool:
         normalized = (api_key or "").strip()
-        return not normalized or normalized.startswith("DEIN_")
+        return not normalized or normalized.startswith("DEIN_") or not normalized.startswith("gsk-")
 
     @staticmethod
     def _estimate_request_tokens(messages: list[dict], config: GenerationConfig) -> int:
         text = "\n".join(str(message.get("content", "")) for message in messages)
-        return get_cerebras_limiter().estimate_tokens(text) + int(config.max_tokens or 0)
+        return get_groq_limiter().estimate_tokens(text) + int(config.max_tokens or 0)
 
     def _claim_quota(self, messages: list[dict], config: GenerationConfig) -> Optional[str]:
-        allowed, reason = get_cerebras_limiter().can_start(self._estimate_request_tokens(messages, config))
+        allowed, reason = get_groq_limiter().can_start(self._estimate_request_tokens(messages, config))
         return None if allowed else reason
-    
+
     def _stream_generate(
         self,
         messages: list[dict],
         config: GenerationConfig
     ) -> Generator[str, None, None]:
-        """Streaming-Generierung - Token für Token."""
         try:
             quota_error = self._claim_quota(messages, config)
             if quota_error:
-                yield f"\nCerebras Fehler: Rate-Limit erreicht ({quota_error})"
+                yield f"\nGroq Fehler: Rate-Limit erreicht ({quota_error})"
                 return
 
             stream = self.client.chat.completions.create(
@@ -138,20 +117,19 @@ class CerebrasBrain(BaseBrain):
                 temperature=config.temperature,
                 stream=True
             )
-            
+
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-                    
+
         except Exception as e:
-            yield f"\nCerebras Fehler: {str(e)}"
-    
+            yield f"\nGroq Fehler: {str(e)}"
+
     def _sync_generate(self, messages: list[dict], config: GenerationConfig) -> str:
-        """Synchrone Generierung - komplette Antwort auf einmal."""
         try:
             quota_error = self._claim_quota(messages, config)
             if quota_error:
-                return f"Cerebras Fehler: Rate-Limit erreicht ({quota_error})"
+                return f"Groq Fehler: Rate-Limit erreicht ({quota_error})"
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -161,40 +139,40 @@ class CerebrasBrain(BaseBrain):
                 stream=False
             )
             return response.choices[0].message.content
-            
+
         except Exception as e:
-            return f"Cerebras Fehler: {str(e)}"
-    
+            return f"Groq Fehler: {str(e)}"
+
     def is_available(self) -> bool:
-        """Prueft ob Cerebras bereit ist (kein API-Call, nur Initialisierungs-Check)."""
         return self._is_initialized
-    
+
     def get_model_info(self) -> dict:
-        """Gibt Modell-Informationen zurück."""
         return {
             "name": self.model,
-            "provider": "cerebras",
+            "provider": "groq",
             "local": False,
             "api_configured": bool(self.api_key)
         }
-    
+
     def list_models(self) -> list[str]:
-        """Listet alle verfügbaren Cerebras-Modelle."""
         if not self._is_initialized:
             return []
-        
+
         try:
             models = self.client.models.list()
             return [m.id for m in models.data]
         except Exception:
-            # Fallback: Liste bekannter Modelle
-            return list(CEREBRAS_MODELS.keys())
+            return list(GROQ_MODELS.keys())
 
 
-# === Verfügbare Cerebras Modelle (Stand: Januar 2026) ===
-CEREBRAS_MODELS = {
-    "llama-3.1-8b": "Llama 3.1 8B - Schnell & Effizient",
-    "qwen-3-235b-a22b-instruct-2507": "Qwen 3 235B - Hochwertiges Reasoning",
+# === Verfügbare Groq Modelle ===
+GROQ_MODELS = {
+    "llama-3.1-8b-instant": "Llama 3.1 8B - Sehr schnell & günstig",
+    "llama-3.3-70b-versatile": "Llama 3.3 70B - Starkes Reasoning",
+    "openai/gpt-oss-120b": "GPT-OSS 120B - Hochwertige Formatierung",
+    "openai/gpt-oss-20b": "GPT-OSS 20B - Extrem schnell",
+    "qwen/qwen3-32b": "Qwen3 32B - Gutes Reasoning",
+    "meta-llama/llama-4-scout-17b-16e-instruct": "Llama 4 Scout 17B - Vision & Text",
 }
 
 
@@ -202,40 +180,36 @@ CEREBRAS_MODELS = {
 if __name__ == "__main__":
     from rich.console import Console
     from rich.panel import Panel
-    
+
     console = Console()
-    console.print(Panel("Cerebras Brain Test", style="bold blue"))
-    
-    # Brain initialisieren
-    brain = CerebrasBrain()
-    
-    # Verfügbarkeit prüfen
+    console.print(Panel("Groq Brain Test", style="bold blue"))
+
+    brain = GroqBrain()
+
     console.print(f"\n[cyan]1. Prüfe Verfügbarkeit...[/cyan]")
     if brain.is_available():
-        console.print("   Cerebras API ist erreichbar!")
-        
-        # Modelle auflisten
+        console.print("   Groq API ist erreichbar!")
+
         models = brain.list_models()
         console.print(f"   Verfügbare Modelle: {len(models)}")
         for model in models[:5]:
             console.print(f"      - {model}")
-        
-        # Test-Generierung
+
         console.print(f"\n[cyan]2. Test-Generierung (Streaming)...[/cyan]")
-        
+
         messages = [
             Message(role="system", content="Du bist ein hilfreicher Assistent. Antworte kurz auf Deutsch."),
             Message(role="user", content="Was ist 2+2? Antworte in einem Satz.")
         ]
-        
+
         console.print("   Antwort: ", end="")
         for token in brain.generate(messages):
             console.print(token, end="")
         console.print()
-        
-        console.print("\n[green]Cerebras Brain Test erfolgreich![/green]")
+
+        console.print("\n[green]Groq Brain Test erfolgreich![/green]")
     else:
-        console.print("   Cerebras ist nicht erreichbar!")
+        console.print("   Groq ist nicht erreichbar!")
         if not brain.api_key:
             console.print("   Trage deinen API-Key in CHAPPIE_CONFIG.json ein")
         else:

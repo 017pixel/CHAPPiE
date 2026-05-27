@@ -458,7 +458,7 @@ class MemoryEngine:
 
         Nutzt Multi-Provider Strategy:
         1. Manual (Kurze Inputs < 10 Woerter)
-        2. LLM Extraction mit aktivem Provider (Cerebras/Ollama)
+        2. LLM Extraction mit aktivem Provider (Groq/Ollama)
         3. Fallback: Zusammenfassung der ersten 200 Zeichen
 
         Args:

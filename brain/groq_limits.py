@@ -1,4 +1,4 @@
-"""Lightweight in-process Cerebras quota guard."""
+"""Lightweight in-process Groq quota guard."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class UsageEvent:
     tokens: int
 
 
-class CerebrasRateLimiter:
+class GroqRateLimiter:
     def __init__(self):
         self._lock = threading.Lock()
         self._requests: Deque[UsageEvent] = deque()
@@ -27,9 +27,9 @@ class CerebrasRateLimiter:
     def _limits(self):
         from config.config import settings
         return {
-            "minute": (settings.cerebras_requests_per_minute, settings.cerebras_tokens_per_minute, 60),
-            "hour": (settings.cerebras_requests_per_hour, settings.cerebras_tokens_per_hour, 3600),
-            "day": (settings.cerebras_requests_per_day, settings.cerebras_tokens_per_day, 86400),
+            "minute": (settings.groq_requests_per_minute, settings.groq_tokens_per_minute, 60),
+            "hour": (settings.groq_requests_per_hour, settings.groq_tokens_per_hour, 3600),
+            "day": (settings.groq_requests_per_day, settings.groq_tokens_per_day, 86400),
         }
 
     def _prune(self, now: float) -> None:
@@ -43,9 +43,9 @@ class CerebrasRateLimiter:
             for name, (request_limit, token_limit, window) in self._limits().items():
                 events = [event for event in self._requests if now - event.ts <= window]
                 if len(events) + 1 > request_limit:
-                    return False, f"cerebras_{name}_request_limit"
+                    return False, f"groq_{name}_request_limit"
                 if sum(event.tokens for event in events) + estimated_tokens > token_limit:
-                    return False, f"cerebras_{name}_token_limit"
+                    return False, f"groq_{name}_token_limit"
             self._requests.append(UsageEvent(now, estimated_tokens))
             return True, ""
 
@@ -64,9 +64,8 @@ class CerebrasRateLimiter:
             }
 
 
-_limiter = CerebrasRateLimiter()
+_limiter = GroqRateLimiter()
 
 
-def get_cerebras_limiter() -> CerebrasRateLimiter:
+def get_groq_limiter() -> GroqRateLimiter:
     return _limiter
-

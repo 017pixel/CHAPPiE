@@ -8,7 +8,7 @@ from typing import Optional
 
 from .base_brain import BaseBrain, Message, GenerationConfig
 from .ollama_brain import OllamaBrain
-from .cerebras_brain import CerebrasBrain
+from .groq_brain import GroqBrain
 from .vllm_brain import VLLMBrain
 from .deep_think import DeepThinkEngine, DeepThinkStep
 
@@ -21,7 +21,7 @@ def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = Non
     
     Waehlt automatisch basierend auf LLM_PROVIDER in settings:
     - "ollama" → OllamaBrain (lokal)
-    - "cerebras" → CerebrasBrain (cloud, high-speed)
+    - "groq" → GroqBrain (cloud, high-speed)
     - "vllm" → VLLMBrain (lokale GPU-Beschleunigung)
     
     Returns:
@@ -29,8 +29,8 @@ def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = Non
     """
     effective_provider = provider or settings.llm_provider
 
-    if effective_provider == LLMProvider.CEREBRAS:
-        return CerebrasBrain(model=model)
+    if effective_provider == LLMProvider.GROQ:
+        return GroqBrain(model=model)
     elif effective_provider == LLMProvider.VLLM:
         return VLLMBrain(model=model)
     else:

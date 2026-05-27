@@ -6,7 +6,7 @@ import { api } from "../services/api";
 const PROVIDER_OPTIONS = [
   { value: "vllm", label: "vLLM (Local GPU)" },
   { value: "ollama", label: "Ollama (Local)" },
-  { value: "cerebras", label: "Cerebras (Cloud)" },
+  { value: "groq", label: "Groq (Cloud)" },
 ];
 
 interface SettingDef {
@@ -34,7 +34,9 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "vllm_force_single_model", label: "Force Single Model", type: "boolean", group: "provider", icon: "lock" },
   { key: "ollama_model", label: "Ollama Model", type: "string", group: "provider", icon: "smart_toy" },
   { key: "ollama_host", label: "Ollama Host", type: "string", group: "provider", icon: "dns" },
-  { key: "cerebras_model", label: "Cerebras Model", type: "string", group: "provider", icon: "cloud" },
+  { key: "groq_model", label: "Groq Model", type: "string", group: "provider", icon: "cloud" },
+  { key: "groq_format_model", label: "Groq Format Model", type: "string", group: "provider", icon: "cloud" },
+  { key: "groq_memory_model", label: "Groq Memory Model", type: "string", group: "provider", icon: "cloud" },
 
   { key: "temperature", label: "Temperature", type: "number", group: "generation", icon: "thermostat" },
   { key: "repetition_penalty", label: "Repetition Penalty", type: "number", group: "generation", icon: "repeat" },
@@ -61,15 +63,15 @@ const SETTINGS_DEFS: SettingDef[] = [
 
   { key: "intent_provider", label: "Intent Provider", type: "provider", group: "intent", icon: "psychology" },
   { key: "intent_processor_model_vllm", label: "Intent Model (vLLM)", type: "string", group: "intent", icon: "smart_toy" },
-  { key: "intent_processor_model_cerebras", label: "Intent Model (Cerebras)", type: "string", group: "intent", icon: "cloud" },
+  { key: "intent_processor_model_groq", label: "Intent Model (Groq)", type: "string", group: "intent", icon: "cloud" },
   { key: "intent_processor_model_ollama", label: "Intent Model (Ollama)", type: "string", group: "intent", icon: "smart_toy" },
   { key: "query_extraction_provider", label: "Query Extract. Provider", type: "provider", group: "intent", icon: "search" },
 
   { key: "training_use_global_settings", label: "Use Global Settings", type: "boolean", group: "training", icon: "settings" },
   { key: "training_chappie_model", label: "Training Model", type: "string", group: "training", icon: "model_training" },
 
-  { key: "cerebras_requests_per_minute", label: "Cerebras RPM", type: "number", group: "rate", icon: "speed" },
-  { key: "cerebras_tokens_per_minute", label: "Cerebras TPM", type: "number", group: "rate", icon: "token" },
+  { key: "groq_requests_per_minute", label: "Groq RPM", type: "number", group: "rate", icon: "speed" },
+  { key: "groq_tokens_per_minute", label: "Groq TPM", type: "number", group: "rate", icon: "token" },
 ];
 
 function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; onChange: (key: string, val: any) => void }) {
