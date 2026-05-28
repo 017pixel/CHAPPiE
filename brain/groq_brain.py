@@ -88,7 +88,7 @@ class GroqBrain(BaseBrain):
     @staticmethod
     def _is_missing_key(api_key: str) -> bool:
         normalized = (api_key or "").strip()
-        return not normalized or normalized.startswith("DEIN_") or not normalized.startswith("gsk-")
+        return not normalized or normalized.startswith("DEIN_") or not normalized.startswith("gsk_")
 
     @staticmethod
     def _estimate_request_tokens(messages: list[dict], config: GenerationConfig) -> int:

@@ -47,7 +47,7 @@ def test_is_missing_key_invalid():
 
 
 def test_is_missing_key_valid():
-    assert GroqBrain._is_missing_key("gsk-1234567890abcdef") is False
+    assert GroqBrain._is_missing_key("gsk_1234567890abcdef") is False
 
 
 def test_get_model_info_without_key():
@@ -68,7 +68,7 @@ def test_get_model_info_with_key():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="openai/gpt-oss-120b", api_key="gsk-testkey123")
+        brain = GroqBrain(model="openai/gpt-oss-120b", api_key="gsk_testkey123")
         info = brain.get_model_info()
         assert info["provider"] == "groq"
         assert info["name"] == "openai/gpt-oss-120b"
@@ -94,7 +94,7 @@ def test_is_available_true_with_valid_key():
         settings.groq_api_key = ""
         with patch("brain.groq_brain.OpenAI") as mock_openai:
             mock_openai.return_value = MagicMock()
-            brain = GroqBrain(model="llama-3.1-8b-instant", api_key="gsk-testkey123")
+            brain = GroqBrain(model="llama-3.1-8b-instant", api_key="gsk_testkey123")
             assert brain.is_available() is True
     finally:
         settings.groq_api_key = original_key
@@ -136,7 +136,7 @@ def test_model_defaults_from_settings():
     try:
         settings.groq_api_key = ""
         settings.groq_model = "openai/gpt-oss-120b"
-        brain = GroqBrain(api_key="gsk-test")
+        brain = GroqBrain(api_key="gsk_test")
         assert brain.model == "openai/gpt-oss-120b"
     finally:
         settings.groq_model = original_model
@@ -147,7 +147,7 @@ def test_model_explicit_overrides_settings():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="qwen/qwen3-32b", api_key="gsk-test")
+        brain = GroqBrain(model="qwen/qwen3-32b", api_key="gsk_test")
         assert brain.model == "qwen/qwen3-32b"
     finally:
         settings.groq_api_key = original_key
@@ -157,8 +157,8 @@ def test_api_key_explicit_overrides_settings():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(api_key="gsk-explicit", model="llama-3.1-8b-instant")
-        assert brain.api_key == "gsk-explicit"
+        brain = GroqBrain(api_key="gsk_explicit", model="llama-3.1-8b-instant")
+        assert brain.api_key == "gsk_explicit"
     finally:
         settings.groq_api_key = original_key
 
