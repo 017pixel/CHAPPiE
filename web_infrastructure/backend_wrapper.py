@@ -1521,7 +1521,8 @@ def create_chappie_backend():
 
         @staticmethod
         def _estimate_msg_tokens(msg) -> int:
-            text = str(msg.get("content", ""))
+            content = getattr(msg, "content", None)
+            text = str(content if content is not None else msg.get("content", ""))
             char_count = len(text)
             non_ascii = sum(1 for c in text if ord(c) > 127)
             ascii_chars = char_count - non_ascii
