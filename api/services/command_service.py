@@ -9,6 +9,8 @@ HELP_TEXT = """**CHAPPiE Commands:**
 - **/sleep** - Startet die Traum-Phase (konsolidiert Erinnerungen)
 - **/think [thema]** - Einfacher Reflektionsmodus (10 Schritte)
 - **/deep think [anzahl]** - Rekursive Selbstreflexion, Standard 10 Schritte
+- **/emotion <name> [+/-]<0-100>** - Emotion setzen/erhoehen/senken (z.B. /emotion happiness +10)
+- **/emotion** - Zeigt alle aktuellen Emotions-Werte
 - **/clear /new** - Startet eine neue Chat-Sitzung
 - **/stats** - Zeigt System-Statistiken
 - **/config** - Zeigt Hinweis auf die Settings-Ansicht
@@ -121,6 +123,53 @@ def _run_deep_think(backend, command: str) -> Dict[str, Any]:
     return _base_result(backend, response_text, deep_think_summary=summary)
 
 
+EMOTION_NAMES = ("happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness")
+
+
+def _run_emotion(backend, cmd: str) -> Dict[str, Any]:
+    """Setzt/erhoeht/senkt eine Emotion. Syntax: /emotion [name] [[+/-]wert]"""
+    parts = cmd.split()
+
+    if len(parts) == 1:
+        emotions = backend._get_emotions_snapshot()
+        lines = ["**Aktuelle Emotions-Werte:**\n"]
+        for name in EMOTION_NAMES:
+            val = emotions.get(name, "?")
+            lines.append(f"- **{name}**: {val}/100")
+        lines.append(f"\n*Syntax: /emotion <name> [+/-]<0-100>*")
+        lines.append(f"*Beispiel: /emotion happiness +10*")
+        return _base_result(backend, "\n".join(lines))
+
+    if len(parts) < 3:
+        return _base_result(backend, "Nutze: `/emotion <name> [+/-]<0-100>` (z.B. `/emotion happiness +10`)")
+
+    _, emotion, val_str, *_extra = parts
+    if emotion not in EMOTION_NAMES:
+        names = ", ".join(EMOTION_NAMES)
+        return _base_result(backend, f"Unbekannte Emotion: `{emotion}`. Gueltig: {names}")
+
+    is_delta = val_str.startswith("+") or val_str.startswith("-")
+    try:
+        parsed = int(val_str)
+    except ValueError:
+        return _base_result(backend, f"Ungueltiger Wert: `{val_str}`. Erwartet: Zahl oder +Zahl/-Zahl.")
+
+    current = backend._get_emotions_snapshot().get(emotion, 50)
+    target = current + parsed if is_delta else parsed
+    clamped = max(0, min(100, target))
+
+    if target != clamped:
+        direction = "Maximum" if target > 100 else "Minimum"
+        overflow = abs(target - clamped)
+        msg = f"**{emotion}**: {current} {'+' if parsed > 0 else ''}{parsed} → **{clamped}**/100 ⚠️ *({direction} erreicht, {overflow} {'reduziert' if target > 100 else 'erhoeht'})*"
+    else:
+        delta_str = f" {'+' if parsed > 0 else ''}{parsed} → " if is_delta else " → "
+        msg = f"**{emotion}**: {current}{delta_str}**{clamped}**/100 ✓"
+
+    backend.emotions.set_emotion(emotion, clamped)
+    return _base_result(backend, msg)
+
+
 def execute_slash_command(command: str, backend) -> Dict[str, Any]:
     cmd = command.strip()
     lower = cmd.lower()
@@ -137,6 +186,8 @@ def execute_slash_command(command: str, backend) -> Dict[str, Any]:
         return _base_result(backend, _build_stats_text(backend))
     if lower == "/config":
         return _base_result(backend, "Die Konfiguration liegt jetzt im React-Frontend unter der Settings-Ansicht und in der API unter `/settings`.")
+    if lower.startswith("/emotion"):
+        return _run_emotion(backend, cmd)
     if lower in ("/clear", "/new"):
         new_session_id = backend.chat_manager.create_session()
         backend.chat_manager.set_active_session(new_session_id)

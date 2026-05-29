@@ -109,11 +109,15 @@ def create_chappie_backend():
             self.last_memory_timestamp = datetime.now(timezone.utc).isoformat()
 
         def _run_sleep_phase_job(self):
+            print(f"\n{'=' * 50}")
+            print(f"  SCHLAFPHASE GESTARTET - Energie & Emotionen regenerieren...")
+            print(f"{'=' * 50}")
             try:
                 result = self.sleep_handler.execute_sleep_phase(
                     memory_engine=self.memory,
                     context_files=self.context_files,
                     short_term_memory=self.short_term_memory_v2,
+                    emotions_engine=self.emotions,
                 )
                 self.debug_logger.log_info(
                     "SLEEP",
@@ -131,6 +135,8 @@ def create_chappie_backend():
                     self._sleep_job_lock.release()
                 except RuntimeError:
                     pass
+                print(f"  SCHLAFPHASE ABGESCHLOSSEN")
+                print(f"{'=' * 50}\n")
 
         def _schedule_sleep_phase_if_due(self) -> Dict[str, Any]:
             self.sleep_handler.increment_interaction()
@@ -342,15 +348,15 @@ def create_chappie_backend():
 
             if not display_response:
                 if model_reasoning or thought:
-                    # Keep thought/model_reasoning for CoT display — don't clear them
-                    display_response = "CHAPPiE schweigt..."
+                    display_response = self._FALLBACK_SCHWEIGT
                 else:
                     display_response = self._format_generation_error(phase, raw_text)
             elif (len(thought or "") > 4000 or len(model_reasoning or "") > 4000) and len(display_response) < 80:
-                # Loop detection: mark answer as error but keep thought/model_reasoning for CoT
                 display_response = self._format_generation_error(
                     phase, "Antwort ist nur Thinking (Loop erkannt). Antworttext zu kurz."
                 )
+            else:
+                display_response = self._detect_repetition_loop(display_response)
             return display_response, thought, model_reasoning
 
         @staticmethod
@@ -589,6 +595,69 @@ def create_chappie_backend():
 
         GROQ_FORMAT_MODEL = "openai/gpt-oss-120b"
 
+        _FALLBACK_SILENT = "CHAPPiE hat nachgedacht, schweigt aber..."
+        _FALLBACK_NO_THINK = "CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet."
+        _FALLBACK_SCHWEIGT = "CHAPPiE schweigt..."
+
+        @staticmethod
+        def _is_fallback_text(text: str) -> bool:
+            return text in (
+                CHAPPiEBackend._FALLBACK_SILENT,
+                CHAPPiEBackend._FALLBACK_NO_THINK,
+                CHAPPiEBackend._FALLBACK_SCHWEIGT,
+            )
+
+        @staticmethod
+        def _detect_repetition_loop(text: str, min_repeat: int = 10) -> str:
+            if not text:
+                return text
+            lines = text.splitlines()
+            cleaned = []
+            for line in lines:
+                line = line.rstrip()
+                if not line:
+                    cleaned.append(line)
+                    continue
+                words = line.split()
+                if len(words) < 3:
+                    cleaned.append(line)
+                    continue
+                for wlen in (1, 2, 3):
+                    for i in range(len(words) - wlen * min_repeat + 1):
+                        pattern = tuple(words[i:i + wlen])
+                        count = 1
+                        j = i + wlen
+                        while j + wlen <= len(words) and tuple(words[j:j + wlen]) == pattern:
+                            count += 1
+                            j += wlen
+                        if count >= min_repeat:
+                            cutoff = i + wlen
+                            truncated = " ".join(words[:cutoff])
+                            cleaned.append(truncated + " [REPETITION CUT]")
+                            break
+                    else:
+                        continue
+                    break
+                else:
+                    cleaned.append(line)
+                    continue
+                break
+            return "\n".join(cleaned)
+
+        @staticmethod
+        def _normalize_whitespace(text: str) -> str:
+            """Fuegt Leerzeichen zwischen zusammengeschriebenen Woertern ein (Fallback vor Groq-Formatierung)."""
+            import re
+            text = re.sub(r'([a-zäöüß])([A-ZÄÖÜ])', r'\1 \2', text)
+            text = re.sub(r'([.!?])([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
+            text = re.sub(r'([a-zäöüß])(\*)', r'\1 \2', text)
+            text = re.sub(r'(\*)([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
+            text = re.sub(r'([a-zäöüß])(\d)', r'\1 \2', text)
+            text = re.sub(r'(\d)([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
+            text = re.sub(r'([a-zäöüß])(\()', r'\1 \2', text)
+            text = re.sub(r'(\))([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
+            return text
+
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
             """Entfernt vLLM/Provider-Fehlermeldungen aus dem Roh-Output."""
@@ -611,7 +680,7 @@ def create_chappie_backend():
             """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
-                return {"cot": "", "answer": "CHAPPiE hat nachgedacht, schweigt aber...", "formatting_failed": False}
+                return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "answer_is_fallback": True}
             if not settings.groq_api_key:
                 return self._local_format_fallback(clean_text, formatting_failed=False)
             try:
@@ -623,86 +692,29 @@ def create_chappie_backend():
                 )
                 system_prompt = (
                     "You are a deterministic raw-text formatter.\n\n"
-                    "Your ONLY task is to reformat raw copied text into readable structured text.\n\n"
-                    "You are NOT allowed to:\n"
-                    "- change wording\n"
-                    "- paraphrase\n"
-                    "- summarize\n"
-                    "- rewrite\n"
-                    "- improve grammar\n"
-                    "- improve spelling\n"
-                    "- fix punctuation\n"
-                    "- remove repetitions\n"
-                    "- remove duplicated words\n"
-                    "- complete unfinished sentences\n"
-                    "- continue interrupted thoughts\n"
-                    "- invent missing content\n"
-                    "- modify tone\n"
-                    "- shorten text\n"
-                    "- expand text\n"
-                    "- interpret meaning\n"
-                    "- optimize formatting beyond whitespace and structure\n"
-                    "- alter capitalization\n"
-                    "- remove debug information\n"
-                    "- remove metadata\n"
-                    "- remove timestamps\n"
-                    "- remove status information\n"
-                    "- remove tags\n"
-                    "- remove chain-of-thought content\n"
-                    "- remove internal drafts\n"
-                    "- remove repeated drafts\n"
-                    "- remove self-corrections\n"
-                    "- remove unfinished reasoning\n"
-                    "- remove malformed reasoning\n"
-                    "- remove asterisks\n"
-                    "- remove quotes\n"
-                    "- remove special characters\n\n"
-                    "You are ONLY allowed to:\n"
-                    "- insert spaces between merged words\n"
-                    "- insert line breaks\n"
-                    "- insert paragraph breaks\n"
-                    "- preserve existing ordering exactly\n"
-                    "- preserve every character exactly except whitespace changes\n"
-                    "- visually separate sections if clearly detectable\n"
-                    "- preserve incomplete or malformed text exactly as-is\n\n"
-                    "If content appears incomplete, corrupted, truncated, malformed, or abruptly cut off:\n"
-                    "- preserve it exactly\n"
-                    "- NEVER complete it\n"
-                    "- NEVER continue it\n"
-                    "- NEVER infer missing text\n"
-                    "- NEVER generate a likely continuation\n\n"
-                    "The formatter must behave like a lossless decoder, not like an editor.\n"
-                    "Output fidelity is more important than readability.\n"
-                    "If unsure whether a modification changes meaning: DO NOT MODIFY.\n\n"
-                    "CRITICAL RULES:\n"
-                    "1. Every original word must remain.\n"
-                    "2. Every original sentence fragment must remain.\n"
-                    "3. Every repeated sentence must remain.\n"
-                    "4. Every typo must remain.\n"
-                    "5. Every correction attempt must remain.\n"
-                    "6. Every unfinished thought must remain.\n"
-                    "7. Every debug line must remain.\n"
-                    "8. If the raw text abruptly ends, keep it abruptly ended.\n"
-                    "9. If a section is empty, keep it empty.\n"
-                    "10. Never generate new semantic content.\n\n"
-                    "Whitespace normalization is allowed.\n"
-                    "Semantic modification is forbidden.\n\n"
-                    "Your output must be a structurally readable version of the exact same raw text.\n\n"
-                    "STRUCTURAL SEPARATION:\n"
-                    "Split thinking/chain-of-thought and final answer into two tagged blocks:\n"
-                    "<cot>\n[formatted chain of thought]\n</cot>\n"
-                    "<antwort>\n[formatted final answer]\n</antwort>\n\n"
-                    "SPECIAL RULES:\n"
-                    "- If the text consists ONLY of thinking/reasoning without any actual answer: "
-                    "write exactly 'CHAPPiE hat nachgedacht, schweigt aber...' inside the <antwort> block.\n"
-                    "- If the text consists ONLY of an answer without any thinking/reasoning: "
-                    "write exactly 'CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet.' inside the <cot> block.\n"
-                    "- If the answer cuts off mid-sentence or ends incomplete: "
-                    "append '[CHAPPiE hat diese Antwort am Ende abgebrochen]' at the end of the <antwort> block.\n\n"
-                    "Do not explain anything.\n"
-                    "Do not add notes.\n"
-                    "Do not add headers unless already present in the raw text.\n"
-                    "Output ONLY the formatted text."
+                    "Your task: take raw model output and make it readable WITHOUT changing meaning.\n\n"
+                    "CRITICAL - ALWAYS DO:\n"
+                    "- INSERT SPACES between every merged word (e.g. 'HalloWelt' → 'Hallo Welt')\n"
+                    "- INSERT SPACES after punctuation when missing (e.g. 'text.Weiter' → 'text. Weiter')\n"
+                    "- INSERT SPACES around asterisks (e.g. '*seufzt*Hallo' → '*seufzt* Hallo')\n"
+                    "- Insert line breaks for readability\n"
+                    "- Split into <cot> (chain-of-thought/thinking) and <antwort> (final answer) blocks\n\n"
+                    "FORBIDDEN - NEVER:\n"
+                    "- change, add, or remove any word\n"
+                    "- paraphrase, summarize, or rewrite\n"
+                    "- shorten, expand, or complete text\n"
+                    "- fix grammar, spelling, or punctuation (only add whitespace)\n"
+                    "- remove repetition or duplicated content\n"
+                    "- remove asterisks, quotes, or special characters\n"
+                    "- interpret meaning or modify tone\n"
+                    "- invent any content not present in the raw input\n\n"
+                    "OUTPUT FORMAT:\n"
+                    "<cot>\n[reasoning content — or 'CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet.' if none]\n</cot>\n"
+                    "<antwort>\n[answer content — or 'CHAPPiE hat nachgedacht, schweigt aber...' if none]\n</antwort>\n\n"
+                    "RULE: The ENTIRE raw text minus thinking markers goes into <antwort> UNLESS it contains explicit <think>/<thinking> tags.\n"
+                    "RULE: Only put text inside <think>/<thinking> tags (or clear reasoning patterns) into <cot>.\n"
+                    "RULE: Never leave <antwort> empty if the raw text contains any non-thinking content.\n\n"
+                    "Do not explain. Output ONLY the tagged blocks."
                 )
                 response = client.chat.completions.create(
                     model=self.GROQ_FORMAT_MODEL,
@@ -721,14 +733,14 @@ def create_chappie_backend():
                 cot = (cot_block.content or "").strip()
                 answer = (answer_block.content or "").strip()
                 if not answer:
-                    answer = "CHAPPiE hat nachgedacht, schweigt aber..."
+                    answer = self._FALLBACK_SILENT
                 if not cot:
                     parsed = parse_thinking_tags(clean_text)
                     cot_parsed = parse_chain_of_thought(clean_text)
                     thought = parsed.thought or cot_parsed.thought or ""
                     if thought:
                         cot = thought
-                return {"cot": cot, "answer": answer, "formatting_failed": False}
+                return {"cot": cot, "answer": answer, "formatting_failed": False, "answer_is_fallback": self._is_fallback_text(answer)}
             except Exception as e:
                 print(f"[Groq Format] Fehler: {e}")
                 return self._local_format_fallback(clean_text, formatting_failed=True)
@@ -741,16 +753,13 @@ def create_chappie_backend():
             thought = parsed_thinking.thought or parsed_cot.thought or ""
             answer_text = parsed_thinking.answer or parsed_cot.answer or ""
 
-            # Wurde ein expliziter <antwort>/<answer>-Tag gefunden?
             has_explicit_answer_tag = (parsed_thinking.answer and parsed_thinking.answer != clean_text) or \
                                        (parsed_cot.answer and parsed_cot.answer != clean_text)
 
             if not has_explicit_answer_tag:
-                # Kein answer-tag gefunden. Extrahiere text nach letztem </think> als Antwort.
                 after_think = clean_text
                 stripped = clean_text.replace("<think>", "").replace("</think>", "").replace("<thinking>", "").replace("</thinking>", "").strip()
 
-                # Finde text nach dem letzten think-close-tag
                 for close_tag in ("</think>", "</thinking>"):
                     idx = after_think.rfind(close_tag)
                     if idx != -1:
@@ -760,15 +769,14 @@ def create_chappie_backend():
                 if after_think and after_think != clean_text:
                     answer_text = after_think
                 elif stripped and thought and stripped.strip() != thought.strip():
-                    # Text ausserhalb der think-Blöcke, aber nicht gleich dem thought
                     answer_text = stripped
                 elif thought:
-                    # Nur think-Inhalt, kein echtes answer
-                    answer_text = "CHAPPiE hat nachgedacht, schweigt aber..."
+                    answer_text = CHAPPiEBackend._FALLBACK_SILENT
                 else:
                     answer_text = stripped
 
-            return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed}
+            answer_is_fallback = CHAPPiEBackend._is_fallback_text(answer_text)
+            return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "answer_is_fallback": answer_is_fallback}
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -1717,8 +1725,11 @@ def create_chappie_backend():
 
             # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted.get("cot", "") or thought or model_reasoning or ""
-            safe_answer = formatted.get("answer", "") or display_response
-            
+            if formatted.get("answer_is_fallback") and display_response and not self._is_fallback_text(display_response):
+                safe_answer = display_response
+            else:
+                safe_answer = formatted.get("answer", "") or display_response
+
             return {
                 "response_text": display_response,
                 "formatted_cot": safe_cot,
@@ -1726,7 +1737,7 @@ def create_chappie_backend():
                 "formatting_failed": formatted.get("formatting_failed", False),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
-                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "rag_memories": memories,
                 "memory_trace": memory_trace,
                 "memory_consolidation": consolidation_meta,
@@ -1760,7 +1771,7 @@ def create_chappie_backend():
                 "response_text": display_response,
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
-                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "rag_memories": memories,
                 "raw_response": raw_response,
             }
@@ -2357,7 +2368,10 @@ def create_chappie_backend():
 
             # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted_stream.get("cot", "") or thought or model_reasoning or ""
-            safe_answer = formatted_stream.get("answer", "") or display_response
+            if formatted_stream.get("answer_is_fallback") and display_response and not self._is_fallback_text(display_response):
+                safe_answer = display_response
+            else:
+                safe_answer = formatted_stream.get("answer", "") or display_response
 
             result = {
                 "response_text": display_response,
@@ -2369,7 +2383,7 @@ def create_chappie_backend():
                 "emotions_delta": emotion_transitions,
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
-                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "input_classification": input_classification,
                 "rag_memories": meta.get("rag_memories", []) if 'meta' in dir() else [],
                 "emotion_steering": meta.get("emotion_steering", {}) if 'meta' in dir() else {},
@@ -2552,14 +2566,15 @@ def create_chappie_backend():
             result = {
                 "response_text": display_response,
                 "formatted_cot": formatted_legacy.get("cot", "") or thought or model_reasoning or "",
-                "formatted_answer": formatted_legacy.get("answer", "") or display_response,
+                "formatted_answer": formatted_legacy.get("answer", "")
+                    if not formatted_legacy.get("answer_is_fallback") else (display_response or formatted_legacy.get("answer", "")),
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
-                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == "CHAPPiE schweigt..."),
+                "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "input_classification": input_classification,
                 "rag_memories": memories,
                 "emotion_steering": prompt_runtime["emotion_steering"],

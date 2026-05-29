@@ -93,7 +93,7 @@ class SleepPhaseHandler:
                 self._state.get("interaction_count_since_sleep", 0) + 1
             self._save_state()
     
-    def execute_sleep_phase(self, memory_engine=None, context_files=None, short_term_memory=None) -> Dict[str, Any]:
+    def execute_sleep_phase(self, memory_engine=None, context_files=None, short_term_memory=None, emotions_engine=None) -> Dict[str, Any]:
         """
         Execute the sleep phase.
         
@@ -107,6 +107,7 @@ class SleepPhaseHandler:
         Args:
             memory_engine: Memory engine instance
             context_files: Context files manager
+            emotions_engine: Existing EmotionsEngine instance (reuse, don't recreate)
             
         Returns:
             Dict with sleep phase results
@@ -138,12 +139,12 @@ class SleepPhaseHandler:
                 results["forgetting"] = forgetting_result
 
                 # ENERGIE WIEDERHERSTELLEN (95-100%)
-                energy_recovery = self._restore_energy()
+                energy_recovery = self._restore_energy(emotions_engine=emotions_engine)
                 results["energy_restored"] = True
                 results["energy_value"] = energy_recovery
                 
                 # EMOTIONALE REGENERATION im Schlaf
-                emotional_recovery = self._emotional_sleep_recovery()
+                emotional_recovery = self._emotional_sleep_recovery(emotions_engine=emotions_engine)
                 results["emotional_recovery"] = emotional_recovery
 
                 life_result = get_life_simulation_service().process_sleep_cycle()
@@ -170,7 +171,7 @@ class SleepPhaseHandler:
             
             return results
     
-    def _restore_energy(self) -> int:
+    def _restore_energy(self, emotions_engine=None) -> int:
         """
         Stellt die Energie auf 95-100% wieder her.
         
@@ -179,8 +180,11 @@ class SleepPhaseHandler:
         """
         import random
         try:
-            from memory.emotions_engine import EmotionsEngine
-            engine = EmotionsEngine()
+            if emotions_engine is not None:
+                engine = emotions_engine
+            else:
+                from memory.emotions_engine import EmotionsEngine
+                engine = EmotionsEngine()
             new_energy = random.randint(95, 100)
             engine.set_emotion("energy", new_energy)
             print(f"[SleepPhase] Energie wiederhergestellt: {new_energy}%")
@@ -189,7 +193,7 @@ class SleepPhaseHandler:
             print(f"[SleepPhase] Energie-Reset Fehler: {e}")
             return 100
     
-    def _emotional_sleep_recovery(self) -> Dict[str, int]:
+    def _emotional_sleep_recovery(self, emotions_engine=None) -> Dict[str, int]:
         """
         Emotionale Regeneration waehrend des Schlafs.
         
@@ -205,8 +209,11 @@ class SleepPhaseHandler:
         import random
         recovery = {}
         try:
-            from memory.emotions_engine import EmotionsEngine
-            engine = EmotionsEngine()
+            if emotions_engine is not None:
+                engine = emotions_engine
+            else:
+                from memory.emotions_engine import EmotionsEngine
+                engine = EmotionsEngine()
             state = engine.get_state()
             
             # Traurigkeit reduzieren

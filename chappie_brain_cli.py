@@ -625,7 +625,8 @@ class CHAPPiEBrainCLI:
                 rtk = timing.get("reasoning_tokens", 0)
                 atk = timing.get("answer_tokens", 0)
                 gen = timing.get("total_gen_ms", 0)
-                table.add_row("Timing:", f"TTFT:{ttft}ms  r:{rtk}tk  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms")
+                r_label = f"r:{rtk}tk" if rtk > 0 else "r:0tk (kein CoT)"
+                table.add_row("Timing:", f"TTFT:{ttft}ms  {r_label}  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms")
 
             causal_chain = " → ".join(c.get("phase", "?") for c in (causal or [])[:5])
             if causal_chain:
@@ -1064,30 +1065,91 @@ class CHAPPiEBrainCLI:
                 print(f"\n{Colors.STEER}Steering: {report.get('dominant_vector', '?')} ({report.get('dominant_strength', 0):.2f}){Colors.RESET}\n")
             return True
 
-        if cmd_lower.startswith("/emotion "):
+        if cmd_lower.startswith("/emotion"):
             parts = cmd.split()
-            if len(parts) != 3:
-                _log("EMOTION", "Nutze: /emotion <name> <0-100>", Colors.EMOTION)
+            # /emotion ohne Argumente: Status + Hilfe anzeigen
+            if len(parts) == 1:
+                state = self.emotions.get_state() if not self._use_remote else None
+                if state:
+                    _log("EMOTION", "Aktuelle Emotions-Werte:", Colors.EMOTION)
+                    for name in EMOTION_NAMES:
+                        val = getattr(state, name, 0)
+                        bar_st = _bar(val, width=15)
+                        print(f"  {name:>12} [{Colors.AI}{bar_st}{Colors.RESET}] {val}")
+                else:
+                    try:
+                        r = requests.get(f"{self.remote_url}/emotions/state", timeout=5)
+                        data = r.json().get("emotions", {})
+                        _log("EMOTION", "Aktuelle Emotions-Werte:", Colors.EMOTION)
+                        for name in EMOTION_NAMES:
+                            val = data.get(name, "?")
+                            print(f"  {name:>12}  {val}")
+                    except Exception:
+                        _log("EMOTION", "Remote-Status nicht abrufbar", Colors.WARN)
+                print(f"\n{Colors.EMOTION}Syntax: /emotion <name> [+/-]<0-100>{Colors.RESET}")
+                print(f"  Beispiel: /emotion happiness +10  (erhoeht um 10)")
+                print(f"  Beispiel: /emotion sadness -5     (senkt um 5)")
+                print(f"  Beispiel: /emotion energy 50      (setzt absolut)")
                 return True
-            _, emotion, val = parts
-            try:
-                value = int(val)
-            except ValueError:
-                _error(f"Ungueltiger Wert: {val}")
+
+            if len(parts) < 2:
+                _log("EMOTION", "Nutze: /emotion <name> [+/-]<0-100>", Colors.EMOTION)
                 return True
+
+            _, emotion, *rest = parts
             valid = set(EMOTION_NAMES)
             if emotion not in valid:
                 _error(f"Unbekannte Emotion: {emotion}")
                 return True
+
+            if not rest:
+                _log("EMOTION", f"Nutze: /emotion {emotion} [+/-]<0-100>", Colors.EMOTION)
+                return True
+
+            val_str = rest[0]
+            is_delta = val_str.startswith("+") or val_str.startswith("-")
+            try:
+                parsed = int(val_str)
+            except ValueError:
+                _error(f"Ungueltiger Wert: {val_str}")
+                return True
+
+            # Aktuellen Wert holen
             if self._use_remote:
                 try:
-                    requests.post(f"{self.remote_url}/emotions/state", json={emotion: value}, timeout=5)
-                    _success(f"{emotion} auf {value} gesetzt (remote)")
+                    r = requests.get(f"{self.remote_url}/emotions/state", timeout=5)
+                    current = r.json().get("emotions", {}).get(emotion, 50)
+                except Exception:
+                    _error("Remote-Status nicht abrufbar")
+                    return True
+            else:
+                state = self.emotions.get_state()
+                current = getattr(state, emotion, 50)
+
+            # Zielwert berechnen
+            if is_delta:
+                target = current + parsed
+            else:
+                target = parsed
+
+            # Clamping
+            clamped = max(0, min(100, target))
+            if target != clamped:
+                direction = "Maximum" if target > 100 else "Minimum"
+                overflow = abs(target - clamped)
+                _warn(f"{emotion}: {current} {'+' if parsed > 0 else ''}{parsed} → {clamped} ({direction} erreicht, um {overflow} {'reduziert' if target > 100 else 'erhoeht'})")
+            else:
+                delta_str = f" {'+' if parsed > 0 else ''}{parsed}" if is_delta else ""
+                _success(f"{emotion}: {current}{delta_str} → {clamped}")
+
+            # Anwenden
+            if self._use_remote:
+                try:
+                    requests.post(f"{self.remote_url}/emotions/state", json={emotion: clamped}, timeout=5)
                 except Exception as e:
                     _error(f"Remote-Fehler: {e}")
             else:
-                self.emotions.set_emotion(emotion, value)
-                _success(f"{emotion} auf {value} gesetzt")
+                self.emotions.set_emotion(emotion, clamped)
             return True
 
         if cmd_lower == "/resetemotions":
@@ -1107,7 +1169,7 @@ class CHAPPiEBrainCLI:
                 return True
             from memory.sleep_phase import get_sleep_phase_handler
             handler = get_sleep_phase_handler()
-            result = handler.execute_sleep_phase(memory_engine=self.memory, context_files=self.context)
+            result = handler.execute_sleep_phase(memory_engine=self.memory, context_files=self.context, emotions_engine=self.emotions)
             if result.get("energy_restored"):
                 _success(f"Energie wiederhergestellt: {result.get('energy_value', 100)}%")
             for emo, delta in result.get("emotional_recovery", {}).items():
@@ -1188,8 +1250,9 @@ class CHAPPiEBrainCLI:
   /status        Emotionaler Status + Life-Simulation
   /runtime       Modell, Provider, Steering-Konfiguration
   /steering      Detaillierter Steering-Report
-  /emotion <n> <0-100>  Emotion manuell setzen
-  /resetemotions         Emotionen zuruecksetzen
+  /emotion <n> [+/-]<0-100>  Emotion setzen/erhoehen/senken
+  /emotion                    Alle Emotions-Werte anzeigen
+  /resetemotions              Emotionen zuruecksetzen
   /sleep         Schlafphase erzwingen
   /memory        Kurzzeitgedaechtnis anzeigen
   /history       Chat-Verlauf anzeigen

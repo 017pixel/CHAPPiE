@@ -42,6 +42,8 @@ const THINKING_MESSAGES = [
   "Die Antwort formt sich...",
 ];
 
+const EMOTION_NAMES = ["happiness", "trust", "energy", "curiosity", "motivation", "frustration", "sadness"] as const;
+
 function isPending(msg: ChatMessage): boolean {
   return msg.metadata?.pending === true;
 }
@@ -73,6 +75,8 @@ export function ChatPage() {
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
   const [rawPopupMsg, setRawPopupMsg] = useState<ChatMessage | null>(null);
+  const [showEmotionPopup, setShowEmotionPopup] = useState(false);
+  const emotionPopupRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const processingRef = useRef(false);
@@ -177,6 +181,34 @@ export function ChatPage() {
     // Also set processingRef from store on mount in case we navigate back mid-stream
     processingRef.current = storeState.isProcessing;
   }, []);
+
+  // Emotion popup: show when typing /emotion
+  useEffect(() => {
+    const trimmed = message.trimStart();
+    setShowEmotionPopup(trimmed.startsWith("/emotion") && !trimmed.match(/^\/emotion\s+\w+\s+[+-]?\d+/));
+  }, [message]);
+
+  // Close emotion popup on click outside
+  useEffect(() => {
+    if (!showEmotionPopup) return;
+    const handleClick = (e: MouseEvent) => {
+      if (emotionPopupRef.current && !emotionPopupRef.current.contains(e.target as Node)) {
+        setShowEmotionPopup(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showEmotionPopup]);
+
+  // Close emotion popup on Escape
+  useEffect(() => {
+    if (!showEmotionPopup) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowEmotionPopup(false);
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [showEmotionPopup]);
 
   // Auto-send from queue when idle
   useEffect(() => {
@@ -372,7 +404,7 @@ export function ChatPage() {
   }
 
   const status = (statusQuery.data ?? {}) as StatusSnapshot;
-  const allCommands = ["/sleep", "/stats", "/help", "/clear", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
+  const allCommands = ["/sleep", "/stats", "/help", "/clear", "/emotion", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
   const visibleCommands = commandsExpanded ? allCommands : allCommands.slice(0, 4);
 
   // Build final display messages: add thinking/streaming overlay
@@ -863,6 +895,37 @@ export function ChatPage() {
             <span className="material-symbols-outlined text-sm leading-none">{commandsExpanded ? "close" : "more_horiz"}</span>
           </button>
         </div>
+
+        {/* Emotion Autocomplete Popup */}
+        {showEmotionPopup && (
+          <div ref={emotionPopupRef} className="rounded-none border border-ember/30 bg-[#121212] p-4 shadow-2xl">
+            <p className="text-xs text-slate mb-3">Emotion auswaehlen (Syntax: /emotion &lt;name&gt; [+/-]wert)</p>
+            <div className="grid grid-cols-4 gap-2">
+              {EMOTION_NAMES.map((name) => {
+                const current = status.emotions?.[name] ?? 0;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      setMessage(`/emotion ${name} `);
+                      setShowEmotionPopup(false);
+                    }}
+                    className="rounded-none border border-white/10 bg-white/5 px-3 py-2 text-left transition-all hover:border-ember hover:bg-white/10"
+                  >
+                    <div className="text-xs font-bold text-mist">{name}</div>
+                    <div className="text-[10px] text-slate">{current}/100</div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex gap-2 text-[10px] text-slate">
+              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion happiness +10</span>
+              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion sadness -5</span>
+              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion energy 80</span>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="relative">
           <textarea
