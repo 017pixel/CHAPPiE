@@ -1129,7 +1129,8 @@ def create_chappie_backend():
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
-            intent_query_source = " ".join(input_classification.get("entities", [])) or user_input
+            entities_safe = [str(e) for e in (input_classification.get("entities", []) or [])]
+            intent_query_source = " ".join(entities_safe) or user_input
             intent_memory_query = self.memory.extract_search_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
@@ -2130,7 +2131,8 @@ def create_chappie_backend():
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
-            intent_query_source = " ".join(input_classification.get("entities", [])) or user_input
+            entities_safe = [str(e) for e in (input_classification.get("entities", []) or [])]
+            intent_query_source = " ".join(entities_safe) or user_input
             intent_memory_query = self.memory.extract_search_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,

@@ -364,10 +364,15 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             except Exception:
                 pass
         
+        entities_raw = intent_data.get("entities", [])
+        if not isinstance(entities_raw, list):
+            entities_raw = []
+        entities_clean = [str(e) if not isinstance(e, str) else e for e in entities_raw]
+
         return IntentResult(
             intent_type=intent_type,
             confidence=intent_data.get("confidence", 0.5),
-            entities=intent_data.get("entities", []),
+            entities=entities_clean,
             tool_calls=tool_calls,
             emotions_update=emotions_update,
             context_requirements=context_req,
