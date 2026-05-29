@@ -1011,7 +1011,6 @@ class CHAPPiEBrainCLI:
             if not self.last_result:
                 _log("TRACE", "Noch keine Antwort vorhanden.", Colors.DIM)
                 return True
-            self._panel_causal(self.last_result)
             if HAS_RICH and self.last_result.get("causal_trace"):
                 console.print(self._panel_causal(self.last_result) or "")
             else:

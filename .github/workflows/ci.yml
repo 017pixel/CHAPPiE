@@ -89,6 +89,9 @@ jobs:
           python tests/test_root_config.py
           python tests/test_settings_integrity.py
           python tests/test_cli_import.py
+          python tests/test_cli_display.py
+          python tests/test_cli_commands.py
+          python tests/test_cli_remote.py
 
       - name: Run extended tests (may need mock deps)
         shell: bash
