@@ -280,12 +280,13 @@ class VLLMBrain(BaseBrain):
         """Bereitet provider-spezifische Optionen vor."""
         payload = dict(extra_body or {})
 
-        # Thinking-Mode fuer lebendigere Antworten mit repetition_penalty-Schutz.
+        # Thinking-Mode deaktiviert — verhindert <|thinking|>-Injection bei Qwen3.5,
+        # die bei geringer Token-Ausbeute zu verstuemmelten Antworten fuehrt.
         if self.model.lower().startswith("qwen/qwen3.5"):
             chat_kwargs = payload.get("chat_template_kwargs")
             if not isinstance(chat_kwargs, dict):
                 chat_kwargs = {}
-            chat_kwargs.setdefault("enable_thinking", True)
+            chat_kwargs.setdefault("enable_thinking", False)
             payload["chat_template_kwargs"] = chat_kwargs
 
         return payload

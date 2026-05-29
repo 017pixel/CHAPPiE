@@ -1535,24 +1535,24 @@ def create_chappie_backend():
             if requirements.get("need_soul_context", True):
                 soul = self.context_files.get_soul_context()
                 if soul:
-                    context_parts.append(f"=== CHAPPiE'S SOUL ===\\n{soul}")
-            
+                    context_parts.append(f"=== CHAPPiE'S SOUL ===\n{soul}")
+
             if requirements.get("need_user_context", True):
                 user = self.context_files.get_user_context()
                 if user:
-                    context_parts.append(f"=== USER PROFILE ===\\n{user}")
-            
+                    context_parts.append(f"=== USER PROFILE ===\n{user}")
+
             if requirements.get("need_preferences", True):
                 prefs = self.context_files.get_preferences_context()
                 if prefs:
-                    context_parts.append(f"=== CHAPPiE'S PREFERENCES ===\\n{prefs}")
-            
+                    context_parts.append(f"=== CHAPPiE'S PREFERENCES ===\n{prefs}")
+
             if requirements.get("need_short_term_memory", True):
                 short_term = self.short_term_memory_v2.get_formatted_for_prompt()
                 if short_term:
                     context_parts.append(short_term)
-            
-            return "\\n\\n".join(context_parts)
+
+            return "\n\n".join(context_parts)
 
         def _generate_response(self, user_input: str, history: List[Dict], 
                               context: str, emotions: Dict[str, int],
@@ -1673,18 +1673,18 @@ def create_chappie_backend():
             
             # Context hinzufuegen
             if context:
-                system_prompt += f"\\n\\n{context}"
+                system_prompt += f"\n\n{context}"
 
-            system_prompt += "\\n\\n" + self.action_response.build_prompt_suffix(
+            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
                 prompt_runtime["response_plan"],
                 life_context,
                 global_workspace,
             )
-            system_prompt += "\\n\\n" + self._generation_budget_instruction()
-            
+            system_prompt += "\n\n" + self._generation_budget_instruction()
+
             # Memories hinzufuegen
             if memories_for_prompt:
-                system_prompt += f"\\n\\n{memories_for_prompt}"
+                system_prompt += f"\n\n{memories_for_prompt}"
             
             # Messages bauen — Chat-History gecapped
             messages = self.brain.build_prompt(
