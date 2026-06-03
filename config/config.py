@@ -103,6 +103,20 @@ class Settings:
         self.training_trainer_provider = _parse_provider(self._get_val("TRAINING_TRAINER_PROVIDER", "auto"))
         self.training_trainer_model = self._get_val("TRAINING_TRAINER_MODEL", "")
 
+        # Finetune configuration
+        self.finetune_enabled = bool(self._get_val("FINETUNE_ENABLED", True))
+        self.finetune_models_dir = Path(self._get_val("FINETUNE_MODELS_DIR", str(DATA_DIR / "finetuned_models")))
+        self.finetune_chats_dir = Path(self._get_val("FINETUNE_CHATS_DIR", str(DATA_DIR / "finetune_chats")))
+        self.finetune_active_adapter = self._get_val("FINETUNE_ACTIVE_ADAPTER", None)
+        self.finetune_default_lora_r = int(self._get_val("FINETUNE_DEFAULT_LORA_R", 16))
+        self.finetune_default_lora_alpha = int(self._get_val("FINETUNE_DEFAULT_LORA_ALPHA", 32))
+        self.finetune_default_lr = float(self._get_val("FINETUNE_DEFAULT_LR", 2e-4))
+        self.finetune_default_epochs = int(self._get_val("FINETUNE_DEFAULT_EPOCHS", 1))
+        self.finetune_default_batch_size = int(self._get_val("FINETUNE_DEFAULT_BATCH_SIZE", 4))
+        self.finetune_default_grad_accum = int(self._get_val("FINETUNE_DEFAULT_GRAD_ACCUM", 4))
+        self.finetune_general_de_ratio = float(self._get_val("FINETUNE_GENERAL_DE_RATIO", 0.15))
+        self.finetune_bf16_fallback = bool(self._get_val("FINETUNE_BF16_FALLBACK", True))
+
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 40))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
@@ -255,6 +269,19 @@ class Settings:
         if "training_trainer_model" in kwargs:
             self.training_trainer_model = kwargs["training_trainer_model"]
 
+        if "finetune_enabled" in kwargs:
+            self.finetune_enabled = bool(kwargs["finetune_enabled"])
+        if "finetune_active_adapter" in kwargs:
+            self.finetune_active_adapter = kwargs["finetune_active_adapter"] or None
+        for key in [
+            "finetune_models_dir", "finetune_chats_dir", "finetune_default_lora_r",
+            "finetune_default_lora_alpha", "finetune_default_lr", "finetune_default_epochs",
+            "finetune_default_batch_size", "finetune_default_grad_accum", "finetune_general_de_ratio",
+            "finetune_bf16_fallback",
+        ]:
+            if key in kwargs and kwargs[key] is not None:
+                setattr(self, key, kwargs[key])
+
         for key in [
             "temperature", "repetition_penalty", "max_tokens", "chain_of_thought",
             "memory_top_k", "memory_min_relevance",
@@ -332,6 +359,18 @@ class Settings:
             "TRAINING_CHAPPIE_MODEL": self.training_chappie_model,
             "TRAINING_TRAINER_PROVIDER": provider_value(self.training_trainer_provider),
             "TRAINING_TRAINER_MODEL": self.training_trainer_model,
+            "FINETUNE_ENABLED": self.finetune_enabled,
+            "FINETUNE_MODELS_DIR": str(self.finetune_models_dir),
+            "FINETUNE_CHATS_DIR": str(self.finetune_chats_dir),
+            "FINETUNE_ACTIVE_ADAPTER": self.finetune_active_adapter or "",
+            "FINETUNE_DEFAULT_LORA_R": self.finetune_default_lora_r,
+            "FINETUNE_DEFAULT_LORA_ALPHA": self.finetune_default_lora_alpha,
+            "FINETUNE_DEFAULT_LR": self.finetune_default_lr,
+            "FINETUNE_DEFAULT_EPOCHS": self.finetune_default_epochs,
+            "FINETUNE_DEFAULT_BATCH_SIZE": self.finetune_default_batch_size,
+            "FINETUNE_DEFAULT_GRAD_ACCUM": self.finetune_default_grad_accum,
+            "FINETUNE_GENERAL_DE_RATIO": self.finetune_general_de_ratio,
+            "FINETUNE_BF16_FALLBACK": self.finetune_bf16_fallback,
             "DEBUG": self.debug,
             "ENABLE_FUNCTIONS": self.enable_functions,
             "HISTORY_MAX_MESSAGES": self.history_max_messages,

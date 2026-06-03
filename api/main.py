@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routers import chat, context, memory, runtime, system, training
+from api.routers import chat, context, memory, runtime, system, training, finetune
 from api.dependencies import get_backend
 from Chappies_Trainingspartner import daemon_manager
 from config.config import settings, get_active_model
@@ -28,6 +28,7 @@ app.include_router(context.router)
 app.include_router(chat.router)
 app.include_router(runtime.router)
 app.include_router(training.router)
+app.include_router(finetune.router)
 
 
 @app.get("/", include_in_schema=False)

@@ -10,6 +10,7 @@ import { MemoriesPage } from "./pages/memories-page";
 import { SettingsPage } from "./pages/settings-page";
 import { TrainingPage } from "./pages/training-page";
 import { VisualizerPage } from "./pages/visualizer-page";
+import { ModelsPage } from "./pages/models-page";
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: "growth", element: <GrowthPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "training", element: <TrainingPage /> },
+      { path: "models", element: <ModelsPage /> },
       { path: "debug", element: <DebugPage /> },
       { path: "visualizer", element: <VisualizerPage /> }
     ]

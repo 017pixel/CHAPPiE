@@ -17,6 +17,7 @@ Environment="HF_HOME=/home/bbecker/.cache/huggingface"
 Environment="CHAPPIE_STEERING_MODEL=Qwen/Qwen3.5-4B"
 Environment="CHAPPIE_STEERING_QUANTIZE=1"
 Environment="CHAPPIE_STEERING_CONTEXT_LENGTH=8192"
+Environment="CHAPPIE_STEERING_ADAPTER="
 
 ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m brain.steering_api_server --host 127.0.0.1 --port 8000 --model Qwen/Qwen3.5-4B --context-length 8192
 

@@ -454,7 +454,7 @@ class ActivationVectorResolver:
 
 
 class LocalSteeringEngine:
-    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192, quantize: Optional[bool] = None):
+    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192, quantize: Optional[bool] = None, adapter_path: Optional[str] = None):
         self.model_name = model_name
         self.context_length = context_length
         self.quantize = self._resolve_quantize(quantize)
@@ -497,6 +497,14 @@ class LocalSteeringEngine:
         if not self.quantize:
             self.model.to(self.device)
         self.model.eval()
+
+        # Load LoRA adapter if specified
+        if adapter_path and Path(adapter_path).exists():
+            from peft import PeftModel
+            LOGGER.info("Steering: Lade LoRA-Adapter von %s", adapter_path)
+            self.model = PeftModel.from_pretrained(self.model, adapter_path)
+            LOGGER.info("Steering: LoRA-Adapter erfolgreich geladen.")
+
         self.layers = list(getattr(getattr(self.model, "model", self.model), "layers"))
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
 
@@ -582,7 +590,7 @@ class LocalSteeringEngine:
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
-        kwargs.setdefault("enable_thinking", False)
+        # Thinking mode: nicht mehr erzwingen, Qwen-Default verwenden
         prompt_messages = [dict(message) for message in messages]
         style_instruction = build_style_instruction(steering_payload)
         if style_instruction:

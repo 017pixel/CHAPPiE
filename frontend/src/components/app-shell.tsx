@@ -9,6 +9,7 @@ const items = [
   { label: "Growth", to: "/growth", icon: "trending_up" },
   { label: "Settings", to: "/settings", icon: "settings" },
   { label: "Training", to: "/training", icon: "model_training" },
+  { label: "Modelle", to: "/models", icon: "neurology" },
   { label: "Debug", to: "/debug", icon: "bug_report" },
   { label: "3D", to: "/visualizer", icon: "view_in_ar" }
 ];

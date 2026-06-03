@@ -73,6 +73,20 @@
     "training_trainer_provider": "auto",
     "training_trainer_model": ""
   },
+  "finetune": {
+    "finetune_enabled": true,
+    "finetune_models_dir": "data/finetuned_models",
+    "finetune_chats_dir": "data/finetune_chats",
+    "finetune_active_adapter": null,
+    "finetune_default_lora_r": 16,
+    "finetune_default_lora_alpha": 32,
+    "finetune_default_lr": 0.0002,
+    "finetune_default_epochs": 1,
+    "finetune_default_batch_size": 4,
+    "finetune_default_grad_accum": 4,
+    "finetune_general_de_ratio": 0.15,
+    "finetune_bf16_fallback": true
+  },
   "debug": {
     "debug": true,
     "enable_functions": true

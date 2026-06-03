@@ -1,0 +1,21 @@
+[Unit]
+Description=CHAPPiE Fine-Tune Training - %I
+After=network.target
+
+[Service]
+Type=simple
+User=bbecker
+Group=bbecker
+WorkingDirectory=/home/bbecker/CHAPPiE
+Environment="PATH=/home/bbecker/CHAPPiE/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONIOENCODING=utf-8"
+Environment="CUDA_VISIBLE_DEVICES=0"
+Environment="PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,garbage_collection_threshold:0.8"
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 -m brain.whatsapp_finetune_trainer --config /home/bbecker/CHAPPiE/data/finetuned_models/%I/training_config.json --background
+Restart=no
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

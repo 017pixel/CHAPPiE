@@ -4,7 +4,7 @@
 
 | Pfad | Inhalt | Wichtige Dateien |
 |---|---|---|
-| `brain/` | Brain-Pipeline, Agenten, Steering, Global Workspace | `brain_pipeline.py`, `global_workspace.py`, `action_response.py`, `steering_api_server.py`, `steering_backend.py` |
+| `brain/` | Brain-Pipeline, Agenten, Steering, Global Workspace, Fine-Tuning | `brain_pipeline.py`, `global_workspace.py`, `action_response.py`, `steering_api_server.py`, `steering_backend.py`, `whatsapp_finetune_trainer.py`, `models_manager.py` |
 | `brain/agents/` | Spezialisierte Gehirn-Agenten | `sensory_cortex.py`, `amygdala.py`, `hippocampus.py`, `prefrontal_cortex.py`, `steering_manager.py` |
 | `memory/` | Gedaechtnis, Konsolidierung, Kontextdateien | `memory_engine.py`, `sleep_phase.py`, `forgetting_curve.py`, `context_files.py` |
 | `life/` | Inneres Zustandsmodell und Entwicklung | `service.py`, `goal_engine.py`, `planning_engine.py`, `social_arc.py` |
@@ -29,6 +29,8 @@
 | Terminal-CLI (v5.0) | `chappie_brain_cli.py` |
 | Terminal-CLI (Remote) | `chappie_brain_cli.py --remote` |
 | Training-Daemon | `Chappies_Trainingspartner/training_daemon.py` |
+| Model Manager (CLI) | `brain/models_manager.py` |
+| WhatsApp Fine-Tune Trainer | `brain/whatsapp_finetune_trainer.py` |
 | Lokaler Steering-Endpoint | `brain/steering_api_server.py` |
 
 ## Systemd-Services (in `deploy/`)
