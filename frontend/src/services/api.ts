@@ -122,5 +122,9 @@ export const api = {
   getTrainingConfig: () => request("/training/config"),
   saveTrainingConfig: (payload: Record<string, unknown>) => request("/training/config", { method: "POST", body: JSON.stringify(payload) }),
   runTrainingAction: (payload: Record<string, unknown>) => request("/training/action", { method: "POST", body: JSON.stringify(payload) }),
-  getVisualizer: () => request("/visualizer")
+  getVisualizer: () => request("/visualizer"),
+  get: <T = any>(path: string) => request<T>(path),
+  put: <T = any>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  post: <T = any>(path: string, body?: unknown) => request<T>(path, { method: "POST", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  delete: <T = any>(path: string) => request<T>(path, { method: "DELETE" })
 };
