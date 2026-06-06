@@ -449,8 +449,8 @@ export function ChatPage() {
               <span>Kontext: <span className={contextBudget.was_trimmed ? "text-ember" : contextNearLimit ? "text-yellow-400" : "text-pine"}>
                 {contextBudget.was_trimmed ? "GETRIMMT" : contextTokens + "/7000"}
               </span></span>
-            )}
-          </div>
+                    )}
+                  </div>
         </div>
         <div className="flex gap-2">
           {Object.entries(status.emotions ?? {}).map(([key, value]) => (
@@ -573,8 +573,11 @@ export function ChatPage() {
                              if (consol.ltm_loaded) previewLines.push(`Konsolidierung: ${consol.ltm_loaded} LTM → ${consol.ltm_consolidated} | ${consol.stm_loaded} STM → ${consol.stm_consolidated}`);
                              const budget = meta.context_budget || {};
                              if (budget.estimated_tokens) previewLines.push(`Kontext: ${budget.estimated_tokens}/7000 Tokens${budget.was_trimmed ? " (GETRIMMT)" : ""}`);
-                             previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
-                             if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
+                              previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
+                              const repEvt = meta.repetition_events || {};
+                              const repKeys = Object.keys(repEvt);
+                              if (repKeys.length > 0) previewLines.push(`⚠ Repetition: ${repKeys.join(", ")}`);
+                              if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
                              previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
                             return previewLines.slice(0, 5).map((line, i) => (
                               <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
@@ -620,65 +623,44 @@ export function ChatPage() {
               const causal = meta.causal_trace || [];
               const consolidation = meta.memory_consolidation || {};
               const budget = meta.context_budget || {};
+              const repEvents = meta.repetition_events || {};
               return (
-                <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-white/5">
-                  {/* LINKE HÄLFTE — Debug-Info */}
-                  <div className="overflow-y-auto p-6 space-y-4 text-xs text-slate">
-                    {/* Context Budget */}
-                    {(budget.estimated_tokens || budget.near_limit || budget.was_trimmed) && (
-                      <div className={`rounded-none border p-3 ${budget.was_trimmed ? 'border-ember/30 bg-ember/[0.06]' : budget.near_limit ? 'border-yellow-500/20 bg-yellow-500/[0.04]' : 'border-white/5 bg-white/[0.02]'}`}>
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Kontext-Budget</p>
-                        <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                          <div className="text-slate/50">Tokens: <span className="text-slate/70">{budget.estimated_tokens ?? "?"} / {budget.trimmed_tokens ? budget.original_tokens + "→" + budget.trimmed_tokens : "7000"}</span></div>
-                          <div className="text-slate/50">Status: <span className={budget.was_trimmed ? "text-ember" : budget.near_limit ? "text-yellow-400" : "text-pine"}>
-                            {budget.was_trimmed ? "GETRIMMT" : budget.near_limit ? "NAHE LIMIT" : "OK"}
-                          </span></div>
-                          {budget.was_trimmed && (
-                            <div className="text-slate/50 col-span-2">Gekuerzt: <span className="text-ember">{budget.removed_messages} aeltere Messages entfernt</span></div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                <div className="flex-1 overflow-y-auto p-6 space-y-3 text-xs text-slate">
 
-                    {/* LTM Memories */}
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Langzeitgedaechtnis ({memories.length})</p>
-                      {memories.length === 0 ? (
-                        <p className="text-slate/50 italic">Keine relevanten Erinnerungen gefunden</p>
-                      ) : (
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                          {memories.map((mem: any, i: number) => (
-                            <div key={i} className="border-l-2 border-white/10 pl-3">
-                              <div className="flex gap-2 items-baseline">
-                                <span className="text-[9px] uppercase text-slate/40">{mem.role}</span>
-                                <span className="text-[9px] text-ember font-bold">{Math.round((mem.relevance_score || 0) * 100)}%</span>
-                                <span className="text-[9px] text-slate/30">{mem.label}</span>
-                              </div>
-                              <div className="text-[10px] leading-relaxed text-slate/70 mt-0.5 line-clamp-2">{mem.content}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                  {/* 1. Ueberblick */}
+                  <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                    <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Ueberblick</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-3 gap-y-1 text-[10px]">
+                      <div><span className="text-slate/40">Provider</span><br/><span className="text-slate/70">{meta.provider||"?"}</span></div>
+                      <div><span className="text-slate/40">Modell</span><br/><span className="text-slate/70">{meta.model||"?"}</span></div>
+                      <div><span className="text-slate/40">Dauer</span><br/><span className="text-slate/70">{meta.processing_time_ms?(meta.processing_time_ms/1000).toFixed(1)+"s":"?"}</span></div>
+                      <div><span className="text-slate/40">Intent</span><br/><span className="text-slate/70">{meta.intent_type||"?"} {meta.intent_confidence!=null?Math.round(meta.intent_confidence*100)+"%":""}</span></div>
+                      <div><span className="text-slate/40">Tone</span><br/><span className="text-slate/70">{meta.tone_decision?.tone||"?"}</span></div>
+                      <div><span className="text-slate/40">Tool Calls</span><br/><span className="text-slate/70">{meta.tool_calls_executed??"0"}</span></div>
+                      <div><span className="text-slate/40">Short-Term</span><br/><span className="text-slate/70">{meta.short_term_count??"?"}</span></div>
+                      <div><span className="text-slate/40">Format</span><br/><span className={meta.formatting_failed?"text-ember":"text-pine"}>{meta.formatting_failed?"FAIL":"OK"}</span></div>
                     </div>
+                  </div>
 
-                    {/* Emotionen */}
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotionen vorher → nachher</p>
-                      {Object.keys(deltas).length === 0 ? (
-                        <p className="text-slate/50 italic">Keine Aenderungen</p>
-                      ) : (
-                        <div className="grid grid-cols-4 gap-1.5">
-                          {Object.entries(deltas).map(([key, val]: [string, any]) => {
-                            const change = val?.change || 0;
-                            const color = change > 0 ? "text-green-400" : change < 0 ? "text-red-400" : "text-slate/50";
+                  {/* 2. Emotionen + Steering */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotionen</p>
+                      {Object.keys(deltas).length===0?(
+                        <p className="text-slate/40 italic text-[10px]">Keine Aenderungen</p>
+                      ):(
+                        <div className="grid grid-cols-4 gap-1">
+                          {Object.entries(deltas).map(([key,val]:[string,any])=>{
+                            const change=val?.change||0;
+                            const color=change>0?"text-green-400":change<0?"text-red-400":"text-slate/50";
                             return (
-                              <div key={key} className="border border-white/5 bg-white/[0.02] px-2 py-1.5 text-center">
-                                <div className="text-[9px] uppercase text-slate/40">{key}</div>
-                                <div className="text-[11px]">
-                                  <span className="text-slate/60">{val?.before ?? (before[key] ?? "?")}</span>
-                                  <span className="mx-1 text-slate/30">→</span>
-                                  <span className="text-slate/70">{val?.after ?? (before[key] ?? "?")}</span>
-                                  <span className={`ml-1 ${color}`}>{change > 0 ? "+" : ""}{change}</span>
+                              <div key={key} className="border border-white/5 bg-white/[0.01] px-1.5 py-1 text-center">
+                                <div className="text-[8px] uppercase text-slate/40">{key}</div>
+                                <div className="text-[10px] font-medium">
+                                  <span className="text-slate/60">{val?.before??(before[key]??"?")}</span>
+                                  <span className="mx-0.5 text-slate/30">→</span>
+                                  <span className="text-slate/70">{val?.after??"?"}</span>
+                                  <span className={`ml-0.5 ${color}`}>{change>0?"+":""}{change}</span>
                                 </div>
                               </div>
                             );
@@ -686,135 +668,116 @@ export function ChatPage() {
                         </div>
                       )}
                     </div>
-
-                    {/* Steering */}
-                    {steering.steering_active && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotion-Steering aktiv</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <div className="text-[10px] text-slate/50">Dominant: <span className="text-slate/70">{steering.dominant_vector}</span></div>
-                          <div className="text-[10px] text-slate/50">Staerke: <span className="text-slate/70">{steering.dominant_strength}</span></div>
-                          <div className="text-[10px] text-slate/50">Mode: <span className="text-slate/70">{steering.summary}</span></div>
-                          <div className="text-[10px] text-slate/50">Vektoren: <span className="text-slate/70">{steering.active_vectors?.length || 0}</span></div>
+                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Steering</p>
+                      {steering.steering_active?(
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                          <div><span className="text-slate/40">Mode</span><br/><span className="text-slate/70">{steering.summary||meta.prompt_emotion_mode||"vector"}</span></div>
+                          <div><span className="text-slate/40">Dominant</span><br/><span className="text-slate/70">{steering.dominant_vector||"neutral"} ({steering.dominant_strength||0})</span></div>
+                          <div className="col-span-2"><span className="text-slate/40">Aktive Vektoren</span><br/><span className="text-slate/70">{(steering.active_vectors||steering.base_vectors||[]).map((v:any)=>v?.name||v).filter(Boolean).join(", ")||"none"}</span></div>
+                          {steering.composite_modes?.length>0&&(
+                            <div className="col-span-2"><span className="text-slate/40">Composite</span><br/><span className="text-slate/70">{steering.composite_modes.map((m:any)=>`${m?.name}(${m?.strength})`).join(", ")}</span></div>
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Timing */}
-                    {meta.timing && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Timing</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <div className="text-[10px] text-slate/50">TTFT: <span className="text-slate/70">{meta.timing.ttft_ms != null ? (meta.timing.ttft_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Total Tokens: <span className="text-slate/70">{meta.timing.total_tokens ?? "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Gesamtzeit: <span className="text-slate/70">{meta.timing.total_gen_ms != null ? (meta.timing.total_gen_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Thinking-Zeit: <span className="text-slate/70">{meta.timing.reasoning_time_ms != null ? (meta.timing.reasoning_time_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Antwort-Zeit: <span className="text-slate/70">{meta.timing.answer_time_ms != null ? (meta.timing.answer_time_ms / 1000).toFixed(2) + "s" : "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Reasoning Tokens: <span className="text-slate/70">{meta.timing.reasoning_tokens ?? "?"}</span></div>
-                          <div className="text-[10px] text-slate/50">Answer Tokens: <span className="text-slate/70">{meta.timing.answer_tokens ?? "?"}</span></div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Allgemein */}
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Allgemein</p>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <div className="text-[10px] text-slate/50">Intent: <span className="text-slate/70">{meta.intent_type || "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Confidence: <span className="text-slate/70">{meta.intent_confidence != null ? Math.round(meta.intent_confidence * 100) + "%" : "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Provider: <span className="text-slate/70">{meta.provider || "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Modell: <span className="text-slate/70">{meta.model || "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Dauer: <span className="text-slate/70">{meta.processing_time_ms ? (meta.processing_time_ms / 1000).toFixed(1) + "s" : "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Tone: <span className="text-slate/70">{meta.tone_decision?.tone || "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Short-Term: <span className="text-slate/70">{meta.short_term_count ?? "?"}</span></div>
-                        <div className="text-[10px] text-slate/50">Tool Calls: <span className="text-slate/70">{meta.tool_calls_executed ?? "0"}</span></div>
-                      </div>
+                      ):(
+                        <p className="text-slate/40 italic text-[10px]">Steering inaktiv</p>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Causal Trace */}
-                    {causal && causal.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Causal Trace</p>
-                        <div className="space-y-1">
-                          {causal.map((step: any, idx: number) => (
-                            <div key={idx} className="text-[10px] text-slate/50 border-l-2 border-white/10 pl-2">
-                              <span className="text-slate/70">{step.phase}:</span> {step.driver}
-                              {step.effect && <span className="text-slate/40"> — {step.effect}</span>}
-                              {step.evidence && (Array.isArray(step.evidence) ? step.evidence.length > 0 : step.evidence) && (
-                                <span className="text-slate/30 ml-1">[{Array.isArray(step.evidence) ? step.evidence.join(", ") : String(step.evidence)}]</span>
-                              )}
+                  {/* 3. Memory */}
+                  {(memories.length>0||(consolidation&&(consolidation.ltm_loaded||consolidation.stm_loaded)))&&(
+                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                      <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+                        <p className="text-[10px] uppercase tracking-widest text-ember">Memory</p>
+                        <span className="text-[9px] text-slate/40">{memories.length} LTM-Matches</span>
+                        {(consolidation&&(consolidation.ltm_loaded||consolidation.stm_loaded))&&(
+                          <span className="text-[9px] text-pine/60">
+                            Konsol.: LTM {consolidation.ltm_loaded}→{consolidation.ltm_consolidated}, STM {consolidation.stm_loaded}→{consolidation.stm_consolidated}
+                            {consolidation.duplicates_merged?`, ${consolidation.duplicates_merged} Merges`:""}
+                            {consolidation.critical_events?`, ${consolidation.critical_events} Kritisch`:""}
+                          </span>
+                        )}
+                      </div>
+                      {memories.length>0&&(
+                        <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
+                          {memories.map((mem:any,i:number)=>(
+                            <div key={i} className="border-l-2 border-white/10 pl-2 py-0.5">
+                              <div className="flex gap-2 items-baseline">
+                                <span className="text-[8px] uppercase text-slate/40">{mem.role}</span>
+                                <span className="text-[8px] text-ember font-bold">{Math.round((mem.relevance_score||0)*100)}%</span>
+                                <span className="text-[8px] text-slate/30">{mem.label}</span>
+                              </div>
+                              <div className="text-[9px] leading-relaxed text-slate/60 mt-0.5 line-clamp-2">{mem.content}</div>
                             </div>
                           ))}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. Timing + Budget */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {meta.timing&&(
+                      <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Timing</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+                          <div><span className="text-slate/40">TTFT</span><br/><span className="text-slate/70">{meta.timing.ttft_ms!=null?(meta.timing.ttft_ms/1000).toFixed(2)+"s":"?"}</span></div>
+                          <div><span className="text-slate/40">Gesamt</span><br/><span className="text-slate/70">{meta.timing.total_gen_ms!=null?(meta.timing.total_gen_ms/1000).toFixed(2)+"s":"?"}</span></div>
+                          <div><span className="text-slate/40">Thinking</span><br/><span className="text-slate/70">{meta.timing.reasoning_time_ms!=null?(meta.timing.reasoning_time_ms/1000).toFixed(2)+"s":"?"} ({meta.timing.reasoning_tokens??0}tk)</span></div>
+                          <div><span className="text-slate/40">Antwort</span><br/><span className="text-slate/70">{meta.timing.answer_time_ms!=null?(meta.timing.answer_time_ms/1000).toFixed(2)+"s":"?"} ({meta.timing.answer_tokens??0}tk)</span></div>
+                          <div className="col-span-2"><span className="text-slate/40">Total Tokens</span><br/><span className="text-slate/70">{meta.timing.total_tokens??"?"}</span></div>
+                        </div>
+                      </div>
+                    )}
+                    {(budget.estimated_tokens||budget.near_limit||budget.was_trimmed)&&(
+                      <div className={`rounded-none border p-3 ${budget.was_trimmed?'border-ember/30 bg-ember/[0.04]':budget.near_limit?'border-yellow-500/20 bg-yellow-500/[0.04]':'border-white/5 bg-white/[0.02]'}`}>
+                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Kontext-Budget</p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+                          <div><span className="text-slate/40">Tokens</span><br/><span className="text-slate/70">{budget.estimated_tokens??"?"} / {budget.trimmed_tokens?budget.original_tokens+"→"+budget.trimmed_tokens:"7000"}</span></div>
+                          <div><span className="text-slate/40">Status</span><br/><span className={budget.was_trimmed?"text-ember":budget.near_limit?"text-yellow-400":"text-pine"}>{budget.was_trimmed?"GETRIMMT":budget.near_limit?"NAHE LIMIT":"OK"}</span></div>
+                          {budget.was_trimmed&&(
+                            <div className="col-span-2"><span className="text-slate/40">Aktion</span><br/><span className="text-ember">{budget.removed_messages} aeltere Messages entfernt</span></div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* RECHTE HÄLFTE — Memory Consolidation Vorher/Nachher */}
-                  <div className="overflow-y-auto p-6 space-y-4 text-xs text-slate">
-                    {consolidation && (consolidation.ltm_loaded || consolidation.stm_loaded) ? (
-                      <>
-                        {/* Stats Header */}
-                        <div className="rounded-none border border-pine/20 bg-pine/[0.04] p-3">
-                          <p className="text-[10px] uppercase tracking-widest text-pine mb-2">Memory-Konsolidierung (qwen-3-235b)</p>
-                          <div className="grid grid-cols-3 gap-2 text-[10px]">
-                            <div className="text-slate/50">LTM: <span className="text-slate/70">{consolidation.ltm_loaded}→{consolidation.ltm_consolidated}</span></div>
-                            <div className="text-slate/50">STM: <span className="text-slate/70">{consolidation.stm_loaded}→{consolidation.stm_consolidated}</span></div>
-                            <div className="text-slate/50">Merges: <span className="text-pine">{consolidation.duplicates_merged || 0}</span></div>
-                            <div className="text-slate/50 col-span-2">Kritische Events: <span className="text-ember">{consolidation.critical_events || 0}</span></div>
+                  {/* 5. Causal Trace */}
+                  {causal&&causal.length>0&&(
+                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Causal Trace</p>
+                      <div className="space-y-1">
+                        {causal.map((step:any,idx:number)=>(
+                          <div key={idx} className="text-[10px] text-slate/50 border-l-2 border-white/10 pl-2">
+                            <span className="text-slate/70">{step.phase}:</span> {step.driver}
+                            {step.effect&&<span className="text-slate/40"> — {step.effect}</span>}
+                            {step.evidence&&(Array.isArray(step.evidence)?step.evidence.length>0:step.evidence)&&(
+                              <span className="text-slate/30 ml-1">[{Array.isArray(step.evidence)?step.evidence.join(", "):String(step.evidence)}]</span>
+                            )}
                           </div>
-                        </div>
-
-                        {/* LTM Vorher */}
-                        <div>
-                          <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Rohdaten LTM ({consolidation.raw_ltm?.length || 0})</p>
-                          <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
-                            {(consolidation.raw_ltm || []).map((mem: any, i: number) => (
-                              <div key={i} className="border-l-2 border-white/10 pl-2 py-0.5">
-                                <div className="flex gap-1 items-baseline">
-                                  <span className="text-[8px] text-slate/30 font-mono">{mem.id?.slice(0, 12) || '?'}</span>
-                                  <span className="text-[8px] text-ember">{Math.round((mem.relevance || 0) * 100)}%</span>
-                                </div>
-                                <div className="text-[9px] text-slate/50 line-clamp-2 mt-0.5">{mem.content}</div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* STM Vorher */}
-                        {consolidation.raw_stm?.length > 0 && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Rohdaten STM ({consolidation.raw_stm.length})</p>
-                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
-                              {(consolidation.raw_stm || []).map((e: any, i: number) => (
-                                <div key={i} className="border-l-2 border-white/10 pl-2 py-0.5">
-                                  <div className="flex gap-1 items-baseline">
-                                    <span className="text-[8px] text-slate/30 font-mono">{e.id?.slice(0, 12) || '?'}</span>
-                                    <span className="text-[8px] text-slate/40">[{e.category}]</span>
-                                  </div>
-                                  <div className="text-[9px] text-slate/50 line-clamp-2 mt-0.5">{e.content}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Nachher JSON */}
-                        <div>
-                          <p className="text-[10px] uppercase tracking-widest text-pine mb-2">Konsolidiertes JSON (Nachher)</p>
-                          <div className="max-h-[400px] overflow-y-auto rounded-none border border-white/5 bg-white/[0.02] p-3">
-                            <pre className="text-[9px] leading-relaxed text-slate/60 whitespace-pre-wrap break-words font-mono">
-                              {consolidation.consolidated_json ? JSON.stringify(consolidation.consolidated_json, null, 2) : 'Keine Daten'}
-                            </pre>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-slate/40 italic text-xs">
-                        Keine Memory-Konsolidierung fuer diesen Turn
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* 6. Repetition Events */}
+                  {repEvents&&Object.keys(repEvents).length>0&&(
+                    <div className="rounded-none border border-ember/20 bg-ember/[0.04] p-3">
+                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Repetition-Events erkannt</p>
+                      <div className="space-y-1">
+                        {Object.entries(repEvents).map(([key,val]:[string,any])=>(
+                          <div key={key} className="text-[10px] text-slate/50 border-l-2 border-ember/30 pl-2">
+                            <span className="text-ember font-medium">{key}</span>
+                            {typeof val==="object"&&val!==null&&(
+                              <span className="text-slate/40 ml-1">{Object.entries(val).map(([k,v])=>`${k}=${v}`).join(", ")}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}

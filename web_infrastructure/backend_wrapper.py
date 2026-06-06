@@ -101,6 +101,18 @@ def create_chappie_backend():
             self._chat_jobs_lock = threading.RLock()
             self.last_memory_timestamp: Optional[str] = None
 
+        def _collect_repetition_events(self) -> Dict[str, Any]:
+            events: Dict[str, Any] = {}
+            brain = getattr(self, "brain", None)
+            if brain and hasattr(brain, "_repetition_events"):
+                events.update(dict(brain._repetition_events))
+            if getattr(self, "_post_repetition_cut", False):
+                events["post_detect_cut"] = True
+            self._post_repetition_cut = False
+            if events:
+                self.debug_logger.log_warning("REPETITION", "Wiederholungsschleifen erkannt", events)
+            return events
+
         @staticmethod
         def _chat_job_key(session_id: str, message_id: str) -> str:
             return f"{session_id}:{message_id}"
@@ -197,6 +209,7 @@ def create_chappie_backend():
                 "tone_decision": result.get("tone_decision", {}),
                 "causal_trace": result.get("causal_trace", []),
                 "prompt_emotion_mode": result.get("prompt_emotion_mode", ""),
+                "repetition_events": result.get("repetition_events", {}),
                 "dream_fragments": result.get("dream_fragments", []),
                 "debug_entries": result.get("debug_entries", []),
                 "debug_log": result.get("debug_log"),
@@ -346,6 +359,9 @@ def create_chappie_backend():
             # never user-visible. ALWAYS remove them, even if no answer tag was found.
             display_response = display_response.replace("<think>", "").replace("</think>", "").replace("<thinking>", "").replace("</thinking>", "").strip()
 
+            # Strip leaked meta-labels and emotion markers from output
+            display_response = self._strip_leaked_metadata(display_response)
+
             if not display_response:
                 if model_reasoning or thought:
                     display_response = self._FALLBACK_SCHWEIGT
@@ -356,7 +372,9 @@ def create_chappie_backend():
                     phase, "Antwort ist nur Thinking (Loop erkannt). Antworttext zu kurz."
                 )
             else:
-                display_response = self._detect_repetition_loop(display_response)
+                display_response, post_cut = self._detect_repetition_loop(display_response)
+                if post_cut:
+                    self._post_repetition_cut = True
             return display_response, thought, model_reasoning
 
         @staticmethod
@@ -608,11 +626,12 @@ def create_chappie_backend():
             )
 
         @staticmethod
-        def _detect_repetition_loop(text: str, min_repeat: int = 10) -> str:
+        def _detect_repetition_loop(text: str, min_repeat: int = 10):
             if not text:
-                return text
+                return text, False
             lines = text.splitlines()
             cleaned = []
+            did_cut = False
             for line in lines:
                 line = line.rstrip()
                 if not line:
@@ -634,6 +653,7 @@ def create_chappie_backend():
                             cutoff = i + wlen
                             truncated = " ".join(words[:cutoff])
                             cleaned.append(truncated + " [REPETITION CUT]")
+                            did_cut = True
                             break
                     else:
                         continue
@@ -642,7 +662,33 @@ def create_chappie_backend():
                     cleaned.append(line)
                     continue
                 break
-            return "\n".join(cleaned)
+            return "\n".join(cleaned), did_cut
+
+        @staticmethod
+        def _strip_leaked_metadata(text: str) -> str:
+            if not text:
+                return text
+            import re
+            leaked_patterns = [
+                r'(?:^|\n)\s*(?:ThinkingProcess|FinalPolish|Draft|FinalResponse|Final)\s*:\s*',
+                r'(?:^|\n)\s*(?:Wait,\s*the\s+command|Let\'s\s+go\s+with|Let\'s\s+write|Refining|Drafting|Output)\s*:?\s*',
+                r'(?:^|\n)\s*\*{1,2}(?:Final|Output|Response|Draft)\*{0,2}\s*:?\s*',
+                r'(?:^|\n)\s*Input:\s*',
+                r'(?:^|\n)\s*Instruction:\s*',
+                r'(?:^|\n)\s*Context:\s*',
+                r'(?:^|\n)\s*Current\s+State:\s*',
+                r'(?:^|\n)\s*Persona:\s*',
+                r'(?:^|\n)\s*Constraints:\s*',
+                r'(?:^|\n)\s*Tone:\s*',
+                r'(?:^|\n)\s*Goal:\s*',
+                r'/joy/[a-zA-Z]+\(\d+\.\d+\)',
+                r'\|?\s*(?:happiness|sadness|frustration|trust|curiosity|motivation|energy)\s*:\s*\d+\.?\d*',
+                r'(?:^|\n)\s*Bevor\s+du\s+antwortest\s*[,:].*?(?:Format|denke)',
+            ]
+            for pattern in leaked_patterns:
+                text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL | re.MULTILINE)
+            text = re.sub(r'\n{3,}', '\n\n', text).strip()
+            return text
 
         @staticmethod
         def _normalize_whitespace(text: str) -> str:
@@ -660,7 +706,7 @@ def create_chappie_backend():
 
         @staticmethod
         def _clean_raw_text(raw_text: str) -> str:
-            """Entfernt vLLM/Provider-Fehlermeldungen aus dem Roh-Output."""
+            """Entfernt vLLM/Provider-Fehlermeldungen und geleakte Metadaten aus dem Roh-Output."""
             text = raw_text.strip()
             if not text:
                 return ""
@@ -672,8 +718,8 @@ def create_chappie_backend():
             cleaned = [l for l in lines if not l.strip().startswith(error_prefixes)]
             result = "\n".join(cleaned).strip()
             if not result:
-                # Alles war Fehler — nimm den ersten Fehlertext als Info
                 result = lines[-1] if lines else ""
+            result = CHAPPiEBackend._strip_leaked_metadata(result)
             return result
 
         def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
@@ -1684,13 +1730,6 @@ def create_chappie_backend():
             if context:
                 system_prompt += f"\n\n{context}"
 
-            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
-                prompt_runtime["response_plan"],
-                life_context,
-                global_workspace,
-            )
-            system_prompt += "\n\n" + self._generation_budget_instruction()
-
             # Memories hinzufuegen
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
@@ -1745,6 +1784,7 @@ def create_chappie_backend():
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "tone_decision": tone_decision,
+                "repetition_events": self._collect_repetition_events(),
                 "action_plan": self.action_response.build_action_plan(
                     {
                         "response_strategy": "conversational",
@@ -1774,6 +1814,7 @@ def create_chappie_backend():
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "rag_memories": memories,
                 "raw_response": raw_response,
+                "repetition_events": self._collect_repetition_events(),
             }
 
         def _calculate_emotion_delta(self, before: Dict[str, int], 
@@ -1860,12 +1901,6 @@ def create_chappie_backend():
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=settings.chain_of_thought
             )
-            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
-                prompt_runtime["response_plan"],
-                life_context,
-                {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
-            )
-            system_prompt += "\n\n" + self._generation_budget_instruction()
             
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             
@@ -2037,13 +2072,6 @@ def create_chappie_backend():
 
             if context:
                 system_prompt += f"\n\n{context}"
-
-            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
-                prompt_runtime["response_plan"],
-                life_context,
-                global_workspace,
-            )
-            system_prompt += "\n\n" + self._generation_budget_instruction()
 
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
@@ -2411,6 +2439,7 @@ def create_chappie_backend():
                 "timing": timing,
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
+                "repetition_events": self._collect_repetition_events(),
             }
 
             yield {"event": "finished", "result": result}
@@ -2476,12 +2505,6 @@ def create_chappie_backend():
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=settings.chain_of_thought
             )
-            system_prompt += "\n\n" + self.action_response.build_prompt_suffix(
-                prompt_runtime["response_plan"],
-                life_context,
-                {"broadcast": "legacy-path", "dominant_focus": {"label": "Legacy Input"}, "guidance": "Halte das Verhalten stabil."},
-            )
-            system_prompt += "\n\n" + self._generation_budget_instruction()
 
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
 
@@ -2599,6 +2622,7 @@ def create_chappie_backend():
                 "model": get_active_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
+                "repetition_events": self._collect_repetition_events(),
             }
 
             yield {"event": "finished", "result": result}

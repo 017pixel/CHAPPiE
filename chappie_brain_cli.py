@@ -580,6 +580,7 @@ class CHAPPiEBrainCLI:
         budget = result.get("context_budget", {})
         timing = result.get("timing", {})
         causal = result.get("causal_trace", [])
+        rep_events = result.get("repetition_events", {})
 
         if HAS_RICH:
             table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
@@ -628,6 +629,12 @@ class CHAPPiEBrainCLI:
                 r_label = f"r:{rtk}tk" if rtk > 0 else "r:0tk (kein CoT)"
                 table.add_row("Timing:", f"TTFT:{ttft}ms  {r_label}  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms")
 
+            if rep_events:
+                parts = []
+                for key, val in sorted(rep_events.items()):
+                    parts.append(f"[bold red]{key}[/]")
+                table.add_row("Repetition:", ", ".join(parts))
+
             causal_chain = " → ".join(c.get("phase", "?") for c in (causal or [])[:5])
             if causal_chain:
                 table.add_row("Trace:", causal_chain)
@@ -645,6 +652,8 @@ class CHAPPiEBrainCLI:
             dom = steering.get("dominant_vector", "neutral")
             print(f"  [STEER]   {prompt_mode} | {dom} ({steering.get('dominant_strength', 0):.2f})")
             print(f"  [TONE]    {tone.get('tone', '?')}")
+            if rep_events:
+                print(f"  [REP]     {', '.join(rep_events.keys())}")
             print(f"  [TIME]    {proc_time:.0f} ms | {provider}/{model}")
             print(f"{'─' * 60}{Colors.RESET}")
 
@@ -676,6 +685,7 @@ class CHAPPiEBrainCLI:
         panels.append(self._panel_timing(result))
         panels.append(self._panel_causal(result))
         panels.append(self._panel_consolidation(result))
+        panels.append(self._panel_repetition(result))
         panels.append(self._panel_debug(result))
 
         proc_time = result.get("processing_time_ms", 0)
@@ -894,6 +904,20 @@ class CHAPPiEBrainCLI:
             f"  Critical events: {mc.get('critical_events', 0)}",
         ]
         return Panel("\n".join(lines), title="[bold magenta]Memory Consolidation[/]", border_style="magenta")
+
+    @staticmethod
+    def _panel_repetition(result: dict) -> Optional[Panel]:
+        events = result.get("repetition_events", {})
+        if not events:
+            return None
+        lines = []
+        for key, val in sorted(events.items()):
+            if isinstance(val, dict):
+                detail = ", ".join(f"{k}={v}" for k, v in val.items())
+                lines.append(f"  [bold red]{key}[/]: {detail}")
+            else:
+                lines.append(f"  [bold red]{key}[/]")
+        return Panel("\n".join(lines), title="[bold red]Repetition Events[/]", border_style="red")
 
     @staticmethod
     def _panel_debug(result: dict) -> Optional[Panel]:

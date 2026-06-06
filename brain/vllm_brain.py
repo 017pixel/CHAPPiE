@@ -49,6 +49,7 @@ class VLLMBrain(BaseBrain):
             api_key="none"  # lokaler Server braucht keinen echten Key
         )
         self._is_initialized = True
+        self._repetition_events: Dict[str, Any] = {}
         print("Lokales OpenAI-Brain initialisiert")
         print(f"   Lokal verbunden: {self.url}")
         print(f"   Modell: {self.model}")
@@ -73,6 +74,9 @@ class VLLMBrain(BaseBrain):
             {"role": msg.role, "content": msg.content}
             for msg in messages
         ]
+
+        # Repetition-Events pro Aufruf zuruecksetzen
+        self._repetition_events.clear()
 
         # Steering / provider-spezifische Parameter
         extra_body = self._prepare_extra_body(config.extra_body)
@@ -152,6 +156,7 @@ class VLLMBrain(BaseBrain):
             emitted_text = False
             reasoning_chars = 0
             accumulated_reasoning = ""
+            accumulated_content = ""
             think_opened = False
             reasoning_capped = False
 
@@ -167,6 +172,7 @@ class VLLMBrain(BaseBrain):
                             yield "</think>"
                             think_opened = False
                         reasoning_capped = True
+                        self._repetition_events["reasoning_capped"] = {"chars": reasoning_chars, "limit": self._REASONING_CHAR_LIMIT}
                         continue
 
                     if not think_opened:
@@ -181,6 +187,7 @@ class VLLMBrain(BaseBrain):
                             yield "</think>"
                             think_opened = False
                         reasoning_capped = True
+                        self._repetition_events["reasoning_loop"] = {"chars": reasoning_chars, "last_180": accumulated_reasoning[-180:]}
                         continue
 
                     yield normalized_reasoning
@@ -190,6 +197,7 @@ class VLLMBrain(BaseBrain):
                             yield "</think>"
                             think_opened = False
                         reasoning_capped = True
+                        self._repetition_events["reasoning_capped"] = {"chars": reasoning_chars, "limit": self._REASONING_CHAR_LIMIT}
                     continue
 
                 content = self._normalize_content(getattr(delta, "content", None))
@@ -197,6 +205,11 @@ class VLLMBrain(BaseBrain):
                     if think_opened:
                         yield "</think>"
                         think_opened = False
+                    accumulated_content += content
+                    if self._detect_reasoning_loop(accumulated_content):
+                        self._repetition_events["content_loop"] = {"chars": len(accumulated_content), "last_180": accumulated_content[-180:]}
+                        yield "\n[REPETITION CUT]"
+                        return
                     emitted_text = True
                     yield content
                     continue
@@ -206,6 +219,7 @@ class VLLMBrain(BaseBrain):
 
             if not emitted_text:
                 if reasoning_chars > 0:
+                    self._repetition_events["no_answer_only_reasoning"] = {"reasoning_chars": reasoning_chars}
                     yield (
                         "\nvLLM Fehler: Stream lieferte nur reasoning_content ohne finale Antwort. "
                         "Setze chat_template_kwargs.enable_thinking=false oder erhoehe MAX_TOKENS."
@@ -262,6 +276,7 @@ class VLLMBrain(BaseBrain):
 
             finish_reason = getattr(first_choice, "finish_reason", "unknown")
             if reasoning:
+                self._repetition_events["no_answer_only_reasoning"] = {"reasoning_chars": len(reasoning)}
                 return self._format_reasoning_response(reasoning, answer="CHAPPiE schweigt...")
 
             tool_calls = getattr(message, "tool_calls", None)
@@ -279,7 +294,10 @@ class VLLMBrain(BaseBrain):
     def _prepare_extra_body(self, extra_body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Bereitet provider-spezifische Optionen vor."""
         payload = dict(extra_body or {})
-        # Thinking-Mode: Qwen3.5 Default verwenden (aktiviert)
+        if "chat_template_kwargs" not in payload:
+            payload["chat_template_kwargs"] = {}
+        if isinstance(payload["chat_template_kwargs"], dict):
+            payload["chat_template_kwargs"].setdefault("enable_thinking", True)
         return payload
 
     @staticmethod
@@ -333,6 +351,10 @@ class VLLMBrain(BaseBrain):
                     return reasoning
 
         return ""
+
+    @property
+    def repetition_events(self) -> Dict[str, Any]:
+        return dict(self._repetition_events)
 
     def is_available(self) -> bool:
         """Prueft ob vLLM bereit ist."""

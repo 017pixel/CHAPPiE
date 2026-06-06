@@ -590,14 +590,7 @@ class LocalSteeringEngine:
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
-        # Thinking mode: nicht mehr erzwingen, Qwen-Default verwenden
         prompt_messages = [dict(message) for message in messages]
-        style_instruction = build_style_instruction(steering_payload)
-        if style_instruction:
-            if prompt_messages and prompt_messages[0].get("role") == "system":
-                prompt_messages[0]["content"] = f"{prompt_messages[0].get('content', '').strip()}\n\n{style_instruction}".strip()
-            else:
-                prompt_messages.insert(0, {"role": "system", "content": style_instruction})
         prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
         inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=self.context_length)
         actual_len = int(inputs["input_ids"].shape[1])
@@ -616,9 +609,9 @@ class LocalSteeringEngine:
         except Exception:
             pass
 
-    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15) -> Dict[str, Any]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature)
+        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty)
         self._log_gpu_stats("pre-generate")
         with self._generation_lock:
             with self._apply_activation_plan(steering_payload):
@@ -664,10 +657,10 @@ class LocalSteeringEngine:
             pass
         return "", self.tokenizer.decode(token_ids, skip_special_tokens=True).strip()
 
-    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None) -> Iterator[str]:
+    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15) -> Iterator[str]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
         streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature)
+        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty)
         generation_kwargs["streamer"] = streamer
         error_box: Dict[str, BaseException] = {}
         self._log_gpu_stats("pre-stream")
@@ -693,7 +686,7 @@ class LocalSteeringEngine:
         if error_box:
             raise error_box["error"]
 
-    def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float) -> Dict[str, Any]:
+    def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float, repetition_penalty: float = 1.15) -> Dict[str, Any]:
         do_sample = float(temperature or 0.0) > 0.01
         input_len = int(inputs["input_ids"].shape[1])
         kwargs: Dict[str, Any] = {
@@ -704,6 +697,7 @@ class LocalSteeringEngine:
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.tokenizer.eos_token_id,
             "use_cache": True,
+            "repetition_penalty": max(1.0, float(repetition_penalty)),
         }
         if do_sample:
             kwargs["temperature"] = max(0.05, float(temperature))
