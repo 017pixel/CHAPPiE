@@ -552,18 +552,32 @@ class CHAPPiEBrainCLI:
         model = result.get("model", "?")
 
         cot = result.get("formatted_cot", "") or result.get("model_reasoning", "")
-        answer = result.get("formatted_answer", "") or result.get("response_text", "")
+        raw_answer = result.get("response_text", "")
+        formatted_answer = result.get("formatted_answer", "")
+        show_both = raw_answer and formatted_answer and formatted_answer != raw_answer
 
         if cot and HAS_RICH:
             console.print(Panel(cot, title="[dim]Chain of Thought[/]", border_style="dim", padding=(0, 1)))
         elif cot:
             print(f"\n{Colors.THOUGHT}--- CHAPPiEs Gedanken ---\n{cot}\n---{Colors.RESET}\n")
 
-        if answer:
+        if show_both:
             if HAS_RICH:
-                console.print(Panel(answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+                console.print(Panel(raw_answer[:2000], title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
+                console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE (formatted)[/]", border_style="bright_cyan", padding=(0, 1)))
             else:
-                print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {answer}\n")
+                print(f"\n{Colors.DIM}--- Raw ---\n{raw_answer[:1000]}\n{Colors.RESET}")
+                print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE (formatted) >{Colors.RESET} {formatted_answer}\n")
+        elif formatted_answer:
+            if HAS_RICH:
+                console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+            else:
+                print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {formatted_answer}\n")
+        elif raw_answer:
+            if HAS_RICH:
+                console.print(Panel(raw_answer, title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
+            else:
+                print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {raw_answer}\n")
 
         intent = result.get("intent_type", "?")
         confidence = result.get("intent_confidence", 0)
@@ -665,12 +679,19 @@ class CHAPPiEBrainCLI:
             return
 
         cot = result.get("formatted_cot", "") or result.get("model_reasoning", "")
-        answer = result.get("formatted_answer", "") or result.get("response_text", "")
+        raw_answer = result.get("response_text", "")
+        formatted_answer = result.get("formatted_answer", "")
+        show_both = raw_answer and formatted_answer and formatted_answer != raw_answer
 
         if cot:
             console.print(Panel(cot, title="[dim]Chain of Thought[/]", border_style="dim", padding=(0, 1)))
-        if answer:
-            console.print(Panel(answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+        if show_both:
+            console.print(Panel(raw_answer[:2000], title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
+            console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE (formatted)[/]", border_style="bright_cyan", padding=(0, 1)))
+        elif formatted_answer:
+            console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+        elif raw_answer:
+            console.print(Panel(raw_answer, title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
 
         panels: list = []
 
@@ -700,11 +721,18 @@ class CHAPPiEBrainCLI:
 
     def _display_raw_result(self, user_text: str, result: dict):
         cot = result.get("formatted_cot", "") or result.get("model_reasoning", "")
-        answer = result.get("formatted_answer", "") or result.get("response_text", "")
+        raw_answer = result.get("response_text", "")
+        formatted_answer = result.get("formatted_answer", "")
+        show_both = raw_answer and formatted_answer and formatted_answer != raw_answer
         if cot:
             print(f"\n{Colors.THOUGHT}--- CHAPPiEs Gedanken ---\n{cot}\n---{Colors.RESET}\n")
-        if answer:
-            print(f"{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {answer}\n")
+        if show_both:
+            print(f"\n{Colors.DIM}--- Raw ---\n{raw_answer[:1000]}\n{Colors.RESET}")
+            print(f"{Colors.AI}{Colors.BOLD}CHAPPiE (formatted) >{Colors.RESET} {formatted_answer}\n")
+        elif formatted_answer:
+            print(f"{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {formatted_answer}\n")
+        elif raw_answer:
+            print(f"{Colors.AI}{Colors.BOLD}CHAPPiE (raw) >{Colors.RESET} {raw_answer}\n")
 
     def _display_remote_result(self, metadata: dict, collected: dict):
         if HAS_RICH:
