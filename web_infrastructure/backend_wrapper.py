@@ -784,6 +784,9 @@ def create_chappie_backend():
                 answer = (answer_block.content or "").strip()
                 if not answer:
                     answer = self._FALLBACK_SILENT
+                else:
+                    answer = CHAPPiEBackend._normalize_whitespace(answer)
+                cot = CHAPPiEBackend._normalize_whitespace(cot)
                 if not cot:
                     parsed = parse_thinking_tags(clean_text)
                     cot_parsed = parse_chain_of_thought(clean_text)
@@ -828,6 +831,8 @@ def create_chappie_backend():
                     answer_text = stripped
 
             answer_is_fallback = CHAPPiEBackend._is_fallback_text(answer_text)
+            answer_text = CHAPPiEBackend._normalize_whitespace(answer_text)
+            thought = CHAPPiEBackend._normalize_whitespace(thought)
             return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "answer_is_fallback": answer_is_fallback}
 
         @staticmethod
