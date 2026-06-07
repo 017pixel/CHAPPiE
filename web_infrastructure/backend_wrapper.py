@@ -224,6 +224,7 @@ def create_chappie_backend():
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
                 "formatting_failed": result.get("formatting_failed", False),
+                "formatting_source": result.get("formatting_source", "local_fallback"),
                 "formatting_model": self.GROQ_FORMAT_MODEL,
             }
             assistant_msg = {
@@ -723,12 +724,15 @@ def create_chappie_backend():
             return result
 
         def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
-            """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed'} zurück."""
+            """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
-                return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "answer_is_fallback": True}
+                return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": "groq", "answer_is_fallback": True}
             if not settings.groq_api_key:
-                return self._local_format_fallback(clean_text, formatting_failed=False)
+                result = self._local_format_fallback(clean_text, formatting_failed=False)
+                result["formatting_source"] = "local_fallback"
+                result["formatting_failed"] = False
+                return result
             try:
                 import openai
 
@@ -786,10 +790,12 @@ def create_chappie_backend():
                     thought = parsed.thought or cot_parsed.thought or ""
                     if thought:
                         cot = thought
-                return {"cot": cot, "answer": answer, "formatting_failed": False, "answer_is_fallback": self._is_fallback_text(answer)}
+                return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "answer_is_fallback": self._is_fallback_text(answer)}
             except Exception as e:
                 print(f"[Groq Format] Fehler: {e}")
-                return self._local_format_fallback(clean_text, formatting_failed=True)
+                result = self._local_format_fallback(clean_text, formatting_failed=True)
+                result["formatting_source"] = "local_fallback"
+                return result
 
         @staticmethod
         def _local_format_fallback(clean_text: str, formatting_failed: bool = False) -> Dict[str, Any]:
@@ -1774,6 +1780,8 @@ def create_chappie_backend():
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted.get("formatting_failed", False),
+                "formatting_source": formatted.get("formatting_source", "local_fallback"),
+                "formatting_model": self.GROQ_FORMAT_MODEL,
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
@@ -1931,7 +1939,8 @@ def create_chappie_backend():
                     "response_chars": len(display_response or ""),
                     "thought_chars": len(thought or ""),
                     "memories_found": len(legacy_response.get("rag_memories") or []),
-                    "formatting_failed": formatted_legacy.get("formatting_failed", False),
+                "formatting_failed": formatted_legacy.get("formatting_failed", False),
+                "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
                 },
             )
             
@@ -1992,6 +2001,7 @@ def create_chappie_backend():
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
+                    "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
@@ -2336,6 +2346,8 @@ def create_chappie_backend():
                         "thought_chars": len(thought or ""),
                         "looks_like_error": looks_like_model_error(display_response or ""),
                         "formatting_failed": formatted_stream.get("formatting_failed", False),
+                        "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
+                        "formatting_model": self.GROQ_FORMAT_MODEL,
                     },
                 )
 
@@ -2345,7 +2357,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
-                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": False}
+                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback"}
 
             final_life_snapshot = self.life_simulation.finalize_turn(
                 user_input=user_input,
@@ -2406,6 +2418,7 @@ def create_chappie_backend():
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_stream.get("formatting_failed", False),
+                "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -2534,6 +2547,8 @@ def create_chappie_backend():
                         "response_chars": len(display_response or ""),
                         "thought_chars": len(thought or ""),
                         "formatting_failed": formatted_legacy.get("formatting_failed", False),
+                        "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
+                        "formatting_model": self.GROQ_FORMAT_MODEL,
                     },
                 )
 
@@ -2543,7 +2558,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
-                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": False}
+                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback"}
 
             self.memory.add_memory(user_input, role="user")
             if display_response.strip() and not looks_like_model_error(display_response):
@@ -2592,6 +2607,7 @@ def create_chappie_backend():
                 "formatted_answer": formatted_legacy.get("answer", "")
                     if not formatted_legacy.get("answer_is_fallback") else (display_response or formatted_legacy.get("answer", "")),
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
+                "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),

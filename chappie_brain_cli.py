@@ -490,6 +490,8 @@ class CHAPPiEBrainCLI:
             "auto_sleep_triggered": metadata.get("auto_sleep_triggered", False),
             "reasoning_only": metadata.get("reasoning_only", False),
             "formatting_failed": metadata.get("formatting_failed", False),
+            "formatting_source": metadata.get("formatting_source", "local_fallback"),
+            "formatting_model": metadata.get("formatting_model", "openai/gpt-oss-120b"),
         }
 
     # ── live rendering ────────────────────────────────────────────
@@ -624,6 +626,12 @@ class CHAPPiEBrainCLI:
 
             table.add_row("Tone:", f"{tone.get('tone', '?')}  ({tone.get('tone_reason', '')[:80]})")
 
+            fmt_source = result.get("formatting_source", "local_fallback")
+            fmt_model = result.get("formatting_model", "?")
+            fmt_color = "green" if fmt_source == "groq" else "yellow"
+            fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+            table.add_row("Format:", f"[{fmt_color}]{fmt_label}[/] ({fmt_model})")
+
             focus = (workspace.get("dominant_focus") or {})
             focus_label = focus.get("label", "?"); focus_sal = focus.get("salience", 0)
             mem_count = mem_trace.get("memories_found", 0) if isinstance(mem_trace, dict) else 0
@@ -666,6 +674,9 @@ class CHAPPiEBrainCLI:
             dom = steering.get("dominant_vector", "neutral")
             print(f"  [STEER]   {prompt_mode} | {dom} ({steering.get('dominant_strength', 0):.2f})")
             print(f"  [TONE]    {tone.get('tone', '?')}")
+            fmt_source = result.get("formatting_source", "local_fallback")
+            fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+            print(f"  [FORMAT]  {fmt_label} ({result.get('formatting_model', '?')})")
             if rep_events:
                 print(f"  [REP]     {', '.join(rep_events.keys())}")
             print(f"  [TIME]    {proc_time:.0f} ms | {provider}/{model}")
