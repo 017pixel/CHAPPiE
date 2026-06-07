@@ -84,7 +84,7 @@ def test_sync_generate_preserves_answer_and_model_reasoning():
     brain = _make_brain_with_response(response)
     result = brain._sync_generate([], GenerationConfig(stream=False), {})
     assert "<model_reasoning>" in result
-    assert "vLLM denkt" in result
+    assert "v LLM denkt" in result
     assert result.strip().endswith("Antwort")
 
 
