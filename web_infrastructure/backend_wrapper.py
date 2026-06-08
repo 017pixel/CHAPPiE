@@ -612,7 +612,7 @@ def create_chappie_backend():
                 "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
             )
 
-        GROQ_FORMAT_MODEL = "openai/gpt-oss-120b"
+        GROQ_FORMAT_MODEL = "llama-3.3-70b-versatile"
 
         _FALLBACK_SILENT = "CHAPPiE hat nachgedacht, schweigt aber..."
         _FALLBACK_NO_THINK = "CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet."
