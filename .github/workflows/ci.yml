@@ -58,15 +58,18 @@ jobs:
             api/services/text_formatting.py \
             api/routers/chat.py \
             api/routers/context.py \
+            api/routers/finetune.py \
             api/routers/memory.py \
             api/routers/runtime.py \
             api/routers/system.py \
             api/routers/training.py \
+            brain/models_manager.py \
             brain/response_parser.py \
             brain/ollama_brain.py \
             brain/vllm_brain.py \
             brain/steering_backend.py \
             brain/steering_api_server.py \
+            brain/whatsapp_finetune_trainer.py \
             config/config.py \
             config/prompts.py \
             memory/chat_manager.py \
@@ -92,6 +95,7 @@ jobs:
           python tests/test_cli_display.py
           python tests/test_cli_commands.py
           python tests/test_cli_remote.py
+          python tests/test_finetune_integration.py
 
       - name: Run extended tests (may need mock deps)
         shell: bash

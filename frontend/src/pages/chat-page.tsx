@@ -369,7 +369,7 @@ export function ChatPage() {
           id: `assistant-${Date.now()}`,
           role: "assistant",
           content: displayContent,
-          metadata: assistantMeta,
+          metadata: { ...assistantMeta, raw_response: assistantContent },
         }]);
       } catch (syncErr: any) {
         setDisplayMessages(prev => [...prev, {
@@ -527,7 +527,10 @@ export function ChatPage() {
                       {entry.content}
                     </div>
                   ) : entry.id === "reasoning-live" ? (
-                    <div className="text-xs leading-relaxed whitespace-pre-wrap break-all text-slate/70">{entry.content}</div>
+                    <details open className="text-xs leading-relaxed whitespace-pre-wrap break-all">
+                      <summary className="text-[10px] uppercase tracking-widest text-pine cursor-pointer mb-1">CHAPPiEs Gedanken (CoT) — live</summary>
+                      <div className="text-slate/70">{entry.content}</div>
+                    </details>
                   ) : entry.id === "thinking" ? (
                     <div>
                       <div className="text-sm leading-relaxed break-all">{entry.content}</div>
@@ -579,7 +582,7 @@ export function ChatPage() {
                               if (repKeys.length > 0) previewLines.push(`⚠ Repetition: ${repKeys.join(", ")}`);
                               if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
                              previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
-                            return previewLines.slice(0, 5).map((line, i) => (
+                            return previewLines.slice(0, 8).map((line, i) => (
                               <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
                             ));
                           })()}
@@ -636,9 +639,23 @@ export function ChatPage() {
                       <div><span className="text-slate/40">Dauer</span><br/><span className="text-slate/70">{meta.processing_time_ms?(meta.processing_time_ms/1000).toFixed(1)+"s":"?"}</span></div>
                       <div><span className="text-slate/40">Intent</span><br/><span className="text-slate/70">{meta.intent_type||"?"} {meta.intent_confidence!=null?Math.round(meta.intent_confidence*100)+"%":""}</span></div>
                       <div><span className="text-slate/40">Tone</span><br/><span className="text-slate/70">{meta.tone_decision?.tone||"?"}</span></div>
-                      <div><span className="text-slate/40">Tool Calls</span><br/><span className="text-slate/70">{meta.tool_calls_executed??"0"}</span></div>
+                      <div><span className="text-slate/40">Tool Calls</span><br/>
+                        <span className="text-slate/70">{meta.tool_calls_executed??"0"}</span>
+                        {meta.selected_tools && (Array.isArray(meta.selected_tools) ? meta.selected_tools : String(meta.selected_tools).split(",")).filter(Boolean).length > 0 && (
+                          <div className="flex flex-wrap gap-0.5 mt-0.5">
+                            {(Array.isArray(meta.selected_tools) ? meta.selected_tools : String(meta.selected_tools).split(",")).filter(Boolean).map((t: string) => (
+                              <span key={t} className="text-[7px] px-1 border border-white/10 text-slate/30">{t.trim()}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div><span className="text-slate/40">Short-Term</span><br/><span className="text-slate/70">{meta.short_term_count??"?"}</span></div>
-                      <div><span className="text-slate/40">Format</span><br/><span className={meta.formatting_failed?"text-ember":"text-pine"}>{meta.formatting_failed?"FAIL":"OK"}</span></div>
+                      <div><span className="text-slate/40">Format</span><br/>
+                        <span className={meta.formatting_failed ? "text-ember" : meta.formatting_source === "groq" ? "text-emerald" : "text-amber"}>
+                          {meta.formatting_failed ? "FAIL" : meta.formatting_source === "groq" ? "GROQ" : "LOCAL"}
+                          {!meta.formatting_failed && <span className="opacity-40 ml-0.5">({meta.formatting_model || "?"})</span>}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -715,6 +732,28 @@ export function ChatPage() {
                       )}
                     </div>
                   )}
+
+                  {/* 3b. Focus + Global Workspace */}
+                  {(() => {
+                    const ws = meta.global_workspace || {};
+                    const focus = ws.dominant_focus || {};
+                    const trace = meta.memory_trace || {};
+                    const merged = trace.merged || trace.seed || {};
+                    if (!focus.label && !merged.memories_found) return null;
+                    return (
+                      <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Focus + Kontext</p>
+                        <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[10px]">
+                          <div><span className="text-slate/40">Dominant Focus</span><br/><span className="text-slate/70">{focus.label || "—"}</span></div>
+                          <div><span className="text-slate/40">Salience</span><br/><span className="text-slate/70">{focus.salience != null ? focus.salience.toFixed(2) : "—"}</span></div>
+                          <div><span className="text-slate/40">Broadcast</span><br/><span className="text-slate/70">{(ws.broadcast || "—").slice(0, 40)}</span></div>
+                          <div><span className="text-slate/40">Memories</span><br/><span className="text-slate/70">{merged.memories_found ?? "—"}</span></div>
+                          <div><span className="text-slate/40">Top Relevance</span><br/><span className="text-slate/70">{merged.top_relevance != null ? merged.top_relevance.toFixed(2) : "—"}</span></div>
+                          <div><span className="text-slate/40">Query</span><br/><span className="text-slate/70">{(merged.query || merged.stage || "—").slice(0, 30)}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 4. Timing + Budget */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -798,7 +837,7 @@ export function ChatPage() {
             {(() => {
               const meta = (rawPopupMsg.metadata || {}) as any;
               const rawText = meta.raw_response || rawPopupMsg.content || "";
-              const fmtModel = meta.formatting_model || "llama-3.1-8b";
+              const fmtModel = meta.formatting_model || "?";
               return (
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   <div className="rounded-none border border-pine/10 bg-pine/[0.04] p-4">
