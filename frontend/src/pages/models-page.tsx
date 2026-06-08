@@ -18,17 +18,25 @@ export function ModelsPage() {
   const [activeModelName, setActiveModelName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [apiUnavailable, setApiUnavailable] = useState(false);
 
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/finetune/models");
-      setModels(res.data);
-      const activeRes = await api.get("/finetune/active");
-      setActiveAdapter(activeRes.data.active_adapter);
-      setActiveModelName(activeRes.data.active_model_name);
-    } catch (e) {
-      console.error("Fehler beim Laden der Modelle:", e);
+      const res = await api.get("/finetune/models") as FinetuneModel[];
+      if (Array.isArray(res)) setModels(res);
+      else setModels([]);
+      try {
+        const activeRes = await api.get("/finetune/active") as any;
+        setActiveAdapter(activeRes?.active_adapter ?? null);
+        setActiveModelName(activeRes?.active_model_name ?? null);
+      } catch {
+        // active endpoint kann fehlen, ist optional
+      }
+      setApiUnavailable(false);
+    } catch {
+      setApiUnavailable(true);
+      setModels([]);
     } finally {
       setLoading(false);
     }
@@ -36,9 +44,13 @@ export function ModelsPage() {
 
   useEffect(() => {
     fetchModels();
+  }, []);
+
+  useEffect(() => {
+    if (apiUnavailable) return;
     const interval = setInterval(fetchModels, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [apiUnavailable]);
 
   const handleSwitch = async (modelName: string | null) => {
     setSwitching(modelName || "base");
@@ -81,8 +93,24 @@ export function ModelsPage() {
     }
   };
 
+  if (apiUnavailable) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Modelle & Fine-Tuning</h1>
+        <div className="rounded-none border border-ember/30 bg-ember/[0.04] p-8 text-center">
+          <span className="material-symbols-outlined text-4xl text-ember/50 mb-4 block">psychology</span>
+          <p className="text-lg font-bold text-ember/80 mb-2">Feature nicht verfügbar</p>
+          <p className="text-sm text-slate/60">
+            Das Modelle & Fine-Tuning Feature wird auf diesem Server (noch) nicht bereitgestellt.
+            Verwende zum Testen die CLI: <code className="text-xs text-pine bg-pine/10 px-1.5 py-0.5 rounded">python brain/models_manager.py</code>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading && models.length === 0) {
-    return <div className="p-8 text-center">Lade Modelle...</div>;
+    return <div className="p-8 text-center text-slate/70">Lade Modelle...</div>;
   }
 
   return (
@@ -130,7 +158,7 @@ export function ModelsPage() {
             </tr>
 
             {/* Fine-tuned Models */}
-            {models.map((model) => (
+            {(models || []).map((model) => (
               <tr
                 key={model.name}
                 className={`border-t border-gray-700 ${model.adapter_path === activeAdapter ? "bg-blue-900/20" : ""}`}
@@ -202,7 +230,7 @@ export function ModelsPage() {
         </table>
       </div>
 
-      {models.length === 0 && (
+      {(!models || models.length === 0) && (
         <div className="text-center text-gray-500 py-8">
           Keine Modelle vorhanden. Starte ein Training ueber die API oder den Manager.
         </div>
