@@ -784,16 +784,13 @@ def create_chappie_backend():
                 answer = (answer_block.content or "").strip()
                 if not answer:
                     answer = self._FALLBACK_SILENT
-                else:
-                    answer = CHAPPiEBackend._normalize_whitespace(answer)
-                cot = CHAPPiEBackend._normalize_whitespace(cot)
                 if not cot:
                     parsed = parse_thinking_tags(clean_text)
                     cot_parsed = parse_chain_of_thought(clean_text)
                     thought = parsed.thought or cot_parsed.thought or ""
                     if thought:
                         cot = thought
-                return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "answer_is_fallback": self._is_fallback_text(answer)}
+                return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": self.GROQ_FORMAT_MODEL, "answer_is_fallback": self._is_fallback_text(answer)}
             except Exception as e:
                 print(f"[Groq Format] Fehler: {e}")
                 result = self._local_format_fallback(clean_text, formatting_failed=True)
@@ -833,7 +830,7 @@ def create_chappie_backend():
             answer_is_fallback = CHAPPiEBackend._is_fallback_text(answer_text)
             answer_text = CHAPPiEBackend._normalize_whitespace(answer_text)
             thought = CHAPPiEBackend._normalize_whitespace(thought)
-            return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "answer_is_fallback": answer_is_fallback}
+            return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "formatting_model": "local_regex", "answer_is_fallback": answer_is_fallback}
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -1309,6 +1306,9 @@ def create_chappie_backend():
                 "response_text": response_data["response_text"],
                 "formatted_cot": response_data.get("formatted_cot", ""),
                 "formatted_answer": response_data.get("formatted_answer", ""),
+                "formatting_failed": response_data.get("formatting_failed", False),
+                "formatting_source": response_data.get("formatting_source", "local_fallback"),
+                "formatting_model": response_data.get("formatting_model", "?"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -1558,6 +1558,7 @@ def create_chappie_backend():
             estimated = self._estimate_total_tokens(messages)
             budget_info = {
                 "estimated_tokens": estimated,
+                "token_limit": settings.context_token_limit,
                 "was_trimmed": False,
                 "near_limit": estimated > settings.context_token_warning_threshold,
             }
@@ -2006,7 +2007,8 @@ def create_chappie_backend():
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
-                    "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
+                "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
+                "formatting_model": formatted_legacy.get("formatting_model", "?"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
@@ -2106,6 +2108,7 @@ def create_chappie_backend():
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "rag_memories": memories,
+                "context_budget": self._enforce_context_budget(messages)[1],
             }
 
         def _process_two_step_stream(
@@ -2362,7 +2365,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
-                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback"}
+                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback", "formatting_model": "local_regex"}
 
             final_life_snapshot = self.life_simulation.finalize_turn(
                 user_input=user_input,
@@ -2418,12 +2421,20 @@ def create_chappie_backend():
             else:
                 safe_answer = formatted_stream.get("answer", "") or display_response
 
+            # Reasoning-Tokens aus formatiertem CoT nachberechnen (Modelle nutzen selten <think>-Tags)
+            if timing and timing.get("reasoning_tokens", 0) == 0 and safe_cot and safe_cot != self._FALLBACK_NO_THINK:
+                estimated = max(1, round(len(safe_cot) / 4))
+                timing["reasoning_tokens"] = estimated
+                timing["total_tokens"] = timing.get("total_tokens", 0) + estimated
+
             result = {
                 "response_text": display_response,
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_stream.get("formatting_failed", False),
                 "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
+                "formatting_model": formatted_stream.get("formatting_model", "?"),
+                "context_budget": meta.get("context_budget", {}),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -2563,7 +2574,7 @@ def create_chappie_backend():
                 display_response = error_text
                 thought = ""
                 model_reasoning = ""
-                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback"}
+                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback", "formatting_model": "local_regex"}
 
             self.memory.add_memory(user_input, role="user")
             if display_response.strip() and not looks_like_model_error(display_response):
@@ -2613,6 +2624,7 @@ def create_chappie_backend():
                     if not formatted_legacy.get("answer_is_fallback") else (display_response or formatted_legacy.get("answer", "")),
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
+                "formatting_model": formatted_legacy.get("formatting_model", "?"),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),

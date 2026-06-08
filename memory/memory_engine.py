@@ -420,6 +420,13 @@ class MemoryEngine:
         cleaned = str(raw_query).replace("\n", " ").replace("\r", " ").strip()
         cleaned = re.sub(r"\s+", " ", cleaned)
         cleaned = cleaned.strip(" ,.;:|")
+        # Detektiere Verweigerungen / Fehlausgaben
+        refusal_patterns = [
+            "ich kann nicht", "ich kann diese", "als ki", "ich darf",
+            "entschuldigung", "tut mir leid", "i cannot", "i'm sorry",
+        ]
+        if any(p in cleaned.lower() for p in refusal_patterns):
+            return ""
         if cleaned.startswith("{") and cleaned.endswith("}"):
             return ""
         return cleaned[:280]

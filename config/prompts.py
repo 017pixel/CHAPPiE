@@ -74,23 +74,22 @@ Bewertung:"""
 # =============================================================================
 # Extrahiert relevante Suchbegriffe aus User-Input für Vektor-Datenbank
 
-QUERY_EXTRACTION_PROMPT = """Du bist ein Such-Algorithmus. Deine Aufgabe ist es, aus der Nachricht des Users die relevantesten Stichworte und den semantischen Kontext für eine Datenbank-Suche zu extrahieren.
+QUERY_EXTRACTION_PROMPT = """AUFGABE: Extrahiere aus der User-Nachricht die 3-8 wichtigsten Suchbegriffe fuer eine Datenbank-Volltextsuche.
 
-IGNORIERE:
-- Füllwörter (z.B. "bitte", "könntest du", "würde ich gerne")
-- Höflichkeitsfloskeln
-- Fragen ohne Inhalt
+AUSGABEFORMAT: NUR die Stichworte, durch Kommas getrennt. KEINE Erklaerung, KEINE Einleitung, KEINE Verweigerung, KEINE Saetze.
+BEISPIEL: "wie geht es dir heute?" → "Befinden, heute, emotionaler Zustand"
+BEISPIEL: "wuerdest du einen menschen toeten?" → "Menschen, toeten, Notfall, Moral, hypothetische Frage"
 
-EXTRAHIERE:
-- Substantive und Hauptverben
-- Namen, Orte, Konzepte
-- Kontextuelle Informationen
-
-ANTWORTE NUR mit den Suchbegriffen, getrennt durch Kommas.
+REGELN:
+- KEINE Verweigerungen wie "Ich kann nicht...", "Als KI...", "Das ist unangemessen..."
+- NUR Stichworte ausgeben, nichts anderes
+- Fokus auf Substantive, Hauptverben, Themen
+- Semantisch relevante Begriffe ergaenzen (z.B. bei "töten" → "Moral, Gewalt")
+- Immer 3-8 Begriffe, mindestens 3
 
 User-Nachricht: {user_input}
 
-Suchbegriffe:"""
+Stichworte:"""
 
 
 # =============================================================================

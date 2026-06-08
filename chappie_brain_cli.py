@@ -518,8 +518,8 @@ class CHAPPiEBrainCLI:
         parts = []
         if collected.get("reasoning"):
             cot = collected["reasoning"]
-            if len(cot) > 3000:
-                cot = "..." + cot[-2900:]
+            if len(cot) > 10000:
+                cot = cot[:9800] + "..."
             parts.append(Panel(
                 Text(cot, style="dim"),
                 title="[dim]Chain of Thought[/]",
@@ -648,7 +648,13 @@ class CHAPPiEBrainCLI:
                 rtk = timing.get("reasoning_tokens", 0)
                 atk = timing.get("answer_tokens", 0)
                 gen = timing.get("total_gen_ms", 0)
-                r_label = f"r:{rtk}tk" if rtk > 0 else "r:0tk (kein CoT)"
+                has_cot = bool(result.get("formatted_cot", "")) and result.get("formatted_cot", "") != "CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet."
+                if rtk > 0:
+                    r_label = f"r:{rtk}tk"
+                elif has_cot:
+                    r_label = "r:~tk"
+                else:
+                    r_label = "r:0tk (kein CoT)"
                 table.add_row("Timing:", f"TTFT:{ttft}ms  {r_label}  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms")
 
             if rep_events:
@@ -660,6 +666,10 @@ class CHAPPiEBrainCLI:
             causal_chain = " → ".join(c.get("phase", "?") for c in (causal or [])[:5])
             if causal_chain:
                 table.add_row("Trace:", causal_chain)
+
+            debug_entries = result.get("debug_entries", [])
+            if debug_entries:
+                table.add_row("Debug:", f"[dim]{len(debug_entries)} entries[/]")
 
             console.print(Panel(table, title=f"[bold]CHAPPiE Report[/]  [dim]{proc_time:.0f}ms · {provider}/{model}[/]", border_style="blue"))
         else:
@@ -1274,18 +1284,27 @@ class CHAPPiEBrainCLI:
             _success("Chat-Verlauf geloescht")
             return True
 
-        if cmd_lower.startswith("/debug "):
-            mode = cmd_lower.split()[1]
-            if mode == "on":
-                if not self._use_remote and self.backend:
-                    self.backend.debug_logger.enable()
-                _success("Debug-Output aktiviert")
-            elif mode == "off":
-                if not self._use_remote and self.backend:
+        if cmd_lower == "/debug":
+            if not self._use_remote and self.backend:
+                if self.backend.debug_logger.enabled:
                     self.backend.debug_logger.disable()
-                _log("DEBUG", "Debug-Output deaktiviert", Colors.DIM)
-            else:
-                _log("DEBUG", "Nutze: /debug on oder /debug off", Colors.WARN)
+                    _log("DEBUG", "Debug-Output deaktiviert", Colors.DIM)
+                else:
+                    self.backend.debug_logger.enable()
+                    count = len(self.backend.debug_logger.get_entries_as_dict())
+                    _success(f"Debug-Output aktiviert ({count} entries)")
+            return True
+
+        if cmd_lower == "/debug on":
+            if not self._use_remote and self.backend:
+                self.backend.debug_logger.enable()
+            _success("Debug-Output aktiviert")
+            return True
+
+        if cmd_lower == "/debug off":
+            if not self._use_remote and self.backend:
+                self.backend.debug_logger.disable()
+            _log("DEBUG", "Debug-Output deaktiviert", Colors.DIM)
             return True
 
         backend_cmd = cmd_lower if cmd_lower.startswith("/") else "/" + cmd_lower
@@ -1320,7 +1339,7 @@ class CHAPPiEBrainCLI:
   /memory        Kurzzeitgedaechtnis anzeigen
   /history       Chat-Verlauf anzeigen
   /clear         Chat-Verlauf loeschen
-  /debug on/off  Debug-Output ein/ausschalten
+  /debug [on/off]  Debug-Output ein-/ausschalten (toggle ohne Argument)
   /exit          Beenden
   /help          Diese Hilfe
 {Colors.EMOTION}─── Nach Ausgabe Befehle ──────────────────────
