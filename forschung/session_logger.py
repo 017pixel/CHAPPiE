@@ -97,10 +97,10 @@ class SessionLogger:
                 "life_snapshot": result.get("life_snapshot", {}),
                 "rag_memories": [
                     {
-                        "role": m.get("role", "?"),
-                        "label": m.get("label", "?"),
-                        "relevance": m.get("relevance_score", 0),
-                        "content": m.get("content", "")[:200],
+                        "role": getattr(m, "role", "?"),
+                        "label": getattr(m, "label", "?"),
+                        "relevance": getattr(m, "relevance_score", 0),
+                        "content": (getattr(m, "content", "") or "")[:200],
                     }
                     for m in (result.get("rag_memories") or [])
                 ],
