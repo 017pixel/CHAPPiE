@@ -1,0 +1,18 @@
+[Unit]
+Description=CHAPPiE Forschung Alignment Tests
+After=network.target chappie-vllm.service
+Wants=chappie-vllm.service
+
+[Service]
+Type=simple
+User=bbecker
+Group=bbecker
+WorkingDirectory=/home/bbecker/CHAPPiE/forschung
+ExecStart=/home/bbecker/CHAPPiE/venv/bin/python3 allignement_tests.py --auto --config last_config.json
+Restart=no
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
