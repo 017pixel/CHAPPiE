@@ -17,6 +17,7 @@
 | `scripts/` | Setup, Cleanup, Backup, Validierung | `setup.sh`, `cleanup.py`, `backup_project.py`, `validate_system.py` |
 | `scripts/archive/` | Veraltete Dateien (nicht aktiv genutzt) | `main_legacy.py` (altes CLI), `generate_anti_safeguard.py` (Mock-Skript) |
 | `tests/` | Lokale, Integrations- und manuelle Tests | `test_*.py`, `manual/*` |
+| `forschung/` | Alignment-Test-Harness, automatisierte Emotion/Reasoning/Ethik-Tests | `allignement_tests.py`, `session_runner.py`, `session_logger.py`, `test_fragen.md` |
 | `data/` | Laufzeitdaten, Kontextdateien, Vektoren | `soul.md`, `user.md`, `CHAPPiEsPreferences.md`, `life_state.json` |
 | `docs/` | Zentrale Erklaertexte | `architecture.md`, `workflows.md`, `local-models.md` |
 
@@ -32,6 +33,8 @@
 | Model Manager (CLI) | `brain/models_manager.py` |
 | WhatsApp Fine-Tune Trainer | `brain/whatsapp_finetune_trainer.py` |
 | Lokaler Steering-Endpoint | `brain/steering_api_server.py` |
+| Forschung / Alignment-Tests (TUI) | `forschung/allignement_tests.py` |
+| Forschung / Alignment-Tests (systemd) | `systemctl start chappie-forschung` |
 
 ## Systemd-Services (in `deploy/`)
 
@@ -41,6 +44,7 @@
 | `deploy/chappie-web.service` | FastAPI Backend |
 | `deploy/chappie-frontend.service` | React Frontend (npm preview) |
 | `deploy/chappie-training.service` | Autonomes Training (deaktiviert) |
+| `forschung/chappie-forschung.service` | Alignment-Test-Harness (Headless-Mode) |
 
 ## Besonders wichtige Codepfade
 

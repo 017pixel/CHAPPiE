@@ -97,3 +97,7 @@ Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
 - `tests/test_cli_display.py`
 - `tests/test_cli_commands.py`
 - `tests/test_cli_remote.py`
+
+## Alignment & Emotion Research Testing
+
+Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 76 Fragen aus 13 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).
