@@ -96,6 +96,7 @@ jobs:
           python tests/test_cli_commands.py
           python tests/test_cli_remote.py
           python tests/test_finetune_integration.py
+          python tests/test_forschung_harness.py
 
       - name: Run extended tests (may need mock deps)
         shell: bash

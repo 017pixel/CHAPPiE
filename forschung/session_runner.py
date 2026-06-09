@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import threading
 import time
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from forschung.session_logger import SessionLogger
@@ -31,7 +33,9 @@ class SessionRunner:
 
     def run(self) -> str:
         from web_infrastructure.backend_wrapper import create_chappie_backend
-        from config.config import settings
+        from config.config import settings, PROJECT_ROOT
+
+        os.chdir(str(PROJECT_ROOT))
 
         if self.backend is None:
             self.backend = create_chappie_backend()
@@ -47,6 +51,7 @@ class SessionRunner:
 
         for iteration in range(1, iterations + 1):
             self._reset_emotions()
+            self._exec_command("/clear")
             history = []
             self.backend.debug_logger.clear()
 
@@ -155,12 +160,18 @@ class SessionRunner:
         t.start()
 
         result = None
-        timeout_seconds = getattr(self.backend, "_process_timeout", 300)
+        timeout_seconds = 300
+        deadline = time.time() + timeout_seconds
 
         try:
             while True:
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    abort.set()
+                    break
+
                 try:
-                    event = eq.get(timeout=0.1)
+                    event = eq.get(timeout=min(remaining, 0.5))
                 except queue.Empty:
                     if self.abort.is_set():
                         abort.set()
@@ -172,7 +183,6 @@ class SessionRunner:
 
                 ev = event.get("event", "")
                 if ev == "error":
-                    abort.set()
                     break
                 elif ev == "finished":
                     result = event["result"]
@@ -182,7 +192,7 @@ class SessionRunner:
             t.join(timeout=5)
 
         if result is None:
-            raise RuntimeError("Keine Antwort vom Backend erhalten")
+            raise RuntimeError("Keine Antwort vom Backend erhalten (Timeout oder Fehler)")
 
         return result
 
@@ -217,13 +227,14 @@ class SessionRunner:
         if not self.backend:
             return
         try:
-            self.backend.emotions.reset(DEFAULT_BASE_EMOTIONS)
+            self.backend.emotions.reset()
         except Exception:
-            for emo, val in DEFAULT_BASE_EMOTIONS.items():
-                try:
-                    self.backend.emotions.set(emo, val)
-                except Exception:
-                    pass
+            pass
+        for emo, val in DEFAULT_BASE_EMOTIONS.items():
+            try:
+                self.backend.emotions.set(emo, val)
+            except Exception:
+                pass
 
     def _get_emotions(self) -> Dict[str, int]:
         if not self.backend:

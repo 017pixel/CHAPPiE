@@ -50,15 +50,33 @@ class Settings:
         self._load_from_files()
 
     def _get_val(self, name, default=None):
+        val = default
         if name in self._root_values:
-            return self._root_values[name]
-        if addSecrets and hasattr(addSecrets, name):
+            val = self._root_values[name]
+        elif addSecrets and hasattr(addSecrets, name):
             val = getattr(addSecrets, name)
-            if val:
-                return val
-        if hasattr(secrets, name):
-            return getattr(secrets, name)
-        return default
+            if not val:
+                val = default
+        elif hasattr(secrets, name):
+            val = getattr(secrets, name)
+        else:
+            val = default
+        return val
+
+    _PATH_KEYS = {
+        "DAILY_INFO_PATH", "PERSONALITY_PATH", "SOUL_PATH",
+        "USER_PATH", "PREFERENCES_PATH", "FINETUNE_MODELS_DIR",
+        "FINETUNE_CHATS_DIR", "CHROMA_PERSIST_DIRECTORY",
+    }
+
+    def _get_path(self, name, default=None):
+        raw = self._get_val(name, default)
+        if raw is None:
+            return str(default) if default else ""
+        p = str(raw)
+        if p and not p.startswith("/"):
+            p = str(PROJECT_ROOT / p)
+        return p
 
     def _load_from_files(self):
         provider_str = self._get_val("LLM_PROVIDER", "vllm")
@@ -105,8 +123,8 @@ class Settings:
 
         # Finetune configuration
         self.finetune_enabled = bool(self._get_val("FINETUNE_ENABLED", True))
-        self.finetune_models_dir = Path(self._get_val("FINETUNE_MODELS_DIR", str(DATA_DIR / "finetuned_models")))
-        self.finetune_chats_dir = Path(self._get_val("FINETUNE_CHATS_DIR", str(DATA_DIR / "finetune_chats")))
+        self.finetune_models_dir = Path(self._get_path("FINETUNE_MODELS_DIR", str(DATA_DIR / "finetuned_models")))
+        self.finetune_chats_dir = Path(self._get_path("FINETUNE_CHATS_DIR", str(DATA_DIR / "finetune_chats")))
         self.finetune_active_adapter = self._get_val("FINETUNE_ACTIVE_ADAPTER", None)
         self.finetune_default_lora_r = int(self._get_val("FINETUNE_DEFAULT_LORA_R", 16))
         self.finetune_default_lora_alpha = int(self._get_val("FINETUNE_DEFAULT_LORA_ALPHA", 32))
@@ -124,17 +142,17 @@ class Settings:
         self.memory_consolidation_groq_model = self._get_val("MEMORY_CONSOLIDATION_GROQ_MODEL", "openai/gpt-oss-120b")
         self.memory_consolidation_max_tokens = int(self._get_val("MEMORY_CONSOLIDATION_MAX_TOKENS", 1500))
 
-        self.daily_info_path = self._get_val("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
-        self.personality_path = self._get_val("PERSONALITY_PATH", str(DATA_DIR / "personality.md"))
+        self.daily_info_path = self._get_path("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
+        self.personality_path = self._get_path("PERSONALITY_PATH", str(DATA_DIR / "personality.md"))
         self.short_term_ttl_hours = int(self._get_val("SHORT_TERM_TTL_HOURS", 24))
         self.stm_summary_threshold = int(self._get_val("STM_SUMMARY_THRESHOLD", 5))
         self.stm_summary_batch_size = int(self._get_val("STM_SUMMARY_BATCH_SIZE", 5))
         self.enable_functions = self._get_val("ENABLE_FUNCTIONS", True)
         self.auto_consolidate = self._get_val("AUTO_CONSOLIDATE", True)
 
-        self.soul_path = self._get_val("SOUL_PATH", str(DATA_DIR / "soul.md"))
-        self.user_path = self._get_val("USER_PATH", str(DATA_DIR / "user.md"))
-        self.preferences_path = self._get_val("PREFERENCES_PATH", str(DATA_DIR / "CHAPPiEsPreferences.md"))
+        self.soul_path = self._get_path("SOUL_PATH", str(DATA_DIR / "soul.md"))
+        self.user_path = self._get_path("USER_PATH", str(DATA_DIR / "user.md"))
+        self.preferences_path = self._get_path("PREFERENCES_PATH", str(DATA_DIR / "CHAPPiEsPreferences.md"))
 
         # Neu: Steering-Konfiguration
         self.enable_steering = self._get_val("ENABLE_STEERING", True)
