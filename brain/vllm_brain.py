@@ -145,12 +145,10 @@ class VLLMBrain(BaseBrain):
                     print(f"vLLM Connection Error (Versuch {attempt + 1}/{self.MAX_RETRIES}), warte {wait}s...")
                     time.sleep(wait)
                     continue
-                yield f"\nvLLM Fehler: {str(conn_err)}"
-                return
+                raise RuntimeError(f"vLLM Verbindungsfehler nach {self.MAX_RETRIES} Versuchen: {conn_err}")
 
         if stream is None:
-            yield "\nvLLM Fehler: Konnte keine Verbindung zum Steering-Server herstellen."
-            return
+            raise RuntimeError("vLLM: Konnte keine Verbindung zum Steering-Server herstellen.")
 
         try:
             emitted_text = False
@@ -220,15 +218,15 @@ class VLLMBrain(BaseBrain):
             if not emitted_text:
                 if reasoning_chars > 0:
                     self._repetition_events["no_answer_only_reasoning"] = {"reasoning_chars": reasoning_chars}
-                    yield (
-                        "\nvLLM Fehler: Stream lieferte nur reasoning_content ohne finale Antwort. "
+                    raise RuntimeError(
+                        "vLLM: Stream lieferte nur reasoning_content ohne finale Antwort. "
                         "Setze chat_template_kwargs.enable_thinking=false oder erhoehe MAX_TOKENS."
                     )
                 else:
-                    yield "\nvLLM Fehler: Stream lieferte keinen Text."
+                    raise RuntimeError("vLLM: Stream lieferte keinen Text.")
 
         except Exception as e:
-            yield f"\nvLLM Fehler: {str(e)}"
+            raise RuntimeError(f"vLLM Laufzeitfehler: {e}")
 
     def _sync_generate(
         self,

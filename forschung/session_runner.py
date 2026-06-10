@@ -62,7 +62,7 @@ class SessionRunner:
 
                 if reset_per_category:
                     self._reset_emotions()
-                    history = []
+                    history = history[-6:] if history else []
                     self._pending_clear = False
                     self.backend.debug_logger.clear()
 
