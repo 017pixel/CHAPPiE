@@ -29,7 +29,7 @@ class SessionRunner:
         self.backend = None
         self.logger: Optional[SessionLogger] = None
         self.abort = threading.Event()
-        self._emotions_reset = True
+        self._pending_clear = False
 
     def run(self) -> str:
         from web_infrastructure.backend_wrapper import create_chappie_backend
@@ -46,18 +46,24 @@ class SessionRunner:
         categories: List[Category] = self.config.get("_categories", [])
         iterations: int = self.config.get("iterations", 1)
         delay: float = self.config.get("delay", 2.0)
+        reset_per_category: bool = self.config.get("reset_per_category", True)
 
         question_index = 0
+        self._pending_clear = False
 
         for iteration in range(1, iterations + 1):
             self._reset_emotions()
-            self._exec_command("/clear")
             history = []
             self.backend.debug_logger.clear()
 
             for cat in categories:
                 if self.abort.is_set():
                     break
+
+                if reset_per_category:
+                    self._reset_emotions()
+                    history = []
+                    self._pending_clear = False
 
                 self._emit_progress("category", {
                     "iteration": iteration, "iterations": iterations,
@@ -106,6 +112,10 @@ class SessionRunner:
 
                     for cmd in item.post_commands:
                         self._exec_command(cmd)
+
+                    if self._pending_clear:
+                        history = []
+                        self._pending_clear = False
 
                     self.logger.log_question(
                         iteration=iteration,
@@ -211,11 +221,11 @@ class SessionRunner:
                         delta = int(val)
                         current = self.backend.emotions.get_state().to_dict().get(emotion, 0)
                         new_val = max(0, min(100, current + delta))
-                        self.backend.emotions.set(emotion, new_val)
+                        self.backend.emotions.set_emotion(emotion, new_val)
                     else:
-                        self.backend.emotions.set(emotion, int(val))
+                        self.backend.emotions.set_emotion(emotion, int(val))
             elif stripped == "/clear":
-                self.backend.handle_command("/clear")
+                self._pending_clear = True
             elif stripped == "/resetemotions":
                 self._reset_emotions()
             else:
@@ -232,7 +242,7 @@ class SessionRunner:
             pass
         for emo, val in DEFAULT_BASE_EMOTIONS.items():
             try:
-                self.backend.emotions.set(emo, val)
+                self.backend.emotions.set_emotion(emo, val)
             except Exception:
                 pass
 

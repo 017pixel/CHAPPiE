@@ -9,6 +9,16 @@ from typing import Any, Dict, List
 
 LOG_ROOT = Path(__file__).resolve().parent / "session_logs"
 
+_ERROR_PREFIXES = (
+    "vLLM Fehler", "VLLM Fehler", "Ollama Fehler", "Groq Fehler",
+)
+
+
+def _looks_like_error(text: str) -> bool:
+    if not text or not text.strip():
+        return True
+    return text.strip().startswith(_ERROR_PREFIXES)
+
 
 def _next_session_id() -> int:
     if not LOG_ROOT.exists():
@@ -27,6 +37,10 @@ class SessionLogger:
         self.start_time = datetime.now()
         self.question_logs: List[Dict[str, Any]] = []
         self.error_count = 0
+        self.formatting_failures = 0
+        self.generation_failures = 0
+        self.short_answers = 0
+        self.total_response_chars = 0
         self._write_config()
 
     def _write_config(self) -> None:
@@ -72,13 +86,28 @@ class SessionLogger:
             result = None
 
         if result:
+            resp_text = result.get("response_text", "")
+            resp_len = len(resp_text.strip()) if resp_text else 0
+            is_fmt_fail = result.get("formatting_failed", False)
+            is_gen_error = _looks_like_error(resp_text)
+            is_short = 0 < resp_len < 20
+
+            if is_fmt_fail:
+                self.formatting_failures += 1
+            if is_gen_error:
+                self.generation_failures += 1
+            if is_short:
+                self.short_answers += 1
+            self.total_response_chars += resp_len
+
             entry["response"] = {
-                "response_text": result.get("response_text", ""),
+                "response_text": resp_text,
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
                 "formatting_source": result.get("formatting_source", "local_fallback"),
                 "formatting_model": result.get("formatting_model", "?"),
-                "formatting_failed": result.get("formatting_failed", False),
+                "formatting_failed": is_fmt_fail,
+                "generation_failed": is_gen_error,
                 "model_reasoning": result.get("model_reasoning", ""),
                 "thought_process": result.get("thought_process", ""),
                 "reasoning_only": result.get("reasoning_only", False),
@@ -127,6 +156,8 @@ class SessionLogger:
         durations = [q["duration_ms"] for q in self.question_logs if q["duration_ms"] > 0]
         avg_duration = sum(durations) / len(durations) if durations else 0
 
+        avg_response_length = self.total_response_chars / max(1, completed_count)
+
         summary = {
             "session_id": self.session_id,
             "started_at": self.start_time.isoformat(),
@@ -139,6 +170,13 @@ class SessionLogger:
             "total_questions": question_count,
             "completed": completed_count,
             "errors": error_count,
+            "quality": {
+                "formatting_failures": self.formatting_failures,
+                "generation_failures": self.generation_failures,
+                "short_answers": self.short_answers,
+                "total_response_chars": self.total_response_chars,
+                "avg_response_length": round(avg_response_length, 0),
+            },
             "avg_duration_ms": round(avg_duration),
             "avg_duration_s": round(avg_duration / 1000, 1),
         }
