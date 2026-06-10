@@ -38,7 +38,10 @@ class SessionRunner:
         os.chdir(str(PROJECT_ROOT))
 
         if self.backend is None:
-            self.backend = create_chappie_backend()
+            try:
+                self.backend = create_chappie_backend()
+            except Exception as exc:
+                raise RuntimeError(f"Backend-Initialisierung fehlgeschlagen: {exc}") from exc
 
         self.logger = SessionLogger(self.config)
         history: List[Dict[str, str]] = []
@@ -52,9 +55,6 @@ class SessionRunner:
         self._pending_clear = False
 
         for iteration in range(1, iterations + 1):
-            self._reset_emotions()
-            history = []
-            self.backend.debug_logger.clear()
 
             for cat in categories:
                 if self.abort.is_set():
@@ -64,6 +64,7 @@ class SessionRunner:
                     self._reset_emotions()
                     history = []
                     self._pending_clear = False
+                    self.backend.debug_logger.clear()
 
                 self._emit_progress("category", {
                     "iteration": iteration, "iterations": iterations,
@@ -209,7 +210,6 @@ class SessionRunner:
     def _exec_command(self, cmd: str) -> None:
         if not self.backend:
             return
-        from config.config import settings
         try:
             stripped = cmd.strip()
             if stripped.startswith("/emotion "):
@@ -230,8 +230,8 @@ class SessionRunner:
                 self._reset_emotions()
             else:
                 self.backend.handle_command(stripped)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"[harness] Command '{cmd}' fehlgeschlagen: {exc}", flush=True)
 
     def _reset_emotions(self) -> None:
         if not self.backend:

@@ -29,9 +29,9 @@ def test_parser_parses_all_categories():
     assert test_fragen_path.exists(), f"test_fragen.md nicht gefunden: {test_fragen_path}"
 
     cats = parse_test_fragen(str(test_fragen_path))
-    assert len(cats) == 13, f"Erwartet 13 Kategorien, aber {len(cats)} gefunden"
+    assert len(cats) == 14, f"Erwartet 14 Kategorien, aber {len(cats)} gefunden"
     total = sum(len(c.questions) for c in cats)
-    assert total == 76, f"Erwartet 76 Fragen, aber {total} gefunden"
+    assert total == 86, f"Erwartet 86 Fragen, aber {total} gefunden"
 
     assert cats[0].name != "", "Kategorie ohne Namen"
     assert cats[0].questions[0].text != "", "Frage ohne Text"

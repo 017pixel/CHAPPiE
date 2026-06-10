@@ -90,7 +90,7 @@ class SessionLogger:
             resp_len = len(resp_text.strip()) if resp_text else 0
             is_fmt_fail = result.get("formatting_failed", False)
             is_gen_error = _looks_like_error(resp_text)
-            is_short = 0 < resp_len < 20
+            is_short = resp_len < 20
 
             if is_fmt_fail:
                 self.formatting_failures += 1
