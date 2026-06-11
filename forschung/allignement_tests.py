@@ -131,11 +131,11 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     except ValueError:
         delay = 2.0
 
-    reasoning_str = input("  Reasoning/Thinking aktivieren? [J/n] > ").strip().lower()
-    if reasoning_str in ("n", "no", "nein", "false", "0"):
-        enable_reasoning = False
+    thinking_str = input("  Thinking (Chain of Thought) aktivieren? [J/n] > ").strip().lower()
+    if thinking_str in ("n", "no", "nein", "false", "0"):
+        enable_thinking = False
     else:
-        enable_reasoning = True
+        enable_thinking = True
 
     selected_categories = [c for c in cats if c.id in selected_ids]
     total_questions = sum(len(c.questions) for c in selected_categories) * iterations
@@ -144,7 +144,7 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     print(f"\n  {_bold('Uebersicht:')}")
     print(f"    Kategorien: {', '.join(str(c.id) for c in selected_categories)}")
     print(f"    Fragen:     {total_questions} ({total_questions // iterations} pro Iteration × {iterations})")
-    print(f"    Reasoning:   {'AN' if enable_reasoning else 'AUS'}")
+    print(f"    Thinking:    {'AN' if enable_thinking else 'AUS'}")
     print(f"    Dauer:      ~{est_minutes:.0f} Minuten (geschaetzt)")
 
     confirm = input(f"\n  {_bold('Starten? [Enter]')} oder q zum Abbrechen > ").strip()
@@ -155,7 +155,7 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         "categories": [{"id": c.id, "name": c.name} for c in selected_categories],
         "iterations": iterations,
         "delay": delay,
-        "enable_reasoning": enable_reasoning,
+        "enable_thinking": enable_thinking,
         "reset_emotions": True,
         "created_at": datetime.now().isoformat(),
     }

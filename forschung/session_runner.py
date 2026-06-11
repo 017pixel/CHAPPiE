@@ -37,9 +37,9 @@ class SessionRunner:
 
         os.chdir(str(PROJECT_ROOT))
 
-        enable_reasoning = self.config.get("enable_reasoning")
-        if enable_reasoning is not None:
-            settings.update_from_ui(chain_of_thought=bool(enable_reasoning))
+        enable_thinking = self.config.get("enable_thinking")
+        if enable_thinking is not None:
+            settings.update_from_ui(chain_of_thought=bool(enable_thinking))
 
         if self.backend is None:
             try:
