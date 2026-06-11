@@ -66,7 +66,8 @@ class OllamaBrain(BaseBrain):
         if think_override is not None:
             kwargs["think"] = think_override
         elif self._supports_thinking_toggle():
-            kwargs["think"] = False
+            from config.config import settings
+            kwargs["think"] = settings.chain_of_thought
         return kwargs
 
     def _chat(

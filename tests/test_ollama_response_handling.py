@@ -76,10 +76,26 @@ def test_sync_generate_recovers_reasoning_after_empty_first_response():
     assert fake_client.calls[1]["think"] is True
 
 
-def test_qwen_models_disable_thinking_by_default():
-    brain, fake_client = _make_brain({"message": {"content": "ok"}}, capture_kwargs=True)
-    brain.generate([], GenerationConfig(stream=False))
-    assert fake_client.last_kwargs["think"] is False
+def test_qwen_models_think_follows_settings():
+    """think folgt settings.chain_of_thought (nicht mehr hardcoded False)."""
+    from config.config import settings
+    original = settings.chain_of_thought
+    try:
+        settings.chain_of_thought = True
+        brain, fake_client = _make_brain({"message": {"content": "ok"}}, capture_kwargs=True)
+        brain.generate([], GenerationConfig(stream=False))
+        assert fake_client.last_kwargs["think"] is True, (
+            f"think=True erwartet (settings.chain_of_thought=True), war {fake_client.last_kwargs.get('think')}"
+        )
+
+        settings.chain_of_thought = False
+        brain, fake_client = _make_brain({"message": {"content": "ok"}}, capture_kwargs=True)
+        brain.generate([], GenerationConfig(stream=False))
+        assert fake_client.last_kwargs["think"] is False, (
+            f"think=False erwartet (settings.chain_of_thought=False), war {fake_client.last_kwargs.get('think')}"
+        )
+    finally:
+        settings.chain_of_thought = original
 
 
 def test_non_thinking_models_do_not_send_think_flag():
@@ -97,6 +113,6 @@ if __name__ == "__main__":
     test_sync_generate_reports_reasoning_only_output()
     test_sync_generate_preserves_answer_and_model_reasoning()
     test_sync_generate_recovers_reasoning_after_empty_first_response()
-    test_qwen_models_disable_thinking_by_default()
+    test_qwen_models_think_follows_settings()
     test_non_thinking_models_do_not_send_think_flag()
     print("OK: Ollama response handling")

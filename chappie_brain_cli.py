@@ -1,7 +1,8 @@
-"""CHAPPiE Terminal Interface v6.0
+"""CHAPPiE Terminal Interface v6.1
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
+Inkl. /thinking Command zum Aktivieren/Deaktivieren des Reasonings.
 
 Modes:
   Local  - Direct backend (create_chappie_backend), process_stream() with Live display
@@ -218,6 +219,8 @@ class CHAPPiEBrainCLI:
                 _log("INIT", f"Steering: {mode}", Colors.STEER)
             else:
                 _log("INIT", "Steering: DEAKTIVIERT", Colors.DIM)
+            thinking_status = "AN" if _s.chain_of_thought else "AUS"
+            _log("INIT", f"Thinking/CoT: {thinking_status}", Colors.THOUGHT)
 
     @staticmethod
     def _settings():
@@ -1115,9 +1118,40 @@ class CHAPPiEBrainCLI:
             print(f"  Provider:      {s.llm_provider.value}")
             print(f"  Modell:        {s.vllm_model}")
             print(f"  Two-Step:      {'AN' if s.enable_two_step_processing else 'AUS'}")
+            print(f"  Thinking/CoT:  {'AN' if s.chain_of_thought else 'AUS'}")
             print(f"  Steering:      {'AN' if s.enable_steering else 'AUS'} ({mode})")
             print(f"  Intent-Modell: {s.get_intent_model(s.intent_provider)}")
             print(f"{'═' * 50}{Colors.RESET}\n")
+            return True
+
+        if cmd_lower == "/thinking":
+            s = self._settings()
+            status_str = "AN" if s.chain_of_thought else "AUS"
+            provider_label = s.llm_provider.value.upper() if not self._use_remote else "REMOTE"
+            print(f"\n{Colors.AI}Thinking/Reasoning: {Colors.BOLD}{status_str}{Colors.RESET}")
+            print(f"  Provider: {provider_label}")
+            print(f"  vLLM: {'enable_thinking' if s.chain_of_thought else 'kein Reasoning'}")
+            print(f"  Ollama: {'think aktiv' if s.chain_of_thought else 'think deaktiviert'}")
+            print(f"  Groq: {'CoT-Prompt aktiv' if s.chain_of_thought else 'kein CoT-Prompt'}")
+            print(f"\n{Colors.DIM}Syntax: /thinking true | /thinking false{Colors.RESET}\n")
+            return True
+
+        if cmd_lower.startswith("/thinking "):
+            _, val = cmd.split(maxsplit=1)
+            val = val.lower().strip()
+            if val in ("true", "on", "an", "1", "ja", "yes"):
+                new_val = True
+            elif val in ("false", "off", "aus", "0", "nein", "no"):
+                new_val = False
+            else:
+                _error(f"Ungueltiger Wert: {val}. Nutze: /thinking true | /thinking false")
+                return True
+            s = self._settings()
+            s.update_from_ui(chain_of_thought=new_val)
+            if not self._use_remote and self.backend:
+                self.backend.apply_runtime_settings(force=True)
+            status_str = "AN" if new_val else "AUS"
+            _success(f"Thinking/Reasoning: {status_str}")
             return True
 
         if cmd_lower == "/steering":
@@ -1331,6 +1365,7 @@ class CHAPPiEBrainCLI:
 {Colors.DEBUG}───────────────────────────────────────────────
   /status        Emotionaler Status + Life-Simulation
   /runtime       Modell, Provider, Steering-Konfiguration
+  /thinking [true|false]  Chain-of-Thought/Reasoning ein-/ausschalten
   /steering      Detaillierter Steering-Report
   /emotion <n> [+/-]<0-100>  Emotion setzen/erhoehen/senken
   /emotion                    Alle Emotions-Werte anzeigen

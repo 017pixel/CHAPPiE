@@ -170,7 +170,7 @@ class Settings:
         self.temperature = float(self._get_val("TEMPERATURE", 0.85))
         self.repetition_penalty = float(self._get_val("REPETITION_PENALTY", 1.15))
         self.stream = bool(self._get_val("STREAM", True))
-        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", False))
+        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))
         self.debug = bool(self._get_val("DEBUG", True))
         self.history_max_messages = int(self._get_val("HISTORY_MAX_MESSAGES", 20))
         self.context_token_limit = int(self._get_val("CONTEXT_TOKEN_LIMIT", 7000))

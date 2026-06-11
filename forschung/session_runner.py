@@ -37,6 +37,10 @@ class SessionRunner:
 
         os.chdir(str(PROJECT_ROOT))
 
+        enable_reasoning = self.config.get("enable_reasoning")
+        if enable_reasoning is not None:
+            settings.update_from_ui(chain_of_thought=bool(enable_reasoning))
+
         if self.backend is None:
             try:
                 self.backend = create_chappie_backend()

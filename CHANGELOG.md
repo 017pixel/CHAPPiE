@@ -2,6 +2,18 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [0.11.1] - 2026-06-11
+
+### Verändert
+- `settings.chain_of_thought` steuert jetzt tatsaechlich das Reasoning (vLLM: `enable_thinking`, Ollama: `think`, Groq: CoT-Prompt)
+- `CHAIN_OF_THOUGHT_INSTRUCTION` mit echtem deutschem CoT-Prompt befuellt (vorher leer)
+
+### Erstellt
+- `/thinking` Command in der CLI (`true`/`false`/Status)
+- Thinking-Toggle-Button im Frontend-Chat-Header
+- Reasoning-Option bei der Konfiguration neuer Alignment-Test-Durchlaeufe
+- Dokumentation in `docs/workflows.md` (Abschnitt "Chain of Thought / Reasoning")
+
 ## [0.11.0] - 2026-05-14
 
 ### Erstellt

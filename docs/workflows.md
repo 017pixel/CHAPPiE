@@ -67,6 +67,33 @@ sequenceDiagram
 7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline.
 8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
 
+### Chain of Thought / Reasoning
+
+CHAPPiE unterstuetzt Reasoning/Chain-of-Thought auf zwei Ebenen, gesteuert durch
+`settings.chain_of_thought` (Standard: `true`):
+
+**vLLM (Qwen3.5, lokal)**: `enable_thinking` im Chat-Template steuert, ob das Modell `reasoning_content` produziert. Das Reasoning wird als `<think>...</think>` in der Stream-Ausgabe mitgeliefert.
+
+**Ollama (lokal)**: `think`-Parameter steuert natives Reasoning bei Qwen3/DeepSeek-Modellen.
+
+**Groq (Cloud)**: Kein API-level Reasoning. Stattdessen wird `CHAIN_OF_THOUGHT_INSTRUCTION` (aus `config/prompts.py`) an den System-Prompt angehaengt, sodass das Modell via `<gedanke>/<antwort>`-Tags strukturiert antwortet.
+
+Der Toggle ist an drei Stellen verfuegbar:
+
+| Ort | Steuerung |
+|-----|-----------|
+| **CLI** | `/thinking true` / `/thinking false` / `/thinking` (Status) |
+| **Frontend** | "Thinking"-Toggle-Button im Chat-Header (speichert ueber `POST /settings`) |
+| **Alignment-Tests** | "Reasoning/Thinking aktivieren? [J/n]" bei der Konfiguration eines neuen Test-Durchlaufs |
+
+Relevante Dateien:
+- `config/config.py` → `settings.chain_of_thought`
+- `config/prompts.py` → `CHAIN_OF_THOUGHT_INSTRUCTION`
+- `brain/vllm_brain.py` → `_prepare_extra_body()` (enable_thinking)
+- `brain/ollama_brain.py` → `_build_chat_kwargs()` (think)
+- `chappie_brain_cli.py` → `/thinking` Command
+- `frontend/src/pages/chat-page.tsx` → Thinking-Toggle
+
 ## 3. Schlafphase und Konsolidierung
 
 ```mermaid

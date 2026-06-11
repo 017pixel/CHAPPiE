@@ -33,6 +33,8 @@ type UiState = {
   setElapsedMs: (value: number) => void;
   loadedOnce: boolean;
   setLoadedOnce: (value: boolean) => void;
+  thinkingEnabled: boolean;
+  setThinkingEnabled: (value: boolean) => void;
   resetStreamingState: () => void;
 };
 
@@ -61,6 +63,8 @@ export const useUiStore = create<UiState>((set) => ({
   setElapsedMs: (value) => set({ elapsedMs: value }),
   loadedOnce: false,
   setLoadedOnce: (value) => set({ loadedOnce: value }),
+  thinkingEnabled: true,
+  setThinkingEnabled: (value) => set({ thinkingEnabled: value }),
   resetStreamingState: () => set({
     processingState: "idle",
     streamingContent: "",

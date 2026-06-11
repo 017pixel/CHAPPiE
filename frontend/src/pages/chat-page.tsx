@@ -67,6 +67,8 @@ export function ChatPage() {
   const setElapsedMs = useUiStore((state) => state.setElapsedMs);
   const loadedOnce = useUiStore((state) => state.loadedOnce);
   const setLoadedOnce = useUiStore((state) => state.setLoadedOnce);
+  const thinkingEnabled = useUiStore((state) => state.thinkingEnabled);
+  const setThinkingEnabled = useUiStore((state) => state.setThinkingEnabled);
   const resetStreamingState = useUiStore((state) => state.resetStreamingState);
 
   const [message, setMessage] = useState("");
@@ -89,6 +91,14 @@ export function ChatPage() {
     enabled: Boolean(currentSessionId)
   });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus, refetchInterval: 3000 });
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+
+  useEffect(() => {
+    const settings = settingsQuery.data as any;
+    if (settings?.chain_of_thought !== undefined) {
+      setThinkingEnabled(settings.chain_of_thought);
+    }
+  }, [settingsQuery.data, setThinkingEnabled]);
 
   // Sync display messages from server on initial load, but only when idle
   useEffect(() => {
@@ -435,6 +445,12 @@ export function ChatPage() {
   const contextNearLimit = contextBudget.near_limit || contextBudget.was_trimmed;
   const contextTokens = contextBudget.estimated_tokens || contextBudget.trimmed_tokens || 0;
 
+  const handleToggleThinking = () => {
+    const next = !thinkingEnabled;
+    setThinkingEnabled(next);
+    api.saveSettings({ chain_of_thought: next });
+  };
+
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col gap-6">
       {/* Header Info Card */}
@@ -453,6 +469,19 @@ export function ChatPage() {
                   </div>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleToggleThinking}
+            className={`flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all ${
+              thinkingEnabled
+                ? "bg-pine/20 border-pine/40 text-pine"
+                : "bg-white/5 border-white/10 text-slate"
+            }`}
+            title={thinkingEnabled ? "Reasoning deaktivieren" : "Reasoning aktivieren"}
+          >
+            <span className={`material-symbols-outlined text-[12px] ${thinkingEnabled ? "" : "opacity-50"}`}>psychology</span>
+            <span>Thinking</span>
+            <span className={`ml-0.5 text-[14px] font-bold ${thinkingEnabled ? "" : "opacity-0"}`}>●</span>
+          </button>
           {Object.entries(status.emotions ?? {}).map(([key, value]) => (
             <div key={key} className="flex flex-col items-center rounded-none bg-white/5 px-3 py-1.5 min-w-[60px] border border-white/5">
               <span className="text-[10px] text-slate uppercase">{key}</span>

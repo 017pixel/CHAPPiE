@@ -165,17 +165,31 @@ def test_default_repetition_penalty_in_generation_config():
     print("  [OK] GenerationConfig default repetition_penalty=1.1")
 
 
-def test_enable_thinking_is_true_for_qwen35():
-    """Qwen3.5 Modelle bekommen enable_thinking=True."""
-    response = _FakeResponse([_FakeChoice(_FakeMessage(content="ok"))])
-    with patch("brain.vllm_brain.OpenAI", return_value=_FakeOpenAIClient(response)):
-        brain = VLLMBrain(model="Qwen/Qwen3.5-4B", url="http://localhost:8000/v1")
-    body = brain._prepare_extra_body({})
-    ctk = body.get("chat_template_kwargs", {})
-    assert ctk.get("enable_thinking") is True, (
-        f"enable_thinking=True erwartet fuer Qwen3.5, war {ctk.get('enable_thinking')}"
-    )
-    print("  [OK] enable_thinking=True fuer Qwen/Qwen3.5-4B")
+def test_enable_thinking_follows_settings_chain_of_thought():
+    """enable_thinking folgt settings.chain_of_thought (nicht mehr hardcoded)."""
+    from config.config import settings
+    original = settings.chain_of_thought
+    try:
+        settings.chain_of_thought = True
+        response = _FakeResponse([_FakeChoice(_FakeMessage(content="ok"))])
+        with patch("brain.vllm_brain.OpenAI", return_value=_FakeOpenAIClient(response)):
+            brain = VLLMBrain(model="Qwen/Qwen3.5-4B", url="http://localhost:8000/v1")
+        body = brain._prepare_extra_body({})
+        ctk = body.get("chat_template_kwargs", {})
+        assert ctk.get("enable_thinking") is True, (
+            f"enable_thinking=True erwartet (settings.chain_of_thought=True), war {ctk.get('enable_thinking')}"
+        )
+        print("  [OK] enable_thinking=True wenn settings.chain_of_thought=True")
+
+        settings.chain_of_thought = False
+        body = brain._prepare_extra_body({})
+        ctk = body.get("chat_template_kwargs", {})
+        assert ctk.get("enable_thinking") is False, (
+            f"enable_thinking=False erwartet (settings.chain_of_thought=False), war {ctk.get('enable_thinking')}"
+        )
+        print("  [OK] enable_thinking=False wenn settings.chain_of_thought=False")
+    finally:
+        settings.chain_of_thought = original
 
 
 def test_extra_body_preserves_steering_when_adding_penalty():
@@ -229,7 +243,7 @@ def test_loop_detector_needs_minimum_length():
 if __name__ == "__main__":
     tests = [
         test_default_repetition_penalty_in_generation_config,
-        test_enable_thinking_is_true_for_qwen35,
+        test_enable_thinking_follows_settings_chain_of_thought,
         test_sync_generate_passes_repetition_penalty_in_extra_body,
         test_stream_generate_passes_repetition_penalty_in_extra_body,
         test_extra_body_preserves_steering_when_adding_penalty,

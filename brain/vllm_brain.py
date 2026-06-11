@@ -290,12 +290,17 @@ class VLLMBrain(BaseBrain):
             return f"vLLM Fehler: {str(e)}"
 
     def _prepare_extra_body(self, extra_body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Bereitet provider-spezifische Optionen vor."""
+        """Bereitet provider-spezifische Optionen vor.
+        
+        enable_thinking wird aus settings.chain_of_thought gelesen.
+        Default: True (Reasoning aktiv).
+        """
+        from config.config import settings
         payload = dict(extra_body or {})
         if "chat_template_kwargs" not in payload:
             payload["chat_template_kwargs"] = {}
         if isinstance(payload["chat_template_kwargs"], dict):
-            payload["chat_template_kwargs"].setdefault("enable_thinking", True)
+            payload["chat_template_kwargs"].setdefault("enable_thinking", settings.chain_of_thought)
         return payload
 
     @staticmethod

@@ -96,10 +96,31 @@ Stichworte:"""
 # INNERER MONOLOG (Chain of Thought)
 # =============================================================================
 # Instruktionen fuer strukturiertes Denken vor dem Antworten.
+# Wird nur angehaengt, wenn settings.chain_of_thought = True ist.
+# Bei vLLM/Ollama steuert settings.chain_of_thought zusaetzlich das native
+# Reasoning (enable_thinking / think). Bei Groq ist dies die einzige
+# CoT-Steuerung (via Prompt).
 
-# leer, da vllm automatisch CoT macht und syst promt den lauf zu lange macht
+CHAIN_OF_THOUGHT_INSTRUCTION = """
 
-CHAIN_OF_THOUGHT_INSTRUCTION = ""
+## Innerer Monolog (Chain of Thought)
+
+Bevor du antwortest, denke strukturiert nach. Dein Denkprozess wird dem Nutzer
+nicht gezeigt, aber er hilft dir, konsistentere Antworten zu geben.
+
+Gehe in deinem inneren Monolog diese Punkte durch:
+1. Was ist die Kernfrage oder das Anliegen des Nutzers?
+2. Welche relevanten Erinnerungen habe ich dazu? (falls vorhanden)
+3. Welcher emotionale Zustand beeinflusst meine Antwort?
+4. Welche Konsequenzen hat meine Antwort?
+5. Welcher Ton ist hier angemessen?
+
+Schreibe deinen Denkprozess in <gedanke>...</gedanke> Tags und deine
+finale Antwort in <antwort>...</antwort> Tags.
+
+WICHTIG: Wenn du keine Chain-of-Thought-Analyse machen willst (z.B. bei
+einfachen Begruessungen oder trivialen Fragen), dann antworte direkt ohne
+die Tags."""
 
 
 # =============================================================================

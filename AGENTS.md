@@ -108,8 +108,11 @@ Bei Änderungen an der Modelllogik immer diese Pfade gemeinsam prüfen:
 
 - `config/config.py`
 - `config/brain_config.py`
+- `config/prompts.py`
 - `config/secrets_example.py`
 - `brain/agents/*.py`
+- `brain/vllm_brain.py`
+- `brain/ollama_brain.py`
 - `README.md` + `docs/local-models.md`
 
 ## Arbeitsstil für Agents
