@@ -108,7 +108,7 @@ python3 tests/test_reasoning_layering.py
 python3 tests/test_api_contract.py
 python3 tests/test_chat_ui_formatting.py
 python3 tests/test_training_config_ui.py
-python3 tests/test_short_term_memory_v2.py
+python3 tests/test_short_term_memory.py
 ```
 
 Plus Syntax-Prüfung:

@@ -79,7 +79,6 @@ DEFAULT_ROOT_CONFIG: Dict[str, Dict[str, Any]] = {
         "tokens_per_day": 144000000,
     },
     "paths": {
-        "daily_info_path": "data/daily_info.md",
         "personality_path": "data/personality.md",
         "soul_path": "data/soul.md",
         "user_path": "data/user.md",

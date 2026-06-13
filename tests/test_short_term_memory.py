@@ -6,16 +6,16 @@ import unittest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import memory.short_term_memory_v2 as stm_module
+import memory.short_term_memory as stm_module
 
 
-class ShortTermMemoryV2Tests(unittest.TestCase):
+class ShortTermMemoryTests(unittest.TestCase):
     def test_active_entries_sort_by_importance_then_recency(self):
         with TemporaryDirectory() as tmp_dir:
             original_data_dir = stm_module.DATA_DIR
             stm_module.DATA_DIR = Path(tmp_dir)
             try:
-                memory = stm_module.ShortTermMemoryV2(memory_engine=None, ttl_hours=24)
+                memory = stm_module.ShortTermMemory(memory_engine=None, ttl_hours=24)
                 memory.entries = [
                     stm_module.ShortTermEntry(
                         id="normal-new",
@@ -62,7 +62,7 @@ class ShortTermMemoryV2Tests(unittest.TestCase):
             original_data_dir = stm_module.DATA_DIR
             stm_module.DATA_DIR = Path(tmp_dir)
             try:
-                memory = stm_module.ShortTermMemoryV2(memory_engine=None, ttl_hours=24)
+                memory = stm_module.ShortTermMemory(memory_engine=None, ttl_hours=24)
                 memory.entries = [
                     stm_module.ShortTermEntry(
                         id="active",
@@ -102,7 +102,7 @@ class ShortTermMemoryV2Tests(unittest.TestCase):
             original_data_dir = stm_module.DATA_DIR
             stm_module.DATA_DIR = Path(tmp_dir)
             try:
-                memory = stm_module.ShortTermMemoryV2(memory_engine=None, ttl_hours=24)
+                memory = stm_module.ShortTermMemory(memory_engine=None, ttl_hours=24)
                 memory._summarize_batch = lambda batch: "Zusammenfassung aus fuenf Eintraegen"
                 memory.entries = [
                     stm_module.ShortTermEntry(
@@ -140,7 +140,7 @@ class ShortTermMemoryV2Tests(unittest.TestCase):
             stm_module.DATA_DIR = Path(tmp_dir)
             sink = MemorySink()
             try:
-                memory = stm_module.ShortTermMemoryV2(memory_engine=sink, ttl_hours=24)
+                memory = stm_module.ShortTermMemory(memory_engine=sink, ttl_hours=24)
                 memory.entries = [
                     stm_module.ShortTermEntry(
                         id="raw-expired",

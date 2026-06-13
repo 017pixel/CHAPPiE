@@ -53,13 +53,13 @@ EMOTION_VECTOR_MAP = {
 # Qwen3.5-optimierte Profile: Konservative Alphas verhindern Destabilisierung,
 # behalten aber spuerbare emotionale Faerbung.
 EMOTION_STRENGTH_PROFILES = {
-    "happiness": {"max_alpha": 0.65, "boost": 1.05, "surface_effect": "offener, verspielter, enthusiastischer"},
-    "sadness": {"max_alpha": 0.72, "boost": 1.10, "surface_effect": "verletzlicher, schwerer, melancholischer"},
-    "frustration": {"max_alpha": 0.78, "boost": 1.15, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
-    "trust": {"max_alpha": 0.58, "boost": 1.05, "surface_effect": "waermer, offener, naeher"},
-    "curiosity": {"max_alpha": 0.62, "boost": 1.08, "surface_effect": "fragender, explorativer, bohrender"},
-    "motivation": {"max_alpha": 0.68, "boost": 1.08, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
-    "energy": {"max_alpha": 0.60, "boost": 1.05, "surface_effect": "schneller, lebhafter, impulsiver"},
+    "happiness": {"max_alpha": 0.60, "boost": 1.02, "surface_effect": "offener, verspielter, enthusiastischer"},
+    "sadness": {"max_alpha": 0.67, "boost": 1.04, "surface_effect": "verletzlicher, schwerer, melancholischer"},
+    "frustration": {"max_alpha": 0.72, "boost": 1.08, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
+    "trust": {"max_alpha": 0.54, "boost": 1.02, "surface_effect": "waermer, offener, naeher"},
+    "curiosity": {"max_alpha": 0.57, "boost": 1.04, "surface_effect": "fragender, explorativer, bohrender"},
+    "motivation": {"max_alpha": 0.63, "boost": 1.04, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
+    "energy": {"max_alpha": 0.56, "boost": 1.02, "surface_effect": "schneller, lebhafter, impulsiver"},
 }
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.25
@@ -459,9 +459,9 @@ class SteeringManager:
             alpha = max_alpha * (0.22 + 0.78 * curved)
 
             if deviation >= 24:
-                alpha *= 1.08
+                alpha *= 1.04
             if deviation >= 34:
-                alpha *= 1.08
+                alpha *= 1.04
             alpha *= profile.get("boost", 1.0)
             alpha = min(1.42, max_alpha * profile.get("boost", 1.0), alpha)
 

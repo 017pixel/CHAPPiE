@@ -539,15 +539,23 @@ export function ChatPage() {
                 <div
                   className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
                     entry.role === "assistant"
-                      ? (entry.metadata as any)?.formatting_failed
-                        ? "bg-night border-ember/30 text-ember/80"
-                        : "bg-night border-white/10 text-mist"
+                      ? (entry.metadata as any)?.cot_leak?.is_unexpected_cot
+                        ? "bg-night border-love/40 text-love/85"
+                        : (entry.metadata as any)?.formatting_failed
+                          ? "bg-night border-ember/30 text-ember/80"
+                          : "bg-night border-white/10 text-mist"
                       : "bg-ember border-ember/20 text-white"
                   } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
                 >
-                  <p className="mb-2 text-[10px] uppercase tracking-widest opacity-50">
+                  <p className={`mb-2 text-[10px] uppercase tracking-widest opacity-50 ${(entry.metadata as any)?.cot_leak?.is_unexpected_cot ? 'text-love' : ''}`}>
                     {entry.role === "assistant" ? (!["streaming", "thinking", "reasoning-live"].includes(entry.id || "") ? "CHAPPiEs Antwort" : "CHAPPiE") : entry.role}
                   </p>
+                  {entry.role === "assistant" && (entry.metadata as any)?.cot_leak?.is_unexpected_cot && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
+                    <p className="mb-1 text-[9px] text-love font-bold uppercase flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[11px]">warning</span>
+                      Unerwartetes Reasoning in Antwort (Score: {(entry.metadata as any).cot_leak?.score?.toFixed(2)})
+                    </p>
+                  )}
                   {entry.role === "assistant" && (entry.metadata as any)?.formatting_failed && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
                     <p className="mb-1 text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen — Rohtext</p>
                   )}

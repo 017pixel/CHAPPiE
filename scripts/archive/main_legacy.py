@@ -214,11 +214,11 @@ class CHAPPiE:
         if cmd == "/daily":
             from memory.short_term_memory import get_short_term_memory
             stm = get_short_term_memory()
-            infos = stm.get_relevant_infos()
+            entries = stm.get_active_entries()
             print_section("KURZZEITGEDÄCHTNIS", Colors.MEMORY)
-            print(f"Einträge: {len(infos)}")
-            for timestamp, importance, category, content in infos:
-                print(f"  [{importance}] [{category}] {content[:60]}...")
+            print(f"Einträge: {len(entries)}")
+            for entry in entries:
+                print(f"  [{entry.importance}] [{entry.category}] {entry.content[:60]}...")
             return True
         
         if cmd == "/personality":
@@ -231,7 +231,7 @@ class CHAPPiE:
         if cmd == "/consolidate":
             from memory.short_term_memory import get_short_term_memory
             stm = get_short_term_memory()
-            count = stm.cleanup_expired()
+            count = stm.migrate_expired_entries()
             print_section("KONSOLIDIERUNG", Colors.MEMORY)
             print(f"Bereinigt: {count} abgelaufene Einträge")
             return True

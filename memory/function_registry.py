@@ -241,7 +241,7 @@ class FunctionRegistry:
         from memory.short_term_memory import get_short_term_memory
 
         stm = get_short_term_memory()
-        timestamp = stm.add_info(content, importance=importance, category=category)
+        entry_id = stm.add_entry(content, importance=importance, category=category)
         return f"✓ Info im Kurzzeitgedächtnis gespeichert ({importance}, {category}): \"{content[:80]}{'...' if len(content) > 80 else ''}\""
 
     def _handle_update_personality(self, category: str, value: str, reasoning: str = "") -> str:
@@ -275,14 +275,14 @@ class FunctionRegistry:
         from memory.short_term_memory import get_short_term_memory
 
         stm = get_short_term_memory()
-        infos = stm.get_relevant_infos(query=query)
+        entries = stm.get_active_entries(query=query)
 
-        if not infos:
+        if not entries:
             return "Keine Einträge im Kurzzeitgedächtnis."
 
         lines = ["Kurzzeitgedächtnis-Einträge:"]
-        for timestamp, importance, category, content in infos:
-            lines.append(f"- [{importance}] [{category}] {content[:60]}{'...' if len(content) > 60 else ''}")
+        for entry in entries:
+            lines.append(f"- [{entry.importance}] [{entry.category}] {entry.content[:60]}{'...' if len(entry.content) > 60 else ''}")
 
         return "\n".join(lines)
 
@@ -291,8 +291,8 @@ class FunctionRegistry:
         from memory.short_term_memory import get_short_term_memory
 
         stm = get_short_term_memory()
-        count = stm.cleanup_expired()
-        return f"✓ Bereinigung abgeschlossen: {count} abgelaufene Einträge entfernt."
+        count = stm.migrate_expired_entries()
+        return f"✓ Bereinigung abgeschlossen: {count} abgelaufene Einträge migriert."
 
 
 # === Singleton Instance ===

@@ -207,7 +207,7 @@ class CHAPPiEBrainCLI:
             self.memory = self.backend.memory
             self.steering = self.backend.steering_manager
             self.context = self.backend.context_files
-            self.short_term = self.backend.short_term_memory_v2
+            self.short_term = self.backend.short_term_memory
             status = self.backend.get_status()
             model = status.get("model", "?")
             _log("INIT", f"Lokaler Modus: {model}", Colors.AI)
@@ -495,6 +495,7 @@ class CHAPPiEBrainCLI:
             "formatting_failed": metadata.get("formatting_failed", False),
             "formatting_source": metadata.get("formatting_source", "local_fallback"),
             "formatting_model": metadata.get("formatting_model", "openai/gpt-oss-120b"),
+            "cot_leak": metadata.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
         }
 
     # ── live rendering ────────────────────────────────────────────
@@ -583,6 +584,19 @@ class CHAPPiEBrainCLI:
                 console.print(Panel(raw_answer, title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
             else:
                 print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {raw_answer}\n")
+
+        # CoT Leakage Warning
+        cot_leak = result.get("cot_leak", {})
+        if cot_leak.get("is_unexpected_cot"):
+            reasons = cot_leak.get("reasons", [])
+            score = cot_leak.get("score", 0)
+            leak_msg = f"Unerwartetes Reasoning in Antwort (Score: {score:.2f})"
+            if reasons:
+                leak_msg += f" — {', '.join(reasons)}"
+            if HAS_RICH:
+                console.print(Panel(leak_msg, title="[bold red]CoT Leakage[/]", border_style="red", padding=(0, 1)))
+            else:
+                print(f"{Colors.WARN}WARNUNG: CoT-Leakage in Antwort: {leak_msg}{Colors.RESET}")
 
         intent = result.get("intent_type", "?")
         confidence = result.get("intent_confidence", 0)
@@ -759,9 +773,17 @@ class CHAPPiEBrainCLI:
             print(f"{Colors.AI}{Colors.BOLD}CHAPPiE (raw) >{Colors.RESET} {raw_answer}\n")
 
     def _display_remote_result(self, metadata: dict, collected: dict):
+        cot_leak = metadata.get("cot_leak", {})
         if HAS_RICH:
             cot = metadata.get("formatted_cot", "")
             answer = metadata.get("formatted_answer", "") or collected.get("answer", "")
+            if cot_leak.get("is_unexpected_cot"):
+                reasons = cot_leak.get("reasons", [])
+                score = cot_leak.get("score", 0)
+                leak_msg = f"Unerwartetes Reasoning in Antwort (Score: {score:.2f})"
+                if reasons:
+                    leak_msg += f" — {', '.join(reasons)}"
+                console.print(Panel(leak_msg, title="[bold red]CoT Leakage[/]", border_style="red", padding=(0, 1)))
             if cot:
                 console.print(Panel(cot, title="[dim]Chain of Thought[/]", border_style="dim", padding=(0, 1)))
             if answer:
@@ -773,6 +795,9 @@ class CHAPPiEBrainCLI:
         else:
             cot = metadata.get("formatted_cot", "")
             answer = metadata.get("formatted_answer", "")
+            if cot_leak.get("is_unexpected_cot"):
+                score = cot_leak.get("score", 0)
+                print(f"{Colors.WARN}WARNUNG: CoT-Leakage in Antwort (Score: {score:.2f}){Colors.RESET}")
             if cot:
                 print(f"\n{Colors.THOUGHT}--- CHAPPiEs Gedanken ---\n{cot}\n---{Colors.RESET}\n")
             if answer:

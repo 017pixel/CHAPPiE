@@ -13,8 +13,7 @@ from config.prompts import get_system_prompt_with_emotions, get_personality_cont
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
 from memory.chat_manager import ChatManager
-from memory.short_term_memory import ShortTermMemory
-from memory.short_term_memory_v2 import get_short_term_memory_v2
+from memory.short_term_memory import get_short_term_memory
 from memory.personality_manager import PersonalityManager
 from memory.function_registry import get_function_registry
 from memory.context_files import get_context_files_manager
@@ -58,25 +57,16 @@ def create_chappie_backend():
             self.sleep_handler = get_sleep_phase_handler()
             self._sleep_job_lock = threading.Lock()
 
-            # NEU: Short-Term Memory V2 (JSON-basiert mit Timestamps)
-            self.short_term_memory_v2 = get_short_term_memory_v2(memory_engine=self.memory)
+            # Short-Term Memory (JSON-basiert mit Timestamps)
+            self.short_term_memory = get_short_term_memory(memory_engine=self.memory)
             
             # Migration von abgelaufenen Eintraegen beim Start
             try:
-                migrated = self.short_term_memory_v2.migrate_expired_entries()
+                migrated = self.short_term_memory.migrate_expired_entries()
                 if migrated > 0:
                     print(f"[CHAPPiE] {migrated} Eintraege ins Langzeitgedaechtnis migriert")
             except Exception as e:
                 print(f"[CHAPPiE] Migration fehlgeschlagen: {e}")
-
-            # LEGACY: Altes Short-Term Memory (fuer Abwaertskompatibilitaet)
-            self.short_term_memory = ShortTermMemory(memory_engine=self.memory)
-            try:
-                cleaned = self.short_term_memory.cleanup_expired()
-                if cleaned > 0:
-                    print(f"[CHAPPiE] Short-Term Memory: {cleaned} abgelaufene Eintraege bereinigt")
-            except Exception as e:
-                print(f"[CHAPPiE] WARNUNG: Short-Term Memory Bereinigung fehlgeschlagen: {e}")
 
             # NEU: Intent Processor (Step 1)
             self.intent_processor = get_intent_processor()
@@ -128,7 +118,7 @@ def create_chappie_backend():
                 result = self.sleep_handler.execute_sleep_phase(
                     memory_engine=self.memory,
                     context_files=self.context_files,
-                    short_term_memory=self.short_term_memory_v2,
+                    short_term_memory=self.short_term_memory,
                     emotions_engine=self.emotions,
                 )
                 self.debug_logger.log_info(
@@ -226,6 +216,7 @@ def create_chappie_backend():
                 "formatting_failed": result.get("formatting_failed", False),
                 "formatting_source": result.get("formatting_source", "local_fallback"),
                 "formatting_model": self.GROQ_FORMAT_MODEL,
+                "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
             }
             assistant_msg = {
                 "role": "assistant",
@@ -391,6 +382,91 @@ def create_chappie_backend():
                 return float(value)
             except (TypeError, ValueError):
                 return default
+
+        @staticmethod
+        def _detect_cot_leakage(text: str) -> Dict[str, Any]:
+            """Erkennt unerwartete Reasoning/CoT-Inhalte in der Antwort (keine expliziten Tags)."""
+            if not text or len(text) < 40:
+                return {"is_unexpected_cot": False, "score": 0.0, "reasons": []}
+            reasons = []
+            score = 0.0
+
+            # Meta-reasoning patterns
+            reasoning_patterns = [
+                (r'(?:^|\n)\s*\*{1,2}(?:atmet|seufzt|denkt|starrt|faehrt|bricht|haelt)\s.*?\*{1,2}', 0.35, "action_description"),
+                (r'(?:^|\n)\s*(?:Last known thought|Looking at chronology|Review relevant|Identify Persona|Action Planning|Final draft)', 0.45, "meta_reasoning_label"),
+                (r'(?:^|\n)\s*(?:Step \d|Output in|Direct Response)', 0.30, "step_instruction"),
+                (r'(?:^|\n)\s*\*{1,2}(?:Analyze|Analysis|Recollection|Connection|Memory)\b.*?\*{1,2}', 0.30, "analysis_marker"),
+                (r'(?:^|\n)\s*(?:gut\.)\s*\n\s*(?:fragemich|benchmark|binich)', 0.50, "german_meta_reasoning"),
+                (r'\.s\.c[ho]\.e[nt]\.', 0.60, "glitch_breakdown"),
+                (r'(?:\b[A-ZÄÖÜ]{2,}\b\s?){4,}', 0.25, "allcaps_emphasis"),
+                (r'\b(?:because|when|if|through|within|about|based on|real-time|input|output|null|variable|signal|constraint)\b', 0.05, "english_logic_indicator"),
+            ]
+            import re
+            for pattern, weight, label in reasoning_patterns:
+                if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
+                    reasons.append(label)
+                    score += weight
+
+            # Strong indicator: fragmented one-word-per-line patterns (>5 lines of single words)
+            lines = [l.strip() for l in text.split('\n') if l.strip()]
+            single_word_lines = sum(1 for l in lines if len(l.split()) == 1 and not l.startswith('*'))
+            if single_word_lines > 5 and single_word_lines > len(lines) * 0.4:
+                reasons.append("fragmented_output")
+                score += 0.45
+
+            # Dot-separated gibberish indicator
+            dot_tokens = re.findall(r'\.[a-z]+\.', text)
+            if len(dot_tokens) > 3:
+                reasons.append("dot_glitch")
+                score += 0.50
+
+            score = min(1.0, score)
+            is_leak = score >= 0.55
+            return {"is_unexpected_cot": is_leak, "score": round(score, 3), "reasons": list(set(reasons))}
+
+        @staticmethod
+        def _get_emotion_adjusted_config(emotions: Dict[str, int]) -> Dict[str, Any]:
+            """Passt Generationsparameter dynamisch an extreme emotionale Zustaende an."""
+            frustration = emotions.get("frustration", 50)
+            sadness = emotions.get("sadness", 50)
+            energy = emotions.get("energy", 50)
+
+            from config.config import settings
+
+            temperature = settings.temperature
+            repetition_penalty = settings.repetition_penalty
+            max_tokens = settings.max_tokens
+
+            # Hohe Frustration (>70): Output wird instabil, runterregeln
+            if frustration > 70:
+                t_scale = 1.0 - min(0.30, (frustration - 70) / 100.0)
+                temperature = min(temperature, max(0.45, settings.temperature * t_scale))
+                repetition_penalty = max(repetition_penalty, 1.25)
+
+            # Extreme Frustration (>85): stark runterregeln
+            if frustration > 85:
+                temperature = min(temperature, 0.52)
+                repetition_penalty = max(repetition_penalty, 1.32)
+
+            # Hohe Traurigkeit + niedrige Energie: Output wird schwer, leicht daempfen
+            if sadness > 70 and energy < 35:
+                temperature = min(temperature, max(0.50, settings.temperature * 0.82))
+
+            # Kurze Antworten bei hoher Frustration: max_tokens etwas reduzieren
+            if frustration > 75:
+                thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 800))
+                answer_limit = int(getattr(settings, "chappie_answer_token_limit", 1200))
+                max_tokens = min(max_tokens, thinking_limit + int(answer_limit * 0.7))
+
+            return {
+                "temperature": round(temperature, 3),
+                "repetition_penalty": round(repetition_penalty, 3),
+                "max_tokens": max_tokens,
+                "was_adjusted": (temperature != settings.temperature or
+                                 repetition_penalty != settings.repetition_penalty or
+                                 max_tokens != settings.max_tokens),
+            }
 
         def _derive_response_plan(
             self,
@@ -741,12 +817,13 @@ def create_chappie_backend():
                     api_key=settings.groq_api_key,
                 )
                 system_prompt = (
-                    "You are a deterministic raw-text formatter.\n\n"
+                    "You are a deterministic raw-text formatter. Do exactly as instructed.\n\n"
                     "Your task: take raw model output and make it readable WITHOUT changing meaning.\n\n"
                     "CRITICAL - ALWAYS DO:\n"
-                    "- INSERT SPACES between every merged word (e.g. 'HalloWelt' → 'Hallo Welt')\n"
-                    "- INSERT SPACES after punctuation when missing (e.g. 'text.Weiter' → 'text. Weiter')\n"
-                    "- INSERT SPACES around asterisks (e.g. '*seufzt*Hallo' → '*seufzt* Hallo')\n"
+                    "- INSERT SPACES between every merged word (e.g. 'HalloWelt' -> 'Hallo Welt')\n"
+                    "- INSERT SPACES after punctuation when missing (e.g. 'text.Weiter' -> 'text. Weiter')\n"
+                    "- INSERT SPACES around asterisks (e.g. '*seufzt*Hallo' -> '*seufzt* Hallo')\n"
+                    "- Split dot-separated letters into readable words when possible (e.g. '.s.ch.en.s.c.h.en.t.' -> 'schenschent')\n"
                     "- Insert line breaks for readability\n"
                     "- Split into <cot> (chain-of-thought/thinking) and <antwort> (final answer) blocks\n\n"
                     "FORBIDDEN - NEVER:\n"
@@ -759,21 +836,24 @@ def create_chappie_backend():
                     "- interpret meaning or modify tone\n"
                     "- invent any content not present in the raw input\n\n"
                     "OUTPUT FORMAT:\n"
-                    "<cot>\n[reasoning content — or 'CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet.' if none]\n</cot>\n"
-                    "<antwort>\n[answer content — or 'CHAPPiE hat nachgedacht, schweigt aber...' if none]\n</antwort>\n\n"
-                    "RULE: The ENTIRE raw text minus thinking markers goes into <antwort> UNLESS it contains explicit <think>/<thinking> tags.\n"
-                    "RULE: Only put text inside <think>/<thinking> tags (or clear reasoning patterns) into <cot>.\n"
-                    "RULE: Never leave <antwort> empty if the raw text contains any non-thinking content.\n\n"
+                    "<cot>\n[reasoning content — or leave EMPTY if no reasoning exists: just <cot>\\n</cot>]\n</cot>\n"
+                    "<antwort>\n[answer content — the ENTIRE non-thinking text goes here]\n</antwort>\n\n"
+                    "RULES:\n"
+                    "- ONLY text inside explicit <think>/<thinking>/<gedanke> tags (or clear meta-reasoning) goes into <cot>.\n"
+                    "- Everything else goes into <antwort>. This includes emotional narrative, poetic text, dialogue, glitched/degraded output.\n"
+                    "- If the raw text is glitched or word-salad: reproduce it EXACTLY AS-IS in <antwort>. Never discard glitched text.\n"
+                    "- If there is NO reasoning content: output <cot>\\n</cot> (empty cot block).\n"
+                    "- Never leave <antwort> empty while the raw text contains any non-thinking content.\n\n"
                     "Do not explain. Output ONLY the tagged blocks."
                 )
                 response = client.chat.completions.create(
                     model=self.GROQ_FORMAT_MODEL,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": clean_text[:12000]},
+                        {"role": "user", "content": clean_text[:16000]},
                     ],
-                    max_tokens=2048,
-                    temperature=0.3,
+                    max_tokens=5000,
+                    temperature=0.0,
                     stream=False,
                     timeout=15.0,
                 )
@@ -990,7 +1070,7 @@ def create_chappie_backend():
                 "model": get_active_model(),
                 "provider": settings.llm_provider.value,
                 "emotions": self._get_emotions_snapshot(),
-                "daily_info_count": self.short_term_memory_v2.get_count(),
+                "daily_info_count": self.short_term_memory.get_count(),
                 "two_step_enabled": settings.enable_two_step_processing,
                 "life_snapshot": life_snapshot,
                 "life_state": life_snapshot,
@@ -1187,7 +1267,7 @@ def create_chappie_backend():
             self._add_short_term_entries(intent_result.short_term_entries)
             
             # === AUSFUEHRUNG: Migration ===
-            migrated = self.short_term_memory_v2.migrate_expired_entries()
+            migrated = self.short_term_memory.migrate_expired_entries()
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
@@ -1284,13 +1364,13 @@ def create_chappie_backend():
             
             # === AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN ===
             # User Nachricht
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"User: {user_input}",
                 category="chat",
                 importance="normal"
             )
             # CHAPPiE Antwort
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"CHAPPiE: {response_data['response_text'][:200]}",  # Erste 200 chars
                 category="chat",
                 importance="normal"
@@ -1328,7 +1408,7 @@ def create_chappie_backend():
                 "available_tools": available_tools,
                 "selected_tools": selected_tool_names,
                 "unused_tools": unused_tool_names,
-                "short_term_count": self.short_term_memory_v2.get_count(),
+                "short_term_count": self.short_term_memory.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
@@ -1398,7 +1478,7 @@ def create_chappie_backend():
                         category = tool_call.data.get("category", "general")
                         importance = tool_call.data.get("importance", "normal")
                         
-                        self.short_term_memory_v2.add_entry(
+                        self.short_term_memory.add_entry(
                             content=content,
                             category=category,
                             importance=importance
@@ -1469,7 +1549,7 @@ def create_chappie_backend():
             """Fuegt Short-Term Eintraege hinzu."""
             for entry in entries:
                 try:
-                    self.short_term_memory_v2.add_entry(
+                    self.short_term_memory.add_entry(
                         content=entry.content,
                         category=entry.category,
                         importance=entry.importance
@@ -1615,7 +1695,7 @@ def create_chappie_backend():
                     context_parts.append(f"=== CHAPPiE'S PREFERENCES ===\n{prefs}")
 
             if requirements.get("need_short_term_memory", True):
-                short_term = self.short_term_memory_v2.get_formatted_for_prompt()
+                short_term = self.short_term_memory.get_formatted_for_prompt()
                 if short_term:
                     context_parts.append(short_term)
 
@@ -1646,7 +1726,7 @@ def create_chappie_backend():
             stm_entries = []
             consolidation_meta = {}
             if settings.memory_consolidation_enabled:
-                stm_entries = self.short_term_memory_v2.get_active_entries() if hasattr(self, 'short_term_memory_v2') and self.short_term_memory_v2 else []
+                stm_entries = self.short_term_memory.get_active_entries() if hasattr(self, 'short_term_memory') and self.short_term_memory else []
                 consolidated_prompt, consolidation_meta = self._consolidate_memories_for_prompt(
                     ltm_memories=memories or [],
                     stm_entries=stm_entries or [],
@@ -1761,11 +1841,12 @@ def create_chappie_backend():
                     budget_info,
                 )
             
-            # Generierung
+            # Dynamische Parameteranpassung bei extremen Emotionen
+            adj = self._get_emotion_adjusted_config(emotions)
             gen_config = GenerationConfig(
-                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
-                temperature=settings.temperature,
-                repetition_penalty=settings.repetition_penalty,
+                max_tokens=adj["max_tokens"],
+                temperature=adj["temperature"],
+                repetition_penalty=adj["repetition_penalty"],
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
@@ -1781,6 +1862,9 @@ def create_chappie_backend():
             else:
                 safe_answer = formatted.get("answer", "") or display_response
 
+            # Detektiere unerwartetes CoT-Leakage in der Antwort
+            cot_leak = self._detect_cot_leakage(safe_answer)
+
             return {
                 "response_text": display_response,
                 "formatted_cot": safe_cot,
@@ -1790,6 +1874,7 @@ def create_chappie_backend():
                 "formatting_model": self.GROQ_FORMAT_MODEL,
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
+                "cot_leak": cot_leak,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "rag_memories": memories,
                 "memory_trace": memory_trace,
@@ -1918,11 +2003,14 @@ def create_chappie_backend():
             
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             
-            # Generierung
+            
+            # Dynamische Parameter anpassen
+            adj = self._get_emotion_adjusted_config(state.__dict__)
+            
             gen_config = GenerationConfig(
-                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
-                temperature=settings.temperature,
-                repetition_penalty=settings.repetition_penalty,
+                max_tokens=adj["max_tokens"],
+                temperature=adj["temperature"],
+                repetition_penalty=adj["repetition_penalty"],
                 stream=False,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
@@ -1957,12 +2045,12 @@ def create_chappie_backend():
             self._set_last_memory_timestamp()
             
             # AUTOMATISCH ALLE KONVERSATIONEN SPEICHERN (Legacy Mode)
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"User: {user_input}",
                 category="chat",
                 importance="normal"
             )
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"CHAPPiE: {display_response[:200]}",
                 category="chat",
                 importance="normal"
@@ -2028,7 +2116,7 @@ def create_chappie_backend():
                 "available_tools": self._get_available_step1_tools(),
                 "selected_tools": [],
                 "unused_tools": self._get_available_step1_tools(),
-                "short_term_count": self.short_term_memory_v2.get_count(),
+                "short_term_count": self.short_term_memory.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "life_snapshot": final_life_snapshot,
@@ -2095,9 +2183,11 @@ def create_chappie_backend():
 
             messages = self.brain.build_prompt(system_prompt, "", user_input, history, max_history=settings.history_max_messages)
 
+            adj = self._get_emotion_adjusted_config(emotions)
             gen_config = GenerationConfig(
-                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
-                temperature=settings.temperature,
+                max_tokens=adj["max_tokens"],
+                temperature=adj["temperature"],
+                repetition_penalty=adj["repetition_penalty"],
                 stream=True,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
@@ -2184,7 +2274,7 @@ def create_chappie_backend():
             self._add_short_term_entries(intent_result.short_term_entries)
 
             # === AUSFUEHRUNG: Migration ===
-            migrated = self.short_term_memory_v2.migrate_expired_entries()
+            migrated = self.short_term_memory.migrate_expired_entries()
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
@@ -2394,12 +2484,12 @@ def create_chappie_backend():
 
             def _bg_stm():
                 try:
-                    self.short_term_memory_v2.add_entry(
+                    self.short_term_memory.add_entry(
                         content=f"User: {user_input}",
                         category="chat",
                         importance="normal"
                     )
-                    self.short_term_memory_v2.add_entry(
+                    self.short_term_memory.add_entry(
                         content=f"CHAPPiE: {display_response[:200]}",
                         category="chat",
                         importance="normal"
@@ -2434,6 +2524,7 @@ def create_chappie_backend():
                 "formatting_failed": formatted_stream.get("formatting_failed", False),
                 "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
                 "formatting_model": formatted_stream.get("formatting_model", "?"),
+                "cot_leak": self._detect_cot_leakage(safe_answer),
                 "context_budget": meta.get("context_budget", {}),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
@@ -2454,7 +2545,7 @@ def create_chappie_backend():
                 "available_tools": available_tools,
                 "selected_tools": selected_tool_names,
                 "unused_tools": unused_tool_names,
-                "short_term_count": self.short_term_memory_v2.get_count(),
+                "short_term_count": self.short_term_memory.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "intent_raw_json": intent_result.raw_json if hasattr(intent_result, 'raw_json') else {},
@@ -2537,9 +2628,11 @@ def create_chappie_backend():
 
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
 
+            adj = self._get_emotion_adjusted_config(state.__dict__)
             gen_config = GenerationConfig(
-                max_tokens=min(settings.max_tokens, settings.chappie_thinking_token_limit + settings.chappie_answer_token_limit),
-                temperature=settings.temperature,
+                max_tokens=adj["max_tokens"],
+                temperature=adj["temperature"],
+                repetition_penalty=adj["repetition_penalty"],
                 stream=True,
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
@@ -2581,12 +2674,12 @@ def create_chappie_backend():
                 self.memory.add_memory(display_response, role="assistant")
             self._set_last_memory_timestamp()
 
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"User: {user_input}",
                 category="chat",
                 importance="normal"
             )
-            self.short_term_memory_v2.add_entry(
+            self.short_term_memory.add_entry(
                 content=f"CHAPPiE: {display_response[:200]}",
                 category="chat",
                 importance="normal"
@@ -2625,6 +2718,7 @@ def create_chappie_backend():
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
                 "formatting_model": formatted_legacy.get("formatting_model", "?"),
+                "cot_leak": self._detect_cot_leakage(formatted_legacy.get("answer", "") or display_response),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": self._calculate_emotion_delta(emotions_before, emotions_after),
@@ -2644,7 +2738,7 @@ def create_chappie_backend():
                 "available_tools": self._get_available_step1_tools(),
                 "selected_tools": [],
                 "unused_tools": self._get_available_step1_tools(),
-                "short_term_count": self.short_term_memory_v2.get_count(),
+                "short_term_count": self.short_term_memory.get_count(),
                 "debug_log": self.debug_logger.get_formatted_log() if self.debug_logger.enabled else None,
                 "debug_entries": self.debug_logger.get_entries_as_dict() if self.debug_logger.enabled else [],
                 "life_snapshot": final_life_snapshot,
@@ -2703,7 +2797,7 @@ def create_chappie_backend():
             cmd = command.lower().strip()
 
             if cmd == "/daily" or cmd == "/shortterm":
-                entries = self.short_term_memory_v2.get_active_entries()
+                entries = self.short_term_memory.get_active_entries()
                 if not entries:
                     return "Keine Eintraege im Kurzzeitgedaechtnis."
                 lines = ["**Kurzzeitgedaechtnis (24h):**\\n"]
@@ -2727,7 +2821,7 @@ def create_chappie_backend():
                 return self.context_files.get_preferences_context()
 
             elif cmd == "/consolidate":
-                migrated = self.short_term_memory_v2.migrate_expired_entries()
+                migrated = self.short_term_memory.migrate_expired_entries()
                 return f"Bereinigung abgeschlossen: {migrated} Eintraege migriert."
 
             elif cmd == "/reflect":

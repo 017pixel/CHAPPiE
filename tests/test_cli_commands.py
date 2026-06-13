@@ -20,7 +20,7 @@ for mod in (
     "memory.emotions_engine", "memory.sleep_phase",
     "memory.forgetting_curve", "memory.context_files",
     "memory.chat_manager", "memory.short_term_memory",
-    "memory.short_term_memory_v2", "memory.personality_manager",
+    "memory.personality_manager",
     "memory.function_registry", "memory.intent_processor",
     "memory.debug_logger", "sentence_transformers",
 ):
@@ -42,7 +42,7 @@ class _MockBackend:
         self.emotions = _MockEmotions()
         self.memory = _MockMemory()
         self.debug_logger = _MockDebug()
-        self.short_term_memory_v2 = _MockSTM()
+        self.short_term_memory = _MockSTM()
 
     def get_status(self):
         return {"model": "test", "provider": "test", "two_step_enabled": True, "emotions": {}}
@@ -98,7 +98,7 @@ def _build_local_cli():
     cli.emotions = cli.backend.emotions
     cli.memory = cli.backend.memory
     cli.steering = cli.backend.steering_manager
-    cli.short_term = cli.backend.short_term_memory_v2
+    cli.short_term = cli.backend.short_term_memory
     return cli
 
 

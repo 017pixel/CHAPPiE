@@ -64,7 +64,7 @@ class Settings:
         return val
 
     _PATH_KEYS = {
-        "DAILY_INFO_PATH", "PERSONALITY_PATH", "SOUL_PATH",
+        "PERSONALITY_PATH", "SOUL_PATH",
         "USER_PATH", "PREFERENCES_PATH", "FINETUNE_MODELS_DIR",
         "FINETUNE_CHATS_DIR", "CHROMA_PERSIST_DIRECTORY",
     }
@@ -142,7 +142,6 @@ class Settings:
         self.memory_consolidation_groq_model = self._get_val("MEMORY_CONSOLIDATION_GROQ_MODEL", "openai/gpt-oss-120b")
         self.memory_consolidation_max_tokens = int(self._get_val("MEMORY_CONSOLIDATION_MAX_TOKENS", 1500))
 
-        self.daily_info_path = self._get_path("DAILY_INFO_PATH", str(DATA_DIR / "daily_info.md"))
         self.personality_path = self._get_path("PERSONALITY_PATH", str(DATA_DIR / "personality.md"))
         self.short_term_ttl_hours = int(self._get_val("SHORT_TERM_TTL_HOURS", 24))
         self.stm_summary_threshold = int(self._get_val("STM_SUMMARY_THRESHOLD", 5))
@@ -367,7 +366,6 @@ class Settings:
             "STEERING_MODEL": self.steering_model,
             "STEERING_QUANTIZE": self.steering_quantize,
             "STEERING_CONTEXT_LENGTH": self.steering_context_length,
-            "DAILY_INFO_PATH": self.daily_info_path,
             "PERSONALITY_PATH": self.personality_path,
             "SOUL_PATH": self.soul_path,
             "USER_PATH": self.user_path,

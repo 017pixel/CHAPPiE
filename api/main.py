@@ -41,7 +41,7 @@ def root_overview():
         life = backend.life_simulation.get_snapshot()
         training = daemon_manager.get_training_snapshot()
         memory_count = backend.memory.get_memory_count()
-        stm_count = backend.short_term_memory_v2.get_count()
+        stm_count = backend.short_term_memory.get_count()
         sessions = backend.chat_manager.list_sessions()
     except Exception as e:
         return JSONResponse({

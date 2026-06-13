@@ -32,7 +32,7 @@ CHAPPiE uses a **brain metaphor** across three interacting layers: Brain, Memory
 | Sleep Phase | `memory/sleep_phase.py` | Consolidation, replay, compression |
 | Forgetting Curve | `memory/forgetting_curve.py` | Ebbinghaus decay model |
 | Context Files | `memory/context_files.py` | soul.md, user.md, preferences |
-| Short-Term V2 | `memory/short_term_memory_v2.py` | JSON-based STM with timestamps |
+| Short-Term | `memory/short_term_memory.py` | JSON-based STM with timestamps |
 
 ## Life Simulation (`life/`)
 

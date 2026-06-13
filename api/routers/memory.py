@@ -85,7 +85,7 @@ def get_short_term_memories(
     q: str | None = Query(default=None),
     backend=Depends(get_backend),
 ):
-    items = backend.short_term_memory_v2.get_active_entries(category=category, query=q)
+    items = backend.short_term_memory.get_active_entries(category=category, query=q)
     return {
         "count": len(items),
         "items": [_short_term_to_dict(entry) for entry in items],
@@ -94,8 +94,8 @@ def get_short_term_memories(
 
 @router.post("/memories/short-term/cleanup")
 def cleanup_short_term_memories(backend=Depends(get_backend)):
-    migrated = backend.short_term_memory_v2.migrate_expired_entries()
-    return {"migrated": migrated, "count": backend.short_term_memory_v2.get_count(), "should_reset_chat": True}
+    migrated = backend.short_term_memory.migrate_expired_entries()
+    return {"migrated": migrated, "count": backend.short_term_memory.get_count(), "should_reset_chat": True}
 
 
 @router.delete("/memories")

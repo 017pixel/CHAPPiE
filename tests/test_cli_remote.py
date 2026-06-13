@@ -20,7 +20,7 @@ for mod in (
     "memory.emotions_engine", "memory.sleep_phase",
     "memory.forgetting_curve", "memory.context_files",
     "memory.chat_manager", "memory.short_term_memory",
-    "memory.short_term_memory_v2", "memory.personality_manager",
+    "memory.personality_manager",
     "memory.function_registry", "memory.intent_processor",
     "memory.debug_logger", "sentence_transformers",
 ):

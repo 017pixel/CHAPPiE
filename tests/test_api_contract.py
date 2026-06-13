@@ -199,7 +199,7 @@ class _DummyBackend:
         self.debug_logger = _DummyDebugLogger()
         self.life_simulation = _DummyLife()
         self.memory = _DummyMemory()
-        self.short_term_memory_v2 = _DummyShortTermMemory()
+        self.short_term_memory = _DummyShortTermMemory()
         self.context_files = _DummyContextFiles()
         self.steering_manager = _DummySteeringManager()
         self.sleep_handler = _DummySleep()

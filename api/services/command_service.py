@@ -39,7 +39,7 @@ def _base_result(backend, response_text: str, **extra: Any) -> Dict[str, Any]:
 def _build_stats_text(backend) -> str:
     status = backend.get_status()
     memory_count = backend.memory.get_memory_count()
-    short_term_count = backend.short_term_memory_v2.get_count()
+    short_term_count = backend.short_term_memory.get_count()
     emotion_lines = "\n".join(f"- {name}: {value}%" for name, value in status.get("emotions", {}).items())
     return f"""**System-Statistiken:**
 
@@ -58,7 +58,7 @@ def _run_sleep(backend) -> Dict[str, Any]:
     result = backend.sleep_handler.execute_sleep_phase(
         memory_engine=backend.memory,
         context_files=backend.context_files,
-        short_term_memory=backend.short_term_memory_v2,
+        short_term_memory=backend.short_term_memory,
     )
     recovery = result.get("emotional_recovery", {})
     recovery_text = ", ".join(f"{key}: {'+' if value > 0 else ''}{value}" for key, value in recovery.items()) or "keine Veraenderung"

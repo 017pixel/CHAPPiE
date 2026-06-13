@@ -208,10 +208,6 @@ def test_config_path_resolution():
     """7. _get_path() loest relative Pfade gegen PROJECT_ROOT auf."""
     from config.config import settings, PROJECT_ROOT
 
-    daily = Path(settings.daily_info_path)
-    assert daily.is_absolute() or str(daily).startswith(str(PROJECT_ROOT)), \
-        f"daily_info_path sollte absolut sein oder unter PROJECT_ROOT: {daily}"
-
     personality = Path(settings.personality_path)
     assert personality.is_absolute() or str(personality).startswith(str(PROJECT_ROOT)), \
         f"personality_path: {personality}"

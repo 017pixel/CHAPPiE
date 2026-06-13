@@ -16,7 +16,7 @@ for mod in (
     "brain.deep_think", "brain.global_workspace",
     "brain.action_response", "brain.groq_limits",
     "memory.emotions_engine", "memory.chat_manager",
-    "memory.short_term_memory", "memory.short_term_memory_v2",
+    "memory.short_term_memory",
     "memory.personality_manager", "memory.function_registry",
     "memory.intent_processor", "memory.debug_logger",
     "sentence_transformers",
