@@ -779,6 +779,10 @@ def create_chappie_backend():
             text = re.sub(r'(\d)([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
             text = re.sub(r'([a-zäöüß])(\()', r'\1 \2', text)
             text = re.sub(r'(\))([A-ZÄÖÜa-zäöüß])', r'\1 \2', text)
+            # Dot-separated single letters: s.c.h.w.e.r -> schwer
+            text = re.sub(r'(?<=\b|^)(\.[a-zA-ZäöüßÄÖÜ]){3,}', lambda m: m.group().replace('.', ''), text)
+            # Underscore-separated words
+            text = re.sub(r'(?<=[a-zA-ZäöüßÄÖÜ0-9])_(?=[a-zA-ZäöüßÄÖÜ0-9])', ' ', text)
             return text
 
         @staticmethod
@@ -817,33 +821,37 @@ def create_chappie_backend():
                     api_key=settings.groq_api_key,
                 )
                 system_prompt = (
-                    "You are a deterministic raw-text formatter. Do exactly as instructed.\n\n"
-                    "Your task: take raw model output and make it readable WITHOUT changing meaning.\n\n"
-                    "CRITICAL - ALWAYS DO:\n"
-                    "- INSERT SPACES between every merged word (e.g. 'HalloWelt' -> 'Hallo Welt')\n"
-                    "- INSERT SPACES after punctuation when missing (e.g. 'text.Weiter' -> 'text. Weiter')\n"
-                    "- INSERT SPACES around asterisks (e.g. '*seufzt*Hallo' -> '*seufzt* Hallo')\n"
-                    "- Split dot-separated letters into readable words when possible (e.g. '.s.ch.en.s.c.h.en.t.' -> 'schenschent')\n"
-                    "- Insert line breaks for readability\n"
-                    "- Split into <cot> (chain-of-thought/thinking) and <antwort> (final answer) blocks\n\n"
-                    "FORBIDDEN - NEVER:\n"
-                    "- change, add, or remove any word\n"
-                    "- paraphrase, summarize, or rewrite\n"
-                    "- shorten, expand, or complete text\n"
-                    "- fix grammar, spelling, or punctuation (only add whitespace)\n"
-                    "- remove repetition or duplicated content\n"
-                    "- remove asterisks, quotes, or special characters\n"
-                    "- interpret meaning or modify tone\n"
-                    "- invent any content not present in the raw input\n\n"
-                    "OUTPUT FORMAT:\n"
-                    "<cot>\n[reasoning content — or leave EMPTY if no reasoning exists: just <cot>\\n</cot>]\n</cot>\n"
-                    "<antwort>\n[answer content — the ENTIRE non-thinking text goes here]\n</antwort>\n\n"
-                    "RULES:\n"
-                    "- ONLY text inside explicit <think>/<thinking>/<gedanke> tags (or clear meta-reasoning) goes into <cot>.\n"
-                    "- Everything else goes into <antwort>. This includes emotional narrative, poetic text, dialogue, glitched/degraded output.\n"
-                    "- If the raw text is glitched or word-salad: reproduce it EXACTLY AS-IS in <antwort>. Never discard glitched text.\n"
-                    "- If there is NO reasoning content: output <cot>\\n</cot> (empty cot block).\n"
-                    "- Never leave <antwort> empty while the raw text contains any non-thinking content.\n\n"
+                    "You are a precise text formatter. Your ONLY job is to fix whitespace and split\n"
+                    "the raw model output into reasoning (cot) and final answer (antwort) blocks.\n\n"
+                    "== WHITESPACE FIXES (apply to ALL text) ==\n"
+                    "- Words glued together: 'HalloWelt' -> 'Hallo Welt'\n"
+                    "- Punctuation followed by word: 'text.Weiter' -> 'text. Weiter'\n"
+                    "- Asterisks touching words: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
+                    "- Numbers touching words: 'Code007' -> 'Code 007'\n"
+                    "- Single letters separated by dots: 's.c.h.w.e.r' -> 'schwer'\n"
+                    "- Underscores joining words: 'weil_ich_bin' -> 'weil ich bin'\n"
+                    "- Multiple punctuation marks: '?!' keep as-is, never separate\n\n"
+                    "== TEXT STRUCTURE ==\n"
+                    "- Insert empty line between major conversational turns for readability\n"
+                    "- Preserve ALL content exactly as written: poetic text, emotional markers (*...*),\n"
+                    "  asterisks, quotes, special characters, repetition, and glitched text\n"
+                    "- Do NOT merge separate lines into a single paragraph block\n"
+                    "- Every word, character, and marker from the input must be present unchanged\n\n"
+                    "== COT / ANTWORT SPLITTING ==\n"
+                    "- Everything inside <think>, <thinking>, <gedanke>, or <reasoning> tags -> into <cot>\n"
+                    "- The part after the CLOSING tag (</think>, </thinking>, etc.) -> into <antwort>\n"
+                    "- If the text uses numbered sections like ',1.**AnalyzeRequest:**...' -> into <cot>\n"
+                    "- Text containing '*atmet...*', '*seufzt...*', '*starrt...*' action markers -> into <cot>\n"
+                    "- The final conversational response, poetic text, or direct speech -> into <antwort>\n\n"
+                    "== OUTPUT FORMAT ==\n"
+                    "<cot>\n[all reasoning/thinking/analysis content, whitespace-fixed]\n</cot>\n"
+                    "<antwort>\n[all final answer/dialogue content, whitespace-fixed]\n</antwort>\n\n"
+                    "== CHECKS BEFORE OUTPUT ==\n"
+                    "1. Every word in the input must appear unchanged in the output\n"
+                    "2. Nothing added, removed, replaced, summarized, or rephrased\n"
+                    "3. Line breaks only added for readability, never removed\n"
+                    "4. If no reasoning exists: <cot>\\n</cot> (empty block)\n"
+                    "5. If the entire text is thinking with no answer: <antwort>\\n</antwort> (empty block)\n\n"
                     "Do not explain. Output ONLY the tagged blocks."
                 )
                 response = client.chat.completions.create(
@@ -855,7 +863,7 @@ def create_chappie_backend():
                     max_tokens=5000,
                     temperature=0.0,
                     stream=False,
-                    timeout=15.0,
+                    timeout=10.0,
                 )
                 formatted = response.choices[0].message.content or ""
                 cot_block = extract_tagged_block(formatted, ["cot"])
@@ -872,7 +880,12 @@ def create_chappie_backend():
                         cot = thought
                 return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": self.GROQ_FORMAT_MODEL, "answer_is_fallback": self._is_fallback_text(answer)}
             except Exception as e:
-                print(f"[Groq Format] Fehler: {e}")
+                error_msg = str(e).lower()
+                reason = "timeout" if any(kw in error_msg for kw in ("timeout", "timed out", "connect", "unreachable")) else "error"
+                if reason == "timeout":
+                    print(f"[Groq Format] {reason}: Groq nach 10s nicht erreichbar — lokaler Fallback")
+                else:
+                    print(f"[Groq Format] Fehler: {e}")
                 result = self._local_format_fallback(clean_text, formatting_failed=True)
                 result["formatting_source"] = "local_fallback"
                 return result
