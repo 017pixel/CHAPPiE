@@ -70,9 +70,12 @@ jobs:
             brain/steering_backend.py \
             brain/steering_api_server.py \
             brain/whatsapp_finetune_trainer.py \
+            brain/agents/steering_manager.py \
             config/config.py \
             config/prompts.py \
             memory/chat_manager.py \
+            memory/short_term_memory.py \
+            memory/function_registry.py \
             web_infrastructure/backend_wrapper.py \
             web_infrastructure/ui_utils.py \
             chappie_brain_cli.py
