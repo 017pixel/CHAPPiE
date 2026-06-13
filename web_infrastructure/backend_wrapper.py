@@ -863,7 +863,7 @@ def create_chappie_backend():
                     max_tokens=5000,
                     temperature=0.0,
                     stream=False,
-                    timeout=10.0,
+                    timeout=7.5,
                 )
                 formatted = response.choices[0].message.content or ""
                 cot_block = extract_tagged_block(formatted, ["cot"])
@@ -883,7 +883,7 @@ def create_chappie_backend():
                 error_msg = str(e).lower()
                 reason = "timeout" if any(kw in error_msg for kw in ("timeout", "timed out", "connect", "unreachable")) else "error"
                 if reason == "timeout":
-                    print(f"[Groq Format] {reason}: Groq nach 10s nicht erreichbar — lokaler Fallback")
+                    print(f"[Groq Format] {reason}: Groq nach 7.5s nicht erreichbar — lokaler Fallback")
                 else:
                     print(f"[Groq Format] Fehler: {e}")
                 result = self._local_format_fallback(clean_text, formatting_failed=True)

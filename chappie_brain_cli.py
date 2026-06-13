@@ -645,8 +645,16 @@ class CHAPPiEBrainCLI:
 
             fmt_source = result.get("formatting_source", "local_fallback")
             fmt_model = result.get("formatting_model", "?")
-            fmt_color = "green" if fmt_source == "groq" else "yellow"
-            fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+            fmt_failed = result.get("formatting_failed", False)
+            if fmt_failed:
+                fmt_color = "red"
+                fmt_label = f"LOCAL (Groq-API fehlgeschlagen)"
+            elif fmt_source == "groq":
+                fmt_color = "green"
+                fmt_label = "GROQ"
+            else:
+                fmt_color = "yellow"
+                fmt_label = "LOCAL"
             table.add_row("Format:", f"[{fmt_color}]{fmt_label}[/] ({fmt_model})")
 
             focus = (workspace.get("dominant_focus") or {})
@@ -702,8 +710,13 @@ class CHAPPiEBrainCLI:
             print(f"  [STEER]   {prompt_mode} | {dom} ({steering.get('dominant_strength', 0):.2f})")
             print(f"  [TONE]    {tone.get('tone', '?')}")
             fmt_source = result.get("formatting_source", "local_fallback")
-            fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
-            print(f"  [FORMAT]  {fmt_label} ({result.get('formatting_model', '?')})")
+            fmt_failed = result.get("formatting_failed", False)
+            if fmt_failed:
+                fmt_label = "LOCAL (Groq-API fehlgeschlagen)"
+                print(f"  {Colors.ERROR}[FORMAT]  {fmt_label} ({result.get('formatting_model', '?')}){Colors.RESET}")
+            else:
+                fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+                print(f"  [FORMAT]  {fmt_label} ({result.get('formatting_model', '?')})")
             if rep_events:
                 print(f"  [REP]     {', '.join(rep_events.keys())}")
             print(f"  [TIME]    {proc_time:.0f} ms | {provider}/{model}")
@@ -791,6 +804,15 @@ class CHAPPiEBrainCLI:
             proc_time = metadata.get("processing_time_ms", 0)
             intent = metadata.get("intent_type", "?")
             conf = metadata.get("intent_confidence", 0)
+            fmt_source = metadata.get("formatting_source", "local_fallback")
+            fmt_failed = metadata.get("formatting_failed", False)
+            fmt_model = metadata.get("formatting_model", "?")
+            if fmt_failed:
+                console.print(f"[red]Format: LOCAL (Groq-API fehlgeschlagen) ({fmt_model})[/]")
+            else:
+                fmt_color = "green" if fmt_source == "groq" else "yellow"
+                fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+                console.print(f"[{fmt_color}]Format: {fmt_label} ({fmt_model})[/]")
             console.print(f"[dim]Intent: {intent} ({conf:.2f}) | Time: {proc_time:.0f}ms[/]")
         else:
             cot = metadata.get("formatted_cot", "")
@@ -802,6 +824,13 @@ class CHAPPiEBrainCLI:
                 print(f"\n{Colors.THOUGHT}--- CHAPPiEs Gedanken ---\n{cot}\n---{Colors.RESET}\n")
             if answer:
                 print(f"{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {answer}\n")
+            fmt_source = metadata.get("formatting_source", "local_fallback")
+            fmt_failed = metadata.get("formatting_failed", False)
+            if fmt_failed:
+                print(f"{Colors.ERROR}  [FORMAT] LOCAL (Groq-API fehlgeschlagen) ({metadata.get('formatting_model', '?')}){Colors.RESET}")
+            else:
+                fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
+                print(f"  [FORMAT]  {fmt_label} ({metadata.get('formatting_model', '?')})")
 
     # ── full report panels ────────────────────────────────────────
 
