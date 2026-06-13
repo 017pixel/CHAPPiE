@@ -1,0 +1,99 @@
+.node {
+  position: absolute;
+  border-radius: 14px;
+  padding: 20px 22px 16px;
+  cursor: default;
+  background: linear-gradient(160deg, rgba(28,28,28,0.95), rgba(22,22,22,0.97));
+  backdrop-filter: blur(4px);
+  border: 1.5px solid rgba(255,255,255,0.06);
+  transition: border-color 0.25s;
+  z-index: 2;
+}
+.node::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.012) 0%, transparent 60%);
+  pointer-events: none;
+}
+.node:hover { border-color: rgba(255,255,255,0.14); }
+
+.node .n-icon {
+  position: absolute;
+  top: -14px;
+  left: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border: 2px solid;
+  background: var(--bg);
+  z-index: 3;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.node .n-title {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  margin-bottom: 1px;
+}
+.node .n-sub {
+  font-size: 10px;
+  opacity: 0.35;
+  font-weight: 600;
+  margin-bottom: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Sections inside nodes (Nutzen / Infos / Technisch) */
+.node .ns { margin-bottom: 6px; }
+.node .ns:last-child { margin-bottom: 0; }
+.node .ns-t {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.35;
+  margin-bottom: 1px;
+}
+.node .ns-b {
+  font-size: 10.5px;
+  line-height: 1.45;
+  opacity: 0.6;
+}
+.node .ns-b strong { color: rgba(255,255,255,0.75); font-weight: 600; }
+.node .ns-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.node .ns-chip {
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-dim);
+}
+
+/* border-color variants */
+.nc-blue .n-icon { border-color: var(--blue); color: var(--blue); }
+.nc-purple .n-icon { border-color: var(--purple); color: var(--purple); }
+.nc-green .n-icon { border-color: var(--green); color: var(--green); }
+.nc-orange .n-icon { border-color: var(--orange); color: var(--orange); }
+.nc-red .n-icon { border-color: var(--red); color: var(--red); }
+.nc-cyan .n-icon { border-color: var(--cyan); color: var(--cyan); }
+.nc-yellow .n-icon { border-color: var(--yellow); color: var(--yellow); }
+
+.nc-blue { border-left: 3px solid var(--blue); }
+.nc-purple { border-left: 3px solid var(--purple); }
+.nc-green { border-left: 3px solid var(--green); }
+.nc-orange { border-left: 3px solid var(--orange); }
+.nc-red { border-left: 3px solid var(--red); }
+.nc-cyan { border-left: 3px solid var(--cyan); }
+.nc-yellow { border-left: 3px solid var(--yellow); }

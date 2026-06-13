@@ -1,0 +1,56 @@
+#viewport {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+#viewport:active { cursor: grabbing }
+
+#board {
+  position: absolute;
+  width: 9000px;
+  height: 6600px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+#board::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 0);
+  background-size: 40px 40px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+.board-frame {
+  position: absolute;
+  inset: 25px;
+  border: 1px dashed rgba(255,255,255,0.04);
+  border-radius: 24px;
+  pointer-events: none;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.025;
+  pointer-events: none;
+}
+
+.section-title {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+}
+.section-title .h {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.section-title .s {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.25;
+  margin-top: 2px;
+}

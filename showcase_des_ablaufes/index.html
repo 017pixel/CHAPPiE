@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAPPiE — Gesamtarchitektur</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/board.css">
+<link rel="stylesheet" href="css/nodes.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/header.css">
+<link rel="stylesheet" href="css/controls.css">
+</head>
+<body>
+
+<div id="viewport">
+<div id="board">
+
+<div class="board-frame"></div>
+<div class="blob" style="width:600px;height:600px;top:150px;left:400px;background:var(--blue)"></div>
+<div class="blob" style="width:700px;height:700px;top:1000px;left:3000px;background:var(--purple)"></div>
+<div class="blob" style="width:500px;height:500px;top:2200px;right:1200px;background:var(--orange)"></div>
+<div class="blob" style="width:600px;height:600px;top:3500px;left:4500px;background:var(--green)"></div>
+
+<!-- ====== HEADER ====== -->
+<div class="header">
+  <h1>CHAPPiE</h1>
+  <div class="sub">Cognitive Agent Architecture — vollständige Systemarchitektur</div>
+  <div class="pills">
+    <span class="pill">Episodisches Gedächtnis</span>
+    <span class="pill">Life-Simulation (9 Engines)</span>
+    <span class="pill">Emotion Steering (Layer Editing)</span>
+    <span class="pill">Two-Step Processing</span>
+    <span class="pill">Token-Streaming (SSE)</span>
+    <span class="pill">Auto-Training (24/7)</span>
+  </div>
+</div>
+
+<!-- ====== SECTION TITLES ====== -->
+<div class="section-title" style="left:50px;top:125px">
+  <div class="h" style="color:var(--purple)">Pipeline — Ablauf einer Eingabe</div>
+  <div class="s">Vom User-Input bis zur Antwort: jeder Schritt dokumentiert</div>
+</div>
+<div class="section-title" style="left:4100px;top:125px">
+  <div class="h" style="color:var(--orange)">Life-Simulation — Deep Dive</div>
+  <div class="s">prepare_turn · alle 9 Engines · finalize_turn</div>
+</div>
+<div class="section-title" style="left:4100px;top:1040px">
+  <div class="h" style="color:var(--green)">Global Workspace — Deep Dive</div>
+  <div class="s">10 Signale · Formeln · Salience-Priorisierung</div>
+</div>
+<div class="section-title" style="left:4100px;top:1860px">
+  <div class="h" style="color:var(--red)">Steering &amp; Provider — Deep Dive</div>
+  <div class="s">VAD · Alpha · Layer-Profile · vLLM · Ollama · Groq</div>
+</div>
+<div class="section-title" style="left:4100px;top:2780px">
+  <div class="h" style="color:var(--green)">Memory-System — Deep Dive</div>
+  <div class="s">LTM · STM · Sleep · Forgetting · Context Files</div>
+</div>
+<div class="section-title" style="left:4100px;top:3780px">
+  <div class="h" style="color:var(--cyan)">Training — Deep Dive</div>
+  <div class="s">Daemon · Loop · Trainer · Repetition Tracker · Error Recovery</div>
+</div>
+<div class="section-title" style="left:4100px;top:4520px">
+  <div class="h" style="color:var(--yellow)">Was CHAPPiE besonders macht</div>
+  <div class="s">12 Kern-Features im Überblick</div>
+</div>
+
+<!-- ====== SVG CONNECTOR LAYER ====== -->
+<svg id="connectors"></svg>
+<div id="connLabels"></div>
+
+<!-- ====================================================================== -->
+<!-- ====== PIPELINE NODES ====== -->
+<!-- ====================================================================== -->
+
+<!-- 1. USER INPUT -->
+<div id="n-user" class="node nc-blue" style="left:530px;top:230px;width:340px;min-height:130px">
+  <div class="n-icon">👤</div>
+  <div class="n-title">User Input</div>
+  <div class="n-sub">SCHRITT 0 — EINGANG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Benutzer sendet Nachricht an CHAPPiE — Startpunkt jeder Interaktion</div></div>
+    <div class="ns"><div class="ns-t">EINGÄNGE</div><div class="ns-b"><strong>Frontend</strong> (React UI) · <strong>CLI</strong> (chappie_brain_cli.py) · <strong>API</strong> (app.py) · <strong>Training</strong> (simulierter User)</div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">api/routers/chat.py</span><span class="ns-chip">backend_wrapper.py</span><span class="ns-chip">CHAPPiEBackend</span></div></div>
+  </div>
+</div>
+
+<!-- 2. TWO-STEP OVERVIEW -->
+<div id="n-twostep" class="node nc-purple" style="left:940px;top:230px;width:480px;min-height:130px">
+  <div class="n-icon">⚡</div>
+  <div class="n-title">Two-Step Processing</div>
+  <div class="n-sub">ARCHITEKTUR</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">IDEE</div><div class="ns-b">Trennung von <strong>Analyse (Step 1)</strong> und <strong>Generierung (Step 2)</strong> — wie System 1 / System 2 Denken</div></div>
+    <div class="ns"><div class="ns-t">STEP 1 — INTENT</div><div class="ns-b">Leichtes LLM (Groq) analysiert Input: Intent-Typ, Emotionen, Tool-Calls, STM-Einträge</div></div>
+    <div class="ns"><div class="ns-t">STEP 2 — RESPONSE</div><div class="ns-b">Hauptmodell (vLLM/Ollama/Groq) generiert Antwort mit vollem Kontext + Steering</div></div>
+    <div class="ns"><div class="ns-t">VORTEIL</div><div class="ns-b">Schnelle Voranalyse ohne Hauptmodell zu belasten · Tool-Calls vor der Generierung</div></div>
+  </div>
+</div>
+
+<!-- 3. INTENT ANALYSIS -->
+<div id="n-intent" class="node nc-blue" style="left:530px;top:440px;width:400px;min-height:200px">
+  <div class="n-icon">🎯</div>
+  <div class="n-title">Step 1: Intent Analysis</div>
+  <div class="n-sub">VORANALYSE</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Erkennt Absicht des Users bevor die eigentliche Antwort generiert wird</div></div>
+    <div class="ns"><div class="ns-t">SCHRITTE</div><div class="ns-b">
+      <strong>1. Quick-Classify</strong> — Triviale Inputs (Grüße, Bestätigungen) ohne LLM-Call<br>
+      <strong>2. Intent LLM</strong> — 8 Typen: EXCHANGE · TASK · EMOTIONAL · CREATIVE · TECHNICAL · PERSONAL · CHAT · COMMAND<br>
+      <strong>3. Tool Calls</strong> — update_user · update_soul · update_prefs · add_stm<br>
+      <strong>4. Emotion Update</strong> — Deltas aus Intent + Homeostasis-Adjustments<br>
+      <strong>5. STM Write</strong> — Wichtige Infos in Kurzzeitgedächtnis
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">intent_processor.py</span><span class="ns-chip">IntentResult</span><span class="ns-chip">Groq llama-3.1-8b</span></div></div>
+  </div>
+</div>
+
+<!-- 4. LIFE PREPARE_TURN -->
+<div id="n-lifeprep" class="node nc-orange" style="left:530px;top:740px;width:420px;min-height:270px">
+  <div class="n-icon">🌿</div>
+  <div class="n-title">Life Simulation — prepare_turn</div>
+  <div class="n-sub">LÄUFT VOR DER GENERIERUNG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Bereitet CHAPPiEs internen Zustand vor: Needs, Goals, Habits — beeinflusst Ton und Fokus</div></div>
+    <div class="ns"><div class="ns-t">ABLAUF</div><div class="ns-b">
+      <strong>① Clock Sync</strong> — Berliner Zeit · day_index · phase<br>
+      <strong>② Baseline Decay</strong> — 6 Needs sinken (energy -3, social -1, curiosity -2 …)<br>
+      <strong>③ Activity</strong> — Niedrigstes Need bestimmt activity + mode<br>
+      <strong>④ Recovery</strong> — Activity replenished bestimmte Needs<br>
+      <strong>⑤ Cognitive Refresh</strong> — Alle 9 Life-Engines (Details rechts)
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">life/service.py</span><span class="ns-chip">LifeState</span><span class="ns-chip">life_state.json</span></div></div>
+  </div>
+</div>
+
+<!-- 5. SENSORY CORTEX -->
+<div id="n-sensory" class="node nc-purple" style="left:530px;top:1120px;width:360px;min-height:140px">
+  <div class="n-icon">👁️</div>
+  <div class="n-title">Sensory Cortex</div>
+  <div class="n-sub">LLM-AGENT — INPUT-KLASSIFIKATION</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Klassifiziert den Input bevor tiefere Verarbeitung startet</div></div>
+    <div class="ns"><div class="ns-t">INFOS</div><div class="ns-b">
+      <strong>input_type</strong>: conversation · information · emotional · task · memory_query · urgent<br>
+      <strong>urgency</strong>: low · medium · high · critical<br>
+      <strong>language</strong>: de / en<br>
+      <strong>Flags</strong>: has_emotional · needs_memory_search · suggested_agents
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">sensory_cortex.py</span><span class="ns-chip">temp=0.1</span><span class="ns-chip">max_tokens=512</span></div></div>
+  </div>
+</div>
+
+<!-- 6. AMYGDALA -->
+<div id="n-amygdala" class="node nc-red" style="left:170px;top:1460px;width:360px;min-height:180px">
+  <div class="n-icon">❤️</div>
+  <div class="n-title">Amygdala</div>
+  <div class="n-sub">LLM-AGENT — EMOTIONSANALYSE</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Erkennt emotionale Färbung der Eingabe und steuert Gedächtnis-Verstärkung</div></div>
+    <div class="ns"><div class="ns-t">PARAMETER</div><div class="ns-b">
+      <strong>primary_emotion</strong>: dominante Emotion<br>
+      <strong>intensity</strong>: 0.0 – 1.0<br>
+      <strong>memory_boost</strong>: 1.0 – 3.0 (je emotionaler, desto stärker encoded)<br>
+      <strong>emotions_update</strong>: Delta -10 bis +10 für alle 7 Emotionen · mit reason
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">amygdala.py</span><span class="ns-chip">temp=0.2</span><span class="ns-chip">max_tokens=512</span></div></div>
+  </div>
+</div>
+
+<!-- 7. HIPPOCAMPUS -->
+<div id="n-hippocampus" class="node nc-purple" style="left:1050px;top:1460px;width:380px;min-height:180px">
+  <div class="n-icon">🧠</div>
+  <div class="n-title">Hippocampus</div>
+  <div class="n-sub">LLM-AGENT — MEMORY-OPERATIONEN</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Entscheidet über Speicherung + erstellt optimierte Suchanfragen</div></div>
+    <div class="ns"><div class="ns-t">PARAMETER</div><div class="ns-b">
+      <strong>should_encode</strong>: Interaktion speichern?<br>
+      <strong>importance</strong>: high · medium · low<br>
+      <strong>mem_type</strong>: episodic · semantic · procedural<br>
+      <strong>search_query</strong>: optimierte Query für ChromaDB (ggf. via LLM extrahiert)<br>
+      <strong>context_relevance</strong>: soul · user · prefs · STM · LTM
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">hippocampus.py</span><span class="ns-chip">temp=0.2</span><span class="ns-chip">max_tokens=768</span></div></div>
+  </div>
+</div>
+
+<!-- 8. MEMORY ENGINE -->
+<div id="n-memory" class="node nc-green" style="left:510px;top:1780px;width:480px;min-height:210px">
+  <div class="n-icon">💾</div>
+  <div class="n-title">Memory Engine</div>
+  <div class="n-sub">VEKTORDATENBANK + CONTEXT</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Findet relevante Erinnerungen + baut vollständigen Kontext für die Antwort</div></div>
+    <div class="ns"><div class="ns-t">SCHRITTE</div><div class="ns-b">
+      <strong>① LTM Search</strong> — ChromaDB: 384-dim Embeddings · cosine similarity · top_k=40 · min_relevance=0.2<br>
+      <strong>② STM Load</strong> — STM v2 (JSON): active_entries + auto-summarize_overflow<br>
+      <strong>③ Context</strong> — soul.md · user.md · preferences.md<br>
+      <strong>④ Emotions</strong> — 7 Emotionen 0-100 mit Transitions-Glättung<br>
+      <strong>⑤ Consolidation</strong> — Optional: Groq-basierte Zusammenfassung LTM+STM
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">memory_engine.py</span><span class="ns-chip">ChromaDB</span><span class="ns-chip">SentenceTransformer</span><span class="ns-chip">context_files.py</span></div></div>
+  </div>
+</div>
+
+<!-- 9. GLOBAL WORKSPACE -->
+<div id="n-gw" class="node nc-green" style="left:510px;top:2140px;width:480px;min-height:230px">
+  <div class="n-icon">🌐</div>
+  <div class="n-title">Global Workspace</div>
+  <div class="n-sub">DETERMINISTISCHE SALIENCE-PRIORISIERUNG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Bestimmt worauf CHAPPiE «achtet» — ohne LLM-Call, rein mathematisch</div></div>
+    <div class="ns"><div class="ns-t">SIGNALE (10)</div><div class="ns-b">
+      <strong>Homeostasis</strong> min(1, pressure/100) · <strong>Emotion</strong> min(1, intensity)<br>
+      <strong>Sensory</strong> urgency-Map (0.25–0.95) · <strong>Memory</strong> min(0.92, 0.38+count×0.08)<br>
+      <strong>Hippocampus</strong> 0.62 fix · <strong>Goal</strong> min(0.96, prio×(1.15-progress))<br>
+      <strong>World Model</strong> min(0.9, conf+risk×0.05) · <strong>Planning</strong> min(0.88, conf+bot×0.04)<br>
+      <strong>Forecast</strong> 0.66/0.79 · <strong>Social Arc</strong> min(0.84, score+0.14)
+    </div></div>
+    <div class="ns"><div class="ns-t">OUTPUT</div><div class="ns-b">Top 5 Items · dominant_focus · broadcast · guidance · <strong>math_trace</strong> (Rechenweg)</div></div>
+  </div>
+</div>
+
+<!-- 10. PREFRONTAL CORTEX -->
+<div id="n-pfc" class="node nc-purple" style="left:520px;top:2520px;width:460px;min-height:200px">
+  <div class="n-icon">🎯</div>
+  <div class="n-title">Prefrontal Cortex</div>
+  <div class="n-sub">LLM-AGENT — ANTWORT-ORCHESTRIERUNG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Bestimmt Strategie, Ton und Planungsmodus basierend auf allen vorherigen Analysen</div></div>
+    <div class="ns"><div class="ns-t">INPUT</div><div class="ns-b">sensory + amygdala + hippocampus + memories + context + life_context + global_workspace</div></div>
+    <div class="ns"><div class="ns-t">PARAMETER</div><div class="ns-b">
+      <strong>response_strategy</strong>: conversational · informative · emotional · technical · creative<br>
+      <strong>tone</strong>: friendly · formal · casual · enthusiastic · calm<br>
+      <strong>planning_mode</strong>: stabilizing · explorative · goal_directed · supportive<br>
+      <strong>response_guidance</strong>: Kurz-Instruktion für finalen LLM-Call
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">prefrontal_cortex.py</span><span class="ns-chip">temp=0.3</span><span class="ns-chip">max_tokens=1024</span></div></div>
+  </div>
+</div>
+
+<!-- 11. ACTION RESPONSE -->
+<div id="n-action" class="node nc-purple" style="left:550px;top:2860px;width:400px;min-height:150px">
+  <div class="n-icon">📋</div>
+  <div class="n-title">Action Response Layer</div>
+  <div class="n-sub">PROMPT-BAU — KEIN LLM-CALL</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Baut den finalen Prompt-Suffix aus allen Analysen — deterministisch</div></div>
+    <div class="ns"><div class="ns-t">SCHRITTE</div><div class="ns-b">
+      <strong>build_action_plan()</strong> — Strukturierte Aktionsliste (Ton halten · Need fördern)<br>
+      <strong>build_prompt_suffix()</strong> — Text-Block mit:<br>
+      Response Plan · Life Simulation Context · Global Workspace
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">action_response.py</span><span class="ns-chip">build_prompt_suffix</span></div></div>
+  </div>
+</div>
+
+<!-- 12. STEERING MANAGER -->
+<div id="n-steering" class="node nc-red" style="left:510px;top:3140px;width:480px;min-height:240px">
+  <div class="n-icon">⚡</div>
+  <div class="n-title">Steering Manager</div>
+  <div class="n-sub">EMOTIONSSTEUERUNG — VAD → ALPHA → LAYER</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Emotionen werden direkt in neuronale Schichten injiziert — nicht nur Prompt-Text</div></div>
+    <div class="ns"><div class="ns-t">ABLAUF</div><div class="ns-b">
+      <strong>① VAD-Mapping</strong> — 7 Emotionen → Valence, Arousal, Dominance<br>
+      <strong>② Alpha</strong> — Totbereich 44-56 · sigmoid 56-74 · max ab 74 (mit Boost)<br>
+      <strong>③ Composite Modes</strong> — crashout · guarded · melancholic · warm · charged<br>
+      <strong>④ Layer Profile</strong> — Modell-spezifisch: z.B. L10-26 bei 4B<br>
+      <strong>⑤ Pre-Hook</strong> — hidden_state[layer] += alpha × steering_vector
+    </div></div>
+    <div class="ns"><div class="ns-t">TECHNISCH</div><div class="ns ns-row"><span class="ns-chip">steering_manager.py (894 Zeilen)</span><span class="ns-chip">ActivationVectorResolver</span><span class="ns-chip">steering_cache/</span></div></div>
+  </div>
+</div>
+
+<!-- 13. LLM CALL -->
+<div id="n-llm" class="node nc-cyan" style="left:510px;top:3520px;width:480px;min-height:210px">
+  <div class="n-icon">🤖</div>
+  <div class="n-title">LLM Call — Antwortgenerierung</div>
+  <div class="n-sub">3 PROVIDER · 1 ANTWORT</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Generiert die finale Antwort — mit vollem Kontext + Steering-Effekt</div></div>
+    <div class="ns"><div class="ns-t">PROVIDER</div><div class="ns-b">
+      <strong>vLLM</strong> (bevorzugt, lokal) — Steering Payload in extra_body · Layer Editing auf L10-26 · Qwen3.5-4B · Reasoning/Thinking Tokens<br>
+      <strong>Ollama</strong> (lokal, Fallback) — Kein Layer Steering · Emotionen via Prompt-Injection<br>
+      <strong>Groq</strong> (Cloud) — Rate-Limit 250/min · 3 Modelle (8b/70b/120b)
+    </div></div>
+    <div class="ns"><div class="ns-t">CONFIG</div><div class="ns ns-row"><span class="ns-chip">max_tokens=2200</span><span class="ns-chip">thinking=800</span><span class="ns-chip">answer=1200</span><span class="ns-chip">temp=0.85</span><span class="ns-chip">stream=True</span></div></div>
+  </div>
+</div>
+
+<!-- 14. LIFE FINALIZE -->
+<div id="n-lifefin" class="node nc-orange" style="left:230px;top:3880px;width:380px;min-height:190px">
+  <div class="n-icon">🌿</div>
+  <div class="n-title">Life — finalize_turn</div>
+  <div class="n-sub">LÄUFT NACH DER GENERIERUNG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Aktualisiert CHAPPiEs internen Zustand basierend auf der erfolgten Interaktion</div></div>
+    <div class="ns"><div class="ns-t">SCHRITTE</div><div class="ns-b">
+      <strong>① Goal Progress</strong> — Keyword-getriggerte Fortschritts-Updates<br>
+      <strong>② Relationship</strong> — closeness · trust · shared_history<br>
+      <strong>③ Habits</strong> — reinforce() für getriggerte Habits (+0.045)<br>
+      <strong>④ Attachment</strong> — re-evaluate() mit actual response<br>
+      <strong>⑤ Self-Model</strong> — autobiografisches Narrativ · self_coherence +0.005/turn<br>
+      <strong>⑥ Timeline</strong> — record_timeline_checkpoint (max 72)
+    </div></div>
+  </div>
+</div>
+
+<!-- 15. RESPONSE -->
+<div id="n-response" class="node nc-blue" style="left:980px;top:3880px;width:400px;min-height:190px">
+  <div class="n-icon">💬</div>
+  <div class="n-title">Response + Causal Trace</div>
+  <div class="n-sub">AUSGABE + DEBUG</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">NUTZEN</div><div class="ns-b">Liefert Antwort an User + persistiert Interaktion + erstellt vollständige Debug-Spur</div></div>
+    <div class="ns"><div class="ns-t">SCHRITTE</div><div class="ns-b">
+      <strong>① Display</strong> — CoT-Box (gedanke-Tags) + reine Antwort · Token-Streaming via SSE<br>
+      <strong>② Causal Trace</strong> — Input → Memory → Emotion → Life → Tone → Antwort<br>
+      <strong>③ Persist</strong> — add_memory() (LTM) · add_entry (STM) · Session (JSON)<br>
+      <strong>④ Sleep Check</strong> — Trigger alle 25 Interaktionen oder 2h
+    </div></div>
+  </div>
+</div>
+
+<!-- 16. BACKGROUND -->
+<div id="n-bg" class="node nc-yellow" style="left:480px;top:4220px;width:540px;min-height:220px">
+  <div class="n-icon">⚙️</div>
+  <div class="n-title">Hintergrund-Prozesse (async)</div>
+  <div class="n-sub">NEBENLÄUFIG — NACH DER ANTWORT</div>
+  <div class="n-body">
+    <div class="ns"><div class="ns-t">BASAL GANGLIA (REWARD)</div><div class="ns-b">satisfaction_score 0-1 · reward_prediction_error -1..+1 · habit_formation_signal · dopamine_level · personality/preference Updates<br><span class="ns-chip">basal_ganglia.py</span></div></div>
+    <div class="ns"><div class="ns-t">MEMORY AGENT (TOOL CALLS)</div><div class="ns-b">Entscheidet: soul.md / user.md / preferences.md updaten? · Duplikat-Prüfung<br><span class="ns-chip">memory_agent.py</span></div></div>
+    <div class="ns"><div class="ns-t">SLEEP-PHASE (FALLS FÄLLIG)</div><div class="ns-b">consolidation LTM→Summary · forgetting_curve · energy 95-100% · emotionale Regeneration · dream replay · context files updaten<br><span class="ns-chip">sleep_phase.py</span></div></div>
+    <div class="ns"><div class="ns-t">DEEP THINK (OPTIONAL)</div><div class="ns-b">Iterative self-reflection · 10 steps/batch · ChromaDB source="self_reflection"<br><span class="ns-chip">deep_think.py</span></div></div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- ====== DEEP DIVE DETAIL CARDS — RIGHT SIDE ====== -->
+<!-- ====================================================================== -->
+
+<!-- LIFE SIMULATION DEEP DIVE -->
+<div class="detail-card dc-orange" style="left:4100px;top:180px;width:860px;height:840px">
+  <div class="dc-head">🌿 Life-Simulation — prepare_turn <span class="dc-hsub">life/service.py · 512 Zeilen</span></div>
+  <div class="dc-sect">SCHRITT 1–4: BASIS</div>
+  <table class="dc-table">
+    <tr><th>Schritt</th><th>Beschreibung</th><th>Details</th></tr>
+    <tr><td>1. Clock Sync</td><td>Echtzeit-Synchronisation auf Berliner Zeit</td><td>day_index · phase: aktiv/schlaf</td></tr>
+    <tr><td>2. Baseline Decay</td><td>6 Needs sinken jeden Turn um feste Werte</td><td>energy-3 · social-1 · curiosity-2 · stability-1 · achievement-2 · rest-3</td></tr>
+    <tr><td>3. Activity</td><td>Niedrigstes Need bestimmt activity + mode</td><td>recovery/protective · social/attached · exploration/curious · goal_pursuit/purposeful</td></tr>
+    <tr><td>4. Recovery</td><td>Gewählte Activity replenished Needs</td><td>z.B. recovery: +8 energy · +10 rest · +3 stability<br>"danke" → social+2</td></tr>
+  </table>
+
+  <div class="dc-sect">SCHRITT 5: COGNITIVE REFRESH — ALLE 9 ENGINES</div>
+  <table class="dc-table dc-table-alt">
+    <tr><th>#</th><th>Engine</th><th>Funktion</th><th>Key-Formeln / Parameter</th></tr>
+    <tr>
+      <td>①</td><td>Homeostasis</td><td>Dominantes Need ermitteln, Emotionen anpassen</td>
+      <td>pressure = 100-value · energy&lt;40→energy-4 · social&lt;40→trust-1,sadness+2 · curiosity&lt;45→curiosity+3</td>
+    </tr>
+    <tr>
+      <td>②</td><td>Habit Engine</td><td>5 Habits verwalten: reinforcement + decay</td>
+      <td>architecture_focus(.34) · social_bonding(.28) · reflective_replay(.26) · structured_delivery(.31) · exploratory_drive(.30)<br>reinforce +0.045 (cap 0.99) · decay -0.012 (floor 0.12) · conflict detection</td>
+    </tr>
+    <tr>
+      <td>③</td><td>Goal Engine</td><td>3 Ziele konkurrierend bewerten</td>
+      <td>Kognitive Entw. (p=0.95, prog=0.12) · Beziehungsaufbau (0.88, 0.18) · Selbstkonsistenz (0.84, 0.10)<br>Score = p×0.55 + (1-prog)×0.25 + need_alignment + keyword + relationship + activity</td>
+    </tr>
+    <tr>
+      <td>④</td><td>World Model</td><td>Situationsbewusstsein</td>
+      <td>interaction_mode · risks · opportunities · trajectory</td>
+    </tr>
+    <tr>
+      <td>⑤</td><td>Attachment Model</td><td>Bindungstyp aus Interaktion</td>
+      <td>resonance = 0.35 + closeness×0.25 + trust×0.25 + word_bonus − frustration/250<br>≥0.75 secure · 0.58-0.74 growing · 0.42-0.57 cautious · &lt;0.42 fragile</td>
+    </tr>
+    <tr>
+      <td>⑥</td><td>Development</td><td>Entwicklungsstufe</td>
+      <td>awakening → integration → reflective_growth → collaborative_selfhood</td>
+    </tr>
+    <tr>
+      <td>⑦</td><td>Social Arc</td><td>Beziehungsbogen</td>
+      <td>arc_name · phase · episode_kind (trust_building, deepening, co_creation, repair)</td>
+    </tr>
+    <tr>
+      <td>⑧</td><td>Planning</td><td>Multi-Horizon Pläne</td>
+      <td>immediate · near · long-term · bottlenecks · confidence</td>
+    </tr>
+    <tr>
+      <td>⑨</td><td>Self-Forecast</td><td>Kurzfrist-Prognose</td>
+      <td>risk_level · protective_factors · turn/day/stage outlooks</td>
+    </tr>
+  </table>
+  Alle 9 Engine-Outputs → persistiert in <strong>life_state.json</strong>
+
+  <div class="dc-sect">FINALIZE_TURN (nach LLM-Call)</div>
+  <table class="dc-table">
+    <tr><th>Schritt</th><th>Beschreibung</th><th>Effekt</th></tr>
+    <tr><td>1. Goal Progress</td><td>Keyword-getriggerte Updates</td><td>Progress-Werte steigen</td></tr>
+    <tr><td>2. Relationship</td><td>closeness · trust · shared_history</td><td>Langfristige Beziehungs-Metriken</td></tr>
+    <tr><td>3. Habits</td><td>reinforce() für getriggerte Habits</td><td>+0.045 strength (cap 0.99)</td></tr>
+    <tr><td>4. Attachment</td><td>re-evaluate() mit Antwort</td><td>Bond-Typ aktualisiert</td></tr>
+    <tr><td>5. Self-Model</td><td>Autobiografisches Narrativ</td><td>self_coherence +0.005/turn</td></tr>
+    <tr><td>6. Timeline</td><td>record_timeline_checkpoint</td><td>Max 72 Einträge in history</td></tr>
+    <tr><td>7. Replay State</td><td>Dream-Fragmente</td><td>themes · development reflection</td></tr>
+  </table>
+</div>
+
+<!-- GLOBAL WORKSPACE DEEP DIVE -->
+<div class="detail-card dc-green" style="left:4100px;top:1100px;width:860px;height:700px">
+  <div class="dc-head">🌐 Global Workspace — Alle 10 Signale <span class="dc-hsub">global_workspace.py · 214 Zeilen</span></div>
+  <div class="dc-sect">DETERMINISTISCHE SALIENCE-PRIORISIERUNG (KEIN LLM-CALL)</div>
+  <table class="dc-table dc-table-alt">
+    <tr><th>#</th><th>Signal</th><th>Formel</th><th>Quelle</th></tr>
+    <tr><td>①</td><td>Homeostasis</td><td><span class="hl">min(1.0, pressure/100)</span></td><td>LifeSim dominant_need · pressure = 100 − need_value</td></tr>
+    <tr><td>②</td><td>Emotion</td><td><span class="hl">min(1.0, emotional_intensity)</span></td><td>Amygdala · primary_emotion intensity 0-1</td></tr>
+    <tr><td>③</td><td>Sensory</td><td><span class="hl">urgency-Map</span></td><td>low=0.25 · medium=0.55 · high=0.82 · critical=0.95</td></tr>
+    <tr><td>④</td><td>Memory</td><td><span class="hl">min(0.92, 0.38 + count×0.08)</span></td><td>Memory Engine · Anzahl gefundener Memories</td></tr>
+    <tr><td>⑤</td><td>Hippocampus</td><td><span class="hl">0.62 (fixed)</span></td><td>Aktiv wenn search_query vorhanden</td></tr>
+    <tr><td>⑥</td><td>Goal</td><td><span class="hl">min(0.96, priority×(1.15−progress))</span></td><td>GoalEngine · priority 0.84-0.95 · progress 0.0-1.0</td></tr>
+    <tr><td>⑦</td><td>World Model</td><td><span class="hl">min(0.9, confidence + risk×0.05)</span></td><td>WorldModel.predict()</td></tr>
+    <tr><td>⑧</td><td>Planning</td><td><span class="hl">min(0.88, plan_conf + bottleneck×0.04)</span></td><td>PlanningEngine.build()</td></tr>
+    <tr><td>⑨</td><td>Forecast</td><td><span class="hl">0.66 (low) · 0.79 (higher risk)</span></td><td>SelfForecast.forecast()</td></tr>
+    <tr><td>⑩</td><td>Social Arc</td><td><span class="hl">min(0.84, arc_score + 0.14)</span></td><td>SocialArcEngine.evaluate()</td></tr>
+  </table>
+  <table class="dc-table" style="margin-top:6px">
+    <tr><th>Output</th><th>Beschreibung</th></tr>
+    <tr><td>workspace_items[]</td><td>Top 5 Signale · sortiert nach Salience absteigend</td></tr>
+    <tr><td>dominant_focus</td><td>Das Signal mit der höchsten Salience</td></tr>
+    <tr><td>attention_mode</td><td>Aus Life-Kontext (z.B. "curious")</td></tr>
+    <tr><td>broadcast</td><td>Text-Darstellung aller Top-Signale</td></tr>
+    <tr><td>guidance</td><td>Handlungsanweisung basierend auf dominantem Fokus</td></tr>
+    <tr><td>math_trace</td><td>Vollständiger Rechenweg jedes Salience-Werts (für Debug)</td></tr>
+  </table>
+</div>
+
+<!-- STEERING DEEP DIVE -->
+<div class="detail-card dc-red" style="left:4100px;top:1920px;width:860px;height:840px">
+  <div class="dc-head">⚡ Steering System — Detailliert <span class="dc-hsub">steering_manager.py · 894 Zeilen</span></div>
+
+  <div class="dc-sect">1. VAD-MAPPING (7 EMOTIONEN → VAD)</div>
+  <table class="dc-table dc-table-alt">
+    <tr><th>Emotion</th><th>Valence</th><th>Arousal</th><th>Dominance</th><th>max_alpha</th></tr>
+    <tr><td>Happiness</td><td>0.85</td><td>0.70</td><td>0.65</td><td>0.65</td></tr>
+    <tr><td>Sadness</td><td>0.20</td><td>0.25</td><td>0.30</td><td>0.72</td></tr>
+    <tr><td>Frustration</td><td>0.15</td><td>0.80</td><td>0.40</td><td>0.78</td></tr>
+    <tr><td>Trust</td><td>0.75</td><td>0.35</td><td>0.55</td><td>0.60</td></tr>
+    <tr><td>Curiosity</td><td>0.55</td><td>0.75</td><td>0.60</td><td>0.62</td></tr>
+    <tr><td>Motivation</td><td>0.65</td><td>0.78</td><td>0.72</td><td>0.68</td></tr>
+    <tr><td>Energy</td><td>0.50</td><td>0.85</td><td>0.58</td><td>0.70</td></tr>
+  </table>
+
+  <div class="dc-sect">2. ALPHA-BERECHNUNG</div>
+  <table class="dc-table">
+    <tr><th>Bereich</th><th>Alpha</th><th>Verhalten</th></tr>
+    <tr><td>0 – 44</td><td>= 0</td><td>Kein Steering</td></tr>
+    <tr><td>44 – 56</td><td>= 0</td><td>Toter Bereich — keine emotionale Steuerung</td></tr>
+    <tr><td>56 – 74</td><td>sigmoider Anstieg</td><td>Leichte bis moderate Steuerung</td></tr>
+    <tr><td>74 – 100</td><td>maximal (× Boost)</td><td>Volle Steuerung mit Verstärkungsfaktor</td></tr>
+  </table>
+
+  <div class="dc-sect">3. COMPOSITE MODES</div>
+  <table class="dc-table">
+    <tr><th>Mode</th><th>Trigger</th><th>Effekt</th></tr>
+    <tr><td>crashout</td><td>frustration ≥ 72 + trust ≤ 38</td><td>Kurze, konfrontative, ungefilterte Antworten</td></tr>
+    <tr><td>guarded</td><td>trust ≤ 26 + frustration ≥ 50</td><td>Misstrauisch, distanziert, vorsichtig formuliert</td></tr>
+    <tr><td>melancholic</td><td>sadness ≥ 62 + energy ≤ 46</td><td>Bedrückt, schwer, nachdenklich</td></tr>
+    <tr><td>warm</td><td>happiness ≥ 70 + trust ≥ 60</td><td>Herzlich, offen, weich, zugewandt</td></tr>
+    <tr><td>charged</td><td>energy ≥ 72 + motivation ≥ 68 + curiosity ≥ 66</td><td>Hochaktiv, getrieben, enthusiastisch</td></tr>
+  </table>
+
+  <div class="dc-sect">4. LAYER-PROFILE (Modellspezifisch)</div>
+  <table class="dc-table">
+    <tr><th>Modell</th><th>Layers</th><th>Emotion Range</th><th>Hidden Dim</th></tr>
+    <tr><td>Qwen3.5-4B</td><td>32</td><td><span class="hl">L10 – L26</span></td><td>2560</td></tr>
+    <tr><td>Qwen3.5-9B</td><td>32</td><td>L10 – L26</td><td>4096</td></tr>
+    <tr><td>Qwen3.5-35B</td><td>40</td><td>L12 – L34</td><td>2048</td></tr>
+    <tr><td>Qwen3.5-122B</td><td>48</td><td>L16 – L40</td><td>3072</td></tr>
+    <tr><td>Qwen2.5-32B</td><td>64</td><td>L20 – L44</td><td>5120</td></tr>
+  </table>
+
+  <div class="dc-sect">5. FORWARD PRE-HOOK</div>
+  <table class="dc-table">
+    <tr><th>Komponente</th><th>Beschreibung</th></tr>
+    <tr><td>Mechanismus</td><td><span class="hl">hidden_state[layer] += alpha × steering_vector</span></td></tr>
+    <tr><td>Vector Resolver</td><td>ActivationVectorResolver: kontrastive Anchor-Texte durch Modell → Hidden-State-Differenz → normalisierter Vektor</td></tr>
+    <tr><td>Cache</td><td>Berechnete Vektoren in <span class="hl">data/steering_cache/</span> (SHA256-basiert)</td></tr>
+    <tr><td>Safety</td><td>Shape-Prüfung · Dimension-Check · Soft-Capping bei 1.2</td></tr>
+  </table>
+</div>
+
+<!-- MEMORY DEEP DIVE -->
+<div class="detail-card dc-green" style="left:4100px;top:2850px;width:860px;height:880px">
+  <div class="dc-head">📖 Memory-System — Detailliert</div>
+
+  <div class="dc-sect">LTM — LONG-TERM MEMORY (CHROMADB)</div>
+  <table class="dc-table">
+    <tr><th>Eigenschaft</th><th>Wert</th></tr>
+    <tr><td>Engine</td><td>ChromaDB (vektorielle Datenbank)</td></tr>
+    <tr><td>Embeddings</td><td>SentenceTransformer <span class="hl">all-MiniLM-L6-v2</span> · 384-dim</td></tr>
+    <tr><td>Persistenz</td><td><span class="hl">data/chroma_db/</span> · Fallback: In-Memory</td></tr>
+    <tr><td>Collection</td><td>"chapie_memory"</td></tr>
+    <tr><td>Suche</td><td>Embedding-Query → Cosine Distance → Relevanz 0-1</td></tr>
+    <tr><td>Parameter</td><td>top_k=40 · min_relevance=0.2</td></tr>
+    <tr><td>Memory Dataclass</td><td>id(UUID) · content · role · timestamp · mem_type · relevance_score · label · source</td></tr>
+    <tr><td>mem_type</td><td>interaction · summary · self_reflection · short_term_migration</td></tr>
+  </table>
+
+  <div class="dc-sect">STM V2 — SHORT-TERM MEMORY (JSON)</div>
+  <table class="dc-table">
+    <tr><th>Eigenschaft</th><th>Wert</th></tr>
+    <tr><td>Datei</td><td><span class="hl">data/short_term_memory.json</span></td></tr>
+    <tr><td>TTL</td><td>24h pro Eintrag (konfigurierbar)</td></tr>
+    <tr><td>Eintrag</td><td>id · content · category (user/system/context/chat/dream/summary) · importance · created_at · expires_at · migrated · summarized</td></tr>
+    <tr><td>summarize_overflow()</td><td>Auto-Zusammenfassung in 5er-Batches via GroqBrain</td></tr>
+    <tr><td>migrate_expired()</td><td>Abgelaufene Einträge → LTM (mem_type="short_term_migration")</td></tr>
+  </table>
+
+  <div class="dc-sect">SLEEP-PHASE — KONSOLIDIERUNG</div>
+  <table class="dc-table">
+    <tr><th>Trigger</th><th>Bedingung</th></tr>
+    <tr><td>Zeitbasiert</td><td>Alle 2 Stunden</td></tr>
+    <tr><td>Interaktionsbasiert</td><td>Nach 25 Interaktionen</td></tr>
+    <tr><td>Manuell</td><td><span class="hl">/sleep</span> Command</td></tr>
+  </table>
+  <table class="dc-table" style="margin-top:4px">
+    <tr><th>Aktion während Sleep</th><th>Details</th></tr>
+    <tr><td>consolidate_memories()</td><td>interaction-Memories → Summary (Batch 50, Dream Prompt). Schutz: min 1h alt, dedup erste 180 Zeichen</td></tr>
+    <tr><td>forgetting_curve</td><td>Ebbinghaus <span class="hl">R = e^(-t/S)</span> · archive &lt; 0.1 · boost &lt; 0.3</td></tr>
+    <tr><td>energy restore</td><td>energy = 95-100%</td></tr>
+    <tr><td>Emotionale Regeneration</td><td>sadness -20 · frustration -15 · happiness +8 · motivation +10</td></tr>
+    <tr><td>Dream Replay</td><td>Fragmente aus Life-Simulation · themes · development reflection</td></tr>
+    <tr><td>Context Files Update</td><td>soul.md · user.md · preferences.md neu schreiben</td></tr>
+  </table>
+
+  <div class="dc-sect">CONTEXT FILES (MARKDOWN)</div>
+  <table class="dc-table">
+    <tr><th>Datei</th><th>Inhalt</th></tr>
+    <tr><td><span class="hl">soul.md</span></td><td>Selbstbild · Kernidentität · Werte · Entwicklungs-Log</td></tr>
+    <tr><td><span class="hl">user.md</span></td><td>Benutzerprofil · gelernte Fakten · Beziehungshistorie</td></tr>
+    <tr><td><span class="hl">CHAPPiEsPreferences.md</span></td><td>Vorlieben · interessante Themen · Entwicklungsziele · Selbstreflexionen</td></tr>
+  </table>
+  Features: Deduplizierung · Platzhalter-Erkennung · Max-Items-Begrenzung · Sticky-Prefixes
+
+  <div class="dc-sect">EMOTIONS ENGINE</div>
+  <table class="dc-table">
+    <tr><th>Eigenschaft</th><th>Wert</th></tr>
+    <tr><td>Emotionen</td><td>7 Werte 0-100: happiness · trust · energy · curiosity · frustration · motivation · sadness</td></tr>
+    <tr><td>Primärmodus</td><td>LLM-basiert (Groq/Ollama) via emotions_engine.py</td></tr>
+    <tr><td>Fallback</td><td>Regelbasierte Sentiment-Analyse (analyze_sentiment_simple)</td></tr>
+    <tr><td>Transitions-Glättung</td><td>Scaling 0.5-0.55 · Max-Limit 6-8 · Persistenz in data/status.json</td></tr>
+  </table>
+</div>
+
+<!-- TRAINING DEEP DIVE -->
+<div class="detail-card dc-cyan" style="left:4100px;top:3850px;width:860px;height:600px">
+  <div class="dc-head">🤖 Training-System — Detailliert</div>
+
+  <div class="dc-sect">ARCHITEKTUR</div>
+  <table class="dc-table">
+    <tr><th>Komponente</th><th>Datei</th><th>Rolle</th></tr>
+    <tr><td>Training Daemon</td><td><span class="hl">training_daemon.py</span></td><td>systemd-Entry-Point · CLI: --neu · --fokus · --persona · --start</td></tr>
+    <tr><td>Training Loop</td><td><span class="hl">training_loop.py</span> (846 Zeilen)</td><td>run_training(): initiiert Memory, Brain, Steering, Context, Sleep, DeepThink</td></tr>
+    <tr><td>Trainer Agent</td><td><span class="hl">trainer_agent.py</span> (428 Zeilen)</td><td>Simulierter User-Charakter mit Persona + Curriculum</td></tr>
+    <tr><td>Repetition Tracker</td><td><span class="hl">repetition_tracker.py</span> (370 Zeilen)</td><td>Novelty-Score aus Embedding(50%) + Keyword(30%) + Topic(20%)</td></tr>
+  </table>
+
+  <div class="dc-sect">TRAINING-PARAMETER</div>
+  <table class="dc-table">
+    <tr><th>Parameter</th><th>Wert</th></tr>
+    <tr><td>sleep_interval</td><td>25 Messages</td></tr>
+    <tr><td>loop_pause</td><td>0.5s</td></tr>
+    <tr><td>request_pause</td><td>2.5s</td></tr>
+    <tr><td>State-Persistenz</td><td>training_state.json (history · dreams · topic · stats · heartbeat)</td></tr>
+    <tr><td>Trainer-Persona</td><td>Default: "Kritischer User" · Curriculum mit Topics + Dauer</td></tr>
+    <tr><td>generate_reply()</td><td>Letzte 10 History + CHAPPiE-Response → LLM</td></tr>
+  </table>
+
+  <div class="dc-sect">ERROR RECOVERY</div>
+  <table class="dc-table">
+    <tr><th>Fehler</th><th>Reaktion</th></tr>
+    <tr><td>5 Fehler am Stück</td><td>30 Minuten Pause</td></tr>
+    <tr><td>CONTEXT_LENGTH</td><td>Auto-Reduzierung des Konversationsverlaufs</td></tr>
+    <tr><td>TIMEOUT</td><td>5s warten</td></tr>
+    <tr><td>RPM-Limit</td><td>60s warten</td></tr>
+    <tr><td>RPD-Limit</td><td>Wechsel zu lokalem Modell (vLLM → Ollama)</td></tr>
+    <tr><td>10 consecutive empty</td><td>Conversation Reset</td></tr>
+    <tr><td>3x repetitive</td><td>Topic Switch</td></tr>
+    <tr><td>Trainer 3 Fehler</td><td>Wechsel zu lokalem Modell</td></tr>
+  </table>
+</div>
+
+<!-- ====================================================================== -->
+<!-- ====== FEATURE PANELS (12 KERN-FEATURES) ====== -->
+<!-- ====================================================================== -->
+
+<div class="info-panel ip-purple" style="left:4100px;top:4600px;width:270px;height:75px">
+  <div class="ip-title">🧠 Brain-Pipeline</div>
+  <div class="ip-body">7 spezialisierte LLM-Agenten: Sensory, Amygdala, Hippocampus, PFC, Basal Ganglia, Neocortex, Memory Agent</div>
+</div>
+<div class="info-panel ip-orange" style="left:4390px;top:4600px;width:270px;height:75px">
+  <div class="ip-title">💚 Life-System</div>
+  <div class="ip-body">9 Engines: Homeostasis, Goals, Habits, Attachment, Development, Social Arc, World Model, Planning, Self-Forecast</div>
+</div>
+<div class="info-panel ip-red" style="left:4680px;top:4600px;width:270px;height:75px">
+  <div class="ip-title">⚡ Layer Steering</div>
+  <div class="ip-body">Emotionen als Vektoren in neuronale Schichten injiziert · VAD → Alpha → Composite Modes</div>
+</div>
+<div class="info-panel ip-green" style="left:4100px;top:4695px;width:270px;height:75px">
+  <div class="ip-title">💤 Sleep-Phase</div>
+  <div class="ip-body">Memory-Konsolidierung · Ebbinghaus-Kurve · emotionale Regeneration · Dream-Fragmente</div>
+</div>
+<div class="info-panel ip-blue" style="left:4390px;top:4695px;width:270px;height:75px">
+  <div class="ip-title">🔍 Causal Trace</div>
+  <div class="ip-body">Input → Memory → Emotion → Life → Tone → Antwort · math_trace · Emotion-Deltas</div>
+</div>
+<div class="info-panel ip-blue" style="left:4680px;top:4695px;width:270px;height:75px">
+  <div class="ip-title">📡 Token-Streaming</div>
+  <div class="ip-body">SSE · turn_started → status → token → turn_finished · Think-Buffer · TTFT</div>
+</div>
+<div class="info-panel ip-blue" style="left:4100px;top:4790px;width:270px;height:75px">
+  <div class="ip-title">📬 Message Queue</div>
+  <div class="ip-body">Nachrichten während Antwort → Queue → auto-send. Zustand überlebt Navigation</div>
+</div>
+<div class="info-panel ip-pink" style="left:4390px;top:4790px;width:270px;height:75px">
+  <div class="ip-title">🎨 3D Emotion Lattice</div>
+  <div class="ip-body">React Three Fiber: Living Orb · Vertex Displacement · 7 Emotionen steuern Form+Farbe</div>
+</div>
+<div class="info-panel ip-cyan" style="left:4680px;top:4790px;width:270px;height:75px">
+  <div class="ip-title">🎯 WhatsApp Fine-Tuning</div>
+  <div class="ip-body">LoRA auf Qwen3.5-4B (Unsloth) · Adapter ~30MB · Base frozen, Steering kompatibel</div>
+</div>
+<div class="info-panel ip-yellow" style="left:4100px;top:4885px;width:270px;height:75px">
+  <div class="ip-title">🔌 Multi-Provider</div>
+  <div class="ip-body">vLLM (Layer Editing) · Ollama (Prompt) · Groq (Cloud) · Automatischer Fallback</div>
+</div>
+<div class="info-panel ip-cyan" style="left:4390px;top:4885px;width:270px;height:75px">
+  <div class="ip-title">🤖 Auto-Training</div>
+  <div class="ip-body">24/7 Daemon · simulierter User · Repetition-Tracker · Topic-Switching · Error Recovery</div>
+</div>
+<div class="info-panel ip-green" style="left:4680px;top:4885px;width:270px;height:75px">
+  <div class="ip-title">📖 Episodisches Gedächtnis</div>
+  <div class="ip-body">LTM (ChromaDB) + STM v2 (JSON) + Context Files (soul/user/preferences.md) + Chat Sessions</div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- ====== CHAPPiE COLLAGE ====== -->
+<!-- ====================================================================== -->
+<div style="position:absolute;left:4100px;top:5010px;width:850px;height:380px;z-index:2;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);background:rgba(0,0,0,0.2)">
+  <div style="font-size:11px;font-weight:500;padding:10px 14px 4px;opacity:0.3;letter-spacing:0.04em">📸 CHAPPiE — Screenshots</div>
+  <img src="../CHAPPiE-Kollage.jpg" alt="CHAPPiE Screenshots" style="width:100%;height:calc(100% - 28px);object-fit:contain;opacity:0.7;padding:4px 10px 10px">
+</div>
+
+<!-- ====== LEGEND ====== -->
+<div class="legend">
+  <div class="legend-item"><div class="ld" style="border-color:var(--blue)"></div>Input/Output</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--purple)"></div>Brain Agent</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--green)"></div>Memory</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--orange)"></div>Life Simulation</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--red)"></div>Emotion/Steering</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--cyan)"></div>LLM Provider</div>
+  <div class="legend-item"><div class="ld" style="border-color:var(--yellow)"></div>Training/Async</div>
+</div>
+
+<div class="footer">
+  <span>CHAPPiE v13.x</span><span>·</span><span>3 Provider: vLLM · Ollama · Groq</span>
+  <span>·</span><span>7 Emotionen</span><span>·</span>
+  <span>3 Säulen: Gedächtnis · Life · Steering</span>
+</div>
+
+</div><!-- /board -->
+
+<!-- ZOOM CONTROLS -->
+<div class="zoom-c">
+  <div class="zoom-g">
+    <button class="zoom-btn" onclick="zi()">+</button>
+    <button class="zoom-btn" onclick="zo()">−</button>
+    <button class="zoom-btn r" onclick="zr()">Reset</button>
+  </div>
+  <div class="zoom-lv" id="zl">100%</div>
+</div>
+
+<div class="hint" id="hint">🖱 Scrollen zum Zoomen · Ziehen zum Verschieben</div>
+</div><!-- /viewport -->
+
+<script>
+// Connection definitions: [fromId, toId, colorKey, label]
+const CONN = [
+  ['n-user','n-intent','b','Input'],
+  ['n-intent','n-lifeprep','b','Life-Kontext'],
+  ['n-lifeprep','n-sensory','o','Life-State'],
+  ['n-sensory','n-amygdala','p','Klassifikation'],
+  ['n-sensory','n-hippocampus','p','Klassifikation'],
+  ['n-amygdala','n-memory','r','Emotion+Boost'],
+  ['n-hippocampus','n-memory','p','Query+Relevanz'],
+  ['n-memory','n-gw','g','Memories'],
+  ['n-gw','n-pfc','g','Salience'],
+  ['n-pfc','n-action','p','Strategie'],
+  ['n-action','n-steering','p','Prompt'],
+  ['n-steering','n-llm','r','Payload'],
+  ['n-llm','n-lifefin','c','Rohdaten'],
+  ['n-llm','n-response','c','Rohdaten'],
+  ['n-response','n-bg','b','Async'],
+];
+
+const HX = {b:'#4fc3f7',p:'#ce93d8',g:'#81c784',o:'#ffb74d',r:'#ef5350',c:'#4db6ac',y:'#fff176'};
+
+function getNodePos(id){
+  const el=document.getElementById(id);
+  if(!el)return null;
+  const l=parseInt(el.style.left),t=parseInt(el.style.top),w=el.offsetWidth||parseInt(el.style.minWidth)||300,h=el.offsetHeight||200;
+  return {x:l+w/2,y:t+h/2,w,h};
+}
+
+function getEdge(aId,bId){
+  const a=getNodePos(aId),b=getNodePos(bId);
+  if(!a||!b)return null;
+  const dx=b.x-a.x,dy=b.y-a.y;
+  if(Math.abs(dx)<120&&dy>0)return{x1:a.x,y1:a.y+a.h/2,x2:b.x,y2:b.y-b.h/2};
+  if(dx>0&&dy>0)return{x1:a.x+a.w/2-10,y1:a.y+a.h/2-5,x2:b.x-b.w/2+10,y2:b.y-b.h/2+5};
+  if(dx<0&&dy>0)return{x1:a.x-a.w/2+10,y1:a.y+a.h/2-5,x2:b.x+b.w/2-10,y2:b.y-b.h/2+5};
+  if(dy>0)return{x1:a.x,y1:a.y+a.h/2,x2:b.x,y2:b.y-b.h/2};
+  return{x1:a.x,y1:a.y+a.h/2,x2:b.x,y2:b.y-b.h/2};
+}
+
+function drawConnectors(){
+  let d='',p='';
+  for(const[k,hex]of Object.entries(HX))
+    d+=`<marker id="m-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Q2,5 0,0" fill="${hex}" opacity="0.35"/></marker>`;
+  for(const c of CONN){
+    const e=getEdge(c[0],c[1]);
+    if(!e)continue;
+    const{x1,y1,x2,y2}=e,dx=x2-x1,dy=y2-y1;
+    p+=`<path d="M${x1},${y1} C${x1+dx*0.25},${y1} ${x2-dx*0.25},${y2} ${x2},${y2}" stroke="${HX[c[2]]}" stroke-width="2" fill="none" opacity="0.25" marker-end="url(#m-${c[2]})"/>`;
+  }
+  document.getElementById('connectors').innerHTML=`<defs>${d}</defs>${p}`;
+  // Labels
+  let l='';
+  for(const c of CONN){
+    const e=getEdge(c[0],c[1]);if(!e)continue;
+    l+=`<div class="conn-label" style="left:${(e.x1+e.x2)/2}px;top:${(e.y1+e.y2)/2-12}px;transform:translateX(-50%)">${c[3]}</div>`;
+  }
+  document.getElementById('connLabels').innerHTML=l;
+}
+
+// ====== ZOOM / PAN ======
+const board=document.getElementById('board'),viewport=document.getElementById('viewport');
+let s=1,ox=0,oy=0,dr=0,sx,sy,td=0;
+
+function ut(){board.style.transform=`translate(${ox}px,${oy}px) scale(${s})`;document.getElementById('zl').textContent=Math.round(s*100)+'%'}
+function zm(mx,my,f){const ns=Math.min(3,Math.max(.2,s*f));ox=mx-(mx-ox)*(ns/s);oy=my-(my-oy)*(ns/s);s=ns;ut()}
+function zi(){zm(window.innerWidth/2,window.innerHeight/2,1.3)}
+function zo(){zm(window.innerWidth/2,window.innerHeight/2,.77)}
+function zr(){const sx=window.innerWidth/9000,sy=window.innerHeight/6600;s=Math.min(sx,sy,1)*.88;ox=(window.innerWidth-9000*s)/2;oy=(window.innerHeight-6600*s)/2;ut()}
+
+viewport.addEventListener('wheel',e=>{e.preventDefault();zm(e.clientX,e.clientY,e.deltaY>0?.9:1.1)},{passive:false});
+viewport.addEventListener('mousedown',e=>{if(e.target.closest('.zoom-btn'))return;dr=1;sx=e.clientX-ox;sy=e.clientY-oy;viewport.style.cursor='grabbing'});
+document.addEventListener('mousemove',e=>{if(!dr)return;ox=e.clientX-sx;oy=e.clientY-sy;ut()});
+document.addEventListener('mouseup',()=>{dr=0;viewport.style.cursor='grab'});
+viewport.addEventListener('touchstart',e=>{if(e.touches.length===1){dr=1;sx=e.touches[0].clientX-ox;sy=e.touches[0].clientY-oy}else if(e.touches.length===2){const d=e.touches[0].clientX-e.touches[1].clientX,e2=e.touches[0].clientY-e.touches[1].clientY;td=Math.sqrt(d*d+e2*e2)}},{passive:true});
+viewport.addEventListener('touchmove',e=>{if(e.touches.length===1&&dr){ox=e.touches[0].clientX-sx;oy=e.touches[0].clientY-sy;ut()}else if(e.touches.length===2){const d=e.touches[0].clientX-e.touches[1].clientX,e2=e.touches[0].clientY-e.touches[1].clientY,dd=Math.sqrt(d*d+e2*e2);if(td>0){const f=dd/td;zm((e.touches[0].clientX+e.touches[1].clientX)/2,(e.touches[0].clientY+e.touches[1].clientY)/2,f)}td=dd}},{passive:true});
+viewport.addEventListener('touchend',()=>{dr=0;td=0});
+
+window.addEventListener('load',()=>{
+  drawConnectors();zr();
+  const h=document.getElementById('hint');h.style.opacity='1';setTimeout(()=>h.style.opacity='0',5000);
+});
+</script>
+</body>
+</html>

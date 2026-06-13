@@ -1,0 +1,116 @@
+.detail-card {
+  position: absolute;
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  background: rgba(255,255,255,0.015);
+  border: 1px solid rgba(255,255,255,0.04);
+  z-index: 2;
+  overflow-y: auto;
+}
+.detail-card::-webkit-scrollbar { width: 4px; }
+.detail-card::-webkit-scrollbar-track { background: transparent; }
+.detail-card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 4px; }
+
+.detail-card .dc-head {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  letter-spacing: 0.01em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.detail-card .dc-head .dc-hsub {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.35;
+  margin-left: 6px;
+}
+
+/* Tables inside detail cards */
+.dc-table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 4px; }
+.dc-table th {
+  text-align: left;
+  padding: 4px 10px 3px 10px;
+  font-weight: 600;
+  opacity: 0.4;
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.dc-table td {
+  padding: 3px 10px;
+  vertical-align: top;
+  opacity: 0.55;
+  line-height: 1.45;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+.dc-table tr:last-child td { border-bottom: none; }
+.dc-table td:first-child { width: 26%; font-weight: 500; opacity: 0.7; }
+.dc-table td:last-child { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 9px; opacity: 0.4; }
+.dc-table td .hl { color: rgba(255,255,255,0.7); font-weight: 500; }
+
+.dc-table-alt td:first-child { width: 18%; }
+.dc-table-alt td:nth-child(2) { width: 52%; }
+
+.dc-sect {
+  font-size: 9px;
+  font-weight: 500;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  opacity: 0.4;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.dc-blue .dc-head { color: var(--blue); }
+.dc-purple .dc-head { color: var(--purple); }
+.dc-green .dc-head { color: var(--green); }
+.dc-orange .dc-head { color: var(--orange); }
+.dc-red .dc-head { color: var(--red); }
+.dc-cyan .dc-head { color: var(--cyan); }
+.dc-yellow .dc-head { color: var(--yellow); }
+.dc-pink .dc-head { color: var(--pink); }
+
+/* Info panels (feature cards) */
+.info-panel {
+  position: absolute;
+  border-radius: 10px;
+  padding: 13px 16px 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  z-index: 2;
+  overflow: hidden;
+}
+.info-panel .ip-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  letter-spacing: 0.01em;
+}
+.info-panel .ip-body {
+  font-size: 9.5px;
+  opacity: 0.45;
+  line-height: 1.45;
+}
+.info-panel .ip-tag {
+  display: inline-block;
+  font-size: 7.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 5px;
+  margin-top: 4px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+.ip-blue .ip-title { color: var(--blue); }
+.ip-purple .ip-title { color: var(--purple); }
+.ip-green .ip-title { color: var(--green); }
+.ip-orange .ip-title { color: var(--orange); }
+.ip-red .ip-title { color: var(--red); }
+.ip-cyan .ip-title { color: var(--cyan); }
+.ip-yellow .ip-title { color: var(--yellow); }
+.ip-pink .ip-title { color: var(--pink); }

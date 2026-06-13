@@ -1,0 +1,28 @@
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #161616;
+  --board: #1e1e1e;
+  --grid: #282828;
+  --text: #e8e8e8;
+  --text-dim: #888;
+  --blue: #4fc3f7;
+  --purple: #ce93d8;
+  --green: #81c784;
+  --orange: #ffb74d;
+  --red: #ef5350;
+  --cyan: #4db6ac;
+  --yellow: #fff176;
+  --pink: #f48fb1;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  user-select: none;
+}
