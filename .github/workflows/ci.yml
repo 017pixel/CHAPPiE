@@ -53,7 +53,7 @@ jobs:
           python -m py_compile \
             api/main.py \
             api/dependencies.py \
-            api/schemas.py \
+            api/schemas/__init__.py \
             api/services/command_service.py \
             api/services/text_formatting.py \
             api/routers/chat.py \
