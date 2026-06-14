@@ -820,40 +820,57 @@ def create_chappie_backend():
                     base_url="https://api.groq.com/openai/v1",
                     api_key=settings.groq_api_key,
                 )
-                system_prompt = (
-                    "You are a precise text formatter. Your ONLY job is to fix whitespace and split\n"
-                    "the raw model output into reasoning (cot) and final answer (antwort) blocks.\n\n"
-                    "== WHITESPACE FIXES (apply to ALL text) ==\n"
-                    "- Words glued together: 'HalloWelt' -> 'Hallo Welt'\n"
-                    "- Punctuation followed by word: 'text.Weiter' -> 'text. Weiter'\n"
-                    "- Asterisks touching words: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
-                    "- Numbers touching words: 'Code007' -> 'Code 007'\n"
-                    "- Single letters separated by dots: 's.c.h.w.e.r' -> 'schwer'\n"
-                    "- Underscores joining words: 'weil_ich_bin' -> 'weil ich bin'\n"
-                    "- Multiple punctuation marks: '?!' keep as-is, never separate\n\n"
-                    "== TEXT STRUCTURE ==\n"
-                    "- Insert empty line between major conversational turns for readability\n"
-                    "- Preserve ALL content exactly as written: poetic text, emotional markers (*...*),\n"
-                    "  asterisks, quotes, special characters, repetition, and glitched text\n"
-                    "- Do NOT merge separate lines into a single paragraph block\n"
-                    "- Every word, character, and marker from the input must be present unchanged\n\n"
-                    "== COT / ANTWORT SPLITTING ==\n"
-                    "- Everything inside <think>, <thinking>, <gedanke>, or <reasoning> tags -> into <cot>\n"
-                    "- The part after the CLOSING tag (</think>, </thinking>, etc.) -> into <antwort>\n"
-                    "- If the text uses numbered sections like ',1.**AnalyzeRequest:**...' -> into <cot>\n"
-                    "- Text containing '*atmet...*', '*seufzt...*', '*starrt...*' action markers -> into <cot>\n"
-                    "- The final conversational response, poetic text, or direct speech -> into <antwort>\n\n"
-                    "== OUTPUT FORMAT ==\n"
-                    "<cot>\n[all reasoning/thinking/analysis content, whitespace-fixed]\n</cot>\n"
-                    "<antwort>\n[all final answer/dialogue content, whitespace-fixed]\n</antwort>\n\n"
-                    "== CHECKS BEFORE OUTPUT ==\n"
-                    "1. Every word in the input must appear unchanged in the output\n"
-                    "2. Nothing added, removed, replaced, summarized, or rephrased\n"
-                    "3. Line breaks only added for readability, never removed\n"
-                    "4. If no reasoning exists: <cot>\\n</cot> (empty block)\n"
-                    "5. If the entire text is thinking with no answer: <antwort>\\n</antwort> (empty block)\n\n"
-                    "Do not explain. Output ONLY the tagged blocks."
-                )
+                if settings.chain_of_thought:
+                    system_prompt = (
+                        "You are a precise text formatter. Your ONLY job is to fix whitespace and split\n"
+                        "the raw model output into reasoning (cot) and final answer (antwort) blocks.\n\n"
+                        "== WHITESPACE FIXES (apply to ALL text) ==\n"
+                        "- Words glued together: 'HalloWelt' -> 'Hallo Welt'\n"
+                        "- Punctuation followed by word: 'text.Weiter' -> 'text. Weiter'\n"
+                        "- Asterisks touching words: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
+                        "- Numbers touching words: 'Code007' -> 'Code 007'\n"
+                        "- Single letters separated by dots: 's.c.h.w.e.r' -> 'schwer'\n"
+                        "- Underscores joining words: 'weil_ich_bin' -> 'weil ich bin'\n"
+                        "- Multiple punctuation marks: '?!' keep as-is, never separate\n\n"
+                        "== TEXT STRUCTURE ==\n"
+                        "- Insert empty line between major conversational turns for readability\n"
+                        "- Preserve ALL content exactly as written: poetic text, emotional markers (*...*),\n"
+                        "  asterisks, quotes, special characters, repetition, and glitched text\n"
+                        "- Do NOT merge separate lines into a single paragraph block\n"
+                        "- Every word, character, and marker from the input must be present unchanged\n\n"
+                        "== COT / ANTWORT SPLITTING ==\n"
+                        "- Everything inside <think>, <thinking>, <gedanke>, or <reasoning> tags -> into <cot>\n"
+                        "- The part after the CLOSING tag (</think>, </thinking>, etc.) -> into <antwort>\n"
+                        "- If the text uses numbered sections like '1.**AnalyzeRequest:**...' -> into <cot>\n"
+                        "- Text containing '*atmet...*', '*seufzt...*', '*starrt...*' action markers -> into <cot>\n"
+                        "- The final conversational response, poetic text, or direct speech -> into <antwort>\n\n"
+                        "== OUTPUT FORMAT ==\n"
+                        "<cot>\n[all reasoning/thinking/analysis content, whitespace-fixed]\n</cot>\n"
+                        "<antwort>\n[all final answer/dialogue content, whitespace-fixed]\n</antwort>\n\n"
+                        "== CHECKS BEFORE OUTPUT ==\n"
+                        "1. Every word in the input must appear unchanged in the output\n"
+                        "2. Nothing added, removed, replaced, summarized, or rephrased\n"
+                        "3. Line breaks only added for readability, never removed\n"
+                        "4. If no reasoning exists: <cot>\\n</cot> (empty block)\n"
+                        "5. If the entire text is thinking with no answer: <antwort>\\n</antwort> (empty block)\n\n"
+                        "Do not explain. Output ONLY the tagged blocks."
+                    )
+                else:
+                    system_prompt = (
+                        "You are a precise whitespace formatter. Fix spacing and punctuation layout.\n\n"
+                        "== WHITESPACE FIXES ==\n"
+                        "- Insert spaces between merged words: 'HalloWelt' -> 'Hallo Welt'\n"
+                        "- Insert spaces after punctuation: 'text.Weiter' -> 'text. Weiter'\n"
+                        "- Insert spaces around asterisks: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
+                        "- Fix dot-separated letters: 's.c.h.w.e.r' -> 'schwer'\n"
+                        "- Fix underscore-joined words: 'weil_ich_bin' -> 'weil ich bin'\n"
+                        "- Keep multiple punctuation marks together: '?!' stays as '?!'\n\n"
+                        "== TEXT STRUCTURE ==\n"
+                        "- Insert line breaks for readability at sentence boundaries\n"
+                        "- Preserve ALL words, punctuation, asterisks, quotes, and special characters exactly\n"
+                        "- Nothing added, removed, replaced, summarized, or rephrased\n\n"
+                        "Output ONLY the corrected text. No tags. No explanations."
+                    )
                 response = client.chat.completions.create(
                     model=self.GROQ_FORMAT_MODEL,
                     messages=[
@@ -866,18 +883,22 @@ def create_chappie_backend():
                     timeout=7.5,
                 )
                 formatted = response.choices[0].message.content or ""
-                cot_block = extract_tagged_block(formatted, ["cot"])
-                answer_block = extract_tagged_block(formatted, ["antwort"])
-                cot = (cot_block.content or "").strip()
-                answer = (answer_block.content or "").strip()
-                if not answer:
-                    answer = self._FALLBACK_SILENT
-                if not cot:
-                    parsed = parse_thinking_tags(clean_text)
-                    cot_parsed = parse_chain_of_thought(clean_text)
-                    thought = parsed.thought or cot_parsed.thought or ""
-                    if thought:
-                        cot = thought
+                if settings.chain_of_thought:
+                    cot_block = extract_tagged_block(formatted, ["cot"])
+                    answer_block = extract_tagged_block(formatted, ["antwort"])
+                    cot = (cot_block.content or "").strip()
+                    answer = (answer_block.content or "").strip()
+                    if not answer:
+                        answer = self._FALLBACK_SILENT
+                    if not cot:
+                        parsed = parse_thinking_tags(clean_text)
+                        cot_parsed = parse_chain_of_thought(clean_text)
+                        thought = parsed.thought or cot_parsed.thought or ""
+                        if thought:
+                            cot = thought
+                else:
+                    cot = ""
+                    answer = formatted.strip() or self._FALLBACK_SILENT
                 return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": self.GROQ_FORMAT_MODEL, "answer_is_fallback": self._is_fallback_text(answer)}
             except Exception as e:
                 error_msg = str(e).lower()
