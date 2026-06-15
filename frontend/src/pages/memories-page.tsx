@@ -63,7 +63,7 @@ export function MemoriesPage() {
   const memoryHealth = (healthQuery.data ?? {}) as any;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+    <div className="grid gap-8 grid-cols-1 lg:grid-cols-[300px_1fr]">
       <aside className="space-y-6">
         <div className="rounded-none border border-white/5 bg-night p-6 shadow-glass">
           <h2 className="text-xs font-bold uppercase tracking-[0.25em] text-slate">Session History</h2>
@@ -153,7 +153,7 @@ export function MemoriesPage() {
           )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
           <div className="rounded-none border border-white/5 bg-white/[0.02] p-4 shadow-glass">
             <p className="text-[10px] uppercase tracking-[0.25em] text-slate">Visible LTM</p>
             <p className="mt-3 text-2xl font-bold text-mist">{longTerm.length}</p>
@@ -168,7 +168,7 @@ export function MemoriesPage() {
           </div>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-2">
+        <div className="grid gap-8 grid-cols-1 xl:grid-cols-2">
           <section className="space-y-4">
             <div className="flex items-center justify-between px-2">
               <h3 className="text-sm font-bold uppercase tracking-[0.25em] text-slate">Short-Term Buffer</h3>
@@ -186,7 +186,7 @@ export function MemoriesPage() {
                       <span className="border border-white/10 px-2 py-1">{entry.migrated ? "migrated" : "active"}</span>
                     </div>
                     <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed text-mist">{entry.content}</p>
-                    <div className="mt-4 grid gap-2 text-[10px] text-slate sm:grid-cols-2">
+                    <div className="mt-4 grid gap-2 text-[10px] text-slate grid-cols-1 sm:grid-cols-2">
                       <p className="truncate uppercase tracking-[0.18em]">Created: {formatDateTime(entry.created_at)}</p>
                       <p className="truncate uppercase tracking-[0.18em]">Expires: {formatDateTime(entry.expires_at)}</p>
                     </div>

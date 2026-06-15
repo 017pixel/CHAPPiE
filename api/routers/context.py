@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencies import get_backend
+from api.schemas import ContextFileUpdate
 
 router = APIRouter(tags=["context"])
 
@@ -22,3 +23,15 @@ def get_context_file(context_name: str, backend=Depends(get_backend)):
     if normalized in {"preferences", "prefs"}:
         return {"name": "preferences", "content": backend.context_files.get_preferences_context()}
     raise HTTPException(status_code=404, detail="Unbekannte Kontextdatei.")
+
+
+@router.put("/context-files/{context_name}")
+def update_context_file(context_name: str, update: ContextFileUpdate, backend=Depends(get_backend)):
+    normalized = context_name.lower()
+    if normalized not in ("soul", "user", "preferences", "prefs"):
+        raise HTTPException(status_code=404, detail="Unbekannte Kontextdatei.")
+    success = backend.context_files.save_raw_content(normalized, update.content)
+    if not success:
+        raise HTTPException(status_code=500, detail="Konnte Datei nicht schreiben.")
+    name = "preferences" if normalized == "prefs" else normalized
+    return {"name": name, "content": update.content}

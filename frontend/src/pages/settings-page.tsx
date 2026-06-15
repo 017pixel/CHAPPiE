@@ -304,7 +304,7 @@ export function SettingsPage() {
           <p className="mt-2 text-[10px] text-slate/70">Applying emotion...</p>
         )}
         {emotionState.steering && (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-[10px]">
+          <div className="mt-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 text-[10px]">
             <div className="rounded-none bg-night/50 border border-white/5 p-3">
               <span className="text-slate">Dominant: </span>
               <span className="text-ember">{emotionState.steering.dominant_vector ?? "neutral"}</span>
@@ -338,7 +338,7 @@ export function SettingsPage() {
               </span>
             </button>
             {expandedGroups.has(group.id) && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {defs.map((def) => (
                   <label key={def.key} className="flex items-center justify-between gap-3 rounded-none border border-white/5 bg-white/[0.02] px-4 py-3 hover:border-ember/30 transition-all">
                     <div className="flex items-center gap-2 min-w-0">
@@ -373,7 +373,7 @@ export function SettingsPage() {
                     Save
                   </button>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                   <div>
                     <p className="text-[9px] uppercase tracking-widest text-slate mb-1">Layer Start</p>
                     <input

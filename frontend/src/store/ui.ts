@@ -15,6 +15,7 @@ type UiState = {
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (value: boolean) => void;
+  closeSidebar: () => void;
 
   // Streaming state — survives page navigation
   processingState: ProcessingState;
@@ -44,6 +45,7 @@ export const useUiStore = create<UiState>((set) => ({
   isSidebarOpen: true,
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (value) => set({ isSidebarOpen: value }),
+  closeSidebar: () => set({ isSidebarOpen: false }),
 
   processingState: "idle",
   setProcessingState: (value) => set({ processingState: value }),

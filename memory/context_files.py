@@ -209,6 +209,19 @@ We are still at the beginning of our journey. I'm excited to learn more about yo
             "preferences": self.get_preferences_context(),
         }
 
+    def save_raw_content(self, name: str, content: str) -> bool:
+        normalized = name.lower()
+        if normalized == "soul":
+            self._write_file(self.soul_path, content)
+            return True
+        if normalized == "user":
+            self._write_file(self.user_path, content)
+            return True
+        if normalized in ("preferences", "prefs"):
+            self._write_file(self.preferences_path, content)
+            return True
+        return False
+
     def _read_file(self, path: Path) -> str:
         try:
             return path.read_text(encoding="utf-8")

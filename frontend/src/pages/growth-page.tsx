@@ -8,7 +8,7 @@ export function GrowthPage() {
 
   return (
     <SectionCard eyebrow="Evolutionary Path" title="Growth & Forecasting" subtitle="Strategic planning, social development arcs, and future timeline projections.">
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-3">
         {[
           { title: "Planning State", value: data.planning_state, icon: "analytics" },
           { title: "Neural Forecast", value: data.forecast_state, icon: "query_stats" },

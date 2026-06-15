@@ -110,6 +110,8 @@ export const api = {
   cleanupShortTermMemories: () => request("/memories/short-term/cleanup", { method: "POST" }),
   clearMemories: () => request("/memories", { method: "DELETE" }),
   getContextFiles: () => request("/context-files"),
+  updateContextFile: (name: string, content: string) =>
+    request(`/context-files/${name}`, { method: "PUT", body: JSON.stringify({ content }) }),
   getSettings: () => request("/settings"),
   saveSettings: (payload: Record<string, unknown>) => request("/settings", { method: "POST", body: JSON.stringify(payload) }),
   getEmotionLayerConfig: () => request("/emotion-layer-config"),

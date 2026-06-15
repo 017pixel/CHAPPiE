@@ -24,7 +24,7 @@ export function TrainingPage() {
   return (
     <div className="space-y-8">
       <SectionCard eyebrow="Neural Training" title="Daemon Control Center" subtitle="Manage the background training cycles, monitor active process PID, and view generation logs.">
-        <div className="grid gap-6 md:grid-cols-4">
+        <div className="grid gap-6 grid-cols-2 md:grid-cols-4">
           {[
             { label: "Daemon Status", value: status.status_label, icon: "terminal" },
             { label: "Process ID", value: status.pid, icon: "fingerprint" },
@@ -82,7 +82,7 @@ export function TrainingPage() {
       </SectionCard>
 
       <SectionCard eyebrow="Configuration" title="Curriculum & Parameters" subtitle="Adjust the training focus area, persona overrides, and curriculum text.">
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
           {[
             { key: "persona", value: config.persona, icon: "theater_comedy" },
             { key: "focus_area", value: config.focus_area, icon: "track_changes" },

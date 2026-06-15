@@ -10,13 +10,13 @@ export function LifePage() {
   return (
     <SectionCard eyebrow="Biological Core" title="Digital Life Dynamics" subtitle="Real-time monitoring of homeostasis, goal competition, and developmental stages.">
       {/* Top Stats Grid */}
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
         <article className="rounded-none border border-white/5 bg-white/[0.02] p-8 shadow-glass transition-all hover:bg-white/[0.04]">
           <div className="flex items-center gap-3 mb-8">
             <span className="material-symbols-outlined text-ember">monitoring</span>
             <h3 className="text-sm font-bold uppercase tracking-widest text-mist">Core Pulse</h3>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-2">
             {[
                 { label: "Temporal Phase", value: snapshot.clock?.phase_label, icon: "schedule" },
                 { label: "Active Engagement", value: snapshot.current_activity, icon: "vital_signs" },
@@ -59,7 +59,7 @@ export function LifePage() {
       </div>
 
       {/* Detail Grid */}
-      <div className="mt-8 grid gap-6 xl:grid-cols-3">
+      <div className="mt-8 grid gap-6 grid-cols-1 xl:grid-cols-3">
         {[
           { title: "World Model", value: snapshot.world_model, icon: "language" },
           { title: "Strategic Intent", value: snapshot.planning_state, icon: "route" },

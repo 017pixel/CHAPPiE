@@ -10,7 +10,7 @@ export function DebugPage() {
   return (
     <div className="space-y-8">
       <SectionCard eyebrow="Neural Diagnostic" title="Brain Monitor" subtitle="Deep inspection of assistant metadata, attention mechanisms, and execution logs.">
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
           <article className="rounded-none border border-white/5 bg-white/[0.02] p-8 shadow-glass transition-all hover:bg-white/[0.04]">
             <div className="flex items-center gap-3 mb-6">
                 <span className="material-symbols-outlined text-ember text-sm">psychology</span>

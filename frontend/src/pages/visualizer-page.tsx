@@ -20,7 +20,7 @@ export function VisualizerPage() {
 
   return (
     <SectionCard eyebrow="Spatial Neural Interface" title="3D Emotion Lattice" subtitle="High-fidelity 3D representation of the digital entity's current emotional state using React Three Fiber.">
-      <div className="grid gap-8 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid gap-8 grid-cols-1 xl:grid-cols-[1.5fr_1fr]">
         <div className="relative rounded-none border border-white/10 bg-night overflow-hidden shadow-glass min-h-[500px]">
           <div className="absolute top-6 left-6 z-10 flex gap-4">
               <div className="rounded-none bg-ember/20 border border-ember/30 px-3 py-1 flex items-center gap-2">

@@ -511,7 +511,7 @@ export function ChatPage() {
             >
               {/* CoT box */}
               {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
-                <div className={`max-w-[85%] w-full rounded-none border overflow-hidden ${(entry.metadata as any)?.formatting_failed ? 'border-ember/30 bg-ember/[0.04]' : 'border-pine/20 bg-pine/[0.06]'}`}>
+                <div className={`max-w-full lg:max-w-[85%] w-full rounded-none border overflow-hidden ${(entry.metadata as any)?.formatting_failed ? 'border-ember/30 bg-ember/[0.04]' : 'border-pine/20 bg-pine/[0.06]'}`}>
                   <div className={`flex items-center justify-between px-5 py-2 border-b ${(entry.metadata as any)?.formatting_failed ? 'border-ember/20' : 'border-pine/10'}`}>
                     <div className="flex items-center gap-2">
                        <span className={`material-symbols-outlined text-[12px] ${(entry.metadata as any)?.formatting_failed ? 'text-ember' : 'text-pine'}`}>psychology</span>
@@ -535,7 +535,7 @@ export function ChatPage() {
                 </div>
               )}
               {/* Output box */}
-              <div className="flex items-start gap-2 max-w-[85%] w-full">
+              <div className="flex items-start gap-2 max-w-full lg:max-w-[85%] w-full">
                 <div
                   className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
                     entry.role === "assistant"

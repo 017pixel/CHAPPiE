@@ -1395,6 +1395,48 @@ class CHAPPiEBrainCLI:
             _log("DEBUG", "Debug-Output deaktiviert", Colors.DIM)
             return True
 
+        if cmd_lower == "/md":
+            """Zeigt alle drei .md-Kontextdateien an (soul, user, preferences)."""
+            if self._use_remote:
+                soul = self.remote.handle_command("/soul")
+                user = self.remote.handle_command("/user")
+                prefs = self.remote.handle_command("/prefs")
+            elif hasattr(self, 'context') and self.context:
+                soul = self.context.get_soul_context() or "(leer)"
+                user = self.context.get_user_context() or "(leer)"
+                prefs = self.context.get_preferences_context() or "(leer)"
+            else:
+                _warn("Context-Dateien nicht verfuegbar (kein Backend)")
+                return True
+
+            if HAS_RICH:
+                console.print(Panel(
+                    soul.strip() if soul else "(leer)",
+                    title="[bold cyan]soul.md[/]",
+                    border_style="cyan",
+                ))
+                console.print(Panel(
+                    user.strip() if user else "(leer)",
+                    title="[bold green]user.md[/]",
+                    border_style="green",
+                ))
+                console.print(Panel(
+                    prefs.strip() if prefs else "(leer)",
+                    title="[bold yellow]CHAPPiEsPreferences.md[/]",
+                    border_style="yellow",
+                ))
+            else:
+                print(f"\n{Colors.AI}{'═' * 60}")
+                print(f"  soul.md\n{'═' * 60}")
+                print(f"{soul.strip()}{Colors.RESET}\n")
+                print(f"\n{Colors.USER}{'═' * 60}")
+                print(f"  user.md\n{'═' * 60}")
+                print(f"{user.strip()}{Colors.RESET}\n")
+                print(f"\n{Colors.EMOTION}{'═' * 60}")
+                print(f"  CHAPPiEsPreferences.md\n{'═' * 60}")
+                print(f"{prefs.strip()}{Colors.RESET}\n")
+            return True
+
         backend_cmd = cmd_lower if cmd_lower.startswith("/") else "/" + cmd_lower
 
         if self._use_remote:
@@ -1429,6 +1471,7 @@ class CHAPPiEBrainCLI:
   /history       Chat-Verlauf anzeigen
   /clear         Chat-Verlauf loeschen
   /debug [on/off]  Debug-Output ein-/ausschalten (toggle ohne Argument)
+  /md            Zeigt soul.md, user.md und Preferences.md an
   /exit          Beenden
   /help          Diese Hilfe
 {Colors.EMOTION}─── Nach Ausgabe Befehle ──────────────────────

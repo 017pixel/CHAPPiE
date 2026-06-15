@@ -164,6 +164,10 @@ class SettingsSnapshot(BaseModel):
 
 class SettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None
+
+
+class ContextFileUpdate(BaseModel):
+    content: str = Field(min_length=0)
     groq_api_key: Optional[str] = None
     groq_model: Optional[str] = None
     groq_format_model: Optional[str] = None
