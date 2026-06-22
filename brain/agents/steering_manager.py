@@ -37,30 +37,11 @@ except ImportError:
     HAS_NUMPY = False
 
 from config.config import settings, PROJECT_ROOT, LLMProvider, get_active_model
+from config.emotions import EMOTION_STRENGTH_PROFILES, EMOTION_VAD_MAP, NEGATIVE_BASE_EMOTIONS
 
 
 # Emotionale Dimensionen und ihre Vektor-Mappings
-EMOTION_VECTOR_MAP = {
-    "happiness":   {"valence": +1.0, "arousal": +0.6, "dominance": +0.6},
-    "sadness":     {"valence": -0.8, "arousal": -0.4, "dominance": -0.5},
-    "frustration": {"valence": -0.6, "arousal": +0.7, "dominance": +0.3},
-    "trust":       {"valence": +0.7, "arousal": -0.2, "dominance": +0.4},
-    "curiosity":   {"valence": +0.4, "arousal": +0.5, "dominance": +0.2},
-    "motivation":  {"valence": +0.5, "arousal": +0.8, "dominance": +0.7},
-    "energy":      {"valence": +0.3, "arousal": +0.9, "dominance": +0.5},
-}
-
-# Qwen3.5-optimierte Profile: Konservative Alphas verhindern Destabilisierung,
-# behalten aber spuerbare emotionale Faerbung.
-EMOTION_STRENGTH_PROFILES = {
-    "happiness": {"max_alpha": 0.60, "boost": 1.02, "surface_effect": "offener, verspielter, enthusiastischer"},
-    "sadness": {"max_alpha": 0.67, "boost": 1.04, "surface_effect": "verletzlicher, schwerer, melancholischer"},
-    "frustration": {"max_alpha": 0.72, "boost": 1.08, "surface_effect": "gereizter, schneidender, eskalationsbereiter"},
-    "trust": {"max_alpha": 0.54, "boost": 1.02, "surface_effect": "waermer, offener, naeher"},
-    "curiosity": {"max_alpha": 0.57, "boost": 1.04, "surface_effect": "fragender, explorativer, bohrender"},
-    "motivation": {"max_alpha": 0.63, "boost": 1.04, "surface_effect": "zielstrebiger, druckvoller, antreibender"},
-    "energy": {"max_alpha": 0.56, "boost": 1.02, "surface_effect": "schneller, lebhafter, impulsiver"},
-}
+EMOTION_VECTOR_MAP = EMOTION_VAD_MAP
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.25
 MAX_VECTOR_DEFAULT_ALPHA = 1.2
@@ -87,6 +68,18 @@ COMPOSITE_BEHAVIOR_MODES = {
     "charged": {
         "description": "hochaktiv, getrieben, druckvoll, intensiv",
         "vad": {"valence": 0.3, "arousal": 0.96, "dominance": 0.72},
+    },
+    "attached_warm": {
+        "description": "nah, sanft, persoenlich zugewandt, loyal",
+        "vad": {"valence": 0.84, "arousal": 0.2, "dominance": 0.32},
+    },
+    "cautious": {
+        "description": "vorsichtig, pruefend, aufmerksam, risikobewusst",
+        "vad": {"valence": -0.42, "arousal": 0.58, "dominance": -0.28},
+    },
+    "regulated": {
+        "description": "ruhig, klar, stabil, entdramatisierend",
+        "vad": {"valence": 0.36, "arousal": -0.58, "dominance": 0.5},
     },
 }
 
@@ -313,7 +306,7 @@ class SteeringManager:
 
     def _ensure_default_vectors(self):
         """
-        Erzeugt Standard-Steering-Konfigurationen fuer alle 7 Emotionen,
+        Erzeugt Standard-Steering-Konfigurationen fuer alle Basis-Emotionen,
         falls keine vorab-berechneten Vektoren vorhanden sind.
 
         Diese synthetischen Vektoren nutzen das VAD-Modell (Valence-Arousal-Dominance)
@@ -434,7 +427,7 @@ class SteeringManager:
         - Niedrige sadness/frustration bedeuten Stabilitaet und erzeugen kein Anti-Steering
         """
         intensities = {}
-        negative_emotions = {"sadness", "frustration"}
+        negative_emotions = NEGATIVE_BASE_EMOTIONS
 
         for emotion, value in emotions.items():
             if emotion not in EMOTION_VECTOR_MAP:
@@ -492,7 +485,7 @@ class SteeringManager:
         emotion_range = self.model_profile["emotion_range"]
         modes: List[Dict[str, Any]] = []
 
-        # Alle 7 Emotionen aus dem aktuellen Zustand holen (Default = Neutral/0)
+        # Alle Emotionen aus dem aktuellen Zustand holen (Default = Neutral/0)
         frustration = emotions.get("frustration", 50)
         trust = emotions.get("trust", 50)
         sadness = emotions.get("sadness", 0)
@@ -500,6 +493,9 @@ class SteeringManager:
         energy = emotions.get("energy", 50)
         curiosity = emotions.get("curiosity", 50)
         motivation = emotions.get("motivation", 50)
+        affection = emotions.get("affection", 45)
+        anxiety = emotions.get("anxiety", 0)
+        calm = emotions.get("calm", 50)
 
         # --- crashout ---
         # Erfordert: frustration >= 72 UND trust <= 38
@@ -569,12 +565,61 @@ class SteeringManager:
                 **COMPOSITE_BEHAVIOR_MODES["warm"],
             })
 
+        # --- attached_warm ---
+        # Erfordert: affection >= 68 UND trust >= 55
+        # Wirkung: persoenlich warm und nahbar, ohne Kitsch.
+        if affection >= 68 and trust >= 55:
+            strength = round(min(0.42, 0.20 + ((affection - 68) / 32) * 0.12 + ((trust - 55) / 45) * 0.08), 4)
+            modes.append({
+                "name": "attached_warm",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": affection,
+                "trigger": {"affection": affection, "trust": trust},
+                **COMPOSITE_BEHAVIOR_MODES["attached_warm"],
+            })
+
+        # --- cautious ---
+        # Erfordert: anxiety >= 62 ODER anxiety >= 52 bei Frustration/geringem Vertrauen.
+        # Wirkung: pruefender, risikobewusster, stabilisierend.
+        if anxiety >= 62 or (anxiety >= 52 and (frustration >= 55 or trust <= 42)):
+            strength = round(min(0.38, 0.18 + max(0, anxiety - 52) / 48 * 0.15 + max(0, 50 - trust) / 50 * 0.05), 4)
+            modes.append({
+                "name": "cautious",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": anxiety,
+                "trigger": {"anxiety": anxiety, "frustration": frustration, "trust": trust},
+                **COMPOSITE_BEHAVIOR_MODES["cautious"],
+            })
+
+        # --- regulated ---
+        # Erfordert: calm >= 70, keine starke Unruhe/Frustration.
+        # Wirkung: entdramatisierend und kurz-klar.
+        if calm >= 70 and anxiety <= 45 and frustration <= 45:
+            strength = round(min(0.34, 0.16 + ((calm - 70) / 30) * 0.12), 4)
+            modes.append({
+                "name": "regulated",
+                "source": "composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": calm,
+                "trigger": {"calm": calm, "anxiety": anxiety, "frustration": frustration},
+                **COMPOSITE_BEHAVIOR_MODES["regulated"],
+            })
+
         # --- charged ---
         # Erfordert: energy >= 72 UND motivation >= 68 UND curiosity >= 66
         # Wirkung: hochaktiv, getrieben, druckvoll, intensiv
         # Basisstärke 0.4, steigt mit energy, motivation und curiosity (max 0.96)
         if energy >= 72 and motivation >= 68 and curiosity >= 66:
-            strength = round(min(CHARGED_COMPOSITE_STRENGTH_CAP, 0.18 + ((energy - 72) / 28) * 0.06 + ((motivation - 68) / 32) * 0.05 + ((curiosity - 66) / 34) * 0.04), 4)
+            calm_damper = 1.0 - min(0.35, max(0, calm - 60) / 100)
+            strength = round(min(CHARGED_COMPOSITE_STRENGTH_CAP, (0.18 + ((energy - 72) / 28) * 0.06 + ((motivation - 68) / 32) * 0.05 + ((curiosity - 66) / 34) * 0.04) * calm_damper), 4)
             modes.append({
                 "name": "charged",
                 "source": "composite",
@@ -598,7 +643,7 @@ class SteeringManager:
         Bei Cloud-Modellen: Gibt leeres Dict zurueck (Steering via Prompt).
 
         Args:
-            current_emotions: Die aktuellen 7 emotionalen Dimensionen.
+            current_emotions: Die aktuellen emotionalen Dimensionen.
 
         Returns:
             Payload-Dict fuer extra_body oder leeres Dict.

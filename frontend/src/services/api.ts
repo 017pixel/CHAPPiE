@@ -118,6 +118,7 @@ export const api = {
   updateEmotionLayerConfig: (payload: Record<string, unknown>) =>
     request("/emotion-layer-config", { method: "POST", body: JSON.stringify(payload) }),
   getEmotionState: () => request("/emotions/state"),
+  getEmotionMetadata: () => request("/emotions/metadata"),
   setEmotionState: (payload: Record<string, number>) =>
     request("/emotions/state", { method: "POST", body: JSON.stringify(payload) }),
   getTrainingStatus: () => request("/training/status"),

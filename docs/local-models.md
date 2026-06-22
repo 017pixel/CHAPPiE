@@ -77,7 +77,9 @@ Fuer den bevorzugten lokalen Pfad gilt:
 
 - Emotionen werden nicht primaer als Prompt-Liste transportiert
 - der wichtigste Pfad ist Steering ueber Payload und lokale Modellschicht
-- niedrige Traurigkeit oder Frustration erzeugen kein starkes Anti-Steering; `charged` bleibt bewusst gedrosselt
+- die 10 Emotionsdimensionen sind `happiness`, `trust`, `energy`, `curiosity`, `motivation`, `frustration`, `sadness`, `affection`, `anxiety` und `calm`
+- niedrige Traurigkeit, Frustration oder Unruhe erzeugen kein starkes Anti-Steering; `charged` bleibt bewusst gedrosselt und wird durch hohe Ruhe weiter stabilisiert
+- `affection`, `anxiety` und `calm` haben konservative Steering-Caps, damit sie Ton und Prioritaet verbessern, aber Antwortqualitaet und Kuerze nicht dominieren
 - API und Frontend zeigen `emotion_state`, Intensitaeten und Debugdaten strukturiert an
 - dieselben Daten werden auch fuer Training und Debug genutzt
 

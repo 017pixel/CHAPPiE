@@ -64,7 +64,36 @@ def test_charged_composite_is_capped():
     assert charged["strength"] <= module.CHARGED_COMPOSITE_STRENGTH_CAP
 
 
+def test_new_emotion_vectors_are_conservative():
+    module = _load_steering_manager_module()
+    manager = module.SteeringManager()
+    emotions = {
+        "happiness": 50,
+        "trust": 70,
+        "energy": 55,
+        "curiosity": 50,
+        "motivation": 55,
+        "frustration": 0,
+        "sadness": 0,
+        "affection": 85,
+        "anxiety": 75,
+        "calm": 82,
+    }
+    payload = manager.get_steering_payload(emotions, force=True)
+    vectors = {
+        item["name"]: item
+        for item in payload["steering"]["vectors"]
+        if item.get("source") == "base"
+    }
+
+    assert {"affection", "anxiety", "calm"}.issubset(vectors)
+    assert vectors["affection"]["strength"] <= 0.35
+    assert vectors["anxiety"]["strength"] <= 0.35
+    assert vectors["calm"]["strength"] <= 0.35
+
+
 if __name__ == "__main__":
     test_low_sadness_and_frustration_are_not_anti_steered()
     test_charged_composite_is_capped()
+    test_new_emotion_vectors_are_conservative()
     print("OK: steering manager policy")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from api.dependencies import get_backend
 from api.schemas import EmotionLayerUpdate, EmotionStateUpdate, SettingsSnapshot, SettingsUpdate
 from config.config import settings
+from config.emotions import emotion_metadata
 
 router = APIRouter(tags=["runtime"])
 
@@ -110,6 +111,11 @@ def get_emotion_state(backend=Depends(get_backend)):
         "emotions": emotions,
         "steering": steering_report,
     }
+
+
+@router.get("/emotions/metadata")
+def get_emotion_metadata():
+    return {"emotions": emotion_metadata()}
 
 
 @router.post("/emotions/state")

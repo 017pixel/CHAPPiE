@@ -76,6 +76,10 @@ CHAPPiE arbeitet mit:
 
 Deshalb sind nicht alle Tests gleich „billig“ oder gleich sicher.
 
+## Emotionsmodell
+
+Das aktuelle Emotionsmodell umfasst 10 Dimensionen. Bei Aenderungen an Defaults, neuen Emotionen oder Steering-Profilen muessen mindestens `tests/test_emotion_transition_rules.py`, `tests/test_steering_manager_policy.py`, `tests/test_command_service_emotion.py` und `tests/test_web_ui_consistency.py` laufen.
+
 ## Für zukünftige Aufräumarbeiten
 
 Wenn Testdateien verschoben oder neu gruppiert werden, müssen mindestens diese Dateien geprüft werden:

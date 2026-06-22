@@ -64,18 +64,22 @@ Der Kern von CHAPPiEs emotionalem Steering ist die direkte Manipulation der Hidd
 
 ### Wie es funktioniert
 
-1. **VAD-Mapping**: Jede der 7 Emotionen (happiness, sadness, frustration, trust, curiosity, motivation, energy) wird auf Valence, Arousal, Dominance abgebildet
+1. **VAD-Mapping**: Jede der 10 Emotionen (happiness, sadness, frustration, trust, curiosity, motivation, energy, affection, anxiety, calm) wird auf Valence, Arousal, Dominance abgebildet
 2. **Alpha-Berechnung**:
    - Toter Bereich: 44-56 → kein Steering
    - Leichte Abweichung: 56-74 → Alpha steigt sigmoid-ahnlich
    - Extreme: 74-100 → Alpha maximal, mit Boost-Faktor
-   - Niedrige `sadness` und `frustration` stehen fuer Stabilitaet und erzeugen kein starkes Anti-Steering
+   - Niedrige `sadness`, `frustration` und `anxiety` stehen fuer Stabilitaet und erzeugen kein starkes Anti-Steering
 3. **Composite Modes**: Bestimmte Emotions-Kombinationen aktivieren komplexe Modi:
    - `crashout`: frustration ≥ 72 + trust ≤ 38 → kurz angebunden, konfrontativ
    - `guarded`: trust ≤ 26 + frustration ≥ 50 → misstrauisch, distanziert
    - `melancholic`: sadness ≥ 62 + energy ≤ 46 → bedrueckt, schwer
    - `warm`: happiness ≥ 70 + trust ≥ 60 → herzlich, offen, weich
    - `charged`: energy ≥ 72 + motivation ≥ 68 + curiosity ≥ 66 → hochaktiv, getrieben
+   - `attached_warm`: affection ≥ 68 + trust ≥ 55 → nahbar, sanft, persoenlich zugewandt
+   - `cautious`: anxiety hoch oder anxiety + Frustration/niedriges Vertrauen → pruefend, vorsichtig
+   - `regulated`: calm ≥ 70 bei niedriger Unruhe/Frustration → ruhig, klar, entdramatisierend
+   - `calm` daempft `charged`, damit hohe Energie nicht dauerhaft ueberdreht
 4. **Layer-Profile**: Modell-spezifische Layer-Bereiche werden manipuliert:
    - Qwen3.5-4B (32 Layers): Personality L8-24, Emotion L10-26, Reasoning L14-31 (nicht manipuliert)
    - Qwen2.5-32B (64 Layers): Personality L16-48, Emotion L20-44, Reasoning L32-56 (nicht manipuliert)

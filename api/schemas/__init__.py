@@ -89,6 +89,9 @@ class EmotionStateUpdate(BaseModel):
     frustration: Optional[int] = None
     motivation: Optional[int] = None
     sadness: Optional[int] = None
+    affection: Optional[int] = None
+    anxiety: Optional[int] = None
+    calm: Optional[int] = None
 
 
 class TrainingActionRequest(BaseModel):

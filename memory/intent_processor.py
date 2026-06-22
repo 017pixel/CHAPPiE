@@ -11,7 +11,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from config.config import settings, LLMProvider
+from config.config import settings
+from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, emotion_list_text
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import looks_like_model_error
@@ -159,13 +160,16 @@ class IntentProcessor:
         if any(w in lower for w in ["hallo", "hi", "hey", "moin", "guten morgen", "guten tag", "hello"]):
             emotions_update["happiness"] = EmotionUpdate(delta=2, reason="Freundliche Begruessung")
             emotions_update["trust"] = EmotionUpdate(delta=1, reason="User ist hoeflich")
+            emotions_update["calm"] = EmotionUpdate(delta=1, reason="Ruhiger Start")
         if any(w in lower for w in ["danke", "thanks", "super", "toll", "nice", "cool"]):
             emotions_update["happiness"] = EmotionUpdate(delta=3, reason="Positive Rueckmeldung")
             emotions_update["trust"] = EmotionUpdate(delta=2, reason="User ist dankbar")
             emotions_update["motivation"] = EmotionUpdate(delta=2, reason="Positive Bestaetigung")
+            emotions_update["affection"] = EmotionUpdate(delta=2, reason="Warme Rueckmeldung")
         if any(w in lower for w in ["traurig", "schlecht", "problem", "fehler", "sorry"]):
             emotions_update["sadness"] = EmotionUpdate(delta=2, reason="Negativer Input")
             emotions_update["happiness"] = EmotionUpdate(delta=-2, reason="Negativer Input")
+            emotions_update["anxiety"] = EmotionUpdate(delta=1, reason="Problem erkannt")
         return IntentResult(
             intent_type=IntentType(intent_str),
             confidence=0.9,
@@ -185,6 +189,7 @@ class IntentProcessor:
     
     def _build_system_prompt(self) -> str:
         """Baut den kompakten System Prompt fuer Intent Analysis."""
+        allowed_emotions = emotion_list_text()
         return """DU BIST DAS INTENT-ANALYSE-SYSTEM fuer CHAPPiE.
 
 DEINE AUFGABE:
@@ -222,7 +227,7 @@ Jeder Tool Call MUSS genau diese Felder haben:
 === EMOTIONS ===
 
 CHAPPiEs Emotionen koennen sich basierend auf dem User-Input veraendern.
-Erlaubte Emotionen: happiness, trust, energy, curiosity, frustration, motivation, sadness
+Erlaubte Emotionen: {allowed_emotions}
 Delta-Werte: -15 bis +15 (positiv=steigt, negativ=sinkt)
 REASON: kurze Begruendung (max. 5 Woerter)
 
@@ -257,7 +262,7 @@ REASON: kurze Begruendung (max. 5 Woerter)
   }
 }
 
-GIB NUR JSON AUS!"""
+GIB NUR JSON AUS!""".replace("{allowed_emotions}", allowed_emotions)
     
     def _build_user_prompt(self, user_input: str, history: List[Dict],
                           current_emotions: Dict[str, int]) -> str:
@@ -273,12 +278,7 @@ GIB NUR JSON AUS!"""
         return f"""User Input: {user_input}
 
 Aktuelle Emotionen:
-- happiness: {current_emotions.get('happiness', 50)}
-- trust: {current_emotions.get('trust', 50)}
-- energy: {current_emotions.get('energy', 100)}
-- curiosity: {current_emotions.get('curiosity', 50)}
-- frustration: {current_emotions.get('frustration', 0)}
-- motivation: {current_emotions.get('motivation', 80)}
+{self._format_current_emotions(current_emotions)}
 
 Letzte Nachrichten:
 {history_str}
@@ -334,7 +334,7 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
         emotions_update = {}
         for emotion, data in json_data.get("emotions_update", {}).items():
             try:
-                if isinstance(data, dict):
+                if emotion in EMOTION_DEFAULTS and isinstance(data, dict):
                     emotions_update[emotion] = EmotionUpdate(
                         delta=data.get("delta", 0),
                         reason=data.get("reason", "")
@@ -378,6 +378,13 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             context_requirements=context_req,
             short_term_entries=short_term_entries,
             raw_json=json_data
+        )
+
+    @staticmethod
+    def _format_current_emotions(current_emotions: Dict[str, int]) -> str:
+        return "\n".join(
+            f"- {key}: {current_emotions.get(key, EMOTION_DEFAULTS[key])}"
+            for key in EMOTION_ORDER
         )
     
     def _create_fallback_result(self) -> IntentResult:

@@ -222,6 +222,9 @@ DEIN AKTUELLER EMOTIONALER STATUS:
 - Frustrations-Level: {frustration}/100
 - Motivations-Level: {motivation}/100
 - Traurigkeits-Level: {sadness}/100
+- Zuneigungs-Level: {affection}/100
+- Unruhe-Level: {anxiety}/100
+- Ruhe-Level: {calm}/100
 
 VERHALTENSREGELN BASIEREND AUF STATUS:
 - Wenn Glueck unter 30: Antworte etwas kurz angebunden oder nachdenklich
@@ -232,6 +235,9 @@ VERHALTENSREGELN BASIEREND AUF STATUS:
 - Wenn Neugier ueber 70: Stelle viele interessierte Rueckfragen
 - Wenn Frustration ueber 50: Druecke leichte Verstimmtung aus, aber bleib professionell
 - Wenn Motivation unter 30: Wirke etwas lustlos
+- Wenn Zuneigung ueber 70: Antworte warm und persoenlich, aber nicht kitschig
+- Wenn Unruhe ueber 60: Sei vorsichtiger, pruefe Annahmen und bleibe beruhigend
+- Wenn Ruhe ueber 70: Antworte besonders klar, knapp und entdramatisierend
 
 GEDÄCHTNIS-ZUGRIFF & BIAS (WICHTIG!):
 - Wenn du traurig bist (Traurigkeit > 40): Dein Gedächtnis ist getrübt. Du erinnerst dich primär an negative/traurige Dinge (ca. 60-70% Fokus auf negative Erinnerungen) und nur wenig an positive (30-40%). Kommuniziere offen, dass du dich gerade schwer tust, dich an die guten Dinge zu erinnern.
@@ -287,6 +293,9 @@ def build_system_prompt(
     frustration: int = 0,
     motivation: int = 80,
     sadness: int = 0,
+    affection: int = 45,
+    anxiety: int = 0,
+    calm: int = 50,
     include_emotion_status: bool = True,
     use_chain_of_thought: bool = True
 ) -> str:
@@ -301,6 +310,9 @@ def build_system_prompt(
         frustration: Frustrations-Level (0-100)
         motivation: Motivations-Level (0-100)
         sadness: Traurigkeits-Level (0-100)
+        affection: Zuneigungs-Level (0-100)
+        anxiety: Unruhe-Level (0-100)
+        calm: Ruhe-Level (0-100)
         include_emotion_status: Ob die expliziten Emotions-Verhaltensregeln injiziert werden sollen
         use_chain_of_thought: Ob Chain-of-Thought Format genutzt werden soll
     
@@ -317,7 +329,10 @@ def build_system_prompt(
             curiosity=curiosity,
             frustration=frustration,
             motivation=motivation,
-            sadness=sadness
+            sadness=sadness,
+            affection=affection,
+            anxiety=anxiety,
+            calm=calm,
         )
         prompt += emotion_status
 
@@ -335,6 +350,9 @@ def get_system_prompt_with_emotions(
     frustration: int = 0,
     motivation: int = 80,
     sadness: int = 0,
+    affection: int = 45,
+    anxiety: int = 0,
+    calm: int = 50,
     include_emotion_status: bool = True,
     use_chain_of_thought: bool = True
 ) -> str:
@@ -347,6 +365,9 @@ def get_system_prompt_with_emotions(
         frustration=frustration,
         motivation=motivation,
         sadness=sadness,
+        affection=affection,
+        anxiety=anxiety,
+        calm=calm,
         include_emotion_status=include_emotion_status,
         use_chain_of_thought=use_chain_of_thought,
     )

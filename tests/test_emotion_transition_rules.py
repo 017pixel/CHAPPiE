@@ -3,14 +3,30 @@
 import os
 import sys
 import tempfile
+import importlib.util
 from pathlib import Path
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from memory import emotions_engine as emotions_module
-from memory.emotions_engine import EmotionalState, EmotionsEngine, calculate_emotion_transition
+from config.emotions import EMOTION_DEFAULTS
+
+
+def _load_emotions_module():
+    path = Path(PROJECT_ROOT) / "memory" / "emotions_engine.py"
+    spec = importlib.util.spec_from_file_location("emotions_engine_transition_test", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+emotions_module = _load_emotions_module()
+EmotionalState = emotions_module.EmotionalState
+EmotionsEngine = emotions_module.EmotionsEngine
+calculate_emotion_transition = emotions_module.calculate_emotion_transition
 
 
 def test_extreme_delta_is_softened_and_capped():
@@ -27,6 +43,17 @@ def test_small_delta_stays_direct():
     assert transition["applied_delta"] == 2
     assert transition["after"] == 42
     assert transition["softened"] is False
+
+
+def test_legacy_emotional_state_gets_new_emotion_defaults():
+    state = EmotionalState.from_dict({"happiness": 73, "trust": 67, "sadness": 4})
+    data = state.to_dict()
+
+    assert data["happiness"] == 73
+    assert data["trust"] == 67
+    assert data["affection"] == EMOTION_DEFAULTS["affection"]
+    assert data["anxiety"] == EMOTION_DEFAULTS["anxiety"]
+    assert data["calm"] == EMOTION_DEFAULTS["calm"]
 
 
 def test_emotions_engine_reloads_newer_persisted_state_before_writing():
@@ -67,5 +94,6 @@ def test_emotions_engine_reloads_newer_persisted_state_before_writing():
 if __name__ == "__main__":
     test_extreme_delta_is_softened_and_capped()
     test_small_delta_stays_direct()
+    test_legacy_emotional_state_gets_new_emotion_defaults()
     test_emotions_engine_reloads_newer_persisted_state_before_writing()
     print("OK: emotion transition rules")

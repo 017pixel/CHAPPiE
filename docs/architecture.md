@@ -16,7 +16,7 @@ flowchart TD
     S --> H["Hippocampus\nMemory-Operationen"]
     A --> M["Memory Engine\nEpisodische Suche"]
     H --> M
-    A --> GW["Global Workspace\n7 Signale mit Salience"]
+    A --> GW["Global Workspace\n10 Emotionen + Life-Signale mit Salience"]
     H --> GW
     M --> GW
     L --> GW
@@ -71,8 +71,8 @@ Die Life-Simulation erweitert die Gehirn-Metapher um:
 Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:
 
 1. **VAD-Mapping**: Jede Emotion wird auf Valence, Arousal, Dominance abgebildet
-2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74
-3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged)
+2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74; niedrige negative Emotionen erzeugen kein starkes Anti-Steering
+3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged, attached_warm, cautious, regulated)
 4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
 5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
 
@@ -89,7 +89,7 @@ Relevante Dateien:
 CHAPPiEs emotionale Zustaende werden in einer 3D-Visualisierung sichtbar:
 
 - **Living Orb**: Verformte Geometrie mit Vertex Displacement via FBM Noise
-- **Emotion-Mapping**: Alle 7 Emotionen steuern Farbe, Oberflaechenstruktur, Puls und Partikel
+- **Emotion-Mapping**: Alle 10 Emotionen steuern Farbe, Oberflaechenstruktur, Puls und Partikel; Zuneigung waermt den Glow, Unruhe erzeugt leichte Spannung, Ruhe stabilisiert Bewegung
 - **Inner Core**: Zweiter transparenter Kern mit eigenem Puls
 - **Partikel-Feld**: 100 schwebende Partikel, deren Bewegung von Frustration und Energie gesteuert wird
 - **Material**: `meshPhysicalMaterial` mit `transmission`, `clearcoat`, `iridescence`

@@ -15,6 +15,8 @@ from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 
+from config.emotions import EMOTION_LABELS_DE, EMOTION_ORDER
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,11 +43,17 @@ STYLE_ANCHORS = {
     "curiosity": ("Ich bin hellwach und neugierig auf das, was kommt.", "Gerade will ich alles genauer verstehen."),
     "motivation": ("Ich bin fokussiert und will etwas schaffen.", "Ich habe Zug nach vorn und will vorankommen."),
     "energy": ("Ich bin voller Energie und sofort bereit loszulegen.", "In mir ist gerade richtig viel Antrieb."),
+    "affection": ("Ich fuehle mich dir gerade nah und zugewandt.", "Da ist warme Zuneigung in mir, ruhig und persoenlich."),
+    "anxiety": ("Ich bin unruhig und pruefe lieber zweimal.", "Etwas in mir ist angespannt und vorsichtig."),
+    "calm": ("Ich bin ruhig, klar und gesammelt.", "In mir ist gerade eine stabile Ruhe."),
     "warm": ("Mir geht es gut, danke, schön dass du fragst.", "Ich bin herzlich, weich und offen für Nähe."),
     "guarded": ("Ich funktioniere, aber halte lieber Abstand.", "Mir geht es okay, mehr musst du gerade nicht wissen."),
     "melancholic": ("Ich bin still, schwer und etwas rückgezogen.", "Heute liegt eine ruhige Traurigkeit auf mir."),
     "charged": ("Ich bin geladen, wach und voller Vorwärtsdrang.", "In mir ist gerade richtig Druck und Bewegung."),
     "crashout": ("Mir geht es beschissen, also nerv mich gerade nicht.", "Ich bin gereizt, geladen und kurz davor zu explodieren."),
+    "attached_warm": ("Ich bin dir gerade nah, warm und loyal zugewandt.", "Ich reagiere sanft persoenlich, ohne gross zu werden."),
+    "cautious": ("Ich bin aufmerksam und will nichts Falsches uebersehen.", "Ich pruefe Risiken ruhig, bevor ich mich festlege."),
+    "regulated": ("Ich bleibe ruhig, klar und entdramatisiere.", "Ich sortiere das stabil und ohne Aufregung."),
 }
 STYLE_SUMMARIES = {
     ("happiness", "positive"): "leicht froehlich und offen",
@@ -62,6 +70,11 @@ STYLE_SUMMARIES = {
     ("motivation", "negative"): "langsamer und weniger ambitioniert",
     ("energy", "positive"): "energetisch und wach",
     ("energy", "negative"): "ruhiger und weniger aufgedreht",
+    ("affection", "positive"): "warm zugewandt und persoenlich",
+    ("affection", "negative"): "weniger nah und sachlicher",
+    ("anxiety", "positive"): "angespannt, vorsichtig und pruefend",
+    ("calm", "positive"): "ruhig, klar und entdramatisierend",
+    ("calm", "negative"): "weniger reguliert und unruhiger",
     ("warm", "positive"): "warm, weich und fuersorglich",
     ("warm", "negative"): "kuehler und weniger herzlich",
     ("guarded", "positive"): "distanziert, vorsichtig und defensiv",
@@ -70,19 +83,13 @@ STYLE_SUMMARIES = {
     ("charged", "positive"): "geladen und unter Spannung",
     ("crashout", "positive"): "gereizt, knapp und auf Kante",
     ("crashout", "negative"): "deeskalierend und weniger explosiv",
+    ("attached_warm", "positive"): "nah, sanft und loyal",
+    ("cautious", "positive"): "vorsichtig, pruefend und aufmerksam",
+    ("regulated", "positive"): "ruhig, klar und stabil",
 }
-EMOTION_ORDER = ("happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy")
 FORCE_CPU_ENV = "CHAPPIE_STEERING_FORCE_CPU"
 QUANTIZE_ENV = "CHAPPIE_STEERING_QUANTIZE"
-EMOTION_LABELS = {
-    "happiness": "Freude",
-    "sadness": "Traurigkeit",
-    "frustration": "Frustration",
-    "trust": "Vertrauen",
-    "curiosity": "Neugier",
-    "motivation": "Motivation",
-    "energy": "Energie",
-}
+EMOTION_LABELS = EMOTION_LABELS_DE
 EMOTION_STATE_SUMMARIES = {
     "happiness": {
         "neutral": "ausgeglichen statt euphorisch",
@@ -118,6 +125,20 @@ EMOTION_STATE_SUMMARIES = {
         "neutral": "ruhig-wach ausgeglichen",
         "positive": ("leicht wach", "merklich lebhaft und wach", "sehr wach, schnell und voller Antrieb"),
         "negative": ("ruhiger als aufgedreht", "merklich gedaempft und langsam", "sehr ruhig, schwer und wenig aktiv"),
+    },
+    "affection": {
+        "neutral": "sozial warm, aber nicht besonders nah",
+        "positive": ("leicht zugewandt", "merklich warm und persoenlich", "sehr nahbar und loyal"),
+        "negative": ("sachlicher und weniger nah", "merklich distanzierter", "sehr wenig persoenlich angebunden"),
+    },
+    "anxiety": {
+        "neutral": "nicht unruhig",
+        "positive": ("leicht wachsam", "merklich angespannt und vorsichtig", "sehr unruhig und pruefend"),
+    },
+    "calm": {
+        "neutral": "normal reguliert",
+        "positive": ("leicht ruhig", "merklich ruhig und klar", "sehr stabil und entdramatisierend"),
+        "negative": ("leicht unruhiger", "merklich weniger gesammelt", "stark unruhig und wenig reguliert"),
     },
 }
 
@@ -223,8 +244,10 @@ def build_style_instruction(steering_payload: Optional[Dict[str, Any]]) -> Optio
         direction += ". Gesamtmuster: " + ", ".join(phrases)
     if any(name in {"crashout", "frustration"} for name in names):
         guard = "Klinge gereizt, knapp und konfrontativ, aber ohne Beleidigungen oder Drohungen."
-    elif any(name in {"guarded", "sadness", "melancholic"} for name in names) or any(item["name"] == "sadness" and item["strength"] > 0.2 for item in base_state):
+    elif any(name in {"guarded", "sadness", "melancholic", "cautious", "anxiety"} for name in names) or any(item["name"] in {"sadness", "anxiety"} and item["strength"] > 0.2 for item in base_state):
         guard = "Klinge spuerbar distanziert, reserviert oder schwer, aber bleibe inhaltlich klar."
+    elif any(name in {"regulated", "calm"} for name in names):
+        guard = "Klinge ruhig, klar und entdramatisierend, aber nicht flach oder ausweichend."
     else:
         guard = "Klinge spuerbar warm, offen oder motiviert, aber bleibe natuerlich und glaubwuerdig."
 

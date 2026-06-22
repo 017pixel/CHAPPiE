@@ -14,6 +14,7 @@ import re
 from typing import Dict, Any
 from datetime import datetime
 
+from config.emotions import EMOTION_ORDER, zero_emotion_updates
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -81,6 +82,9 @@ EMOTIONEN (Skala 0-100):
 - fear: Angst, Sorge
 - surprise: Ueberraschung, Neuheit
 - trust: Vertrauen, Offenheit
+- affection: Zuneigung, Naehe, Waerme
+- anxiety: Unruhe, Sorge, Risiko
+- calm: Ruhe, Regulation, Klarheit
 - disgust: Ablehnung, Ekel
 
 MEMORY BOOST:
@@ -101,7 +105,10 @@ ANTWORTE NUR MIT JSON:
     "curiosity": {"delta": -10 bis +10, "reason": "Grund"},
     "frustration": {"delta": -10 bis +10, "reason": "Grund"},
     "motivation": {"delta": -10 bis +10, "reason": "Grund"},
-    "sadness": {"delta": -10 bis +10, "reason": "Grund"}
+    "sadness": {"delta": -10 bis +10, "reason": "Grund"},
+    "affection": {"delta": -10 bis +10, "reason": "Grund"},
+    "anxiety": {"delta": -10 bis +10, "reason": "Grund"},
+    "calm": {"delta": -10 bis +10, "reason": "Grund"}
   },
   "steering_hints": {
     "target_emotion": "Wunsch-Emotion für das Modell-Steering",
@@ -151,7 +158,7 @@ Analysiere die emotionalen Aspekte (NUR JSON):"""
         if "emotions_update" not in data:
             data["emotions_update"] = {}
         
-        for emotion in ["happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness"]:
+        for emotion in EMOTION_ORDER:
             if emotion not in data["emotions_update"]:
                 data["emotions_update"][emotion] = {"delta": 0, "reason": ""}
             else:
@@ -167,15 +174,7 @@ Analysiere die emotionalen Aspekte (NUR JSON):"""
             "emotional_intensity": 0.3,
             "memory_boost_factor": 1.0,
             "emotional_tags": [],
-            "emotions_update": {
-                "happiness": {"delta": 0, "reason": ""},
-                "trust": {"delta": 0, "reason": ""},
-                "energy": {"delta": 0, "reason": ""},
-                "curiosity": {"delta": 0, "reason": ""},
-                "frustration": {"delta": 0, "reason": ""},
-                "motivation": {"delta": 0, "reason": ""},
-                "sadness": {"delta": 0, "reason": ""}
-            },
+            "emotions_update": zero_emotion_updates(),
             "steering_hints": {
                 "target_emotion": "neutral",
                 "alpha": 0.0

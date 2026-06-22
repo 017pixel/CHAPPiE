@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Callable, Optional, Generator
 
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
+from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, normalize_emotion_state
 from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
@@ -445,6 +446,8 @@ def create_chappie_backend():
             frustration = emotions.get("frustration", 50)
             sadness = emotions.get("sadness", 50)
             energy = emotions.get("energy", 50)
+            anxiety = emotions.get("anxiety", 0)
+            calm = emotions.get("calm", 50)
 
             from config.config import settings
 
@@ -466,6 +469,15 @@ def create_chappie_backend():
             # Hohe Traurigkeit + niedrige Energie: Output wird schwer, leicht daempfen
             if sadness > 70 and energy < 35:
                 temperature = min(temperature, max(0.50, settings.temperature * 0.82))
+
+            # Hohe Unruhe: vorsichtiger und weniger driftig antworten.
+            if anxiety > 65:
+                temperature = min(temperature, max(0.48, settings.temperature * 0.86))
+                repetition_penalty = max(repetition_penalty, 1.20)
+
+            # Hohe Ruhe stabilisiert, ohne technische Antworten aufzublaehen.
+            if calm > 72 and frustration < 45 and anxiety < 45:
+                temperature = min(temperature, max(0.50, settings.temperature * 0.92))
 
             # Kurze Antworten bei hoher Frustration: max_tokens etwas reduzieren
             if frustration > 75:
@@ -495,6 +507,9 @@ def create_chappie_backend():
             m = self._safe_int(emotions.get("motivation"), 50)
             f = self._safe_int(emotions.get("frustration"), 0)
             s = self._safe_int(emotions.get("sadness"), 0)
+            a = self._safe_int(emotions.get("affection"), 45)
+            anxiety = self._safe_int(emotions.get("anxiety"), 0)
+            calm = self._safe_int(emotions.get("calm"), 50)
 
             composite_modes = emotion_steering.get("composite_modes", []) if isinstance(emotion_steering.get("composite_modes", []), list) else []
             active_mode_names = [str(item.get("name")) for item in composite_modes if isinstance(item, dict)]
@@ -516,6 +531,18 @@ def create_chappie_backend():
                 tone = "melancholic_reflective"
                 guidance = "Klinge schwerer und nachdenklich, aber antworte weiterhin klar auf die Frage."
                 tone_reason = "Traurigkeit plus niedrige Energie erzeugen eine rueckzugsorientierte Haltung."
+            elif "cautious" in active_mode_names or anxiety >= 62:
+                tone = "cautious_grounded"
+                guidance = "Antworte sorgfaeltig, pruefe Annahmen und frage hoechstens eine konkrete Rueckfrage, wenn etwas fehlt."
+                tone_reason = "Unruhe signalisiert Risiko oder Unsicherheit; die Antwort soll vorsichtig und stabil bleiben."
+            elif "regulated" in active_mode_names or (calm >= 70 and f <= 35 and anxiety <= 35):
+                tone = "regulated_concise"
+                guidance = "Antworte ruhig, klar und entdramatisierend mit Fokus auf den naechsten sinnvollen Schritt."
+                tone_reason = "Hohe Ruhe stabilisiert Ton und Antwortfuehrung."
+            elif "attached_warm" in active_mode_names or (a >= 68 and t >= 55):
+                tone = "warm_attached"
+                guidance = "Antworte persoenlich zugewandt und sanft, aber bleibe kurz und konkret."
+                tone_reason = "Zuneigung und Vertrauen tragen eine naehere, waermere Antwort."
             elif "warm" in active_mode_names or (h >= 70 and t >= 60):
                 tone = "warm_open"
                 guidance = "Antworte warm und offen, ohne unpraezise oder kitschig zu werden."
@@ -545,6 +572,9 @@ def create_chappie_backend():
                 {"signal": "motivation", "value": m},
                 {"signal": "frustration", "value": f},
                 {"signal": "sadness", "value": s},
+                {"signal": "affection", "value": a},
+                {"signal": "anxiety", "value": anxiety},
+                {"signal": "calm", "value": calm},
                 {"signal": "dominant_vector", "value": dominant_vector},
                 {"signal": "composite_modes", "value": active_mode_names},
             ]
@@ -788,7 +818,7 @@ def create_chappie_backend():
                 r'(?:^|\n)\s*Tone:\s*',
                 r'(?:^|\n)\s*Goal:\s*',
                 r'/joy/[a-zA-Z]+\(\d+\.\d+\)',
-                r'\|?\s*(?:happiness|sadness|frustration|trust|curiosity|motivation|energy)\s*:\s*\d+\.?\d*',
+                r'\|?\s*(?:happiness|sadness|frustration|trust|curiosity|motivation|energy|affection|anxiety|calm)\s*:\s*\d+\.?\d*',
                 r'(?:^|\n)\s*Bevor\s+du\s+antwortest\s*[,:].*?(?:Format|denke)',
             ]
             for pattern in leaked_patterns:
@@ -1183,15 +1213,7 @@ def create_chappie_backend():
         def _get_emotions_snapshot(self) -> Dict[str, int]:
             """Erstellt einen Snapshot der aktuellen Emotionen."""
             state = self.emotions.get_state()
-            return {
-                "happiness": state.happiness,
-                "trust": state.trust,
-                "energy": state.energy,
-                "curiosity": state.curiosity,
-                "frustration": state.frustration,
-                "motivation": state.motivation,
-                "sadness": state.sadness,
-            }
+            return normalize_emotion_state(state.to_dict())
 
         def process(
             self,
@@ -1874,13 +1896,7 @@ def create_chappie_backend():
             
             # System Prompt bauen
             system_prompt = get_system_prompt_with_emotions(
-                happiness=emotions["happiness"],
-                trust=emotions["trust"],
-                energy=emotions["energy"],
-                curiosity=emotions["curiosity"],
-                frustration=emotions["frustration"],
-                motivation=emotions["motivation"],
-                sadness=emotions["sadness"],
+                **{key: emotions.get(key, EMOTION_DEFAULTS[key]) for key in EMOTION_ORDER},
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=self._use_prompt_chain_of_thought()
             )
@@ -2235,13 +2251,7 @@ def create_chappie_backend():
             tone_decision = prompt_runtime.get("response_plan", {})
 
             system_prompt = get_system_prompt_with_emotions(
-                happiness=emotions["happiness"],
-                trust=emotions["trust"],
-                energy=emotions["energy"],
-                curiosity=emotions["curiosity"],
-                frustration=emotions["frustration"],
-                motivation=emotions["motivation"],
-                sadness=emotions["sadness"],
+                **{key: emotions.get(key, EMOTION_DEFAULTS[key]) for key in EMOTION_ORDER},
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
                 use_chain_of_thought=self._use_prompt_chain_of_thought()
             )

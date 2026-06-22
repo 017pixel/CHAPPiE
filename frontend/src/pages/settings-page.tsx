@@ -74,6 +74,19 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "groq_tokens_per_minute", label: "Groq TPM", type: "number", group: "rate", icon: "token" },
 ];
 
+const FALLBACK_EMOTION_META: Record<string, { label: string; icon: string; color: string; default: number }> = {
+  happiness: { label: "Happiness", icon: "sentiment_satisfied", color: "#fbbf24", default: 50 },
+  trust: { label: "Trust", icon: "verified_user", color: "#34d399", default: 50 },
+  energy: { label: "Energy", icon: "bolt", color: "#f97316", default: 100 },
+  curiosity: { label: "Curiosity", icon: "explore", color: "#a78bfa", default: 50 },
+  motivation: { label: "Motivation", icon: "rocket_launch", color: "#2dd4bf", default: 80 },
+  frustration: { label: "Frustration", icon: "sentiment_dissatisfied", color: "#ef4444", default: 0 },
+  sadness: { label: "Sadness", icon: "sentiment_very_dissatisfied", color: "#64748b", default: 0 },
+  affection: { label: "Affection", icon: "favorite", color: "#fb7185", default: 45 },
+  anxiety: { label: "Anxiety", icon: "ecg_heart", color: "#f59e0b", default: 0 },
+  calm: { label: "Calm", icon: "spa", color: "#38bdf8", default: 50 },
+};
+
 function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; onChange: (key: string, val: any) => void }) {
   if (def.type === "boolean") {
     return (
@@ -122,6 +135,7 @@ export function SettingsPage() {
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
   const layerQuery = useQuery({ queryKey: ["emotion-layer-config"], queryFn: api.getEmotionLayerConfig });
   const emotionQuery = useQuery({ queryKey: ["emotion-state"], queryFn: api.getEmotionState });
+  const emotionMetaQuery = useQuery({ queryKey: ["emotion-metadata"], queryFn: api.getEmotionMetadata });
 
   const [filter, setFilter] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["provider", "generation", "memory"]));
@@ -149,6 +163,19 @@ export function SettingsPage() {
   const layerRows = (layerQuery.data ?? []) as any[];
   const emotionState = (emotionQuery.data ?? { emotions: {}, steering: {} }) as any;
   const currentEmotions: Record<string, number> = emotionState.emotions ?? {};
+  const emotionMetaRows = ((emotionMetaQuery.data as any)?.emotions ?? []) as any[];
+  const emotionMetaEntries = emotionMetaRows.length
+    ? emotionMetaRows.map((row) => [
+        row.key,
+        {
+          label: row.label_en ?? row.key,
+          icon: row.icon ?? "tune",
+          color: row.color ?? "#94a3b8",
+          default: Number(row.default ?? 50),
+        },
+      ])
+    : Object.entries(FALLBACK_EMOTION_META);
+  const emotionMeta = Object.fromEntries(emotionMetaEntries) as Record<string, { label: string; icon: string; color: string; default: number }>;
 
   useEffect(() => {
     if (emotionState.emotions && Object.keys(emotionValues).length === 0) {
@@ -242,16 +269,6 @@ export function SettingsPage() {
 
   const getValue = (key: string) => (key in draft ? draft[key] : settings[key]);
 
-  const EMOTION_META: Record<string, { label: string; icon: string; color: string }> = {
-    happiness: { label: "Happiness", icon: "sentiment_satisfied", color: "#fbbf24" },
-    trust: { label: "Trust", icon: "verified_user", color: "#34d399" },
-    energy: { label: "Energy", icon: "bolt", color: "#f97316" },
-    curiosity: { label: "Curiosity", icon: "explore", color: "#a78bfa" },
-    frustration: { label: "Frustration", icon: "sentiment_dissatisfied", color: "#ef4444" },
-    motivation: { label: "Motivation", icon: "rocket_launch", color: "#2dd4bf" },
-    sadness: { label: "Sadness", icon: "sentiment_very_dissatisfied", color: "#64748b" },
-  };
-
   return (
     <div className="space-y-8">
       {/* Settings Filter */}
@@ -273,7 +290,7 @@ export function SettingsPage() {
       {/* Manual Emotion Control */}
       <SectionCard eyebrow="Live Emotion Control" title="Manual Emotion Steering" subtitle="Set CHAPPiE's emotional state directly. Adjust the slider, then click Apply to update each emotion.">
         <div className="space-y-2">
-          {Object.entries(EMOTION_META).map(([key, meta]) => (
+          {Object.entries(emotionMeta).map(([key, meta]) => (
             <div key={key} className="flex items-center gap-4 rounded-none border border-white/5 bg-white/[0.02] px-4 py-3">
               <div className="flex items-center gap-2 w-32 shrink-0">
                 <span className="material-symbols-outlined text-sm" style={{ color: meta.color }}>{meta.icon}</span>
@@ -283,12 +300,12 @@ export function SettingsPage() {
                 type="range"
                 min="0"
                 max="100"
-                value={emotionValues[key] ?? 50}
+                value={emotionValues[key] ?? currentEmotions[key] ?? meta.default}
                 onChange={(e) => handleEmotionChange(key, Number(e.target.value))}
                 className="flex-1 h-1"
                 style={{ accentColor: meta.color }}
               />
-              <span className="w-10 text-right text-xs font-mono text-mist shrink-0">{emotionValues[key] ?? 50}</span>
+              <span className="w-10 text-right text-xs font-mono text-mist shrink-0">{emotionValues[key] ?? currentEmotions[key] ?? meta.default}</span>
               <button
                 onClick={() => applyEmotion(key)}
                 disabled={emotionMutation.isPending}

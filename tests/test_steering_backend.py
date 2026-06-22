@@ -11,6 +11,7 @@ PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
 from config.config import LLMProvider, settings  # noqa: E402
+from config.emotions import EMOTION_DEFAULTS  # noqa: E402
 from brain.agents.steering_manager import SteeringManager  # noqa: E402
 from brain.steering_backend import LocalSteeringEngine, add_vector_to_inputs, add_vector_to_output, build_activation_plan, build_style_instruction, extract_steering_payload  # noqa: E402
 
@@ -88,36 +89,42 @@ def test_build_style_instruction_mentions_negative_guardrails():
     assert "ohne Beleidigungen" in instruction
 
 
-def test_build_style_instruction_uses_all_seven_vitals_from_payload_metadata():
+def test_build_style_instruction_uses_all_vitals_from_payload_metadata():
     instruction = build_style_instruction({
         "steering": {
             "emotion_state": {
                 "happiness": 82,
-                "sadness": 27,
-                "frustration": 18,
                 "trust": 79,
+                "energy": 71,
                 "curiosity": 67,
                 "motivation": 64,
-                "energy": 71,
+                "frustration": 18,
+                "sadness": 27,
+                "affection": 76,
+                "anxiety": 22,
+                "calm": 73,
             },
             "emotion_intensities": {
                 "happiness": 0.9,
-                "sadness": -0.6,
-                "frustration": -0.55,
                 "trust": 0.72,
+                "energy": 0.58,
                 "curiosity": 0.35,
                 "motivation": 0.42,
-                "energy": 0.58,
+                "frustration": -0.55,
+                "sadness": -0.6,
+                "affection": 0.28,
+                "anxiety": 0.0,
+                "calm": 0.24,
             },
             "vectors": [],
         }
     })
     assert instruction is not None
-    for label in ["Freude", "Traurigkeit", "Frustration", "Vertrauen", "Neugier", "Motivation", "Energie"]:
+    for label in ["Freude", "Traurigkeit", "Frustration", "Vertrauen", "Neugier", "Motivation", "Energie", "Zuneigung", "Unruhe", "Ruhe"]:
         assert label in instruction
 
 
-def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
+def test_steering_manager_payload_keeps_all_vitals_and_base_vectors():
     provider_before = settings.llm_provider
     settings.llm_provider = LLMProvider.VLLM
     try:
@@ -130,18 +137,21 @@ def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
             "curiosity": 69,
             "motivation": 72,
             "energy": 75,
+            "affection": 82,
+            "anxiety": 72,
+            "calm": 78,
         }, force=True)
     finally:
         settings.llm_provider = provider_before
 
     steering = payload["steering"]
-    assert set(steering["emotion_state"].keys()) == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
-    assert set(steering["emotion_intensities"].keys()) == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
+    assert set(steering["emotion_state"].keys()) == set(EMOTION_DEFAULTS)
+    assert set(steering["emotion_intensities"].keys()) == set(EMOTION_DEFAULTS)
     base_names = {item["name"] for item in steering["base_vectors"]}
-    assert base_names == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
+    assert {"affection", "anxiety", "calm"}.issubset(base_names)
 
 
-def test_low_sadness_and_frustration_do_not_emit_anti_vectors():
+def test_low_negative_emotions_do_not_emit_anti_vectors():
     provider_before = settings.llm_provider
     settings.llm_provider = LLMProvider.VLLM
     try:
@@ -154,6 +164,7 @@ def test_low_sadness_and_frustration_do_not_emit_anti_vectors():
             "motivation": 90,
             "frustration": 10,
             "sadness": 0,
+            "anxiety": 0,
         }, force=True)
     finally:
         settings.llm_provider = provider_before
@@ -162,6 +173,7 @@ def test_low_sadness_and_frustration_do_not_emit_anti_vectors():
     names = {item["name"] for item in steering["vectors"]}
     assert "sadness" not in names
     assert "frustration" not in names
+    assert "anxiety" not in names
     assert steering["dominant_emotion"] != "sadness"
     assert steering["dominant_strength"] <= 0.45
 
@@ -286,9 +298,9 @@ if __name__ == "__main__":
     test_add_vector_to_inputs_updates_first_tuple_tensor_only()
     test_build_activation_plan_soft_caps_many_overlapping_vectors()
     test_build_style_instruction_mentions_negative_guardrails()
-    test_build_style_instruction_uses_all_seven_vitals_from_payload_metadata()
-    test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors()
-    test_low_sadness_and_frustration_do_not_emit_anti_vectors()
+    test_build_style_instruction_uses_all_vitals_from_payload_metadata()
+    test_steering_manager_payload_keeps_all_vitals_and_base_vectors()
+    test_low_negative_emotions_do_not_emit_anti_vectors()
     test_steering_manager_includes_anti_safeguard_vector()
     test_local_steering_engine_uses_trust_remote_code_for_qwen35()
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()

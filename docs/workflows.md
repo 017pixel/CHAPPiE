@@ -56,16 +56,17 @@ sequenceDiagram
 4. `life/service.py` berechnet `prepare_turn`: Uhrzeit, Baseline-Decay, Aktivitaet, Homeostasis.
 5. `brain/brain_pipeline.py` orchestriert:
    - Sensory Cortex: Input-Klassifikation (Typ, Dringlichkeit, Memory-Bedarf)
-   - Amygdala: Emotionsanalyse (7 Emotionen, Intensity, memory_boost, steering_hints)
+   - Amygdala: Emotionsanalyse (10 Emotionen, Intensity, memory_boost, steering_hints)
    - Hippocampus: Memory-Operationen (Encoding, Query-Extraktion, Context-Relevanz)
    - Memory Engine: Episodische Suche mit optimierter Query
-   - Global Workspace: 7 Signale mit Salience bundeln und priorisieren
+   - Global Workspace: Emotion-, Memory- und Life-Signale mit Salience bundeln und priorisieren
    - Prefrontal Cortex: Response-Strategie, Tone, Guidance, Planning-Mode
    - Action Response Layer: prompt_suffix und action_plan bauen
    - Steering Manager: VAD-Mapping, Alpha, Composite Modes, Layer-Profile
 6. Antwortgenerierung: 1x LLM-Call mit komplettem Kontext (Prompt + Steering-Payload)
    - Casual Chat laedt fuer die finale Antwort 20 Memories; komplexere Intents nutzen den globalen Memory-Top-K-Wert.
    - Lokale vLLM-Antworten starten mit einer kurzen Antwortvorgabe und nutzen keine langen CoT-Promptbloecke.
+   - Neue Emotionssignale (`affection`, `anxiety`, `calm`) faerben Ton und Steering konservativ, ohne die Antwortlaenge zu erhoehen.
 7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline.
 8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
 

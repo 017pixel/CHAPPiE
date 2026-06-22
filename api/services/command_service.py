@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from config.config import get_active_model, settings
+from config.emotions import EMOTION_ORDER
 
 HELP_TEXT = """**CHAPPiE Commands:**
 
@@ -123,7 +124,7 @@ def _run_deep_think(backend, command: str) -> Dict[str, Any]:
     return _base_result(backend, response_text, deep_think_summary=summary)
 
 
-EMOTION_NAMES = ("happiness", "trust", "energy", "curiosity", "frustration", "motivation", "sadness")
+EMOTION_NAMES = EMOTION_ORDER
 
 
 def _run_emotion(backend, cmd: str) -> Dict[str, Any]:

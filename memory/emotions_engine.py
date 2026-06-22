@@ -14,6 +14,9 @@ Emotionen:
 - frustration: Frustration (0-100, niedrig ist gut)
 - motivation: Motivation (0-100)
 - sadness: Traurigkeit (0-100)
+- affection: Zuneigung (0-100)
+- anxiety: Unruhe (0-100, niedrig ist gut)
+- calm: Ruhe (0-100)
 """
 
 import json
@@ -23,6 +26,7 @@ from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
 
 from config.config import PROJECT_ROOT, settings
+from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, clamp_emotion_value, normalize_emotion_state
 
 
 # Status-Datei Pfad
@@ -37,11 +41,14 @@ EMOTION_TRANSITION_RULES = {
     "frustration": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
     "motivation": {"scale": 0.55, "max_increase": 7, "max_decrease": 7},
     "sadness": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
+    "affection": {"scale": 0.50, "max_increase": 6, "max_decrease": 7},
+    "anxiety": {"scale": 0.45, "max_increase": 6, "max_decrease": 7},
+    "calm": {"scale": 0.45, "max_increase": 6, "max_decrease": 6},
 }
 
 
 def _clamp_emotion_value(value: int) -> int:
-    return max(0, min(100, int(value)))
+    return clamp_emotion_value(value)
 
 
 def calculate_emotion_transition(emotion: str, current_value: int, raw_delta: int | float) -> Dict[str, Any]:
@@ -112,6 +119,9 @@ AKTUELLE EMOTIONEN VON CHAPPIE:
 - Frustration (frustration): {current_frustration}/100
 - Motivation (motivation): {current_motivation}/100
 - Traurigkeit (sadness): {current_sadness}/100
+- Zuneigung (affection): {current_affection}/100
+- Unruhe (anxiety): {current_anxiety}/100
+- Ruhe (calm): {current_calm}/100
 
 ANALYSE-REGELN:
 - Positive Nachrichten, Lob -> Freude und Vertrauen STEIGEN, Traurigkeit SINKT
@@ -120,6 +130,9 @@ ANALYSE-REGELN:
 - Verlust, traurige Themen, Alleinsein -> Traurigkeit STEIGT stark, Freude SINKT
 - Fragen, Neugier -> Neugier STEIGT
 - Ermutigung, Aufgaben -> Motivation STEIGT
+- Naehe, Dankbarkeit, persoenliche Waerme -> Zuneigung STEIGT
+- Unsicherheit, Risiko, Fehler, Druck -> Unruhe STEIGT leicht, Ruhe SINKT leicht
+- Beruhigende, klare oder versoehnliche Nachrichten -> Ruhe STEIGT, Unruhe SINKT
 - Energie sinkt bei jeder Interaktion leicht (-1 bis -3)
 - Frustration baut sich langsam ab wenn nichts Negatives passiert
 
@@ -138,6 +151,9 @@ ANTWORTE NUR IM JSON FORMAT:
   "frustration_change": <Zahl von -15 bis +15>,
   "motivation_change": <Zahl von -10 bis +15>,
   "sadness_change": <Zahl von -20 bis +20>,
+  "affection_change": <Zahl von -15 bis +15>,
+  "anxiety_change": <Zahl von -15 bis +15>,
+  "calm_change": <Zahl von -15 bis +15>,
   "reasoning": "<Kurze Begruendung>"
 }}
 """
@@ -152,16 +168,15 @@ class EmotionalState:
     curiosity: int = 50    # Neugier
     frustration: int = 0   # Frustration (niedrig ist gut)
     motivation: int = 80   # Motivation
-    sadness: int = 0       # Traurigkeit    
+    sadness: int = 0       # Traurigkeit
+    affection: int = 45    # Zuneigung
+    anxiety: int = 0       # Unruhe (niedrig ist gut)
+    calm: int = 50         # Ruhe
+
     def clamp(self):
         """Begrenzt alle Werte auf 0-100."""
-        self.happiness = max(0, min(100, self.happiness))
-        self.trust = max(0, min(100, self.trust))
-        self.energy = max(0, min(100, self.energy))
-        self.curiosity = max(0, min(100, self.curiosity))
-        self.frustration = max(0, min(100, self.frustration))
-        self.motivation = max(0, min(100, self.motivation))
-        self.sadness = max(0, min(100, self.sadness))
+        for key in EMOTION_ORDER:
+            setattr(self, key, clamp_emotion_value(getattr(self, key), EMOTION_DEFAULTS[key]))
     
     def to_dict(self) -> dict:
         """Konvertiert zu Dictionary."""
@@ -170,15 +185,7 @@ class EmotionalState:
     @classmethod
     def from_dict(cls, data: dict) -> "EmotionalState":
         """Erstellt aus Dictionary."""
-        return cls(
-            happiness=data.get("happiness", 50),
-            trust=data.get("trust", 50),
-            energy=data.get("energy", 100),
-            curiosity=data.get("curiosity", 50),
-            frustration=data.get("frustration", 0),
-            motivation=data.get("motivation", 80),
-            sadness=data.get("sadness", 0)
-        )
+        return cls(**normalize_emotion_state(data))
     
     def get_mood_description(self) -> str:
         """Gibt eine textuelle Beschreibung der Stimmung zurueck."""
@@ -332,7 +339,10 @@ class EmotionsEngine:
                 current_curiosity=self.state.curiosity,
                 current_frustration=self.state.frustration,
                 current_motivation=self.state.motivation,
-                current_sadness=self.state.sadness
+                current_sadness=self.state.sadness,
+                current_affection=self.state.affection,
+                current_anxiety=self.state.anxiety,
+                current_calm=self.state.calm,
             )
             
             config = GenerationConfig(
@@ -377,15 +387,8 @@ class EmotionsEngine:
         
         if llm_result:
             # LLM-basierte Aenderungen anwenden
-            llm_changes = {
-                "happiness": llm_result.get("happiness_change", 0),
-                "trust": llm_result.get("trust_change", 0),
-                "energy": llm_result.get("energy_change", -1),
-                "curiosity": llm_result.get("curiosity_change", 0),
-                "frustration": llm_result.get("frustration_change", 0),
-                "motivation": llm_result.get("motivation_change", 0),
-                "sadness": llm_result.get("sadness_change", 0),
-            }
+            llm_changes = {key: llm_result.get(f"{key}_change", 0) for key in EMOTION_ORDER}
+            llm_changes["energy"] = llm_result.get("energy_change", -1)
             for emotion_name, raw_delta in llm_changes.items():
                 apply_emotion_delta(self.state, emotion_name, raw_delta)
             
@@ -407,13 +410,8 @@ class EmotionsEngine:
     def _apply_simple_sentiment(self, sentiment: str):
         """Wendet einfache Sentiment-basierte Aenderungen an (Fallback)."""
         changes = {
-            "happiness": 0,
-            "trust": 0,
+            **{key: 0 for key in EMOTION_ORDER},
             "energy": -1,
-            "curiosity": 0,
-            "frustration": 0,
-            "motivation": 0,
-            "sadness": 0,
         }
 
         if sentiment == "POSITIV":
@@ -421,17 +419,25 @@ class EmotionsEngine:
             changes["trust"] = 1
             changes["motivation"] = 2
             changes["frustration"] = -3
+            changes["affection"] = 2
+            changes["calm"] = 1
+            changes["anxiety"] = -2
         elif sentiment == "NEGATIV":
             changes["happiness"] = -5
             changes["frustration"] = 8
+            changes["anxiety"] = 3
+            changes["calm"] = -2
         elif sentiment == "NEUGIERIG":
             changes["curiosity"] = 8
             changes["motivation"] = 2
         elif sentiment == "VERTRAUEN":
             changes["trust"] = 10
             changes["happiness"] = 3
+            changes["affection"] = 4
+            changes["calm"] = 2
         else:  # NEUTRAL
             changes["frustration"] = -1
+            changes["anxiety"] = -1
 
         for emotion_name, raw_delta in changes.items():
             apply_emotion_delta(self.state, emotion_name, raw_delta)
@@ -472,13 +478,7 @@ class EmotionsEngine:
         from config.prompts import EMOTION_STATUS_TEMPLATE
         
         return EMOTION_STATUS_TEMPLATE.format(
-            happiness=self.state.happiness,
-            trust=self.state.trust,
-            energy=self.state.energy,
-            curiosity=self.state.curiosity,
-            frustration=self.state.frustration,
-            motivation=self.state.motivation,
-            sadness=self.state.sadness
+            **self.state.to_dict()
         )
     
     def get_state(self) -> EmotionalState:
@@ -491,26 +491,14 @@ class EmotionsEngine:
         Setzt eine einzelne Emotion auf einen bestimmten Wert.
         
         Args:
-            emotion: Name der Emotion (happiness, trust, energy, curiosity, frustration, motivation, sadness)
+            emotion: Name der Emotion (siehe config.emotions.EMOTION_ORDER)
             value: Neuer Wert (0-100)
         """
         self._sync_state_from_disk_if_newer()
-        value = max(0, min(100, value))
-        
-        if emotion == "happiness":
-            self.state.happiness = value
-        elif emotion == "trust":
-            self.state.trust = value
-        elif emotion == "energy":
-            self.state.energy = value
-        elif emotion == "curiosity":
-            self.state.curiosity = value
-        elif emotion == "frustration":
-            self.state.frustration = value
-        elif emotion == "motivation":
-            self.state.motivation = value
-        elif emotion == "sadness":
-            self.state.sadness = value
+        value = clamp_emotion_value(value)
+
+        if emotion in EMOTION_DEFAULTS:
+            setattr(self.state, emotion, value)
         
         self._save_state()
     

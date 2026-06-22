@@ -9,6 +9,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from unittest.mock import MagicMock
 from api.services.command_service import _run_emotion, EMOTION_NAMES
+from config.emotions import EMOTION_DEFAULTS
 
 
 class _MockEmotionsEngine:
@@ -16,7 +17,7 @@ class _MockEmotionsEngine:
         self._values: dict[str, int] = {
             "happiness": 56, "trust": 47, "energy": 80,
             "curiosity": 59, "frustration": 8, "motivation": 77,
-            "sadness": 15,
+            "sadness": 15, "affection": 45, "anxiety": 0, "calm": 50,
         }
         self._calls: list[tuple[str, int]] = []
 
@@ -30,7 +31,7 @@ def _make_backend(emotions_override: dict[str, int] | None = None):
     default_emotions = {
         "happiness": 56, "trust": 47, "energy": 80,
         "curiosity": 59, "frustration": 8, "motivation": 77,
-        "sadness": 15,
+        "sadness": 15, "affection": 45, "anxiety": 0, "calm": 50,
     }
     emotions = dict(default_emotions)
     if emotions_override:
@@ -198,12 +199,12 @@ def test_emotion_just_name():
 
 # ── all emotions work ───────────────────────────────────────────
 
-def test_all_seven_emotions_accepted():
+def test_all_emotions_accepted():
     backend = _make_backend()
     for name in EMOTION_NAMES:
         result = _run_emotion(backend, f"/emotion {name} 42")
 
-    assert len(backend.emotions._calls) == 7
+    assert len(backend.emotions._calls) == len(EMOTION_DEFAULTS)
 
 
 # ── runner ───────────────────────────────────────────────────────
@@ -227,7 +228,7 @@ if __name__ == "__main__":
         ("invalid value", test_emotion_invalid_value),
         ("missing value", test_emotion_missing_value),
         ("just name trailing space", test_emotion_just_name),
-        ("all seven emotions", test_all_seven_emotions_accepted),
+        ("all emotions", test_all_emotions_accepted),
     ]
     for name, fn in tests:
         fn()

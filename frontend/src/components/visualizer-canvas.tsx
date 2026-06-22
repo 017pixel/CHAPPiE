@@ -11,6 +11,9 @@ type EmotionState = {
   frustration: number;
   motivation: number;
   sadness: number;
+  affection: number;
+  anxiety: number;
+  calm: number;
 };
 
 /* ─── helpers ─── */
@@ -63,6 +66,9 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
     frustration,
     motivation,
     sadness,
+    affection,
+    anxiety,
+    calm,
   } = emotions;
 
   useFrame((state) => {
@@ -81,13 +87,15 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
     const time = state.clock.elapsedTime;
 
     /* emotion-derived params */
+    const calmFactor = calm / 100;
+    const anxietyFactor = anxiety / 100;
     const surfaceAmp =
-      0.04 + (frustration / 100) * 0.3 + (energy / 100) * 0.05;
+      0.04 + (frustration / 100) * 0.3 + anxietyFactor * 0.08 + (energy / 100) * 0.05 - calmFactor * 0.04;
     const surfaceFreq = 0.6 + (curiosity / 100) * 2.0;
-    const surfaceSpeed = 0.15 + (energy / 100) * 1.2;
-    const pulseAmp = 0.02 + (energy / 100) * 0.06;
+    const surfaceSpeed = 0.12 + (energy / 100) * 1.2 + anxietyFactor * 0.3 - calmFactor * 0.12;
+    const pulseAmp = 0.02 + (energy / 100) * 0.06 + anxietyFactor * 0.015 - calmFactor * 0.012;
     const baseFreq = 0.8 + (energy / 100) * 3.5;
-    const pulseNoise = (frustration / 100) * 0.4;
+    const pulseNoise = Math.max(0, (frustration / 100) * 0.4 + anxietyFactor * 0.16 - calmFactor * 0.12);
 
     /* multi-band pulse */
     const pulse =
@@ -136,7 +144,7 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
     meshRef.current.rotation.x =
       Math.sin(time * 0.3) * 0.1 * (happiness / 100);
     meshRef.current.rotation.z =
-      Math.cos(time * 0.25) * 0.05 * (frustration / 100);
+      Math.cos(time * 0.25) * 0.05 * (frustration / 100 + anxietyFactor * 0.45);
   });
 
   /* colour */
@@ -144,11 +152,13 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
     0.35 +
     (frustration / 100) * -0.35 +
     (sadness / 100) * -0.1 +
+    (affection / 100) * -0.04 +
+    (calm / 100) * 0.04 +
     (motivation / 100) * 0.05;
   const saturation =
-    0.4 + (happiness / 100) * 0.4 + (energy / 100) * 0.2;
+    0.4 + (happiness / 100) * 0.34 + (energy / 100) * 0.16 + (affection / 100) * 0.12;
   const lightness =
-    0.35 + (energy / 100) * 0.25 - (sadness / 100) * 0.15;
+    0.35 + (energy / 100) * 0.22 - (sadness / 100) * 0.15 + (calm / 100) * 0.04;
   const [r, g, b] = hslToRgb(hue, saturation, lightness);
 
   const emissiveHue = hue + 0.05;
@@ -158,7 +168,7 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
     lightness * 0.6
   );
 
-  const roughness = 0.1 + (frustration / 100) * 0.7;
+  const roughness = Math.max(0.08, 0.1 + (frustration / 100) * 0.7 + (anxiety / 100) * 0.18 - (calm / 100) * 0.16);
   const metalness = 0.1 + (trust / 100) * 0.4;
   const emissiveIntensity = 0.3 + (energy / 100) * 2.5;
 
@@ -186,20 +196,20 @@ function LivingOrb({ emotions }: { emotions: EmotionState }) {
 /* ─── Inner Core ─── */
 function InnerCore({ emotions }: { emotions: EmotionState }) {
   const meshRef = useRef<Mesh>(null);
-  const { energy, frustration, happiness } = emotions;
+  const { energy, frustration, happiness, affection, calm } = emotions;
 
   useFrame((state) => {
     if (!meshRef.current) return;
     const time = state.clock.elapsedTime;
-    const freq = 1.2 + energy / 30;
-    const pulse = 1 + Math.sin(time * freq) * (0.08 + energy / 1000);
+    const freq = 1.0 + energy / 32 - calm / 180;
+    const pulse = 1 + Math.sin(time * freq) * (0.07 + energy / 1100 - calm / 3000);
     meshRef.current.scale.setScalar(pulse);
     meshRef.current.rotation.y = time * (0.5 + energy / 100);
     meshRef.current.rotation.x = time * 0.3;
   });
 
-  const hue = 0.35 + (frustration / 100) * -0.25;
-  const [r, g, b] = hslToRgb(hue, 0.7, 0.5 + happiness / 200);
+  const hue = 0.35 + (frustration / 100) * -0.25 + (affection / 100) * -0.05;
+  const [r, g, b] = hslToRgb(hue, 0.7 + affection / 600, 0.5 + happiness / 200);
   const emissiveInt = 0.5 + energy / 50;
 
   return (
@@ -220,20 +230,20 @@ function InnerCore({ emotions }: { emotions: EmotionState }) {
 /* ─── Orb Glow (simulated bloom) ─── */
 function OrbGlow({ emotions }: { emotions: EmotionState }) {
   const meshRef = useRef<Mesh>(null);
-  const { energy, happiness, frustration, sadness } = emotions;
+  const { energy, happiness, frustration, sadness, affection, calm } = emotions;
 
   useFrame((state) => {
     if (!meshRef.current) return;
     const time = state.clock.elapsedTime;
     const pulse =
       1 +
-      Math.sin(time * (0.8 + energy / 100)) * (0.05 + energy / 500);
+      Math.sin(time * (0.75 + energy / 110 - calm / 300)) * (0.05 + energy / 550);
     meshRef.current.scale.setScalar(pulse);
   });
 
-  const hue = 0.35 + (frustration / 100) * -0.35 + (sadness / 100) * -0.1;
-  const [r, g, b] = hslToRgb(hue, 0.5, 0.5);
-  const intensity = 0.2 + energy / 200 + happiness / 300;
+  const hue = 0.35 + (frustration / 100) * -0.35 + (sadness / 100) * -0.1 + (affection / 100) * -0.05;
+  const [r, g, b] = hslToRgb(hue, 0.5 + affection / 300, 0.5 + calm / 1000);
+  const intensity = 0.2 + energy / 220 + happiness / 330 + affection / 500;
 
   return (
     <mesh ref={meshRef}>
@@ -255,7 +265,7 @@ function ParticleField({ emotions }: { emotions: EmotionState }) {
   const pointsRef = useRef<Points>(null);
   const count = 100;
 
-  const { energy, frustration, happiness } = emotions;
+  const { energy, frustration, happiness, anxiety, calm } = emotions;
 
   const [positions] = useMemo(() => {
     const pos = new Float32Array(count * 3);
@@ -276,8 +286,8 @@ function ParticleField({ emotions }: { emotions: EmotionState }) {
     const pos = posAttr.array as Float32Array;
     const time = state.clock.elapsedTime;
 
-    const chaos = frustration / 100;
-    const speed = 0.002 + energy / 8000;
+    const chaos = Math.max(0, frustration / 100 + anxiety / 140 - calm / 180);
+    const speed = Math.max(0.001, 0.002 + energy / 8000 + anxiety / 50000 - calm / 60000);
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
@@ -305,7 +315,7 @@ function ParticleField({ emotions }: { emotions: EmotionState }) {
   });
 
   const color = useMemo(() => {
-    const hue = 0.35 + (frustration / 100) * -0.35;
+    const hue = 0.35 + (frustration / 100) * -0.35 + (anxiety / 100) * -0.08 + (calm / 100) * 0.04;
     const [r, g, b] = hslToRgb(hue, 0.6, 0.7);
     return new THREE.Color(r, g, b);
   }, [frustration]);

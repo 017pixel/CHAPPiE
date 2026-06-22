@@ -16,6 +16,9 @@ export function VisualizerPage() {
     frustration: Number(emotions.frustration ?? 0),
     motivation: Number(emotions.motivation ?? 50),
     sadness: Number(emotions.sadness ?? 0),
+    affection: Number(emotions.affection ?? 45),
+    anxiety: Number(emotions.anxiety ?? 0),
+    calm: Number(emotions.calm ?? 50),
   };
 
   return (

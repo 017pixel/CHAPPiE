@@ -25,6 +25,8 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional, Generator, List
 
+from config.emotions import EMOTION_ORDER
+
 try:
     from rich.console import Console, Group as _RichGroup
     from rich.panel import Panel
@@ -115,7 +117,7 @@ def _emo_color(value: int) -> str:
     return "red"
 
 
-EMOTION_NAMES = ("happiness", "trust", "energy", "curiosity", "motivation", "frustration", "sadness")
+EMOTION_NAMES = EMOTION_ORDER
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1502,7 +1504,7 @@ class CHAPPiEBrainCLI:
   ██████╔╝██║  ██║██║  ██║██║██║ ╚████║
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
 {Colors.AI}CHAPPiE Terminal Interface v6.0 [{mode_str}]
-{Colors.STEER}Steering: {steering_info} | 7 Emotionale Dimensionen
+{Colors.STEER}Steering: {steering_info} | {len(EMOTION_NAMES)} Emotionale Dimensionen
 {Colors.DEBUG}Live Streaming + Debug-Report | Tippe /help fuer alle Befehle
 {Colors.RESET}""")
 

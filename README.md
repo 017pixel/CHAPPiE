@@ -35,7 +35,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
 - **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
 - **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden
-- **3D Emotion Lattice**: Lebendiger 3D-Orb, der sich in Echtzeit an alle 7 Emotionen anpasst – Farbe, Oberflaeche, Puls und Partikel reagieren auf emotionale Zustaende
+- **3D Emotion Lattice**: Lebendiger 3D-Orb, der sich in Echtzeit an alle 10 Emotionen anpasst – Farbe, Oberflaeche, Puls und Partikel reagieren auf emotionale Zustaende
 - **WhatsApp Fine-Tuning**: LoRA-basiertes Fine-Tuning von Qwen3.5-4B auf WhatsApp-Chats zur Persoenlichkeitsanpassung – Steering bleibt erhalten
 
 ## Erste Beobachtungen
@@ -82,7 +82,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    E["7 Emotionen\n0-100"] --> VAD["VAD-Mapping"]
+    E["10 Emotionen\n0-100"] --> VAD["VAD-Mapping"]
     VAD --> Alpha["Alpha\n44-56: tot\n56-74: sigmoid\n74+: max"]
     Alpha --> Modes["Composite Modes\ncrashout, warm, ..."]
     Modes --> Layers["Layer-Profile\nL10-26 bei 4B"]
