@@ -64,6 +64,8 @@ EMOTION_STRENGTH_PROFILES = {
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.25
 MAX_VECTOR_DEFAULT_ALPHA = 1.2
+BASE_VECTOR_STRENGTH_CAP = 0.45
+CHARGED_COMPOSITE_STRENGTH_CAP = 0.30
 
 COMPOSITE_BEHAVIOR_MODES = {
     "crashout": {
@@ -429,7 +431,7 @@ class SteeringManager:
         - Neutrale Werte (40-60) erzeugen kein Steering (Alpha = 0)
         - Extreme Werte (0-20 oder 80-100) erzeugen starkes Steering
         - Verwendet eine Sigmoid-aehnliche Skalierung fuer natuerliche Uebergaenge
-        - Negative Emotionen (sadness, frustration) haben invertierte Logik
+        - Niedrige sadness/frustration bedeuten Stabilitaet und erzeugen kein Anti-Steering
         """
         intensities = {}
         negative_emotions = {"sadness", "frustration"}
@@ -442,6 +444,10 @@ class SteeringManager:
             vector_scale = self._get_vector_alpha_scale(emotion)
 
             if vector_scale <= 0:
+                intensities[emotion] = 0.0
+                continue
+
+            if emotion in negative_emotions and value < 50:
                 intensities[emotion] = 0.0
                 continue
 
@@ -463,7 +469,7 @@ class SteeringManager:
             if deviation >= 34:
                 alpha *= 1.04
             alpha *= profile.get("boost", 1.0)
-            alpha = min(1.42, max_alpha * profile.get("boost", 1.0), alpha)
+            alpha = min(BASE_VECTOR_STRENGTH_CAP, max_alpha * profile.get("boost", 1.0), alpha)
 
             # Richtung: Negativer Steering bei niedrigen Werten
             if value < 50 and emotion not in negative_emotions:
@@ -472,7 +478,7 @@ class SteeringManager:
                 # Frustration 80 = starkes Frustrations-Steering (positiv)
                 pass
             elif value < 50 and emotion in negative_emotions:
-                alpha = -alpha  # Niedrige Frustration = anti-Frustration
+                alpha = 0.0
 
             intensities[emotion] = round(alpha, 4)
 
@@ -568,7 +574,7 @@ class SteeringManager:
         # Wirkung: hochaktiv, getrieben, druckvoll, intensiv
         # Basisstärke 0.4, steigt mit energy, motivation und curiosity (max 0.96)
         if energy >= 72 and motivation >= 68 and curiosity >= 66:
-            strength = round(min(0.96, 0.4 + ((energy - 72) / 28) * 0.2 + ((motivation - 68) / 32) * 0.18 + ((curiosity - 66) / 34) * 0.14), 4)
+            strength = round(min(CHARGED_COMPOSITE_STRENGTH_CAP, 0.18 + ((energy - 72) / 28) * 0.06 + ((motivation - 68) / 32) * 0.05 + ((curiosity - 66) / 34) * 0.04), 4)
             modes.append({
                 "name": "charged",
                 "source": "composite",
@@ -668,6 +674,9 @@ class SteeringManager:
 
         # Berechne dominante Emotion fuer Logging
         dominant = max(active_vectors, key=lambda v: v["strength"])
+        dominant_name = dominant["name"]
+        if dominant.get("direction") == "negative":
+            dominant_name = f"anti_{dominant_name}"
 
         return {
             "steering": {
@@ -676,7 +685,7 @@ class SteeringManager:
                 "model_layers": self.model_profile["total_layers"],
                 "target_range": list(self.model_profile["emotion_range"]),
                 "vectors": active_vectors,
-                "dominant_emotion": dominant["name"],
+                "dominant_emotion": dominant_name,
                 "dominant_strength": dominant["strength"],
                 "emotion_state": {
                     emotion: int(current_emotions.get(emotion, 50))

@@ -69,6 +69,7 @@ Der Kern von CHAPPiEs emotionalem Steering ist die direkte Manipulation der Hidd
    - Toter Bereich: 44-56 → kein Steering
    - Leichte Abweichung: 56-74 → Alpha steigt sigmoid-ahnlich
    - Extreme: 74-100 → Alpha maximal, mit Boost-Faktor
+   - Niedrige `sadness` und `frustration` stehen fuer Stabilitaet und erzeugen kein starkes Anti-Steering
 3. **Composite Modes**: Bestimmte Emotions-Kombinationen aktivieren komplexe Modi:
    - `crashout`: frustration ≥ 72 + trust ≤ 38 → kurz angebunden, konfrontativ
    - `guarded`: trust ≤ 26 + frustration ≥ 50 → misstrauisch, distanziert
@@ -93,6 +94,7 @@ Der `ActivationVectorResolver` baut Steering-Vektoren durch kontrastive Analyse:
 ### Was bewusst nicht passieren soll
 
 Im lokalen Hauptpfad sollen Emotionen nicht primaer ueber lange Prompt-Zusatztexte erzwungen werden.
+Auch native Qwen-/vLLM-Reasoning-Pfade sollen nicht durch lange CoT-Promptbloecke ersetzt werden.
 
 Das gilt fuer:
 

@@ -163,10 +163,10 @@ class Settings:
         self.cli_debug_always_on = True
         self.web_debug_default = False
 
-        self.max_tokens = int(self._get_val("MAX_TOKENS", 2200))
-        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 800))
-        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 1200))
-        self.temperature = float(self._get_val("TEMPERATURE", 0.85))
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 450))
+        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 650))
+        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 450))
+        self.temperature = float(self._get_val("TEMPERATURE", 0.7))
         self.repetition_penalty = float(self._get_val("REPETITION_PENALTY", 1.15))
         self.stream = bool(self._get_val("STREAM", True))
         self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))

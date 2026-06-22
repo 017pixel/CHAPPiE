@@ -30,6 +30,20 @@ from brain.deep_think import DeepThinkEngine
 from life import get_life_simulation_service
 
 
+CASUAL_CHAT_MEMORY_TOP_K = 20
+
+
+def response_memory_top_k_for_intent(intent_type: Any, default_top_k: int) -> int:
+    intent = getattr(intent_type, "value", intent_type)
+    if str(intent or "").lower() == "casual_chat":
+        return CASUAL_CHAT_MEMORY_TOP_K
+    return int(default_top_k)
+
+
+def prompt_chain_of_thought_enabled(provider: Any, chain_of_thought: bool) -> bool:
+    return bool(chain_of_thought and provider == LLMProvider.GROQ)
+
+
 def create_chappie_backend():
     """Erzeugt ein CHAPPiE-Backend ohne UI-Cache, z. B. fuer CLI, API und Tests."""
     class CHAPPiEBackend:
@@ -542,6 +556,21 @@ def create_chappie_backend():
                 "tone_drivers": tone_drivers,
                 "response_guidance": guidance,
             }
+
+        @staticmethod
+        def _use_prompt_chain_of_thought() -> bool:
+            return prompt_chain_of_thought_enabled(settings.llm_provider, settings.chain_of_thought)
+
+        @staticmethod
+        def _response_style_instruction(intent_type: Any = None) -> str:
+            intent = getattr(intent_type, "value", intent_type)
+            if str(intent or "").lower() == "casual_chat":
+                return "ANTWORTSTIL: Antworte kurz und konkret, normalerweise in 3-6 Saetzen."
+            return "ANTWORTSTIL: Beginne kurz und konkret; werde nur so ausfuehrlich wie die Aufgabe es braucht."
+
+        @staticmethod
+        def _append_response_style_instruction(system_prompt: str, intent_type: Any = None) -> str:
+            return f"{system_prompt}\n\n{CHAPPiEBackend._response_style_instruction(intent_type)}"
 
         def _build_input_classification(self, intent_result: Any) -> Dict[str, Any]:
             entities = list(getattr(intent_result, "entities", []) or [])
@@ -1359,6 +1388,7 @@ def create_chappie_backend():
                     global_workspace=workspace,
                     preloaded_memories=intent_memories,
                     memory_trace_seed=intent_memory_trace,
+                    intent_type=intent_result.intent_type,
                 ),
                 validator=self._is_valid_generation_result,
                 status_callback=status_callback,
@@ -1740,19 +1770,21 @@ def create_chappie_backend():
                               life_context: Dict[str, Any] | None = None,
                               global_workspace: Dict[str, Any] | None = None,
                               preloaded_memories: Optional[List[Any]] = None,
-                              memory_trace_seed: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                              memory_trace_seed: Optional[Dict[str, Any]] = None,
+                              intent_type: Any = None) -> Dict[str, Any]:
             """Generiert die finale Antwort (Step 2)."""
             # RAG Memory Search
+            memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
             generation_query = self.memory.extract_search_query(user_input)
             fresh_memories = self.memory.search_memory(
                 generation_query or user_input,
-                top_k=settings.memory_top_k,
+                top_k=memory_top_k,
                 optimize_query=False,
             )
             memories = self._merge_memories(
                 preferred=preloaded_memories or [],
                 secondary=fresh_memories,
-                limit=settings.memory_top_k,
+                limit=memory_top_k,
             )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
             
@@ -1798,6 +1830,7 @@ def create_chappie_backend():
                 "Memory-Retrieval abgeschlossen",
                 {
                     "top_k": settings.memory_top_k,
+                    "effective_top_k": memory_top_k,
                     "memories_found": len(memories or []),
                     "memory_ids": [str(getattr(m, "id", ""))[:8] for m in (memories or [])[:8]],
                     "query": generation_query,
@@ -1849,8 +1882,9 @@ def create_chappie_backend():
                 motivation=emotions["motivation"],
                 sadness=emotions["sadness"],
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=settings.chain_of_thought
+                use_chain_of_thought=self._use_prompt_chain_of_thought()
             )
+            system_prompt = self._append_response_style_instruction(system_prompt, intent_type)
             
             # Context hinzufuegen
             if context:
@@ -2032,8 +2066,9 @@ def create_chappie_backend():
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=settings.chain_of_thought
+                use_chain_of_thought=self._use_prompt_chain_of_thought()
             )
+            system_prompt = self._append_response_style_instruction(system_prompt)
             
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             
@@ -2173,15 +2208,17 @@ def create_chappie_backend():
             global_workspace: Dict[str, Any] | None = None,
             preloaded_memories: Optional[List[Any]] = None,
             memory_trace_seed: Optional[Dict[str, Any]] = None,
+            intent_type: Any = None,
         ):
             """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
+            memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
             # Preloaded memories aus Step 1 direkt nutzen – kein zweiter LLM-Call
             memories = list(preloaded_memories or [])
             if not memories:
                 generation_query = self.memory.extract_search_query(user_input)
                 memories = self.memory.search_memory(
                     generation_query or user_input,
-                    top_k=settings.memory_top_k,
+                    top_k=memory_top_k,
                     optimize_query=False,
                 )
             memories_for_prompt = self.memory.format_memories_for_prompt(memories)
@@ -2206,8 +2243,9 @@ def create_chappie_backend():
                 motivation=emotions["motivation"],
                 sadness=emotions["sadness"],
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=settings.chain_of_thought
+                use_chain_of_thought=self._use_prompt_chain_of_thought()
             )
+            system_prompt = self._append_response_style_instruction(system_prompt, intent_type)
 
             if context:
                 system_prompt += f"\n\n{context}"
@@ -2233,6 +2271,7 @@ def create_chappie_backend():
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "rag_memories": memories,
                 "context_budget": self._enforce_context_budget(messages)[1],
+                "effective_memory_top_k": memory_top_k,
             }
 
         def _process_two_step_stream(
@@ -2317,7 +2356,7 @@ def create_chappie_backend():
             intent_memory_query = self.memory.extract_search_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
-                top_k=settings.memory_top_k,
+                top_k=response_memory_top_k_for_intent(intent_result.intent_type, settings.memory_top_k),
                 optimize_query=False,
             )
             intent_memory_trace = self._build_memory_trace(
@@ -2367,6 +2406,7 @@ def create_chappie_backend():
                     global_workspace=workspace,
                     preloaded_memories=intent_memories,
                     memory_trace_seed=intent_memory_trace,
+                    intent_type=intent_result.intent_type,
                 )
 
                 raw_parts = []
@@ -2657,8 +2697,9 @@ def create_chappie_backend():
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=settings.chain_of_thought
+                use_chain_of_thought=self._use_prompt_chain_of_thought()
             )
+            system_prompt = self._append_response_style_instruction(system_prompt)
 
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
 
@@ -3034,4 +3075,3 @@ def create_chappie_backend():
 def init_chappie():
     """Initialisiert das Backend ohne UI-spezifischen Cache."""
     return create_chappie_backend()
-

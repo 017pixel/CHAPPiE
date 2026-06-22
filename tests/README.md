@@ -33,6 +33,8 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_groq_limits.py`
 - `tests/test_runtime_switching.py`
 - `tests/test_root_config.py`
+- `tests/test_response_policy.py`
+- `tests/test_steering_manager_policy.py`
 - `tests/test_cli_import.py`
 - `tests/test_cli_display.py`
 - `tests/test_cli_commands.py`
@@ -93,6 +95,8 @@ Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
 - `tests/test_forgetting_curve.py`
 - `tests/test_brain_pipeline_steering_integration.py`
 - `tests/test_reasoning_layering.py`
+- `tests/test_response_policy.py`
+- `tests/test_steering_manager_policy.py`
 - `tests/test_cli_import.py`
 - `tests/test_cli_display.py`
 - `tests/test_cli_commands.py`

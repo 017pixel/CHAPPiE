@@ -124,7 +124,7 @@ def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
         manager = SteeringManager()
         payload = manager.get_steering_payload({
             "happiness": 82,
-            "sadness": 26,
+            "sadness": 82,
             "frustration": 74,
             "trust": 77,
             "curiosity": 69,
@@ -139,6 +139,31 @@ def test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors():
     assert set(steering["emotion_intensities"].keys()) == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
     base_names = {item["name"] for item in steering["base_vectors"]}
     assert base_names == {"happiness", "sadness", "frustration", "trust", "curiosity", "motivation", "energy"}
+
+
+def test_low_sadness_and_frustration_do_not_emit_anti_vectors():
+    provider_before = settings.llm_provider
+    settings.llm_provider = LLMProvider.VLLM
+    try:
+        manager = SteeringManager()
+        payload = manager.get_steering_payload({
+            "happiness": 86,
+            "trust": 55,
+            "energy": 88,
+            "curiosity": 77,
+            "motivation": 90,
+            "frustration": 10,
+            "sadness": 0,
+        }, force=True)
+    finally:
+        settings.llm_provider = provider_before
+
+    steering = payload["steering"]
+    names = {item["name"] for item in steering["vectors"]}
+    assert "sadness" not in names
+    assert "frustration" not in names
+    assert steering["dominant_emotion"] != "sadness"
+    assert steering["dominant_strength"] <= 0.45
 
 
 def test_steering_manager_includes_anti_safeguard_vector():
@@ -263,6 +288,7 @@ if __name__ == "__main__":
     test_build_style_instruction_mentions_negative_guardrails()
     test_build_style_instruction_uses_all_seven_vitals_from_payload_metadata()
     test_steering_manager_payload_keeps_all_seven_vitals_and_base_vectors()
+    test_low_sadness_and_frustration_do_not_emit_anti_vectors()
     test_steering_manager_includes_anti_safeguard_vector()
     test_local_steering_engine_uses_trust_remote_code_for_qwen35()
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()

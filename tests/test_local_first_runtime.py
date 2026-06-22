@@ -203,7 +203,7 @@ def test_layer_config_exposes_per_emotion_alpha_and_layers():
         settings.vllm_model = "Qwen/Qwen3.5-35B-A3B"
         manager = SteeringManager()
         emotions = {
-            "happiness": 90,
+            "happiness": 58,
             "trust": 58,
             "energy": 64,
             "curiosity": 53,

@@ -47,9 +47,9 @@ DEFAULT_ROOT_CONFIG: Dict[str, Dict[str, Any]] = {
         "query_extraction_min_words_for_llm": 7,
     },
     "generation": {
-        "max_tokens": 3300,
-        "chappie_thinking_token_limit": 2500,
-        "chappie_answer_token_limit": 800,
+        "max_tokens": 450,
+        "chappie_thinking_token_limit": 650,
+        "chappie_answer_token_limit": 450,
         "temperature": 0.7,
         "stream": True,
         "chain_of_thought": True,

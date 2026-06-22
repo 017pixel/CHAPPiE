@@ -42,6 +42,14 @@ Wichtig:
 4. `api.groq_api_key` muss in `CHAPPIE_CONFIG.json` gesetzt sein, damit Intent, Query Extraction, Formatierung und STM-Zusammenfassungen ueber Groq laufen.
 5. Runtime-Settings werden ueber `CHAPPIE_CONFIG.json`, API und Frontend gepflegt.
 
+Empfohlene Antwortdefaults:
+
+- `generation.max_tokens = 450`
+- `generation.chappie_thinking_token_limit = 650`
+- `generation.chappie_answer_token_limit = 450`
+- `generation.temperature = 0.7`
+- Casual Chat nutzt zur Antwortgenerierung 20 Memories; komplexere Intents nutzen weiter `memory.memory_top_k`.
+
 ## Praxis-Hinweise
 
 - `Qwen/Qwen3.5-4B` ist der bevorzugte Default fuer ca. 16 GB VRAM
@@ -69,6 +77,7 @@ Fuer den bevorzugten lokalen Pfad gilt:
 
 - Emotionen werden nicht primaer als Prompt-Liste transportiert
 - der wichtigste Pfad ist Steering ueber Payload und lokale Modellschicht
+- niedrige Traurigkeit oder Frustration erzeugen kein starkes Anti-Steering; `charged` bleibt bewusst gedrosselt
 - API und Frontend zeigen `emotion_state`, Intensitaeten und Debugdaten strukturiert an
 - dieselben Daten werden auch fuer Training und Debug genutzt
 
