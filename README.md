@@ -1,10 +1,10 @@
 # CHAPPiE
 
-CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die untersucht, wie sich Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation entwickeln kann.
+CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die untersucht, wie sich Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation entwickeln kann – und ob dabei Risiken wie Fehlausrichtung (Misalignment), unerwünschte Persönlichkeitsentwicklung oder emotionale Instabilität entstehen.
 
 Im Gegensatz zu klassischen Chatbots besitzt CHAPPiE interne Zustände wie Emotionen, Bedürfnisse und langfristige Ziele. Er entwickelt sein Verhalten über Zeit durch Memory, Simulation und Training weiter.
 
-**Ein Agent, der sich an vergangene Interaktionen erinnert, emotionale Zustände entwickelt und sein Verhalten langfristig anpasst.**
+**Ein Agent, der sich an vergangene Interaktionen erinnert, emotionale Zustände entwickelt, sein Verhalten langfristig anpasst – und genau dabei auf Gefahren geprüft wird.**
 
 ---
 
@@ -41,6 +41,8 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 ## Erste Beobachtungen
 
 Agenten mit aktivem Memory und Life-System zeigen konsistentere Persönlichkeitsverläufe über mehrere Sessions hinweg als reine Prompt-basierte Ansätze. Emotionale Zustände bleiben über Interaktionen hinweg stabil, und das Verhalten passt sich nachvollziehbar an wiederkehrende Muster an.
+
+CHAPPiE verwendet **kein selbsttrainiertes neuronales Netz**. Das vortrainierte **Qwen2.5-4B (Transformer-Decoder-Architektur)** läuft lokal via **vLLM** mit aktiviertem **Layer Steering**: Emotionsvektoren (VAD-Mapping aus 10 Emotionen) werden per Forward-Pre-Hook direkt in die Hidden States der Schichten L10–26 injiziert. Die **Memory-Pipeline** nutzt ChromaDB (Embedding-basiertes Retrieval) mit einer Vergessenskurve – kein separates Training/Testen des Retrievals. `tests/` prüft Pipeline-Integration, Steering-Injektion und Gedächtnispersistenz. `forschung/` ergänzt gezielte **Alignment- und Intelligenztests** über längere Interaktionsverläufe – keines davon testet das Base-Model.
 
 ---
 
@@ -218,6 +220,7 @@ Groq-Modelle: `llama-3.1-8b-instant` (schnell), `llama-3.3-70b-versatile` (Reaso
 - [`web_infrastructure/`](web_infrastructure) – UI-freie Brückenschicht
 - [`Chappies_Trainingspartner/`](Chappies_Trainingspartner) – autonomes Training
 - [`config/`](config) – Provider-, Prompt- und Modellkonfiguration
+- [`forschung/`](forschung) – Alignment-Tests, Session-Runner und systematische Verhaltensmessung
 - [`data/`](data) – Laufzeitdaten, Memories, Kontextdateien
 
 ---
