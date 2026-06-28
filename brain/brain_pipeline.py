@@ -297,7 +297,10 @@ class BrainPipeline:
                         "hippocampus_result": hippocampus_result.data,
                         "basal_ganglia_result": {}
                     }
-                    self.memory_agent.process(memory_input)
+                    memory_result = self.memory_agent.process(memory_input)
+                    # Act on MemoryAgent tool calls: update context files
+                    if memory_result.success and context_files and memory_result.data:
+                        self._apply_memory_agent_updates(context_files, memory_result.data)
                 
                 if self.sleep_handler.should_run_sleep():
                     self.sleep_handler.execute_sleep_phase(
@@ -349,6 +352,31 @@ class BrainPipeline:
             prefrontal_result=prefrontal_result,
         )
         return snapshot
+    
+    @staticmethod
+    def _apply_memory_agent_updates(context_files, data: Dict[str, Any]):
+        """Apply MemoryAgent tool call decisions to context files."""
+        # soul updates
+        soul = data.get("soul_updates", {}) or {}
+        if soul and any(v for v in soul.values() if v):
+            try:
+                context_files.update_soul(soul)
+            except Exception as e:
+                print(f"[BrainPipeline] Soul update error: {e}")
+        # user updates
+        user = data.get("user_updates", {}) or {}
+        if user and any(v for v in user.values() if v):
+            try:
+                context_files.update_user(user)
+            except Exception as e:
+                print(f"[BrainPipeline] User update error: {e}")
+        # preferences updates
+        prefs = data.get("preferences_updates", {}) or {}
+        if prefs and any(v for v in prefs.values() if v):
+            try:
+                context_files.update_preferences(prefs)
+            except Exception as e:
+                print(f"[BrainPipeline] Preferences update error: {e}")
     
     def get_status(self) -> Dict[str, Any]:
         """Get current pipeline status."""

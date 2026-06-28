@@ -7,11 +7,12 @@ Groq bietet:
 - Extrem schnelle Inferenz (LPU-beschleunigt)
 - Zugang zu Llama, Qwen, GPT-OSS Modellen
 - OpenAI-kompatible API
+- Native Function/Tool Calling
 
 Benötigt: Groq API Key (https://console.groq.com/keys)
 """
 
-from typing import Generator, Optional
+from typing import Generator, Optional, List, Dict, Any
 from openai import OpenAI
 
 from .base_brain import BaseBrain, Message, GenerationConfig
@@ -58,7 +59,9 @@ class GroqBrain(BaseBrain):
     def generate(
         self,
         messages: list[Message],
-        config: Optional[GenerationConfig] = None
+        config: Optional[GenerationConfig] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
     ) -> Generator[str, None, None] | str:
         if not self._is_initialized:
             error_msg = "FEHLER: Groq nicht initialisiert - API-Key fehlt!"
@@ -81,9 +84,9 @@ class GroqBrain(BaseBrain):
         ]
 
         if config.stream:
-            return self._stream_generate(openai_messages, config)
+            return self._stream_generate(openai_messages, config, tools=tools, tool_choice=tool_choice)
         else:
-            return self._sync_generate(openai_messages, config)
+            return self._sync_generate(openai_messages, config, tools=tools, tool_choice=tool_choice)
 
     @staticmethod
     def _is_missing_key(api_key: str) -> bool:
@@ -102,7 +105,9 @@ class GroqBrain(BaseBrain):
     def _stream_generate(
         self,
         messages: list[dict],
-        config: GenerationConfig
+        config: GenerationConfig,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
     ) -> Generator[str, None, None]:
         try:
             quota_error = self._claim_quota(messages, config)
@@ -110,13 +115,18 @@ class GroqBrain(BaseBrain):
                 yield f"\nGroq Fehler: Rate-Limit erreicht ({quota_error})"
                 return
 
-            stream = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
-                stream=True
-            )
+            kwargs = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": config.max_tokens,
+                "temperature": config.temperature,
+                "stream": True,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = tool_choice or "auto"
+
+            stream = self.client.chat.completions.create(**kwargs)
 
             for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
@@ -125,23 +135,88 @@ class GroqBrain(BaseBrain):
         except Exception as e:
             yield f"\nGroq Fehler: {str(e)}"
 
-    def _sync_generate(self, messages: list[dict], config: GenerationConfig) -> str:
+    def _sync_generate(
+        self,
+        messages: list[dict],
+        config: GenerationConfig,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
+    ) -> str:
         try:
             quota_error = self._claim_quota(messages, config)
             if quota_error:
                 return f"Groq Fehler: Rate-Limit erreicht ({quota_error})"
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=config.max_tokens,
-                temperature=config.temperature,
-                stream=False
-            )
+            kwargs = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": config.max_tokens,
+                "temperature": config.temperature,
+                "stream": False,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = tool_choice or "auto"
+
+            response = self.client.chat.completions.create(**kwargs)
             return response.choices[0].message.content
 
         except Exception as e:
             return f"Groq Fehler: {str(e)}"
+
+    def generate_with_tools(
+        self,
+        messages: list[Message],
+        config: Optional[GenerationConfig] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Sync-Generierung mit Tool-Support. Gibt kompletten Response zurueck.
+        
+        Returns: {"content": str, "tool_calls": list | None}
+        """
+        if not self._is_initialized:
+            return {"content": "FEHLER: Groq nicht initialisiert", "tool_calls": None}
+
+        if config is None:
+            config = GenerationConfig(max_tokens=settings.max_tokens, temperature=settings.temperature, stream=False)
+
+        openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+
+        try:
+            kwargs = {
+                "model": self.model,
+                "messages": openai_messages,
+                "max_tokens": config.max_tokens,
+                "temperature": config.temperature,
+                "stream": False,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = tool_choice or "auto"
+
+            response = self.client.chat.completions.create(**kwargs)
+            msg = response.choices[0].message
+            return {
+                "content": msg.content or "",
+                "tool_calls": self._parse_tool_calls_from_response(msg),
+            }
+        except Exception as e:
+            return {"content": f"Groq Fehler: {str(e)}", "tool_calls": None}
+
+    @staticmethod
+    def _parse_tool_calls_from_response(msg) -> Optional[List[Dict[str, Any]]]:
+        """Parse tool_calls from OpenAI API response message."""
+        if not hasattr(msg, "tool_calls") or not msg.tool_calls:
+            return None
+        return [
+            {
+                "id": tc.id,
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+            }
+            for tc in msg.tool_calls
+        ]
 
     def is_available(self) -> bool:
         return self._is_initialized

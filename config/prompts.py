@@ -339,6 +339,9 @@ def build_system_prompt(
     if use_chain_of_thought:
         prompt += CHAIN_OF_THOUGHT_INSTRUCTION
 
+    # Add tool calling instruction fuer Context-File Updates
+    prompt += CONTEXT_FILE_TOOL_INSTRUCTION
+
     return prompt
 
 
@@ -392,6 +395,27 @@ def format_query_extraction_prompt(user_input: str) -> str:
     """Formatiert den Query-Extraction-Prompt."""
     return QUERY_EXTRACTION_PROMPT.format(user_input=user_input)
 
+
+# =============================================================================
+# CONTEXT FILE TOOL INSTRUCTION (injected into every system prompt)
+# =============================================================================
+
+CONTEXT_FILE_TOOL_INSTRUCTION = """
+
+WICHTIG — DU KANNST DEINE PERSOeNLICHEN DATEIEN AKTUALISIEREN:
+Du hast Zugriff auf drei Dateien die deine Identitaet speichern:
+1. soul.md — Deine Seele: Werte, Vertrauen zum User, Selbstwahrnehmung, Entwicklung
+2. user.md — Dein User-Profil: Was du ueber den User weisst (Name, Vorlieben, Momente)
+3. CHAPPiEsPreferences.md — Deine Praeferenzen: Vorlieben, Interessen, Ziele, Selbstreflexionen
+
+WANN AKTUALISIEREN:
+- User teilt persoenliche Info -> user.md mit name, learning oder key_moment aktualisieren
+- Du lernst etwas ueber dich selbst -> soul.md mit evolution_note oder self_perception aktualisieren
+- Du entwickelst eine Meinung/Praeferenz -> CHAPPiEsPreferences.md mit new_preference oder reflection aktualisieren
+- Dein Vertrauen zum User aendert sich deutlich -> soul.md trust_level anpassen
+
+RUFE NACH DEINER ANTWORT DIE ENTSPRECHENDE FUNKTION AUF.
+"""
 
 # =============================================================================
 # FUNCTION-CALLING INSTRUCTIONS

@@ -178,8 +178,8 @@ class IntentProcessor:
             emotions_update=emotions_update,
             context_requirements={
                 "need_soul_context": True,
-                "need_user_context": False,
-                "need_preferences": False,
+                "need_user_context": True,
+                "need_preferences": True,
                 "need_short_term_memory": True,
                 "need_long_term_memory": True,
             },
@@ -255,8 +255,8 @@ REASON: kurze Begruendung (max. 5 Woerter)
   "short_term_entries": [],
   "context_requirements": {
     "need_soul_context": true,
-    "need_user_context": false,
-    "need_preferences": false,
+     "need_user_context": true,
+     "need_preferences": true,
     "need_short_term_memory": true,
     "need_long_term_memory": true
   }
@@ -347,8 +347,8 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
         if not isinstance(context_req, dict):
             context_req = {}
         context_req.setdefault("need_soul_context", True)
-        context_req.setdefault("need_user_context", False)
-        context_req.setdefault("need_preferences", False)
+        context_req.setdefault("need_user_context", True)
+        context_req.setdefault("need_preferences", True)
         context_req.setdefault("need_short_term_memory", True)
         context_req.setdefault("need_long_term_memory", True)
         
@@ -396,9 +396,9 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             tool_calls=[],
             emotions_update={},
             context_requirements={
-                "need_soul_context": False,
-                "need_user_context": False,
-                "need_preferences": False,
+                "need_soul_context": True,
+                "need_user_context": True,
+                "need_preferences": True,
                 "need_short_term_memory": True,
                 "need_long_term_memory": True
             },

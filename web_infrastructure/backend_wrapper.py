@@ -1463,6 +1463,15 @@ def create_chappie_backend():
             )
             sleep_result = self._schedule_sleep_phase_if_due()
             
+            # Auto-periodische Context-Aktualisierung (alle 5 Interaktionen)
+            if self.sleep_handler._state.get("interaction_count_since_sleep", 0) % 5 == 4:
+                try:
+                    self.context_files.update_soul({
+                        "evolution_note": f"CHAPPiE war aktiv in {intent_result.intent_type.value}-Interaktionen"
+                    })
+                except Exception:
+                    pass
+            
             start_time_dt = datetime.now()
             processing_time_ms = 0
             if hasattr(self, '_processing_start_time'):
@@ -1510,6 +1519,26 @@ def create_chappie_backend():
                 "memory_consolidation": response_data.get("memory_consolidation", {}),
                 "context_budget": response_data.get("context_budget", {}),
             }
+
+        def _execute_native_tool_calls(self, tool_calls: List[Dict]) -> List[str]:
+            """Fuehrt native OpenAI-Format Tool Calls aus. Gibt Ergebnis-Messages zurueck."""
+            results = []
+            for tc in tool_calls:
+                func = tc.get("function", {})
+                name = func.get("name", "")
+                try:
+                    args_str = func.get("arguments", "{}")
+                    args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                except json.JSONDecodeError:
+                    results.append(f"Tool {name}: JSON Parse Error")
+                    continue
+                try:
+                    result_text = self.function_registry.execute(name, args)
+                    results.append(f"Tool {name}: {result_text}")
+                    self.debug_logger.log_tool_call(name, "native", args, True)
+                except Exception as e:
+                    results.append(f"Tool {name}: Error - {e}")
+            return results
 
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
             """Fuehrt Tool Calls aus Step 1 aus."""
@@ -1761,6 +1790,10 @@ def create_chappie_backend():
             ascii_chars = char_count - non_ascii
             return max(1, (ascii_chars // 3) + non_ascii)
 
+        def _get_context_tools(self) -> List[Dict[str, Any]]:
+            """Returns OpenAI-compatible tools for context file updates."""
+            return self.function_registry.get_openai_tools()
+
         def _build_context(self, requirements: Dict[str, bool]) -> str:
             """Baut den Context String basierend auf Requirements."""
             context_parts = []
@@ -1935,7 +1968,21 @@ def create_chappie_backend():
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
             
-            raw_response = self.brain.generate(messages, config=gen_config)
+            # Native Tool Calling: Kontext-File-Tools an Brain uebergeben
+            tools = self._get_context_tools() if settings.llm_provider == LLMProvider.GROQ else None
+            tool_call_results = []
+            if tools and hasattr(self.brain, "generate_with_tools"):
+                tool_response = self.brain.generate_with_tools(messages, config=gen_config, tools=tools)
+                raw_response = tool_response.get("content", "")
+                native_tool_calls = tool_response.get("tool_calls")
+                if native_tool_calls:
+                    tool_call_results = self._execute_native_tool_calls(native_tool_calls)
+                    # Simuliere Tool-Ergebnisse als System-Message
+                    if tool_call_results:
+                        messages.append(Message(role="system", content="\n".join(tool_call_results)[:800]))
+                        raw_response = self.brain.generate(messages, config=gen_config)
+            else:
+                raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
             formatted = self._format_via_groq(raw_response)
 

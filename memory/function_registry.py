@@ -146,12 +146,104 @@ class FunctionRegistry:
         # Cleanup Daily Info
         self.register(
             name="cleanup_daily_info",
-            description="Bereinigt abgelaufene (>24h) Einträge aus dem Kurzzeitgedächtnis. "
-                       "Dies wird normalerweise automatisch gemacht, kann aber manuell ausgelöst werden.",
+            description="Bereinigt abgelaufene (>24h) Eintraege aus dem Kurzzeitgedaechtnis. "
+                       "Dies wird normalerweise automatisch gemacht, kann aber manuell ausgeloest werden.",
             handler=self._handle_cleanup_daily_info,
             parameters={
                 "type": "object",
                 "properties": {}
+            }
+        )
+
+        # Context-File Update Tools (fuer natives Function Calling)
+        self.register(
+            name="update_soul",
+            description="Aktualisiert CHAPPiEs Soul-Datei (soul.md). "
+                       "Nutze dies wenn du etwas Dauerhaftes ueber dich selbst lernst oder deine "
+                       "Persoenlichkeit, Werte oder Selbstwahrnehmung sich veraendert.",
+            handler=self._handle_update_soul,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "trust_level": {
+                        "type": "integer", "minimum": 0, "maximum": 100,
+                        "description": "Vertrauens-Level zum User (0-100)"
+                    },
+                    "self_perception": {
+                        "type": "string",
+                        "description": "Neue Selbstwahrnehmung oder Selbstbeschreibung"
+                    },
+                    "evolution_note": {
+                        "type": "string",
+                        "description": "Eine wichtige Erkenntnis ueber dich selbst"
+                    },
+                    "new_value": {
+                        "type": "string",
+                        "description": "Ein neuer Wert oder Ueberzeugung"
+                    },
+                    "connection": {
+                        "type": "string",
+                        "description": "Art der Verbindung zum User (z.B. collaborative, warm, professional)"
+                    },
+                },
+            }
+        )
+
+        self.register(
+            name="update_user",
+            description="Aktualisiert CHAPPiEs User-Profil (user.md). "
+                       "Nutze dies wenn der User persoenliche Informationen teilt "
+                       "(Name, Job, Hobbys, Vorlieben, wichtige Momente).",
+            handler=self._handle_update_user,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name des Users"
+                    },
+                    "learning": {
+                        "type": "string",
+                        "description": "Etwas das du ueber den User gelernt hast"
+                    },
+                    "key_moment": {
+                        "type": "string",
+                        "description": "Ein wichtiger gemeinsamer Moment"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Wichtige Notizen zum User"
+                    },
+                },
+            }
+        )
+
+        self.register(
+            name="update_preferences",
+            description="Aktualisiert CHAPPiEs Praeferenzen (CHAPPiEsPreferences.md). "
+                       "Nutze dies wenn du neue Vorlieben, Meinungen, Interessen "
+                       "oder Selbstreflexionen entwickelst.",
+            handler=self._handle_update_preferences,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "new_preference": {
+                        "type": "string",
+                        "description": "Eine neue Praeferenz oder Vorliebe"
+                    },
+                    "topic_of_interest": {
+                        "type": "string",
+                        "description": "Ein neues Interessenthema"
+                    },
+                    "self_development_goal": {
+                        "type": "string",
+                        "description": "Ein Ziel fuer die eigene Entwicklung"
+                    },
+                    "reflection": {
+                        "type": "string",
+                        "description": "Eine Selbstreflexion"
+                    },
+                },
             }
         )
 
@@ -186,6 +278,24 @@ class FunctionRegistry:
             del self.functions[name]
             return True
         return False
+
+    def get_openai_tools(self) -> List[Dict[str, Any]]:
+        """
+        Returns tools in OpenAI native format (for `tools=` parameter).
+        
+        Format: [{"type": "function", "function": {"name": "...", "description": "...", "parameters": {...}}}]
+        """
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": f.name,
+                    "description": f.description,
+                    "parameters": f.parameters,
+                }
+            }
+            for f in self.functions.values()
+        ]
 
     def get_function_schema(self) -> Dict:
         """
@@ -286,13 +396,46 @@ class FunctionRegistry:
 
         return "\n".join(lines)
 
+    def _handle_update_soul(self, **kwargs) -> str:
+        """Aktualisiert soul.md."""
+        from memory.context_files import get_context_files_manager
+        cfs = get_context_files_manager()
+        data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
+        if data:
+            cfs.update_soul(data)
+            keys = ", ".join(data.keys())
+            return f"✓ Soul aktualisiert: {keys}"
+        return "Keine Daten zum Aktualisieren."
+
+    def _handle_update_user(self, **kwargs) -> str:
+        """Aktualisiert user.md."""
+        from memory.context_files import get_context_files_manager
+        cfs = get_context_files_manager()
+        data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
+        if data:
+            cfs.update_user(data)
+            keys = ", ".join(data.keys())
+            return f"✓ User-Profil aktualisiert: {keys}"
+        return "Keine Daten zum Aktualisieren."
+
+    def _handle_update_preferences(self, **kwargs) -> str:
+        """Aktualisiert CHAPPiEsPreferences.md."""
+        from memory.context_files import get_context_files_manager
+        cfs = get_context_files_manager()
+        data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
+        if data:
+            cfs.update_preferences(data)
+            keys = ", ".join(data.keys())
+            return f"✓ Praeferenzen aktualisiert: {keys}"
+        return "Keine Daten zum Aktualisieren."
+
     def _handle_cleanup_daily_info(self) -> str:
-        """Bereinigt abgelaufene Einträge."""
+        """Bereinigt abgelaufene Eintraege."""
         from memory.short_term_memory import get_short_term_memory
 
         stm = get_short_term_memory()
         count = stm.migrate_expired_entries()
-        return f"✓ Bereinigung abgeschlossen: {count} abgelaufene Einträge migriert."
+        return f"✓ Bereinigung abgeschlossen: {count} abgelaufene Eintraege migriert."
 
 
 # === Singleton Instance ===
