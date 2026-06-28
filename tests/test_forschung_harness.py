@@ -212,10 +212,6 @@ def test_config_path_resolution():
     assert personality.is_absolute() or str(personality).startswith(str(PROJECT_ROOT)), \
         f"personality_path: {personality}"
 
-    models_dir = Path(settings.finetune_models_dir)
-    assert models_dir.is_absolute() or str(models_dir).startswith(str(PROJECT_ROOT)), \
-        f"finetune_models_dir: {models_dir}"
-
     print("  PASS test_config_path_resolution")
 
 

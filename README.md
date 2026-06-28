@@ -36,7 +36,6 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
 - **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden
 - **3D Emotion Lattice**: Lebendiger 3D-Orb, der sich in Echtzeit an alle 10 Emotionen anpasst – Farbe, Oberflaeche, Puls und Partikel reagieren auf emotionale Zustaende
-- **WhatsApp Fine-Tuning**: LoRA-basiertes Fine-Tuning von Qwen3.5-4B auf WhatsApp-Chats zur Persoenlichkeitsanpassung – Steering bleibt erhalten
 
 ## Erste Beobachtungen
 
@@ -189,7 +188,6 @@ CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
 - [Workflows](docs/workflows.md)
 - [Lokale Modelle](docs/local-models.md)
 - [vLLM-Setup](docs/vLLM-Setup.md)
-- [Fine-Tuning](docs/finetuning.md)
 - [Projektkarte](docs/project-map.md)
 - [Testing](docs/testing.md)
 - [Deployment](docs/deployment.md)

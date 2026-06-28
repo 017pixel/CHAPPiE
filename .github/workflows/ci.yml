@@ -24,27 +24,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      - name: Install Python dependencies
+      - name: Install Python dependencies (minimal for CI)
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip setuptools wheel
-          # Skip GPU-only packages that won't install on CI
-          python - <<'PY' > /tmp/ci-requirements.txt
-          from pathlib import Path
-          skip = {"vllm", "bitsandbytes", "accelerate"}
-          for raw in Path("requirements.txt").read_text(encoding="utf-8").splitlines():
-              line = raw.split("#", 1)[0].strip()
-              if not line:
-                  continue
-              name = line.replace(" ", "").split(">=", 1)[0].split("==", 1)[0].split("<=", 1)[0].split("[", 1)[0]
-              if name.lower() in skip:
-                  continue
-              print(line)
-          PY
-          python -m pip install -r /tmp/ci-requirements.txt
+          python -m pip install --no-cache-dir --upgrade pip
+          # Only packages actually needed by quick tests + py_compile
+          python -m pip install --no-cache-dir \
+            fastapi uvicorn rich numpy python-dotenv colorama requests pydantic
 
       - name: Syntax check core modules
         shell: bash
@@ -58,18 +46,15 @@ jobs:
             api/services/text_formatting.py \
             api/routers/chat.py \
             api/routers/context.py \
-            api/routers/finetune.py \
             api/routers/memory.py \
             api/routers/runtime.py \
             api/routers/system.py \
             api/routers/training.py \
-            brain/models_manager.py \
             brain/response_parser.py \
             brain/ollama_brain.py \
             brain/vllm_brain.py \
             brain/steering_backend.py \
             brain/steering_api_server.py \
-            brain/whatsapp_finetune_trainer.py \
             brain/agents/steering_manager.py \
             config/config.py \
             config/prompts.py \
@@ -98,7 +83,6 @@ jobs:
           python tests/test_cli_display.py
           python tests/test_cli_commands.py
           python tests/test_cli_remote.py
-          python tests/test_finetune_integration.py
           python tests/test_forschung_harness.py
 
       - name: Run extended tests (may need mock deps)

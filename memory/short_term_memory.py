@@ -252,10 +252,13 @@ class ShortTermMemory:
     
     def migrate_expired_entries(self) -> int:
         """
-        Migriert abgelaufene Einträge ins Langzeitgedächtnis (einzeln!).
+        Migriert abgelaufene Eintraege ins Langzeitgedaechtnis.
+        
+        Zusaetzlich: High-Importance-Eintraege werden bereits nach halber TTL
+        migriert, nicht erst nach voller TTL.
         
         Returns:
-            Anzahl migrierter Einträge
+            Anzahl migrierter Eintraege
         """
         if not self.memory_engine:
             return 0
@@ -271,10 +274,19 @@ class ShortTermMemory:
                 expires = datetime.fromisoformat(entry.expires_at)
                 if expires.tzinfo is None:
                     expires = expires.replace(tzinfo=timezone.utc)
-                    
-                if now > expires and entry.category in ("summary", "chat", "user", "system", "context"):
+                
+                created = datetime.fromisoformat(entry.created_at)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                
+                half_ttl = created + (expires - created) / 2
+                is_high_priority = entry.importance in ("high", "critical")
+                is_expired = now > expires
+                is_early_migration = is_high_priority and now > half_ttl
+                
+                if (is_expired or is_early_migration) and entry.category in ("summary", "chat", "user", "system", "context"):
                     try:
-                        role = "assistant" if entry.content.startswith("CHAPPiE:") else "user"
+                        role = self._detect_role(entry.content, entry.category)
                         self.memory_engine.add_memory(
                             content=entry.content,
                             role=role,
@@ -285,15 +297,27 @@ class ShortTermMemory:
                         entry.migrated = True
                         migrated_count += 1
                     except Exception as e:
-                        print(f"[ShortTerm] Migration fehlgeschlagen für {entry.id}: {e}")
+                        print(f"[ShortTerm] Migration fehlgeschlagen fuer {entry.id}: {e}")
             except (ValueError, TypeError) as e:
-                        print(f"[ShortTerm] Fehler beim Parsen von expires_at: {e}")
+                print(f"[ShortTerm] Fehler beim Parsen von expires_at: {e}")
         
         if migrated_count > 0:
             self._save_entries()
-            print(f"[ShortTerm] {migrated_count} Einträge migriert")
+            print(f"[ShortTerm] {migrated_count} Eintraege migriert")
         
         return migrated_count
+    
+    def _detect_role(self, content: str, category: str) -> str:
+        content_lower = content.lower()
+        if content_lower.startswith("chappie:") or content_lower.startswith("assistant:"):
+            return "assistant"
+        if content_lower.startswith("user:") or content_lower.startswith("human:"):
+            return "user"
+        if content_lower.startswith("system:"):
+            return "system"
+        if category == "chat":
+            return "assistant"
+        return "user"
     
     def get_formatted_for_prompt(self, query: str = None) -> str:
         """

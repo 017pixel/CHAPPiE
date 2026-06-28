@@ -269,6 +269,8 @@ class BrainPipeline:
         emotions_before: Dict,
         emotions_after: Dict,
         context_files=None,
+        short_term_memory=None,
+        emotions_engine=None,
         **kwargs
     ):
         """Start background processing in a separate thread."""
@@ -301,6 +303,8 @@ class BrainPipeline:
                     self.sleep_handler.execute_sleep_phase(
                         memory_engine=kwargs.get("memory_engine"),
                         context_files=context_files,
+                        short_term_memory=short_term_memory,
+                        emotions_engine=emotions_engine,
                     )
                     
             except Exception as e:
@@ -317,6 +321,8 @@ class BrainPipeline:
         emotions_after: Dict[str, int],
         memory_engine=None,
         context_files=None,
+        short_term_memory=None,
+        emotions_engine=None,
         amygdala_result: Optional[AgentResult] = None,
         hippocampus_result: Optional[AgentResult] = None,
         prefrontal_result: Optional[AgentResult] = None,
@@ -336,6 +342,8 @@ class BrainPipeline:
             emotions_after=emotions_after,
             memory_engine=memory_engine,
             context_files=context_files,
+            short_term_memory=short_term_memory,
+            emotions_engine=emotions_engine,
             amygdala_result=amygdala_result,
             hippocampus_result=hippocampus_result,
             prefrontal_result=prefrontal_result,

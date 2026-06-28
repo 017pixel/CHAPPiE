@@ -11,13 +11,15 @@ Neuroscience Basis:
 """
 
 import json
+import re
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import threading
 
 from config.config import DATA_DIR
 from config.brain_config import get_sleep_config, get_forgetting_curve_config
+from memory.forgetting_curve import get_decay_manager
 from life import get_life_simulation_service
 
 
@@ -34,6 +36,7 @@ class SleepPhaseHandler:
     def __init__(self):
         self.config = get_sleep_config()
         self.forgetting_config = get_forgetting_curve_config()
+        self.decay_manager = get_decay_manager()
         self.state_path = DATA_DIR / "sleep_state.json"
         self._lock = threading.Lock()
         self._load_state()
@@ -93,21 +96,25 @@ class SleepPhaseHandler:
                 self._state.get("interaction_count_since_sleep", 0) + 1
             self._save_state()
     
-    def execute_sleep_phase(self, memory_engine=None, context_files=None, short_term_memory=None, emotions_engine=None) -> Dict[str, Any]:
+    def execute_sleep_phase(self, memory_engine=None, context_files=None, short_term_memory=None, emotions_engine=None, brain=None) -> Dict[str, Any]:
         """
         Execute the sleep phase.
         
         Waehrend der Schlafphase:
-        1. Memory-Konsolidierung (Hippocampus -> Neocortex)
-        2. Vergessenskurve anwenden
-        3. Context-Dateien aktualisieren
-        4. Energie wiederherstellen (95-100%)
-        5. Emotionale Regeneration (Traurigkeit -20, Frustration -15)
+        1. STM -> LTM Migration (abgelaufene Eintraege)
+        2. LTM-Aehnlichkeits-Merging (Duplikate zusammenfassen)
+        3. LTM Dream-Konsolidierung (optional, via brain)
+        4. Vergessenskurve anwenden
+        5. Energy wiederherstellen (95-100%)
+        6. Emotionale Regeneration
+        7. Context-Dateien aktualisieren
         
         Args:
             memory_engine: Memory engine instance
             context_files: Context files manager
-            emotions_engine: Existing EmotionsEngine instance (reuse, don't recreate)
+            short_term_memory: ShortTermMemory instance
+            emotions_engine: Existing EmotionsEngine instance
+            brain: Brain instance (for LLM-based dream consolidation)
             
         Returns:
             Dict with sleep phase results
@@ -132,10 +139,13 @@ class SleepPhaseHandler:
                         memory_engine,
                         consolidation_config,
                         short_term_memory=short_term_memory,
+                        brain=brain,
                     )
                     results["consolidation"] = consolidation_result
                 
-                forgetting_result = self._apply_forgetting_curve(memory_engine)
+                # Vergessenskurve NACH Konsolidierung (frische Memories schuetzen)
+                protected_ids = results.get("consolidation", {}).get("protected_ids", [])
+                forgetting_result = self._apply_forgetting_curve(memory_engine, skip_ids=protected_ids)
                 results["forgetting"] = forgetting_result
 
                 # ENERGIE WIEDERHERSTELLEN (95-100%)
@@ -159,7 +169,7 @@ class SleepPhaseHandler:
                 self._state["last_sleep_time"] = datetime.now().isoformat()
                 self._state["interaction_count_since_sleep"] = 0
                 self._state["total_sleeps"] = self._state.get("total_sleeps", 0) + 1
-                self._state["last_consolidation_count"] = results.get("consolidation", {}).get("consolidated", 0)
+                self._state["last_consolidation_count"] = results.get("consolidation", {}).get("total_consolidated", 0)
                 self._save_state()
                 
             except Exception as e:
@@ -247,88 +257,199 @@ class SleepPhaseHandler:
             
         return recovery
     
-    def _consolidate_memories(self, memory_engine, config: Dict, short_term_memory=None) -> Dict[str, Any]:
+    def _consolidate_memories(self, memory_engine, config: Dict, short_term_memory=None, brain=None) -> Dict[str, Any]:
         """
-        Consolidate memories from short-term to long-term.
+        Konsolidiert Memories in drei Schritten:
+        1. STM -> LTM: Abgelaufene Short-Term-Eintraege migrieren
+        2. LTM-Merging: Aehnliche/duplizierte LTM-Eintraege zusammenfassen
+        3. LTM-Dream: Optionale LLM-basierte Zusammenfassung (wenn brain verfuegbar)
         
-        Protection against recursive consolidation:
-        - Only original user/chappie interactions
-        - Minimum age requirement
-        - Maximum consolidation depth check
+        Returns detaillierte Metriken und protected_ids fuer Vergessenskurve.
         """
         result = {
-            "candidates": 0,
-            "consolidated": 0,
-            "skipped": 0,
-            "details": []
+            "stm_migrated": 0,
+            "ltm_merged": 0,
+            "ltm_dream_consolidated": 0,
+            "ltm_candidates_scanned": 0,
+            "total_consolidated": 0,
+            "protected_ids": [],
+            "details": [],
         }
         
         try:
             min_age_hours = config.get("min_memory_age_hours", 1)
-            require_original = config.get("require_original_interaction", True)
+            merge_threshold = float(config.get("merge_similarity_threshold", 0.85))
             batch_size = config.get("batch_size", 50)
             
-            if hasattr(memory_engine, 'get_recent_memories'):
-                candidates = memory_engine.get_recent_memories(limit=batch_size)
-                result["candidates"] = len(candidates) if candidates else 0
-                now = datetime.now()
-                unique_keys = set()
-                filtered_candidates = []
-                for memory in candidates or []:
-                    mem_type = str(getattr(memory, "mem_type", "interaction") or "interaction")
-                    label = str(getattr(memory, "label", "original") or "original")
-                    if require_original and (mem_type != "interaction" or label != "original"):
-                        result["skipped"] += 1
-                        continue
-                    timestamp_raw = str(getattr(memory, "timestamp", "") or "")
-                    try:
-                        created_at = datetime.fromisoformat(timestamp_raw)
-                    except ValueError:
-                        created_at = now
-                    age_hours = max(0.0, (now - created_at).total_seconds() / 3600.0)
-                    if age_hours < float(min_age_hours):
-                        result["skipped"] += 1
-                        continue
-                    content = str(getattr(memory, "content", "") or "").strip().lower()
-                    dedupe_key = " ".join(content.split())[:180]
-                    if not dedupe_key or dedupe_key in unique_keys:
-                        result["skipped"] += 1
-                        continue
-                    unique_keys.add(dedupe_key)
-                    filtered_candidates.append(memory)
-                result["details"] = [
-                    {
-                        "id": str(getattr(memory, "id", "") or "")[:8],
-                        "role": str(getattr(memory, "role", "unknown") or "unknown"),
-                        "timestamp": str(getattr(memory, "timestamp", "") or ""),
-                    }
-                    for memory in filtered_candidates[:8]
-                ]
-                result["deduplicated_candidates"] = len(filtered_candidates)
-
-            migrated = 0
+            # ── Schritt 1: STM -> LTM Migration ──
             if short_term_memory and hasattr(short_term_memory, "migrate_expired_entries"):
-                migrated = int(short_term_memory.migrate_expired_entries() or 0)
-            elif hasattr(memory_engine, 'migrate_expired_entries'):
-                migrated = int(memory_engine.migrate_expired_entries() or 0)
-            result["consolidated"] = migrated
+                result["stm_migrated"] = int(short_term_memory.migrate_expired_entries() or 0)
+                # Nach Migration: IDs der frisch migrierten Eintraege fuer Schutzliste ermitteln
+                if hasattr(memory_engine, "get_recent_memories") and result["stm_migrated"] > 0:
+                    try:
+                        recent = memory_engine.get_recent_memories(limit=min(result["stm_migrated"] + 5, 100))
+                        for mem in recent or []:
+                            mem_type = str(getattr(mem, "mem_type", "") or "")
+                            if mem_type == "short_term_migration":
+                                mid = str(getattr(mem, "id", "") or "")
+                                if mid:
+                                    result["protected_ids"].append(mid)
+                    except Exception:
+                        pass
+            
+            # ── Schritt 2: LTM Aehnlichkeits-Merging ──
+            if hasattr(memory_engine, "get_recent_memories"):
+                all_ltm = memory_engine.get_recent_memories(limit=max(batch_size * 3, 200))
+                if all_ltm:
+                    result["ltm_candidates_scanned"] = len(all_ltm)
+                    merged, protected = self._merge_similar_ltm_entries(
+                        all_ltm,
+                        memory_engine,
+                        merge_threshold=merge_threshold,
+                        min_age_hours=min_age_hours,
+                    )
+                    result["ltm_merged"] = merged
+                    result["protected_ids"].extend(protected)
+            
+            # ── Schritt 3: LTM Dream-Konsolidierung (via LLM) ──
+            if brain and hasattr(memory_engine, "consolidate_memories"):
+                try:
+                    dream_before = 0
+                    if hasattr(memory_engine, "get_memory_count"):
+                        dream_before = max(0, int(memory_engine.get_memory_count()))
+                    dream_result = memory_engine.consolidate_memories(brain)
+                    if hasattr(memory_engine, "get_memory_count"):
+                        dream_after = max(0, int(memory_engine.get_memory_count()))
+                        result["ltm_dream_consolidated"] = max(0, dream_before - dream_after)
+                    if isinstance(dream_result, str):
+                        result["dream_summary"] = dream_result[:500]
+                except Exception as dream_err:
+                    result["dream_error"] = str(dream_err)[:200]
+            
+            result["total_consolidated"] = (
+                result["stm_migrated"]
+                + result["ltm_merged"]
+                + result["ltm_dream_consolidated"]
+            )
             
         except Exception as e:
             result["error"] = str(e)
         
         return result
     
-    def _apply_forgetting_curve(self, memory_engine) -> Dict[str, Any]:
+    def _merge_similar_ltm_entries(
+        self,
+        memories: List,
+        memory_engine,
+        merge_threshold: float = 0.85,
+        min_age_hours: float = 1.0,
+    ) -> tuple:
+        """
+        Findet und merged aehnliche LTM-Eintraege via Word-Overlap.
+        Nutzt Jaccard-Aehnlichkeit auf signifikanten Woertern (len > 3).
+        
+        Returns (merged_count, protected_ids).
+        """
+        merged_count = 0
+        protected_ids = []
+        now = datetime.now()
+        
+        # Nur interaction/original Eintraege
+        candidates = []
+        for mem in memories:
+            mem_type = str(getattr(mem, "mem_type", "interaction") or "interaction")
+            label = str(getattr(mem, "label", "original") or "original")
+            if mem_type != "interaction" or label != "original":
+                continue
+            timestamp_raw = str(getattr(mem, "timestamp", "") or "")
+            try:
+                created_at = datetime.fromisoformat(timestamp_raw)
+            except (ValueError, TypeError):
+                created_at = now
+            age_hours = max(0.0, (now - created_at).total_seconds() / 3600.0)
+            if age_hours >= min_age_hours:
+                candidates.append(mem)
+        
+        if len(candidates) < 2:
+            return 0, []
+        
+        # Extrahiere signifikante Wort-Sets
+        def word_set(content: str) -> set:
+            text = re.sub(r'[^a-z0-9aeouess\s]', '', content.lower().strip())
+            return {w for w in text.split() if len(w) > 2}
+        
+        entries_with_words = []
+        for mem in candidates:
+            content = str(getattr(mem, "content", "") or "").strip()
+            words = word_set(content)
+            if len(words) >= 2:
+                entries_with_words.append((mem, words))
+        
+        if len(entries_with_words) < 2:
+            return 0, []
+        
+        # Pairwise Jaccard-Gruppierung
+        used = set()
+        groups = []
+        
+        for i in range(len(entries_with_words)):
+            if i in used:
+                continue
+            group = [entries_with_words[i]]
+            used.add(i)
+            for j in range(i + 1, len(entries_with_words)):
+                if j in used:
+                    continue
+                set_i = entries_with_words[i][1]
+                set_j = entries_with_words[j][1]
+                if not set_i or not set_j:
+                    continue
+                intersection = len(set_i & set_j)
+                union = len(set_i | set_j)
+                jaccard = intersection / union if union > 0 else 0
+                if jaccard >= 0.35:
+                    group.append(entries_with_words[j])
+                    used.add(j)
+            if len(group) >= 2:
+                groups.append(group)
+        
+        # Merge each group: keep newest, delete older duplicates
+        for group in groups:
+            group.sort(key=lambda item: str(getattr(item[0], "timestamp", "") or ""))
+            keeper = group[-1][0]
+            to_delete = [item[0] for item in group[:-1]]
+            
+            if to_delete and hasattr(memory_engine, "delete_memories"):
+                try:
+                    delete_ids = [str(getattr(m, "id", "") or "") for m in to_delete if getattr(m, "id", None)]
+                    if delete_ids:
+                        memory_engine.delete_memories(delete_ids)
+                        merged_count += len(delete_ids)
+                        keeper_id = str(getattr(keeper, "id", "") or "")
+                        if keeper_id:
+                            protected_ids.append(keeper_id)
+                except Exception:
+                    pass
+        
+        return merged_count, protected_ids
+    
+    def _apply_forgetting_curve(self, memory_engine, skip_ids: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Apply Ebbinghaus forgetting curve to memories.
         
         Formula: R = e^(-t/S)
         R = Retention, t = time, S = memory strength
+        
+        Args:
+            memory_engine: Memory engine instance
+            skip_ids: IDs to protect from deletion (freshly consolidated entries)
         """
+        skip_set = set(skip_ids or [])
         result = {
             "memories_processed": 0,
             "memories_decayed": 0,
-            "memories_archived": 0
+            "memories_archived": 0,
+            "memories_protected": 0,
         }
         
         try:
@@ -338,26 +459,33 @@ class SleepPhaseHandler:
             limit = 200
             if hasattr(memory_engine, "get_memory_count"):
                 try:
-                    limit = max(1, min(400, int(memory_engine.get_memory_count())))
+                    limit = max(10, min(800, int(memory_engine.get_memory_count())))
                 except Exception:
                     limit = 200
 
             recent = memory_engine.get_recent_memories(limit=limit)
             mapped_memories: List[Dict[str, Any]] = []
             for memory in recent or []:
+                mem_id = str(getattr(memory, "id", "") or "")
                 timestamp_raw = str(getattr(memory, "timestamp", "") or "")
                 created_at = None
                 if timestamp_raw:
                     try:
-                        created_at = datetime.fromisoformat(timestamp_raw).isoformat()
-                    except ValueError:
+                        created_at = datetime.fromisoformat(timestamp_raw)
+                    except (ValueError, TypeError):
                         created_at = None
+                # Frisch migrierte/merged Eintraege erhalten hoeheren initial strength
+                mem_type = str(getattr(memory, "mem_type", "interaction") or "interaction")
+                is_protected = mem_id in skip_set
+                if is_protected:
+                    result["memories_protected"] += 1
+                    continue  # Komplett vom Vergessen ausschliessen
                 mapped_memories.append(
                     {
-                        "id": str(getattr(memory, "id", "") or ""),
+                        "id": mem_id,
                         "relevance": float(getattr(memory, "relevance_score", 0.5) or 0.5),
-                        "created_at": created_at,
-                        "strength": 1.0,
+                        "created_at": created_at.isoformat() if created_at else None,
+                        "strength": 2.0 if mem_type == "short_term_migration" else 1.0,
                         "emotional_boost": 1.0,
                         "recall_count": 0,
                     }
@@ -438,8 +566,17 @@ class SleepPhaseHandler:
                 soul_updates["current_focus"] = life_snapshot.get("current_activity") or dominant_need
 
             evolution_notes: List[str] = []
-            if consolidation.get("consolidated"):
-                evolution_notes.append(f"Sleep consolidated {consolidation['consolidated']} memories into longer-term context.")
+            total = consolidation.get("total_consolidated", consolidation.get("consolidated", 0))
+            if total:
+                parts = []
+                if consolidation.get("stm_migrated"):
+                    parts.append(f"{consolidation['stm_migrated']} STM->LTM")
+                if consolidation.get("ltm_merged"):
+                    parts.append(f"{consolidation['ltm_merged']} merged")
+                if consolidation.get("ltm_dream_consolidated"):
+                    parts.append(f"{consolidation['ltm_dream_consolidated']} dream-consolidated")
+                detail = ", ".join(parts) if parts else f"{total} entries"
+                evolution_notes.append(f"Sleep consolidated {detail} into longer-term context.")
             replay_summary = replay_state.get("summary")
             if replay_summary:
                 evolution_notes.append(str(replay_summary))
