@@ -49,6 +49,8 @@ class LifeState:
     forecast_state: Dict[str, Any] = field(default_factory=dict)
     social_arc: Dict[str, Any] = field(default_factory=dict)
     replay_state: Dict[str, Any] = field(default_factory=dict)
+    temporal_state: Dict[str, Any] = field(default_factory=dict)
+    episode_state: Dict[str, Any] = field(default_factory=dict)
     timeline_history: List[Dict[str, Any]] = field(default_factory=list)
     recent_events: List[LifeEvent] = field(default_factory=list)
     dream_fragments: List[str] = field(default_factory=list)

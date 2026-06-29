@@ -6,6 +6,10 @@ export function LifePage() {
   const query = useQuery({ queryKey: ["life"], queryFn: api.getLife, refetchInterval: 3000 });
   const snapshot = (query.data ?? {}) as any;
   const needs = snapshot.homeostasis?.active_needs ?? [];
+  const temporal = snapshot.temporal_state ?? {};
+  const episode = snapshot.episode_state ?? {};
+  const gap = temporal.minutes_since_last_interaction;
+  const gapLabel = gap === null || gap === undefined ? "First contact" : `${Number(gap).toFixed(1)} min`;
 
   return (
     <SectionCard eyebrow="Biological Core" title="Digital Life Dynamics" subtitle="Real-time monitoring of homeostasis, goal competition, and developmental stages.">
@@ -31,6 +35,34 @@ export function LifePage() {
                     <p className="text-sm font-bold text-mist truncate">{stat.value || "---"}</p>
                 </div>
             ))}
+          </div>
+        </article>
+
+        <article className="rounded-none border border-white/5 bg-white/[0.02] p-8 shadow-glass transition-all hover:bg-white/[0.04]">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="material-symbols-outlined text-ember">schedule</span>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-mist">Temporal Sense</h3>
+          </div>
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            {[
+              { label: "Last Gap", value: gapLabel, icon: "timer" },
+              { label: "Rhythm", value: temporal.interaction_rhythm, icon: "waves" },
+              { label: "Silence", value: temporal.silence_bucket, icon: "hourglass" },
+              { label: "Session Turns", value: temporal.session_turn_count, icon: "tag" }
+            ].map((stat) => (
+              <div key={stat.label} className="group rounded-none bg-night border border-white/5 p-5 shadow-glass transition-all hover:border-ember/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="material-symbols-outlined text-[16px] text-slate group-hover:text-ember transition-colors">{stat.icon}</span>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate">{stat.label}</p>
+                </div>
+                <p className="text-sm font-bold text-mist truncate">{stat.value ?? "---"}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 border border-white/5 bg-night/60 p-5">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-slate">Current Episode</p>
+            <p className="mt-2 text-sm font-bold text-mist">{episode.topic ?? "conversation"}</p>
+            <p className="mt-1 text-xs text-slate">{episode.turn_count ?? 0} turns · {Number(episode.elapsed_minutes ?? 0).toFixed(1)} active minutes · {episode.status ?? "forming"}</p>
           </div>
         </article>
 
@@ -64,6 +96,8 @@ export function LifePage() {
           { title: "World Model", value: snapshot.world_model, icon: "language" },
           { title: "Strategic Intent", value: snapshot.planning_state, icon: "route" },
           { title: "Self Concept", value: snapshot.self_model, icon: "person_celebrate" },
+          { title: "Temporal State", value: temporal, icon: "schedule" },
+          { title: "Episode State", value: episode, icon: "route" },
           { title: "Attachment", value: snapshot.attachment_model, icon: "family_history" },
           { title: "Neural Replay", value: snapshot.replay_state, icon: "replay" },
           { title: "Relationships", value: snapshot.relationship, icon: "groups" }

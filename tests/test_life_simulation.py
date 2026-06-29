@@ -2,8 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 import sys
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+for module_name in ("ollama", "chromadb", "chromadb.config", "openai", "sentence_transformers"):
+    sys.modules.setdefault(module_name, MagicMock())
 
 from brain.action_response import ActionResponseLayer
 from brain.global_workspace import GlobalWorkspace
@@ -46,8 +51,47 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertIn("social_arc", snapshot)
         self.assertIn("timeline_summary", snapshot)
         self.assertIn("self_model", snapshot)
+        self.assertIn("temporal_state", snapshot)
+        self.assertIn("episode_state", snapshot)
         self.assertGreater(len(snapshot["homeostasis"]["active_needs"]), 0)
         self.assertEqual(snapshot["active_goal"].get("title"), "Kognitive Entwicklung")
+
+    def test_temporal_state_classifies_interaction_gaps(self):
+        cases = [
+            (5, "immediate", "active_dialogue"),
+            (10 * 60, "break", "paused_dialogue"),
+            (6 * 60 * 60, "long_gap", "returning_after_gap"),
+            (2 * 24 * 60 * 60, "new_day", "reorientation"),
+        ]
+        for seconds, bucket, rhythm in cases:
+            service = self._make_service()
+            now = datetime.now(timezone.utc)
+            previous = now - timedelta(seconds=seconds)
+            service._state.temporal_state["last_user_message_at"] = previous.isoformat()
+            snapshot = service.prepare_turn(
+                "Bitte analysiere die Life Simulation",
+                history=[],
+                emotions={"trust": 60},
+                temporal_context={"user_message_created_at": now.isoformat()},
+            )
+            temporal = snapshot["temporal_state"]
+            self.assertEqual(temporal["silence_bucket"], bucket)
+            self.assertEqual(temporal["interaction_rhythm"], rhythm)
+
+    def test_long_gap_starts_new_episode(self):
+        service = self._make_service()
+        now = datetime.now(timezone.utc)
+        service._state.temporal_state["last_user_message_at"] = (now - timedelta(hours=6)).isoformat()
+        snapshot = service.prepare_turn(
+            "Wir planen die Architektur weiter",
+            history=[],
+            emotions={"trust": 60},
+            temporal_context={"user_message_created_at": now.isoformat()},
+        )
+
+        self.assertEqual(snapshot["temporal_state"]["silence_bucket"], "long_gap")
+        self.assertEqual(snapshot["episode_state"]["topic"], "architecture_work")
+        self.assertEqual(snapshot["episode_state"]["turn_count"], 1)
 
     def test_sleep_cycle_creates_dream_replay(self):
         service = self._make_service()

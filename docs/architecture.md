@@ -65,6 +65,10 @@ Die Life-Simulation erweitert die Gehirn-Metapher um:
 - Development Stage
 - Attachment und Social Arc
 - Timeline und autobiografische Entwicklung
+- Temporal State mit echter Pausenlaenge zwischen User-Nachrichten
+- Episode State fuer zusammenhaengende Arbeits-/Beziehungsphasen
+
+Der Temporal State trennt reale Systemaktualisierung von echter Interaktion: Dashboard-Abfragen koennen den Snapshot aktualisieren, gelten aber nicht als Kontakt. Fuer die Life-Simulation zaehlen `last_user_message_at`, `last_assistant_message_at`, `minutes_since_last_interaction`, `silence_bucket` und `interaction_rhythm`. Lange Pausen starten neue Episoden, kurze schnelle Wechsel verdichten die laufende Episode.
 
 ## Emotion-Steering
 

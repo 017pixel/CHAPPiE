@@ -16,12 +16,21 @@ class HistoryEngine:
         development = snapshot.get("development", {})
         attachment = snapshot.get("attachment_model", {})
         forecast = snapshot.get("forecast_state", {})
+        temporal = snapshot.get("temporal_state", {})
+        episode = snapshot.get("episode_state", {})
         top_habit = self._top_habit(snapshot.get("habits", {}))
         items.append(
             {
                 "timestamp": datetime.now().isoformat(),
                 "source": source,
                 "phase_label": snapshot.get("clock", {}).get("phase_label", "---"),
+                "silence_bucket": temporal.get("silence_bucket", "first_contact"),
+                "minutes_since_last_interaction": temporal.get("minutes_since_last_interaction"),
+                "interaction_rhythm": temporal.get("interaction_rhythm", "new"),
+                "episode_id": episode.get("id", "---"),
+                "episode_topic": episode.get("topic", "conversation"),
+                "episode_elapsed_minutes": episode.get("elapsed_minutes", 0.0),
+                "completed_episode_count": len(episode.get("completed_episodes", [])),
                 "activity": snapshot.get("current_activity", "---"),
                 "goal": active_goal,
                 "dominant_need": dominant_need,

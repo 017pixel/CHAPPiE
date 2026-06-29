@@ -50,6 +50,8 @@ class ChatManager:
         for msg in messages or []:
             current = dict(msg)
             current.setdefault("id", self.create_message_id())
+            fallback_timestamp = current.get("timestamp") or datetime.now(timezone.utc).isoformat()
+            current.setdefault("created_at", fallback_timestamp)
             normalized.append(current)
         return normalized
 

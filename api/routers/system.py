@@ -42,6 +42,8 @@ def get_growth(backend=Depends(get_backend)):
         "social_arc": snapshot.get("social_arc", {}),
         "timeline_history": snapshot.get("timeline_history", []),
         "timeline_summary": snapshot.get("timeline_summary", {}),
+        "temporal_state": snapshot.get("temporal_state", {}),
+        "episode_state": snapshot.get("episode_state", {}),
         "development": snapshot.get("development", {}),
         "habit_dynamics": snapshot.get("habit_dynamics", {}),
     }

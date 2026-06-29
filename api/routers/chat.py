@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
+from datetime import datetime, timezone
 from typing import Any, Dict, Generator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +21,10 @@ from api.schemas import (
 )
 
 router = APIRouter(tags=["chat"])
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _ensure_session(backend, session_id: Optional[str]) -> Dict[str, Any]:
@@ -70,7 +75,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
     session_id = session["id"]
     history = list(session.get("messages", []))
 
-    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message}
+    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message, "created_at": _utc_now_iso()}
     message_id = backend.chat_manager.create_message_id()
     pending_message = backend._build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
@@ -84,7 +89,12 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
             _persist_pending_turn(backend, session_id, user_message, pending_message)
         return _build_sync_chat_response(backend, session_id, user_message, message_id, result)
 
-    result = backend.process(request.message, history, debug_mode=request.debug_mode)
+    result = backend.process(
+        request.message,
+        history,
+        debug_mode=request.debug_mode,
+        temporal_context={"user_message_created_at": user_message["created_at"]},
+    )
     return _build_sync_chat_response(backend, session_id, user_message, message_id, result)
 
 
@@ -94,7 +104,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
     session_id = session["id"]
     history = list(session.get("messages", []))
 
-    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message}
+    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message, "created_at": _utc_now_iso()}
     message_id = backend.chat_manager.create_message_id()
     pending_message = backend._build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
@@ -152,6 +162,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                 request.message,
                 history,
                 debug_mode=request.debug_mode,
+                temporal_context={"user_message_created_at": user_message["created_at"]},
             ):
                 event_type = event.get("event")
                 if event_type == "token":
@@ -233,12 +244,15 @@ def post_command(request: CommandRequest, backend=Depends(get_backend)):
         "id": backend.chat_manager.create_message_id(),
         "role": "user",
         "content": request.command.strip(),
+        "created_at": _utc_now_iso(),
     }
+    assistant_created_at = _utc_now_iso()
     assistant_message = {
         "id": backend.chat_manager.create_message_id(),
         "role": "assistant",
         "content": output,
-        "metadata": {"pending": False, "status_text": ""},
+        "created_at": assistant_created_at,
+        "metadata": {"pending": False, "status_text": "", "created_at": assistant_created_at},
     }
     history = list(session.get("messages", []))
     history.extend([user_message, assistant_message])

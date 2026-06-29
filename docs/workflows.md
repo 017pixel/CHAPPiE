@@ -53,7 +53,7 @@ sequenceDiagram
 1. Frontend oder CLI nimmt Eingabe entgegen.
 2. Die App-API routet nach Chat, Runtime, Memory, Context oder Training.
 3. `web_infrastructure/backend_wrapper.py` kapselt die Fachlogik.
-4. `life/service.py` berechnet `prepare_turn`: Uhrzeit, Baseline-Decay, Aktivitaet, Homeostasis.
+4. `life/service.py` berechnet `prepare_turn`: Uhrzeit, Temporal State, Pausenlaenge, Baseline-Decay, Aktivitaet, Homeostasis und laufende Episode.
 5. `brain/brain_pipeline.py` orchestriert:
    - Sensory Cortex: Input-Klassifikation (Typ, Dringlichkeit, Memory-Bedarf)
    - Amygdala: Emotionsanalyse (10 Emotionen, Intensity, memory_boost, steering_hints)
@@ -67,7 +67,7 @@ sequenceDiagram
    - Casual Chat laedt fuer die finale Antwort 20 Memories; komplexere Intents nutzen den globalen Memory-Top-K-Wert.
    - Lokale vLLM-Antworten starten mit einer kurzen Antwortvorgabe und nutzen keine langen CoT-Promptbloecke.
    - Neue Emotionssignale (`affection`, `anxiety`, `calm`) faerben Ton und Steering konservativ, ohne die Antwortlaenge zu erhoehen.
-7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline.
+7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline und finale Assistant-Zeitmarke.
 8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
 
 ### Chain of Thought / Reasoning
@@ -208,6 +208,13 @@ Wichtige Pfade:
 | `/forecast` | Prognosen und Risiken |
 | `/arc` | Social Arc |
 | `/timeline` | autobiografische Verlaufseintraege |
+
+Zeitgefuehl:
+
+- Chat-Nachrichten erhalten UTC-Timestamps.
+- `life.temporal_state` klassifiziert Pausen als `immediate`, `short_pause`, `break`, `long_gap` oder `new_day`.
+- `interaction_rhythm` unterscheidet aktive Dialoge, Rueckkehr nach Pausen und Reorientierung nach mehrtaegiger Stille.
+- `episode_state` fasst zusammenhaengende Arbeitsphasen mit Thema, Dauer und Turn-Anzahl zusammen.
 
 ## 8. Frontend-Seiten
 

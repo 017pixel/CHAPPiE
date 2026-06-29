@@ -184,6 +184,7 @@ def create_chappie_backend():
             return formatted_memories
 
         def _build_assistant_message(self, user_input: str, result: Dict[str, Any], message_id: Optional[str] = None) -> Dict[str, Any]:
+            created_at = datetime.now(timezone.utc).isoformat()
             intent_raw = result.get("intent_raw_json", {})
             tool_calls_raw = intent_raw.get("tool_calls", []) if isinstance(intent_raw, dict) else []
             metadata = {
@@ -232,10 +233,12 @@ def create_chappie_backend():
                 "formatting_source": result.get("formatting_source", "local_fallback"),
                 "formatting_model": self.GROQ_FORMAT_MODEL,
                 "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
+                "created_at": created_at,
             }
             assistant_msg = {
                 "role": "assistant",
                 "content": result.get("response_text", ""),
+                "created_at": created_at,
                 "metadata": metadata,
             }
             if message_id:
@@ -243,14 +246,17 @@ def create_chappie_backend():
             return assistant_msg
 
         def _build_pending_message(self, message_id: str) -> Dict[str, Any]:
+            created_at = datetime.now(timezone.utc).isoformat()
             return {
                 "id": message_id,
                 "role": "assistant",
                 "content": "_CHAPPiE denkt nach..._",
+                "created_at": created_at,
                 "metadata": {
                     "pending": True,
                     "status_text": "Nachricht wird verarbeitet...",
                     "retry_history": [],
+                    "created_at": created_at,
                 },
             }
         
@@ -1221,6 +1227,7 @@ def create_chappie_backend():
             history: List[Dict],
             debug_mode: bool = False,
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Dict[str, Any]:
             """
             Hauptverarbeitung mit Zwei-Schritte System.
@@ -1258,16 +1265,17 @@ def create_chappie_backend():
 
             # === STEP 1: Intent Analysis (wenn aktiviert) ===
             if settings.enable_two_step_processing:
-                return self._process_two_step(user_input, history, status_callback=status_callback)
+                return self._process_two_step(user_input, history, status_callback=status_callback, temporal_context=temporal_context)
             else:
                 # Fallback: Altes System
-                return self._process_legacy(user_input, history, status_callback=status_callback)
+                return self._process_legacy(user_input, history, status_callback=status_callback, temporal_context=temporal_context)
 
         def _process_two_step(
             self,
             user_input: str,
             history: List[Dict],
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Dict[str, Any]:
             """
             Zwei-Schritte Verarbeitung.
@@ -1278,7 +1286,7 @@ def create_chappie_backend():
             
             # Emotionen Snapshot
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
             self.debug_logger.log_info(
                 "LIFE_PREP",
                 "Life-Kontext vorbereitet",
@@ -2066,10 +2074,11 @@ def create_chappie_backend():
             user_input: str,
             history: List[Dict],
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Dict[str, Any]:
             """Legacy Verarbeitung (altes System als Fallback)."""
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
             
             # Einfache Emotions Analyse
             self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
@@ -2336,6 +2345,7 @@ def create_chappie_backend():
             user_input: str,
             history: List[Dict],
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Generator[Dict[str, Any], None, None]:
             """
             Zwei-Schritte Verarbeitung mit Token-Streaming.
@@ -2345,7 +2355,7 @@ def create_chappie_backend():
             self.debug_logger.log_step1_start()
 
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
 
             # === STEP 1: Intent Analysis ===
             intent_result = self._run_with_retries(
@@ -2700,10 +2710,11 @@ def create_chappie_backend():
             user_input: str,
             history: List[Dict],
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Generator[Dict[str, Any], None, None]:
             """Legacy Verarbeitung mit Token-Streaming."""
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before)
+            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
 
             self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
             emotions_after = self._get_emotions_snapshot()
@@ -2892,6 +2903,7 @@ def create_chappie_backend():
             history: List[Dict],
             debug_mode: bool = False,
             status_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+            temporal_context: Optional[Dict[str, Any]] = None,
         ) -> Generator[Dict[str, Any], None, None]:
             """
             Streaming-Verarbeitung mit Token-Level Ausgabe.
@@ -2918,9 +2930,9 @@ def create_chappie_backend():
             self._processing_start_time = datetime.now()
 
             if settings.enable_two_step_processing:
-                yield from self._process_two_step_stream(user_input, history, status_callback)
+                yield from self._process_two_step_stream(user_input, history, status_callback, temporal_context=temporal_context)
             else:
-                yield from self._process_legacy_stream(user_input, history, status_callback)
+                yield from self._process_legacy_stream(user_input, history, status_callback, temporal_context=temporal_context)
 
         # === Command Handler ===
 
@@ -2973,9 +2985,15 @@ def create_chappie_backend():
                 attachment = snapshot.get("attachment_model", {})
                 planning = snapshot.get("planning_state", {})
                 social_arc = snapshot.get("social_arc", {})
+                temporal = snapshot.get("temporal_state", {})
+                episode = snapshot.get("episode_state", {})
+                gap = temporal.get("minutes_since_last_interaction")
+                gap_text = "erste Interaktion" if gap is None else f"{gap:.1f} Minuten seit letzter User-Nachricht"
                 return (
                     f"**Life Simulation**\n\n"
                     f"Phase: {snapshot.get('clock', {}).get('phase_label', 'unbekannt')}\n"
+                    f"Zeitgefuehl: {gap_text} | Rhythmus: {temporal.get('interaction_rhythm', 'new')} | Pause: {temporal.get('silence_bucket', 'first_contact')}\n"
+                    f"Episode: {episode.get('topic', 'conversation')} ({episode.get('turn_count', 0)} Turns, {episode.get('elapsed_minutes', 0):.1f} min)\n"
                     f"Aktivitaet: {snapshot.get('current_activity', '---')}\n"
                     f"Modus: {snapshot.get('current_mode', '---')}\n"
                     f"Fokusziel: {goal.get('title', '---')} ({goal.get('progress', 0):.0%})\n"
@@ -3076,7 +3094,7 @@ def create_chappie_backend():
                 ]
                 for item in history[-5:]:
                     lines.append(
-                        f"- {item.get('phase_label', '---')} | {item.get('source', '---')} | Goal={item.get('goal', '---')} | Stage={item.get('stage', '---')}"
+                        f"- {item.get('phase_label', '---')} | {item.get('source', '---')} | Pause={item.get('silence_bucket', '---')} | Episode={item.get('episode_topic', '---')} | Goal={item.get('goal', '---')} | Stage={item.get('stage', '---')}"
                     )
                 return "\n".join(lines)
 

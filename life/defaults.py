@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .models import LifeGoal, LifeState
 
@@ -53,7 +53,7 @@ DEFAULT_RELATIONSHIP = {
 
 
 def build_default_life_state() -> LifeState:
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     return LifeState(
         day_index=1,
         minute_of_day=9 * 60,
@@ -74,6 +74,35 @@ def build_default_life_state() -> LifeState:
         forecast_state={},
         social_arc={},
         replay_state={},
+        temporal_state={
+            "created_at": now,
+            "last_interaction_at": "",
+            "last_user_message_at": "",
+            "last_assistant_message_at": "",
+            "last_sleep_at": "",
+            "session_started_at": now,
+            "turn_count": 0,
+            "session_turn_count": 0,
+            "total_active_minutes": 0.0,
+            "total_silence_minutes": 0.0,
+            "seconds_since_last_interaction": None,
+            "minutes_since_last_interaction": None,
+            "silence_bucket": "first_contact",
+            "interaction_rhythm": "new",
+            "same_session": True,
+            "current_message_at": now,
+            "daily_goal_progress": {},
+        },
+        episode_state={
+            "id": "episode-1",
+            "topic": "initialisierung",
+            "started_at": now,
+            "last_event_at": now,
+            "turn_count": 0,
+            "elapsed_minutes": 0.0,
+            "status": "forming",
+            "completed_episodes": [],
+        },
         timeline_history=[],
         recent_events=[],
         dream_fragments=[],

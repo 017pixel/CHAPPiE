@@ -30,6 +30,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 
 - **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
 - **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
+- **Zeitgefuehl** mit Interaktionsabstaenden, Pausen-Buckets, Session-Rhythmus und Episoden-Clustering
 - **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
 - **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton

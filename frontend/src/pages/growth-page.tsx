@@ -5,6 +5,8 @@ import { api } from "../services/api";
 export function GrowthPage() {
   const query = useQuery({ queryKey: ["growth"], queryFn: api.getGrowth, refetchInterval: 3000 });
   const data = (query.data ?? {}) as any;
+  const temporal = data.temporal_state ?? {};
+  const episode = data.episode_state ?? {};
 
   return (
     <SectionCard eyebrow="Evolutionary Path" title="Growth & Forecasting" subtitle="Strategic planning, social development arcs, and future timeline projections.">
@@ -14,6 +16,8 @@ export function GrowthPage() {
           { title: "Neural Forecast", value: data.forecast_state, icon: "query_stats" },
           { title: "Social Evolution", value: data.social_arc, icon: "share_location" },
           { title: "Timeline Synthesis", value: data.timeline_summary, icon: "timeline" },
+          { title: "Temporal Rhythm", value: temporal, icon: "schedule" },
+          { title: "Current Episode", value: episode, icon: "route" },
           { title: "Maturity Level", value: data.development, icon: "upgrade" },
           { title: "Habitual Patterns", value: data.habit_dynamics, icon: "rebase_edit" }
         ].map((item) => (
