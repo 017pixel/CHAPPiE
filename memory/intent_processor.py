@@ -61,6 +61,9 @@ class IntentResult:
     intent_type: IntentType
     confidence: float
     entities: List[str]
+    retrieval_keywords: List[str]
+    exact_entities: List[str]
+    fact_lookup_intent: bool
     tool_calls: List[ToolCall]
     emotions_update: Dict[str, EmotionUpdate]
     context_requirements: Dict[str, bool]
@@ -113,7 +116,7 @@ class IntentProcessor:
         
         # Generiere mit kleinem Modell
         gen_config = GenerationConfig(
-            max_tokens=512,
+            max_tokens=640,
             temperature=0.1,
             stream=False
         )
@@ -174,6 +177,9 @@ class IntentProcessor:
             intent_type=IntentType(intent_str),
             confidence=0.9,
             entities=entities,
+            retrieval_keywords=[],
+            exact_entities=entities,
+            fact_lookup_intent=False,
             tool_calls=[],
             emotions_update=emotions_update,
             context_requirements={
@@ -253,6 +259,11 @@ REASON: kurze Begruendung (max. 5 Woerter)
     "trust": {"delta": 1, "reason": "User ist hoeflich"}
   },
   "short_term_entries": [],
+  "memory_retrieval": {
+    "retrieval_keywords": ["3-10 konkrete Suchwoerter fuer lokale Memory-Suche"],
+    "exact_entities": ["exakte Namen, Orte, Projekt-IDs, Eigennamen"],
+    "fact_lookup_intent": false
+  },
   "context_requirements": {
     "need_soul_context": true,
      "need_user_context": true,
@@ -261,6 +272,13 @@ REASON: kurze Begruendung (max. 5 Woerter)
     "need_long_term_memory": true
   }
 }
+
+=== MEMORY_RETRIEVAL REGELN ===
+- retrieval_keywords: konkrete Begriffe fuer lokale Memory-Suche, z.B. bruder, heisst, wohnort, projektname.
+- exact_entities: nur exakte Namen, Orte, Projekt-IDs oder Eigennamen aus der User-Nachricht oder dem sichtbaren Kontext.
+- fact_lookup_intent: true, wenn der User nach einem konkreten Fakt fragt (Name, Ort, Erinnerung, Entscheidung, Datum, Projekt, Beziehung).
+- Generische Begriffe wie "name", "projekt", "fehler" nie allein liefern, sondern nur mit konkreteren Begriffen.
+- Diese Felder steuern Keyword-RAG im finalen Prompt und muessen ohne weiteren LLM-Call nutzbar sein.
 
 GIB NUR JSON AUS!""".replace("{allowed_emotions}", allowed_emotions)
     
@@ -369,16 +387,42 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             entities_raw = []
         entities_clean = [str(e) if not isinstance(e, str) else e for e in entities_raw]
 
+        retrieval_data = json_data.get("memory_retrieval", {})
+        if not isinstance(retrieval_data, dict):
+            retrieval_data = {}
+        retrieval_keywords = self._clean_string_list(retrieval_data.get("retrieval_keywords", []), max_items=12)
+        exact_entities = self._clean_string_list(retrieval_data.get("exact_entities", []), max_items=8)
+        fact_lookup_intent = bool(retrieval_data.get("fact_lookup_intent", False))
+
         return IntentResult(
             intent_type=intent_type,
             confidence=intent_data.get("confidence", 0.5),
             entities=entities_clean,
+            retrieval_keywords=retrieval_keywords,
+            exact_entities=exact_entities,
+            fact_lookup_intent=fact_lookup_intent,
             tool_calls=tool_calls,
             emotions_update=emotions_update,
             context_requirements=context_req,
             short_term_entries=short_term_entries,
             raw_json=json_data
         )
+
+    @staticmethod
+    def _clean_string_list(values: Any, max_items: int = 10) -> List[str]:
+        if not isinstance(values, list):
+            return []
+        cleaned: List[str] = []
+        seen = set()
+        for value in values:
+            text = str(value).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            cleaned.append(text[:80])
+            if len(cleaned) >= max_items:
+                break
+        return cleaned
 
     @staticmethod
     def _format_current_emotions(current_emotions: Dict[str, int]) -> str:
@@ -393,6 +437,9 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             intent_type=IntentType.CASUAL_CHAT,
             confidence=0.5,
             entities=[],
+            retrieval_keywords=[],
+            exact_entities=[],
+            fact_lookup_intent=False,
             tool_calls=[],
             emotions_update={},
             context_requirements={

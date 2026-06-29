@@ -20,6 +20,9 @@ from datetime import datetime, timedelta, timezone
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+for module_name in ("chromadb", "chromadb.config", "sentence_transformers", "ollama", "openai", "requests"):
+    sys.modules.setdefault(module_name, MagicMock())
+
 from memory.sleep_phase import SleepPhaseHandler
 from memory.short_term_memory import ShortTermMemory, ShortTermEntry, get_short_term_memory
 

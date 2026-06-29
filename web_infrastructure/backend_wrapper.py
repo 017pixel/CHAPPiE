@@ -180,6 +180,8 @@ def create_chappie_backend():
                     "id": memory.id,
                     "timestamp": getattr(memory, "timestamp", ""),
                     "type": getattr(memory, "mem_type", "interaction"),
+                    "match_type": getattr(memory, "match_type", ""),
+                    "matched_terms": getattr(memory, "matched_terms", ""),
                 })
             return formatted_memories
 
@@ -196,6 +198,7 @@ def create_chappie_backend():
                 "emotions_delta": result.get("emotions_delta", {}),
                 "emotions_before": result.get("emotions_before", {}),
                 "input_analysis": result.get("input_analysis", user_input),
+                "keyword_rag_memories": self._serialize_rag_memories(result.get("keyword_rag_memories")),
                 "intent_type": result.get("intent_type"),
                 "intent_confidence": result.get("intent_confidence"),
                 "tool_calls_executed": result.get("tool_calls_executed", 0),
@@ -627,6 +630,8 @@ def create_chappie_backend():
                 "role": str(getattr(memory, "role", "unknown") or "unknown"),
                 "label": str(getattr(memory, "label", "original") or "original"),
                 "relevance": round(float(getattr(memory, "relevance_score", 0.0) or 0.0), 3),
+                "match_type": str(getattr(memory, "match_type", "") or ""),
+                "matched_terms": str(getattr(memory, "matched_terms", "") or ""),
                 "content_preview": content[:160],
             }
 
@@ -642,6 +647,34 @@ def create_chappie_backend():
                 "memory_ids": ids,
                 "preview": previews,
             }
+
+        @staticmethod
+        def _intent_retrieval_terms(intent_result: Any, input_classification: Dict[str, Any] | None = None) -> tuple[List[str], List[str], bool]:
+            keywords = [str(item).strip() for item in getattr(intent_result, "retrieval_keywords", []) or [] if str(item).strip()]
+            exact_entities = [str(item).strip() for item in getattr(intent_result, "exact_entities", []) or [] if str(item).strip()]
+            entities = []
+            if input_classification:
+                entities = [str(item).strip() for item in input_classification.get("entities", []) or [] if str(item).strip()]
+            for entity in entities:
+                if entity not in exact_entities:
+                    exact_entities.append(entity)
+            fact_lookup = bool(getattr(intent_result, "fact_lookup_intent", False))
+            return keywords[:12], exact_entities[:10], fact_lookup
+
+        @staticmethod
+        def _retrieval_query_from_terms(keywords: List[str], entities: List[str], fallback: str) -> str:
+            terms = []
+            for value in (entities or []) + (keywords or []):
+                text = str(value).strip()
+                if text and text not in terms:
+                    terms.append(text)
+            return " ".join(terms[:16]) or fallback
+
+        def _local_retrieval_query(self, text: str, max_terms: int = 12) -> str:
+            try:
+                return self.memory._build_keyword_query(text or "", max_terms=max_terms) or text
+            except Exception:
+                return text
 
         def _merge_memories(self, preferred: List[Any], secondary: List[Any], limit: int) -> List[Any]:
             merged: List[Any] = []
@@ -1364,9 +1397,9 @@ def create_chappie_backend():
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
-            entities_safe = [str(e) for e in (input_classification.get("entities", []) or [])]
-            intent_query_source = " ".join(entities_safe) or user_input
-            intent_memory_query = self.memory.extract_search_query(intent_query_source)
+            retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
+            intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
+            intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
                 top_k=min(settings.memory_top_k, 8),
@@ -1419,6 +1452,9 @@ def create_chappie_backend():
                     preloaded_memories=intent_memories,
                     memory_trace_seed=intent_memory_trace,
                     intent_type=intent_result.intent_type,
+                    retrieval_keywords=retrieval_keywords,
+                    exact_entities=exact_entities,
+                    fact_lookup_intent=fact_lookup_intent,
                 ),
                 validator=self._is_valid_generation_result,
                 status_callback=status_callback,
@@ -1500,6 +1536,7 @@ def create_chappie_backend():
                 "reasoning_only": response_data.get("reasoning_only", False),
                 "input_classification": input_classification,
                 "rag_memories": response_data.get("rag_memories", []),
+                "keyword_rag_memories": response_data.get("keyword_rag_memories", []),
                 "emotion_steering": response_data.get("emotion_steering", {}),
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,
@@ -1834,11 +1871,15 @@ def create_chappie_backend():
                               global_workspace: Dict[str, Any] | None = None,
                               preloaded_memories: Optional[List[Any]] = None,
                               memory_trace_seed: Optional[Dict[str, Any]] = None,
-                              intent_type: Any = None) -> Dict[str, Any]:
+                              intent_type: Any = None,
+                              retrieval_keywords: Optional[List[str]] = None,
+                              exact_entities: Optional[List[str]] = None,
+                              fact_lookup_intent: bool = False) -> Dict[str, Any]:
             """Generiert die finale Antwort (Step 2)."""
             # RAG Memory Search
             memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
-            generation_query = self.memory.extract_search_query(user_input)
+            generation_query_source = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
+            generation_query = generation_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(user_input)
             fresh_memories = self.memory.search_memory(
                 generation_query or user_input,
                 top_k=memory_top_k,
@@ -1849,7 +1890,17 @@ def create_chappie_backend():
                 secondary=fresh_memories,
                 limit=memory_top_k,
             )
-            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            keyword_memories = self.memory.search_memory_keywords(
+                query=user_input,
+                keywords=retrieval_keywords or [],
+                entities=exact_entities or [],
+                top_k=5,
+                min_score=0.18 if fact_lookup_intent else 0.25,
+            )
+            keyword_ids = {str(getattr(memory, "id", "") or "") for memory in keyword_memories or []}
+            semantic_prompt_memories = [memory for memory in memories or [] if str(getattr(memory, "id", "") or "") not in keyword_ids]
+            keyword_memories_for_prompt = self.memory.format_keyword_memories_for_prompt(keyword_memories)
+            memories_for_prompt = self.memory.format_memories_for_prompt(semantic_prompt_memories) if semantic_prompt_memories else ""
             
             # === LTM+STM KONSOLIDIERUNG (via Groq gpt-oss-120b) ===
             stm_entries = []
@@ -1887,6 +1938,16 @@ def create_chappie_backend():
                     memories=memories,
                     stage="merged_context",
                 ),
+                "keyword": {
+                    **self._build_memory_trace(
+                        query=self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input),
+                        memories=keyword_memories,
+                        stage="keyword_facts",
+                    ),
+                    "retrieval_keywords": retrieval_keywords or [],
+                    "exact_entities": exact_entities or [],
+                    "fact_lookup_intent": fact_lookup_intent,
+                },
             }
             self.debug_logger.log_info(
                 "RAG",
@@ -1895,7 +1956,9 @@ def create_chappie_backend():
                     "top_k": settings.memory_top_k,
                     "effective_top_k": memory_top_k,
                     "memories_found": len(memories or []),
+                    "keyword_memories_found": len(keyword_memories or []),
                     "memory_ids": [str(getattr(m, "id", ""))[:8] for m in (memories or [])[:8]],
+                    "keyword_memory_ids": [str(getattr(m, "id", ""))[:8] for m in (keyword_memories or [])[:5]],
                     "query": generation_query,
                 },
             )
@@ -1946,6 +2009,9 @@ def create_chappie_backend():
             # Context hinzufuegen
             if context:
                 system_prompt += f"\n\n{context}"
+
+            if keyword_memories_for_prompt:
+                system_prompt += f"\n\n{keyword_memories_for_prompt}"
 
             # Memories hinzufuegen
             if memories_for_prompt:
@@ -2016,6 +2082,7 @@ def create_chappie_backend():
                 "cot_leak": cot_leak,
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "rag_memories": memories,
+                "keyword_rag_memories": keyword_memories,
                 "memory_trace": memory_trace,
                 "memory_consolidation": consolidation_meta,
                 "context_budget": budget_info,
@@ -2087,6 +2154,13 @@ def create_chappie_backend():
             # RAG
             generation_query = self.memory.extract_search_query(user_input)
             memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
+            keyword_memories = self.memory.search_memory_keywords(
+                query=user_input,
+                keywords=str(generation_query or "").split(),
+                top_k=5,
+            )
+            keyword_ids = {str(getattr(memory, "id", "") or "") for memory in keyword_memories or []}
+            semantic_prompt_memories = [memory for memory in memories or [] if str(getattr(memory, "id", "") or "") not in keyword_ids]
             memory_trace = {
                 "generation": self._build_memory_trace(
                     query=generation_query,
@@ -2098,8 +2172,17 @@ def create_chappie_backend():
                     memories=memories,
                     stage="legacy_merged_context",
                 ),
+                "keyword": self._build_memory_trace(
+                    query=generation_query,
+                    memories=keyword_memories,
+                    stage="keyword_facts",
+                ),
             }
-            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            keyword_memories_for_prompt = self.memory.format_keyword_memories_for_prompt(keyword_memories)
+            memories_for_prompt = self.memory.format_memories_for_prompt(semantic_prompt_memories) if semantic_prompt_memories else ""
+            combined_memories_for_prompt = "\n\n".join(
+                part for part in [keyword_memories_for_prompt, memories_for_prompt] if part
+            )
             
             # Prompt
             state = self.emotions.get_state()
@@ -2142,7 +2225,7 @@ def create_chappie_backend():
             )
             system_prompt = self._append_response_style_instruction(system_prompt)
             
-            messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
+            messages = self.brain.build_prompt(system_prompt, combined_memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             
             
             # Dynamische Parameter anpassen
@@ -2246,6 +2329,7 @@ def create_chappie_backend():
                 "reasoning_only": legacy_response.get("reasoning_only", False),
                 "input_classification": input_classification,
                 "rag_memories": legacy_response.get("rag_memories", memories),
+                "keyword_rag_memories": keyword_memories,
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,
@@ -2281,26 +2365,52 @@ def create_chappie_backend():
             preloaded_memories: Optional[List[Any]] = None,
             memory_trace_seed: Optional[Dict[str, Any]] = None,
             intent_type: Any = None,
+            retrieval_keywords: Optional[List[str]] = None,
+            exact_entities: Optional[List[str]] = None,
+            fact_lookup_intent: bool = False,
         ):
             """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
             memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
             # Preloaded memories aus Step 1 direkt nutzen – kein zweiter LLM-Call
             memories = list(preloaded_memories or [])
             if not memories:
-                generation_query = self.memory.extract_search_query(user_input)
+                generation_query_source = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
+                generation_query = generation_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(user_input)
                 memories = self.memory.search_memory(
                     generation_query or user_input,
                     top_k=memory_top_k,
                     optimize_query=False,
                 )
-            memories_for_prompt = self.memory.format_memories_for_prompt(memories)
+            else:
+                generation_query = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
+            keyword_memories = self.memory.search_memory_keywords(
+                query=user_input,
+                keywords=retrieval_keywords or [],
+                entities=exact_entities or [],
+                top_k=5,
+                min_score=0.18 if fact_lookup_intent else 0.25,
+            )
+            keyword_ids = {str(getattr(memory, "id", "") or "") for memory in keyword_memories or []}
+            semantic_prompt_memories = [memory for memory in memories or [] if str(getattr(memory, "id", "") or "") not in keyword_ids]
+            keyword_memories_for_prompt = self.memory.format_keyword_memories_for_prompt(keyword_memories)
+            memories_for_prompt = self.memory.format_memories_for_prompt(semantic_prompt_memories) if semantic_prompt_memories else ""
             memory_trace = {
                 "seed": memory_trace_seed or {},
                 "merged": self._build_memory_trace(
-                    query=user_input,
+                    query=generation_query,
                     memories=memories,
                     stage="merged_context",
                 ),
+                "keyword": {
+                    **self._build_memory_trace(
+                        query=self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input),
+                        memories=keyword_memories,
+                        stage="keyword_facts",
+                    ),
+                    "retrieval_keywords": retrieval_keywords or [],
+                    "exact_entities": exact_entities or [],
+                    "fact_lookup_intent": fact_lookup_intent,
+                },
             }
 
             prompt_runtime = self._build_prompt_runtime(emotions)
@@ -2315,6 +2425,9 @@ def create_chappie_backend():
 
             if context:
                 system_prompt += f"\n\n{context}"
+
+            if keyword_memories_for_prompt:
+                system_prompt += f"\n\n{keyword_memories_for_prompt}"
 
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
@@ -2336,6 +2449,7 @@ def create_chappie_backend():
                 "emotion_steering": prompt_runtime["emotion_steering"],
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "rag_memories": memories,
+                "keyword_rag_memories": keyword_memories,
                 "context_budget": self._enforce_context_budget(messages)[1],
                 "effective_memory_top_k": memory_top_k,
             }
@@ -2418,9 +2532,9 @@ def create_chappie_backend():
             if migrated > 0:
                 self.debug_logger.log_migration(migrated)
 
-            entities_safe = [str(e) for e in (input_classification.get("entities", []) or [])]
-            intent_query_source = " ".join(entities_safe) or user_input
-            intent_memory_query = self.memory.extract_search_query(intent_query_source)
+            retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
+            intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
+            intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
             intent_memories = self.memory.search_memory(
                 intent_memory_query or user_input,
                 top_k=response_memory_top_k_for_intent(intent_result.intent_type, settings.memory_top_k),
@@ -2474,6 +2588,9 @@ def create_chappie_backend():
                     preloaded_memories=intent_memories,
                     memory_trace_seed=intent_memory_trace,
                     intent_type=intent_result.intent_type,
+                    retrieval_keywords=retrieval_keywords,
+                    exact_entities=exact_entities,
+                    fact_lookup_intent=fact_lookup_intent,
                 )
 
                 raw_parts = []
@@ -2675,6 +2792,7 @@ def create_chappie_backend():
                 "reasoning_only": bool((thought or model_reasoning) and display_response.strip() == self._FALLBACK_SCHWEIGT),
                 "input_classification": input_classification,
                 "rag_memories": meta.get("rag_memories", []) if 'meta' in dir() else [],
+                "keyword_rag_memories": meta.get("keyword_rag_memories", []) if 'meta' in dir() else [],
                 "emotion_steering": meta.get("emotion_steering", {}) if 'meta' in dir() else {},
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,

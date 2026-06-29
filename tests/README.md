@@ -39,6 +39,7 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_cli_display.py`
 - `tests/test_cli_commands.py`
 - `tests/test_cli_remote.py`
+- `tests/test_memory_query_extraction_german.py`
 
 ### 2. Live-/Integrationsnahe Tests
 

@@ -57,6 +57,7 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 - `python tests/test_root_config.py`
 - `python tests/test_response_policy.py`
 - `python tests/test_steering_manager_policy.py`
+- `python tests/test_memory_query_extraction_german.py`
 - `python tests/manual/test_compatibility.py`
 - `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py`
 - `cd frontend && npm run build`

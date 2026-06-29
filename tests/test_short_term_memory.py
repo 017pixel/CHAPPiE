@@ -2,9 +2,13 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import MagicMock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+for module_name in ("chromadb", "chromadb.config", "sentence_transformers", "ollama", "openai", "requests"):
+    sys.modules.setdefault(module_name, MagicMock())
 
 import memory.short_term_memory as stm_module
 

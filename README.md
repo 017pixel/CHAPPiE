@@ -33,6 +33,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Zeitgefuehl** mit Interaktionsabstaenden, Pausen-Buckets, Session-Rhythmus und Episoden-Clustering
 - **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
 - **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
+- **Hybrid-RAG**: semantische Prozent-Memories bleiben erhalten, ein lokaler Keyword-Faktenkanal hebt Namen, Orte, IDs und konkrete Aussagen im finalen Prompt hervor
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
 - **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
 - **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden

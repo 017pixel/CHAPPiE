@@ -70,6 +70,16 @@ Die Life-Simulation erweitert die Gehirn-Metapher um:
 
 Der Temporal State trennt reale Systemaktualisierung von echter Interaktion: Dashboard-Abfragen koennen den Snapshot aktualisieren, gelten aber nicht als Kontakt. Fuer die Life-Simulation zaehlen `last_user_message_at`, `last_assistant_message_at`, `minutes_since_last_interaction`, `silence_bucket` und `interaction_rhythm`. Lange Pausen starten neue Episoden, kurze schnelle Wechsel verdichten die laufende Episode.
 
+## Memory-Retrieval
+
+CHAPPiE nutzt jetzt Hybrid-RAG fuer den finalen Antwortprompt:
+
+- semantische Vektor-Suche in ChromaDB bleibt erhalten und liefert Prozent-Relevanzen
+- der bestehende Step-1-Intent-Call extrahiert `retrieval_keywords`, `exact_entities` und `fact_lookup_intent`
+- `memory/memory_engine.py` fuehrt daraus eine lokale Keyword-/Entity-Suche in den gespeicherten Roh-Memories aus
+- der finale Systemprompt erhaelt einen kleinen Block `KEYWORD-RAG FAKTEN / EXAKTE TREFFER` vor den semantischen Erinnerungen
+- Keyword-RAG erzeugt keinen zusaetzlichen Groq-Call und ist auf wenige Treffer mit Score-, Dedupe- und Tokenlimits begrenzt
+
 ## Emotion-Steering
 
 Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:

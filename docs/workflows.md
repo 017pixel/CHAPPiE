@@ -64,8 +64,9 @@ sequenceDiagram
    - Action Response Layer: prompt_suffix und action_plan bauen
    - Steering Manager: VAD-Mapping, Alpha, Composite Modes, Layer-Profile
 6. Antwortgenerierung: 1x LLM-Call mit komplettem Kontext (Prompt + Steering-Payload)
-   - Casual Chat laedt fuer die finale Antwort 20 Memories; komplexere Intents nutzen den globalen Memory-Top-K-Wert.
-   - Lokale vLLM-Antworten starten mit einer kurzen Antwortvorgabe und nutzen keine langen CoT-Promptbloecke.
+    - Casual Chat laedt fuer die finale Antwort 20 Memories; komplexere Intents nutzen den globalen Memory-Top-K-Wert.
+    - Der finale Prompt kombiniert semantische Prozent-Memories mit lokalem Keyword-RAG fuer konkrete Fakten, Namen, Orte, IDs und fruehere Aussagen.
+    - Lokale vLLM-Antworten starten mit einer kurzen Antwortvorgabe und nutzen keine langen CoT-Promptbloecke.
    - Neue Emotionssignale (`affection`, `anxiety`, `calm`) faerben Ton und Steering konservativ, ohne die Antwortlaenge zu erhoehen.
 7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline und finale Assistant-Zeitmarke.
 8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
@@ -178,6 +179,7 @@ Der Debug-Pfad zeigt die Kette hinter einer Antwort:
 
 - Input und Intent
 - Memory-Treffer und Merge
+- Keyword-RAG-Faktenblock fuer exakte Treffer
 - Emotionen und Deltas
 - Life- und Forecast-Signale
 - finale Ton- und Antwortentscheidung

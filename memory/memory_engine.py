@@ -61,6 +61,8 @@ class Memory:
     mem_type: str = "interaction"  # "interaction" oder "summary"
     relevance_score: float = 0.0
     label: str = "original"  # "original" oder "zsm gefasst"
+    match_type: str = ""
+    matched_terms: str = ""
 
 
 class MemoryEngine:
@@ -458,6 +460,188 @@ class MemoryEngine:
             ),
         )
         return " ".join(ranked[: max(1, int(max_terms))])
+
+    @staticmethod
+    def _keyword_weak_words() -> set[str]:
+        return {
+            "name", "projekt", "projekte", "fehler", "problem", "probleme", "sache", "sachen",
+            "info", "infos", "erinnerung", "erinnerungen", "daten", "frage", "antwort",
+            "user", "chappie", "chat", "gespraech", "gespraeche", "heute", "gestern",
+        }
+
+    @staticmethod
+    def _keyword_strong_words() -> set[str]:
+        return {
+            "bruder", "schwester", "mutter", "vater", "eltern", "familie", "freund", "freundin",
+            "wohnort", "adresse", "geburtstag", "alter", "job", "beruf", "schule", "klasse",
+            "heisse", "heisst", "heiße", "heißt", "genannt", "nenne", "nennst",
+            "lieblings", "lieblingsfarbe", "lieblingsessen", "deadline", "termin",
+        }
+
+    def _normalize_keyword_list(self, values: Optional[list[str] | tuple[str, ...] | set[str] | str], max_terms: int = 20) -> list[str]:
+        if not values:
+            return []
+        if isinstance(values, str):
+            raw_items = re.split(r"[,;|\n]+|\s{2,}", values)
+        else:
+            raw_items = [str(item) for item in values]
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in raw_items:
+            for token in self._tokenize_for_keywords(item):
+                if token in seen:
+                    continue
+                seen.add(token)
+                normalized.append(token)
+                if len(normalized) >= max_terms:
+                    return normalized
+        return normalized
+
+    @staticmethod
+    def _timestamp_score(timestamp: str) -> float:
+        if not timestamp:
+            return 0.0
+        try:
+            parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            age_seconds = max(0.0, (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds())
+        except (TypeError, ValueError):
+            return 0.0
+        age_days = age_seconds / 86400
+        if age_days <= 7:
+            return 0.15
+        if age_days <= 30:
+            return 0.10
+        if age_days <= 365:
+            return 0.04
+        return 0.0
+
+    def _keyword_match_score(
+        self,
+        content: str,
+        keywords: list[str],
+        entities: list[str],
+        timestamp: str = "",
+    ) -> tuple[float, str, list[str]]:
+        normalized_content = self._normalize_german_text(content or "")
+        content_tokens = set(re.findall(r"[a-z0-9]{3,}", normalized_content))
+        weak_words = self._keyword_weak_words()
+        strong_words = self._keyword_strong_words()
+
+        score = 0.0
+        matched: list[str] = []
+        has_non_weak_match = False
+        match_type = "Keyword"
+
+        for entity in entities:
+            if not entity:
+                continue
+            if entity in normalized_content:
+                score += 1.0
+                has_non_weak_match = True
+                match_type = "Exact"
+                matched.append(entity)
+
+        for keyword in keywords:
+            if not keyword:
+                continue
+            is_match = keyword in content_tokens or keyword in normalized_content
+            if not is_match:
+                continue
+            matched.append(keyword)
+            if keyword in weak_words:
+                score += 0.03
+                continue
+            has_non_weak_match = True
+            if keyword in strong_words or len(keyword) >= 8 or any(char.isdigit() for char in keyword):
+                score += 0.35
+            else:
+                score += 0.15
+
+        if not matched or not has_non_weak_match:
+            return 0.0, "", []
+
+        unique_matches = []
+        seen = set()
+        for term in matched:
+            if term in seen:
+                continue
+            seen.add(term)
+            unique_matches.append(term)
+
+        if match_type != "Exact" and len([term for term in unique_matches if term not in weak_words]) >= 2:
+            match_type = "Entity" if entities else "Keyword"
+
+        score += self._timestamp_score(timestamp)
+        return min(1.0, round(score, 3)), match_type, unique_matches[:8]
+
+    def search_memory_keywords(
+        self,
+        query: str,
+        keywords: Optional[list[str]] = None,
+        entities: Optional[list[str]] = None,
+        top_k: int = 5,
+        min_score: float = 0.25,
+        exclude_ids: Optional[set[str]] = None,
+    ) -> list[Memory]:
+        """Lokale Keyword-/Entity-Suche fuer exakte Fakten ohne zusaetzlichen LLM-Call."""
+        if self.collection is None:
+            return []
+
+        exclude_ids = exclude_ids or set()
+        keyword_terms = self._normalize_keyword_list(keywords, max_terms=20)
+        entity_terms = self._normalize_keyword_list(entities, max_terms=12)
+        if not keyword_terms:
+            keyword_terms = self._normalize_keyword_list(self._build_keyword_query(query or "", max_terms=12), max_terms=12)
+        if not keyword_terms and not entity_terms:
+            return []
+
+        try:
+            if self.collection.count() == 0:
+                return []
+            raw = self.collection.get(include=["documents", "metadatas"])
+        except Exception as e:
+            if settings.debug:
+                print(f"   Keyword-RAG Suche fehlgeschlagen: {e}")
+            return []
+
+        documents = raw.get("documents") or []
+        ids = raw.get("ids") or []
+        metadatas = raw.get("metadatas") or []
+        memories: list[Memory] = []
+
+        for idx, content in enumerate(documents):
+            memory_id = str(ids[idx]) if idx < len(ids) else ""
+            if memory_id and memory_id in exclude_ids:
+                continue
+            metadata = metadatas[idx] if idx < len(metadatas) and isinstance(metadatas[idx], dict) else {}
+            timestamp = metadata.get("timestamp", "")
+            score, match_type, matched_terms = self._keyword_match_score(
+                str(content or ""),
+                keyword_terms,
+                entity_terms,
+                timestamp=timestamp,
+            )
+            if score < min_score:
+                continue
+            memories.append(
+                Memory(
+                    id=memory_id,
+                    content=str(content or ""),
+                    role=metadata.get("role", "unknown"),
+                    timestamp=timestamp,
+                    mem_type=metadata.get("type", "interaction"),
+                    relevance_score=score,
+                    label=f"keyword_{match_type.lower()}",
+                    match_type=match_type,
+                    matched_terms=", ".join(matched_terms),
+                )
+            )
+
+        memories.sort(key=lambda m: (m.relevance_score, self._timestamp_score(m.timestamp)), reverse=True)
+        return memories[: max(1, int(top_k))]
 
     def extract_search_query(self, user_input: str) -> str:
         """
@@ -929,6 +1113,30 @@ class MemoryEngine:
             lines.append(f"    {mem.content}")
         
         return "\n".join(lines)
+
+    def format_keyword_memories_for_prompt(self, memories: list[Memory], max_chars: int = 1200) -> str:
+        """Formatiert lokale Keyword-RAG Treffer als kleinen Faktenblock fuer den finalen Prompt."""
+        if not memories:
+            return ""
+
+        lines = [
+            "=== KEYWORD-RAG FAKTEN / EXAKTE TREFFER ===",
+            "Nutze diese Treffer bevorzugt fuer konkrete Fakten, Namen, Orte, Projekte und fruehere Aussagen.",
+            "Bei Widerspruechen neuere und exaktere Treffer bevorzugen; nutze sie nicht, wenn sie nicht zur Frage passen.",
+        ]
+        for memory in memories:
+            role_label = "USER" if memory.role == "user" else "CHAPPIE"
+            match_type = memory.match_type or "Keyword"
+            score_percent = int(min(1.0, max(0.0, memory.relevance_score)) * 100)
+            date = (memory.timestamp or "")[:10] or "ohne Datum"
+            terms = f" | Treffer: {memory.matched_terms}" if memory.matched_terms else ""
+            content = re.sub(r"\s+", " ", memory.content).strip()[:220]
+            candidate = f"\n[{match_type} | Score {score_percent}% | {date} | {role_label}{terms}]\n\"{content}\""
+            if len("\n".join(lines)) + len(candidate) > max_chars:
+                break
+            lines.append(candidate)
+
+        return "\n".join(lines) if len(lines) > 3 else ""
 
     def _parse_bullet_points(self, text: str) -> list[str]:
         """
