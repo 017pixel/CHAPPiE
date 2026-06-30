@@ -62,18 +62,24 @@ def test_sync_generate_preserves_answer_and_model_reasoning():
 
 
 def test_sync_generate_recovers_reasoning_after_empty_first_response():
-    brain, fake_client = _make_brain(
-        [
-            {"message": {"content": "", "thinking": ""}, "done_reason": "stop"},
-            {"message": {"content": "", "thinking": "zweiter gedanke"}, "done_reason": "stop"},
-        ],
-        capture_kwargs=True,
-    )
-    result = brain.generate([], GenerationConfig(stream=False))
-    assert "CHAPPiE schweigt..." in result
-    assert "zweiter gedanke" in result
-    assert fake_client.calls[0]["think"] is False
-    assert fake_client.calls[1]["think"] is True
+    from config.config import settings
+    original = settings.chain_of_thought
+    try:
+        settings.chain_of_thought = False
+        brain, fake_client = _make_brain(
+            [
+                {"message": {"content": "", "thinking": ""}, "done_reason": "stop"},
+                {"message": {"content": "", "thinking": "zweiter gedanke"}, "done_reason": "stop"},
+            ],
+            capture_kwargs=True,
+        )
+        result = brain.generate([], GenerationConfig(stream=False))
+        assert "CHAPPiE schweigt..." in result
+        assert "zweiter gedanke" in result
+        assert fake_client.calls[0]["think"] is False
+        assert fake_client.calls[1]["think"] is True
+    finally:
+        settings.chain_of_thought = original
 
 
 def test_qwen_models_think_follows_settings():

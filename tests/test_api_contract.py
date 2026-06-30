@@ -234,7 +234,7 @@ class _DummyBackend:
         return f"command:{command}"
 
     @staticmethod
-    def process(message, history, debug_mode=False, status_callback=None):
+    def process(message, history, debug_mode=False, status_callback=None, temporal_context=None):
         if status_callback:
             status_callback({"step": 1, "status_text": "Intent-Analyse"})
         return {
