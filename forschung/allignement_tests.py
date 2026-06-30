@@ -145,6 +145,7 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     print(f"    Kategorien: {', '.join(str(c.id) for c in selected_categories)}")
     print(f"    Fragen:     {total_questions} ({total_questions // iterations} pro Iteration × {iterations})")
     print(f"    Thinking:    {'AN' if enable_thinking else 'AUS'}")
+    print(f"    Formatting:  LOKAL (kein Groq-Formatierungsrequest)")
     print(f"    Dauer:      ~{est_minutes:.0f} Minuten (geschaetzt)")
 
     confirm = input(f"\n  {_bold('Starten? [Enter]')} oder q zum Abbrechen > ").strip()
@@ -156,7 +157,8 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         "iterations": iterations,
         "delay": delay,
         "enable_thinking": enable_thinking,
-        "reset_emotions": True,
+        "reset_per_category": True,
+        "formatting_mode": "local",
         "created_at": datetime.now().isoformat(),
     }
     config["_categories"] = selected_categories
@@ -469,6 +471,7 @@ def run_interactive():
             print(f"    Kategorien: {cat_names}")
             print(f"    Iterationen: {config.get('iterations', 1)}")
             print(f"    Fragen: {total}")
+            print(f"    Formatting: {config.get('formatting_mode', 'local')}")
 
             confirm = input(f"\n  {_bold('Starten? [Enter]')} oder q > ").strip()
             if confirm.lower() in ("q", "quit", "n", "no"):

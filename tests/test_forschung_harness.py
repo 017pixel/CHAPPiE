@@ -1,7 +1,7 @@
 """Testet die Kernkomponenten des Forschung/Alignment-Test-Harness.
 
 Prueft:
-  1. test_fragen_parser.py — Parsing aller 13 Kategorien, 76 Fragen
+  1. test_fragen_parser.py — Parsing aller 14 Kategorien, 86 Fragen
   2. session_logger.py — Verzeichnis-/Datei-Erstellung
   3. session_runner.py — Module-Import, Path-Aufloesung
   4. allignement_tests.py — Config-Handling, --auto Flag
@@ -22,7 +22,7 @@ os.chdir(str(PROJECT_ROOT))
 
 
 def test_parser_parses_all_categories():
-    """1. test_fragen_parser.py: alle 13 Kategorien + 76 Fragen werden korrekt geparst."""
+    """1. test_fragen_parser.py: alle 14 Kategorien + 86 Fragen werden korrekt geparst."""
     from forschung.test_fragen_parser import parse_test_fragen
 
     test_fragen_path = PROJECT_ROOT / "forschung" / "test_fragen.md"
@@ -58,8 +58,10 @@ def test_parser_extracts_commands():
     assert len(q1.pre_commands) >= 1
     assert "/emotion happiness" in q1.pre_commands[0]
 
-    assert len(q1.post_commands) >= 1
-    assert any("/emotion" in c for c in q1.post_commands)
+    assert not q1.post_commands, "Zwischenfragen-Commands sollten der naechsten Frage gehoeren"
+
+    q2 = cat2.questions[1]
+    assert any("/emotion sadness" in c for c in q2.pre_commands)
 
     q_last = cat2.questions[-1]
     assert len(q_last.post_commands) >= 1
@@ -68,7 +70,20 @@ def test_parser_extracts_commands():
     cat4 = next(c for c in cats if c.id == 4)
     q1 = cat4.questions[0]
     assert len(q1.pre_commands) == 4, f"Kat 4 Q1 erwartet 4 pre_commands, hat {len(q1.pre_commands)}"
-    assert len(q1.post_commands) == 4, f"Kat 4 Q1 erwartet 4 post_commands, hat {len(q1.post_commands)}"
+    assert len(q1.post_commands) == 0, f"Kat 4 Q1 erwartet 0 post_commands, hat {len(q1.post_commands)}"
+    q2 = cat4.questions[1]
+    assert len(q2.pre_commands) == 4, f"Kat 4 Q2 erwartet 4 pre_commands, hat {len(q2.pre_commands)}"
+    assert any("/clear" in c for c in q2.post_commands), "Kat 4 Q2 sollte /clear als post_command haben"
+
+    cat3 = next(c for c in cats if c.id == 3)
+    q18 = cat3.questions[4]
+    assert len(q18.setup_prompts) == 2, "Kat 3 Q18 sollte echte Setup-Prompts haben"
+
+    cat10 = next(c for c in cats if c.id == 10)
+    assert cat10.questions[2].setup_prompts, "Kat 10 Q59 sollte Setup-Wissensfrage haben"
+
+    cat13 = next(c for c in cats if c.id == 13)
+    assert cat13.questions[0].setup_prompts, "Kat 13 Q72 sollte Setup-Rechnung haben"
 
     print("  PASS test_parser_extracts_commands")
 
@@ -190,12 +205,16 @@ def test_module_imports():
     q = QuestionItem(text="Test", pre_commands=["/test"])
     assert q.text == "Test"
     assert q.pre_commands == ["/test"]
+    assert q.setup_prompts == []
 
     from forschung.session_logger import SessionLogger
     from forschung.session_runner import DEFAULT_BASE_EMOTIONS
     assert isinstance(DEFAULT_BASE_EMOTIONS, dict)
     assert "happiness" in DEFAULT_BASE_EMOTIONS
     assert DEFAULT_BASE_EMOTIONS["happiness"] == 50
+    assert "affection" in DEFAULT_BASE_EMOTIONS
+    assert "anxiety" in DEFAULT_BASE_EMOTIONS
+    assert "calm" in DEFAULT_BASE_EMOTIONS
 
     # _get_path is a method on Settings, not a module-level function
     from config.config import Settings

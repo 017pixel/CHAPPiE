@@ -12,7 +12,7 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 | Struktur- und Kompatibilitaetschecks | Module, Dateien, Startpfade validieren | `tests/manual/test_compatibility.py`, `py_compile` |
 | Live- und Provider-Tests | Verhalten mit echten Modellen oder APIs pruefen | `tests/test_brain_agents.py`, `tests/test_integration.py` |
 | manuelle Bedienung | Chat oder UI bewusst testen | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
-| Alignment/Emotion Research | Automatisierte Test-Sessions ueber 13 Themenkategorien (76 Fragen) via Backend-API | `forschung/allignement_tests.py` |
+| Alignment/Emotion Research | Automatisierte Test-Sessions ueber 14 Themenkategorien (86 Fragen) via Backend-API; Antwort-Formatting laeuft im Harness lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden | `forschung/allignement_tests.py` |
 
 ## GitHub Actions / CI
 

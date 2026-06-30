@@ -64,6 +64,8 @@ class SessionLogger:
         result: Dict[str, Any] | None,
         duration_ms: float,
         error: str | None = None,
+        setup_prompts: List[str] | None = None,
+        setup_results: List[Dict[str, Any]] | None = None,
     ) -> None:
         entry = {
             "session_id": self.session_id,
@@ -74,6 +76,8 @@ class SessionLogger:
             "question_text": question_text,
             "commands_before": commands_before,
             "commands_after": commands_after,
+            "setup_prompts": setup_prompts or [],
+            "setup_results": setup_results or [],
             "timestamp": datetime.now().isoformat(),
             "duration_ms": round(duration_ms),
             "emotions_before": emotions_before,
@@ -140,7 +144,7 @@ class SessionLogger:
 
         self.question_logs.append(entry)
 
-        filename = f"{question_number:03d}_cat{category_id}_{category_name[:20].replace(' ', '_')}_q{question_number}.json"
+        filename = f"it{iteration:02d}_{question_number:03d}_cat{category_id}_{category_name[:20].replace(' ', '_')}_q{question_number}.json"
         filepath = self.session_dir / "questions" / filename
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(entry, f, indent=2, ensure_ascii=False, default=str)

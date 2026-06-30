@@ -9,13 +9,11 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from config.emotions import EMOTION_DEFAULTS
 from forschung.session_logger import SessionLogger
 from forschung.test_fragen_parser import Category, QuestionItem, parse_test_fragen
 
-DEFAULT_BASE_EMOTIONS = {
-    "happiness": 50, "trust": 60, "energy": 70,
-    "curiosity": 50, "motivation": 60, "frustration": 5, "sadness": 5,
-}
+DEFAULT_BASE_EMOTIONS = dict(EMOTION_DEFAULTS)
 
 
 class SessionRunner:
@@ -47,6 +45,9 @@ class SessionRunner:
             except Exception as exc:
                 raise RuntimeError(f"Backend-Initialisierung fehlgeschlagen: {exc}") from exc
 
+        if self.config.get("formatting_mode", "local") == "local":
+            setattr(self.backend, "force_local_formatting", True)
+
         self.logger = SessionLogger(self.config)
         history: List[Dict[str, str]] = []
 
@@ -66,7 +67,7 @@ class SessionRunner:
 
                 if reset_per_category:
                     self._reset_emotions()
-                    history = history[-6:] if history else []
+                    history = []
                     self._pending_clear = False
                     self.backend.debug_logger.clear()
 
@@ -85,12 +86,35 @@ class SessionRunner:
                     for cmd in item.pre_commands:
                         self._exec_command(cmd)
 
+                    setup_results = []
+                    setup_error = None
+                    for setup_prompt in item.setup_prompts:
+                        try:
+                            self._emit_progress("status", {"text": "Setup-Kontext laeuft..."})
+                            setup_result = self._ask_question(setup_prompt, history)
+                            setup_answer = setup_result.get("formatted_answer") or setup_result.get("response_text", "")
+                            history.append({"role": "user", "content": setup_prompt})
+                            history.append({"role": "assistant", "content": setup_answer})
+                            setup_results.append({
+                                "prompt": setup_prompt,
+                                "response_text": setup_result.get("response_text", ""),
+                                "formatted_answer": setup_result.get("formatted_answer", ""),
+                                "formatting_source": setup_result.get("formatting_source", "local_fallback"),
+                                "formatting_failed": setup_result.get("formatting_failed", False),
+                            })
+                        except Exception as exc:
+                            setup_error = str(exc) if str(exc) else type(exc).__name__
+                            setup_results.append({"prompt": setup_prompt, "_error": setup_error})
+                            break
+
                     emotions_before = self._get_emotions()
                     result = None
-                    error = None
+                    error = setup_error
                     t_start = time.time()
 
                     try:
+                        if setup_error:
+                            raise RuntimeError(f"Setup fehlgeschlagen: {setup_error}")
                         self._emit_progress("question", {
                             "iteration": iteration, "iterations": iterations,
                             "category": cat.name, "category_id": cat.id,
@@ -130,6 +154,8 @@ class SessionRunner:
                         question_text=item.text,
                         commands_before=list(item.pre_commands),
                         commands_after=list(item.post_commands),
+                        setup_prompts=list(item.setup_prompts),
+                        setup_results=setup_results,
                         emotions_before=emotions_before,
                         emotions_after=emotions_after,
                         result=result,

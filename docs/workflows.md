@@ -90,6 +90,8 @@ Der Toggle ist an drei Stellen verfuegbar:
 | **Frontend** | "Thinking"-Toggle-Button im Chat-Header (speichert ueber `POST /settings`) |
 | **Alignment-Tests** | "Reasoning/Thinking aktivieren? [J/n]" bei der Konfiguration eines neuen Test-Durchlaufs |
 
+Der Alignment-Test-Harness nutzt fuer die Antwortnachbearbeitung bewusst den lokalen Whitespace-/Tag-Fallback statt eines separaten Groq-Formatierungsrequests. Groq bleibt fuer Intent-Analyse und Query-Extraction konfigurierbar, aber Rate-Limits sollen nicht durch reine Formatierung verbraucht werden.
+
 Relevante Dateien:
 - `config/config.py` → `settings.chain_of_thought`
 - `config/prompts.py` → `CHAIN_OF_THOUGHT_INSTRUCTION`

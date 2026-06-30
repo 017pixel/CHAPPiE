@@ -234,7 +234,7 @@ def create_chappie_backend():
                 "formatted_answer": result.get("formatted_answer", ""),
                 "formatting_failed": result.get("formatting_failed", False),
                 "formatting_source": result.get("formatting_source", "local_fallback"),
-                "formatting_model": self.GROQ_FORMAT_MODEL,
+                "formatting_model": result.get("formatting_model", "?"),
                 "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
                 "created_at": created_at,
             }
@@ -905,7 +905,13 @@ def create_chappie_backend():
             """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
-                return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": "groq", "answer_is_fallback": True}
+                source = "local_fallback" if getattr(self, "force_local_formatting", False) else "groq"
+                return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "answer_is_fallback": True}
+            if getattr(self, "force_local_formatting", False):
+                result = self._local_format_fallback(clean_text, formatting_failed=False)
+                result["formatting_source"] = "local_fallback"
+                result["formatting_skip_reason"] = "forced_local"
+                return result
             if not settings.groq_api_key:
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
                 result["formatting_source"] = "local_fallback"
@@ -913,6 +919,15 @@ def create_chappie_backend():
                 return result
             try:
                 import openai
+                from brain.groq_limits import get_groq_limiter
+
+                estimated_tokens = get_groq_limiter().estimate_tokens(clean_text) + 5000
+                allowed, reason = get_groq_limiter().can_start(estimated_tokens)
+                if not allowed:
+                    result = self._local_format_fallback(clean_text, formatting_failed=False)
+                    result["formatting_source"] = "local_fallback"
+                    result["formatting_skip_reason"] = reason
+                    return result
 
                 client = openai.OpenAI(
                     base_url="https://api.groq.com/openai/v1",
@@ -2076,7 +2091,7 @@ def create_chappie_backend():
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted.get("formatting_failed", False),
                 "formatting_source": formatted.get("formatting_source", "local_fallback"),
-                "formatting_model": self.GROQ_FORMAT_MODEL,
+                "formatting_model": formatted.get("formatting_model", "?"),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
                 "cot_leak": cot_leak,
@@ -2703,7 +2718,7 @@ def create_chappie_backend():
                         "looks_like_error": looks_like_model_error(display_response or ""),
                         "formatting_failed": formatted_stream.get("formatting_failed", False),
                         "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
-                        "formatting_model": self.GROQ_FORMAT_MODEL,
+                        "formatting_model": formatted_stream.get("formatting_model", "?"),
                     },
                 )
 
@@ -2918,7 +2933,7 @@ def create_chappie_backend():
                         "thought_chars": len(thought or ""),
                         "formatting_failed": formatted_legacy.get("formatting_failed", False),
                         "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
-                        "formatting_model": self.GROQ_FORMAT_MODEL,
+                        "formatting_model": formatted_legacy.get("formatting_model", "?"),
                     },
                 )
 

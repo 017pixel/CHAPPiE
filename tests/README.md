@@ -109,4 +109,4 @@ Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
 
 ## Alignment & Emotion Research Testing
 
-Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 76 Fragen aus 13 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).
+Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).

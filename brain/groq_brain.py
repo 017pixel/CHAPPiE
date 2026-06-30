@@ -185,6 +185,10 @@ class GroqBrain(BaseBrain):
         openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
         try:
+            quota_error = self._claim_quota(openai_messages, config)
+            if quota_error:
+                return {"content": f"Groq Fehler: Rate-Limit erreicht ({quota_error})", "tool_calls": None}
+
             kwargs = {
                 "model": self.model,
                 "messages": openai_messages,

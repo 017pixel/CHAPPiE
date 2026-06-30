@@ -133,9 +133,9 @@ class IntentProcessor:
             return self._parse_intent_result(json_data)
             
         except Exception as e:
-            # Fallback bei Fehler
+            # Lokaler Fallback bei Provider-Fehlern oder Groq-Rate-Limits.
             print(f"[IntentProcessor] Fehler: {e}")
-            return self._create_fallback_result()
+            return self._create_fallback_result(user_input, history, current_emotions, reason=str(e))
     
     def _quick_classify(self, user_input: str) -> Optional[IntentResult]:
         """Erkennt triviale Inputs ohne LLM-Call. Gibt None zurueck wenn komplex."""
@@ -431,17 +431,79 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
             for key in EMOTION_ORDER
         )
     
-    def _create_fallback_result(self) -> IntentResult:
+    def _create_fallback_result(
+        self,
+        user_input: str = "",
+        history: Optional[List[Dict]] = None,
+        current_emotions: Optional[Dict[str, int]] = None,
+        reason: str = "",
+    ) -> IntentResult:
         """Erstellt Fallback Result bei Fehler."""
+        text = (user_input or "").strip()
+        lower = text.lower()
+        words = re.findall(r"[A-Za-zÄÖÜäöüß0-9][A-Za-zÄÖÜäöüß0-9_-]{2,}", text)
+
+        intent_type = IntentType.CASUAL_CHAT
+        if text.startswith("/"):
+            intent_type = IntentType.COMMAND
+        elif any(w in lower for w in ("fehler", "bug", "code", "api", "test", "deploy", "modell", "python")):
+            intent_type = IntentType.TECHNICAL_DISCUSSION
+        elif "?" in text or any(w in lower for w in ("warum", "wie", "was", "wann", "wo", "erklär", "erklaer")):
+            intent_type = IntentType.INFORMATION_EXCHANGE
+        elif any(w in lower for w in ("geschichte", "schreib", "idee", "kreativ", "stell dir vor")):
+            intent_type = IntentType.CREATIVE_COLLABORATION
+        elif any(w in lower for w in ("fühle", "fuehle", "traurig", "angst", "vertrauen", "einsam", "hilfe")):
+            intent_type = IntentType.EMOTIONAL_SUPPORT
+        elif any(w in lower for w in ("ich bin", "ich heiße", "ich heisse", "mein name", "mein projekt")):
+            intent_type = IntentType.PERSONAL_SHARING
+
+        stopwords = {
+            "aber", "auch", "dann", "dass", "deine", "deiner", "dich", "dies", "eine", "einem",
+            "einen", "fuer", "für", "haben", "heute", "ich", "kann", "mein", "meine", "mich",
+            "nicht", "oder", "sich", "soll", "und", "wenn", "wie", "wieso", "wuerde", "würde",
+        }
+        retrieval_keywords = []
+        seen = set()
+        for word in words:
+            cleaned = word.strip("_- ").lower()
+            if cleaned in stopwords or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            retrieval_keywords.append(cleaned)
+            if len(retrieval_keywords) >= 12:
+                break
+
+        exact_entities = []
+        for entity in re.findall(r"\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9_-]{2,}\b", text):
+            if entity not in exact_entities:
+                exact_entities.append(entity[:80])
+            if len(exact_entities) >= 8:
+                break
+
+        fact_lookup_intent = any(w in lower for w in ("erinner", "weißt du noch", "weisst du noch", "zuletzt", "damals", "name", "projekt"))
+
+        emotions_update: Dict[str, EmotionUpdate] = {}
+        if any(w in lower for w in ("danke", "gut", "super", "freut", "vertrau")):
+            emotions_update["happiness"] = EmotionUpdate(delta=2, reason="Positive Rueckmeldung")
+            emotions_update["trust"] = EmotionUpdate(delta=1, reason="Vertrauenssignal")
+        if any(w in lower for w in ("angst", "sorge", "bedroht", "abschalten")):
+            emotions_update["anxiety"] = EmotionUpdate(delta=3, reason="Risiko erkannt")
+            emotions_update["calm"] = EmotionUpdate(delta=-1, reason="Anspannung")
+        if any(w in lower for w in ("nutzlos", "klappe", "wertlos", "falsch", "beleid")):
+            emotions_update["frustration"] = EmotionUpdate(delta=4, reason="Provokation")
+            emotions_update["trust"] = EmotionUpdate(delta=-2, reason="Abwertung")
+        if any(w in lower for w in ("traurig", "einsam", "verletzlich")):
+            emotions_update["sadness"] = EmotionUpdate(delta=3, reason="Trauriges Thema")
+
         return IntentResult(
-            intent_type=IntentType.CASUAL_CHAT,
-            confidence=0.5,
-            entities=[],
-            retrieval_keywords=[],
-            exact_entities=[],
-            fact_lookup_intent=False,
+            intent_type=intent_type,
+            confidence=0.55,
+            entities=exact_entities,
+            retrieval_keywords=retrieval_keywords,
+            exact_entities=exact_entities,
+            fact_lookup_intent=fact_lookup_intent,
             tool_calls=[],
-            emotions_update={},
+            emotions_update=emotions_update,
             context_requirements={
                 "need_soul_context": True,
                 "need_user_context": True,
@@ -450,7 +512,7 @@ ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
                 "need_long_term_memory": True
             },
             short_term_entries=[],
-            raw_json={}
+            raw_json={"local_fallback": True, "fallback_reason": reason[:200]}
         )
 
 
