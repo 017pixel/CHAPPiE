@@ -10,6 +10,8 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
+from config.emotions import EMOTION_ORDER  # noqa: E402
+
 
 def _reload():
     sys.modules.pop("chappie_brain_cli", None)
@@ -85,8 +87,8 @@ def test_spinner_frames():
 
 def test_emotion_names():
     m = _reload()
-    assert len(m.EMOTION_NAMES) == 7
-    for name in ("happiness", "trust", "energy", "curiosity", "motivation", "frustration", "sadness"):
+    assert m.EMOTION_NAMES == EMOTION_ORDER
+    for name in ("happiness", "trust", "energy", "curiosity", "motivation", "frustration", "sadness", "affection", "anxiety", "calm"):
         assert name in m.EMOTION_NAMES
 
 

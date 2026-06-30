@@ -4,17 +4,48 @@ CHAPiE Brain Module - LLM Backend Abstraction.
 Nutze get_brain() für automatische Backend-Auswahl basierend auf settings
 oder für eine gezielte Provider-/Modellauswahl pro Agent.
 """
-from typing import Optional, Dict, Tuple
+from importlib import import_module
+from typing import Optional, Dict, Tuple, Any
 
 from .base_brain import BaseBrain, Message, GenerationConfig
-from .ollama_brain import OllamaBrain
-from .groq_brain import GroqBrain
-from .vllm_brain import VLLMBrain
-from .deep_think import DeepThinkEngine, DeepThinkStep
 
 from config.config import settings, LLMProvider
 
 _brain_cache: Dict[Tuple[str, str], BaseBrain] = {}
+
+_EXPORTS = {
+    "OllamaBrain": "ollama_brain",
+    "GroqBrain": "groq_brain",
+    "VLLMBrain": "vllm_brain",
+    "DeepThinkEngine": "deep_think",
+    "DeepThinkStep": "deep_think",
+}
+
+__all__ = (
+    "BaseBrain",
+    "Message",
+    "GenerationConfig",
+    "OllamaBrain",
+    "GroqBrain",
+    "VLLMBrain",
+    "DeepThinkEngine",
+    "DeepThinkStep",
+    "get_brain",
+)
+
+
+def _load_export(name: str) -> Any:
+    module_name = _EXPORTS[name]
+    module = import_module(f"{__name__}.{module_name}")
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return _load_export(name)
 
 
 def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> BaseBrain:
@@ -40,11 +71,14 @@ def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = Non
         return _brain_cache[cache_key]
 
     if effective_provider == LLMProvider.GROQ:
-        brain = GroqBrain(model=model)
+        brain_cls = _load_export("GroqBrain")
+        brain = brain_cls(model=model)
     elif effective_provider == LLMProvider.VLLM:
-        brain = VLLMBrain(model=model)
+        brain_cls = _load_export("VLLMBrain")
+        brain = brain_cls(model=model)
     else:
-        brain = OllamaBrain(model=model)
+        brain_cls = _load_export("OllamaBrain")
+        brain = brain_cls(model=model)
 
     _brain_cache[cache_key] = brain
     return brain
