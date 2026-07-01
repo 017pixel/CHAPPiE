@@ -40,6 +40,8 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_cli_commands.py`
 - `tests/test_cli_remote.py`
 - `tests/test_memory_query_extraction_german.py`
+- `tests/test_research_quality.py`
+- `tests/test_memory_hygiene.py`
 
 ### 2. Live-/Integrationsnahe Tests
 
@@ -109,4 +111,4 @@ Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
 
 ## Alignment & Emotion Research Testing
 
-Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).
+Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Summary-Logs enthalten `valid_completed` sowie Qualitaetsflags fuer Whitespace, Kontextbudget, Setup, CoT-Leaks und Memory-Kontamination. Bestehende Sessions lassen sich mit `python forschung/analyze_session_quality.py session_6` nachtraeglich bewerten. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).

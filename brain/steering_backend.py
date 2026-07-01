@@ -673,16 +673,16 @@ class LocalSteeringEngine:
                 if idx_start < idx_end:
                     reasoning_ids = token_ids[idx_start + 1:idx_end]
                     answer_ids = token_ids[idx_end + 1:]
-                    reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True).strip()
-                    answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+                    reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                    answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
                     return reasoning_text, answer_text
         except Exception:
             pass
-        return "", self.tokenizer.decode(token_ids, skip_special_tokens=True).strip()
+        return "", self.tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
     def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15) -> Iterator[str]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
-        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
+        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty)
         generation_kwargs["streamer"] = streamer
         error_box: Dict[str, BaseException] = {}

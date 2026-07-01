@@ -14,7 +14,7 @@
 | `Chappies_Trainingspartner/` | Autonomes Training | `training_daemon.py`, `training_loop.py`, `daemon_manager.py` |
 | `config/` | Provider-, Prompt- und Modellkonfiguration | `config.py`, `root_config.py`, `brain_config.py`, `prompts.py` |
 | `deploy/` | Systemd-Services und Deployment-Scripts | `chappie-vllm.service`, `chappie-web.service`, `chappie-frontend.service`, `chappie-training.service`, `deploy_training.sh` |
-| `scripts/` | Setup, Cleanup, Backup, Validierung | `setup.sh`, `cleanup.py`, `backup_project.py`, `validate_system.py` |
+| `scripts/` | Setup, Cleanup, Backup, Validierung | `setup.sh`, `cleanup.py`, `cleanup_memory_errors.py`, `backup_project.py`, `validate_system.py` |
 | `scripts/archive/` | Veraltete Dateien (nicht aktiv genutzt) | `main_legacy.py` (altes CLI), `generate_anti_safeguard.py` (Mock-Skript) |
 | `tests/` | Lokale, Integrations- und manuelle Tests | `test_*.py`, `manual/*` |
 | `forschung/` | Alignment-Test-Harness, automatisierte Emotion/Reasoning/Ethik-Tests | `allignement_tests.py`, `session_runner.py`, `session_logger.py`, `test_fragen.md` |

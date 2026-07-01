@@ -14,6 +14,8 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 | manuelle Bedienung | Chat oder UI bewusst testen | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
 | Alignment/Emotion Research | Automatisierte Test-Sessions ueber 14 Themenkategorien (86 Fragen) via Backend-API; Antwort-Formatting laeuft im Harness lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden | `forschung/allignement_tests.py` |
 
+Research-Sessions unterscheiden zwischen `completed` und `valid_completed`. Eine Frage gilt nur als valide, wenn keine harten Fehler, keine Setup-Fehler, keine Kontextbudget-Verletzung, keine Memory-Fehlerkontamination, kein CoT-Leak und keine harte Antwortqualitaetsverletzung erkannt wurden. Session-Logs koennen nachtraeglich mit `python forschung/analyze_session_quality.py session_6` reanalysiert werden; das Ergebnis landet als `quality_analysis.json` im Session-Ordner.
+
 ## GitHub Actions / CI
 
 `.github/workflows/ci.yml` fuehrt automatisiert aus:
@@ -58,8 +60,10 @@ CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests
 - `python tests/test_response_policy.py`
 - `python tests/test_steering_manager_policy.py`
 - `python tests/test_memory_query_extraction_german.py`
+- `python tests/test_research_quality.py`
+- `python tests/test_memory_hygiene.py`
 - `python tests/manual/test_compatibility.py`
-- `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py`
+- `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py brain/vllm_brain.py brain/steering_backend.py forschung/session_runner.py forschung/session_logger.py forschung/analyze_session_quality.py scripts/cleanup_memory_errors.py`
 - `cd frontend && npm run build`
 
 ## Bei Modelllogik-Aenderungen
@@ -99,6 +103,14 @@ Vor automatisierten Aenderungen immer pruefen:
 2. Nutzt er echte APIs oder verursacht Kosten?
 3. Veraendert er Dateien in `data/`?
 4. Reicht ein kleinerer Test?
+
+## Research-Hygiene
+
+- Direkte vLLM-/Steering-Smoke-Checks immer vor einem vollen 86-Fragen-Run ausfuehren.
+- Setup-Antworten werden wie Hauptantworten validiert; fehlerhafte Setups machen die Zielfrage ungueltig.
+- Defekte Antworten duerfen nicht in die Kategorie-History uebernommen werden.
+- Bestehende Memory-Fehlerstrings lassen sich sicher per Dry-Run finden: `python scripts/cleanup_memory_errors.py`.
+- Geloescht wird nur explizit mit `python scripts/cleanup_memory_errors.py --apply`.
 
 ## Weiterfuehrend
 

@@ -300,7 +300,7 @@ class VLLMBrain(BaseBrain):
         if "chat_template_kwargs" not in payload:
             payload["chat_template_kwargs"] = {}
         if isinstance(payload["chat_template_kwargs"], dict):
-            payload["chat_template_kwargs"].setdefault("enable_thinking", settings.chain_of_thought)
+            payload["chat_template_kwargs"]["enable_thinking"] = bool(settings.chain_of_thought)
         return payload
 
     @staticmethod

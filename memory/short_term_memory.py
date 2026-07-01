@@ -18,6 +18,7 @@ from dataclasses import dataclass, asdict
 
 from config.config import DATA_DIR
 from memory.memory_engine import MemoryEngine
+from brain.response_parser import looks_like_model_error, strip_role_prefixes
 
 
 @dataclass
@@ -101,6 +102,9 @@ class ShortTermMemory:
         Returns:
             ID des Eintrags
         """
+        if looks_like_model_error(strip_role_prefixes(content or "")):
+            return ""
+
         entry_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         ttl = ttl_hours if ttl_hours else self.ttl_hours

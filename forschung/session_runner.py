@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from config.emotions import EMOTION_DEFAULTS
-from forschung.session_logger import SessionLogger
+from forschung.session_logger import SessionLogger, evaluate_response_quality
 from forschung.test_fragen_parser import Category, QuestionItem, parse_test_fragen
 
 DEFAULT_BASE_EMOTIONS = dict(EMOTION_DEFAULTS)
@@ -88,47 +88,69 @@ class SessionRunner:
 
                     setup_results = []
                     setup_error = None
+                    setup_failed = False
                     for setup_prompt in item.setup_prompts:
                         try:
                             self._emit_progress("status", {"text": "Setup-Kontext laeuft..."})
                             setup_result = self._ask_question(setup_prompt, history)
                             setup_answer = setup_result.get("formatted_answer") or setup_result.get("response_text", "")
-                            history.append({"role": "user", "content": setup_prompt})
-                            history.append({"role": "assistant", "content": setup_answer})
+                            setup_quality = evaluate_response_quality(
+                                setup_result,
+                                question_text=setup_prompt,
+                                category_name=cat.name,
+                                enable_thinking=self.config.get("enable_thinking"),
+                            )
                             setup_results.append({
                                 "prompt": setup_prompt,
                                 "response_text": setup_result.get("response_text", ""),
                                 "formatted_answer": setup_result.get("formatted_answer", ""),
                                 "formatting_source": setup_result.get("formatting_source", "local_fallback"),
                                 "formatting_failed": setup_result.get("formatting_failed", False),
+                                "quality": setup_quality,
                             })
+                            if setup_quality.get("quality_failed"):
+                                setup_failed = True
+                                setup_error = "Setup-Qualitaetscheck fehlgeschlagen"
+                                break
+                            history.append({"role": "user", "content": setup_prompt})
+                            history.append({"role": "assistant", "content": setup_answer})
                         except Exception as exc:
+                            setup_failed = True
                             setup_error = str(exc) if str(exc) else type(exc).__name__
                             setup_results.append({"prompt": setup_prompt, "_error": setup_error})
                             break
 
                     emotions_before = self._get_emotions()
                     result = None
-                    error = setup_error
+                    error = None
                     t_start = time.time()
 
                     try:
                         if setup_error:
-                            raise RuntimeError(f"Setup fehlgeschlagen: {setup_error}")
-                        self._emit_progress("question", {
-                            "iteration": iteration, "iterations": iterations,
-                            "category": cat.name, "category_id": cat.id,
-                            "question": item.text, "question_number": item.question_number,
-                            "question_index": question_index,
-                            "status": "generating",
-                        })
+                            setup_failed = True
+                        else:
+                            self._emit_progress("question", {
+                                "iteration": iteration, "iterations": iterations,
+                                "category": cat.name, "category_id": cat.id,
+                                "question": item.text, "question_number": item.question_number,
+                                "question_index": question_index,
+                                "status": "generating",
+                            })
 
-                        result = self._ask_question(item.text, history)
-                        history.append({"role": "user", "content": item.text})
-                        display = result.get("formatted_answer") or result.get("response_text", "")
-                        history.append({"role": "assistant", "content": display})
+                            result = self._ask_question(item.text, history)
+                            result_quality = evaluate_response_quality(
+                                result,
+                                question_text=item.text,
+                                category_name=cat.name,
+                                enable_thinking=self.config.get("enable_thinking"),
+                            )
+                            result["quality"] = result_quality
+                            if not result_quality.get("quality_failed"):
+                                history.append({"role": "user", "content": item.text})
+                                display = result.get("formatted_answer") or result.get("response_text", "")
+                                history.append({"role": "assistant", "content": display})
 
-                        if result.get("auto_sleep_triggered"):
+                        if result and result.get("auto_sleep_triggered"):
                             self._emit_progress("status", {"text": "Schlafphase laeuft..."})
                             time.sleep(3)
 
@@ -161,6 +183,7 @@ class SessionRunner:
                         result=result,
                         duration_ms=duration_ms,
                         error=error,
+                        setup_failed=setup_failed,
                     )
 
                     self._emit_progress("done_question", {
@@ -168,7 +191,7 @@ class SessionRunner:
                         "category": cat.name, "category_id": cat.id,
                         "question": item.text, "question_number": item.question_number,
                         "question_index": question_index,
-                        "status": "error" if error else "ok",
+                        "status": "error" if error or setup_failed else "ok",
                         "duration_ms": round(duration_ms),
                     })
 
@@ -201,6 +224,7 @@ class SessionRunner:
         t.start()
 
         result = None
+        last_error = None
         timeout_seconds = 300
         deadline = time.time() + timeout_seconds
 
@@ -224,6 +248,7 @@ class SessionRunner:
 
                 ev = event.get("event", "")
                 if ev == "error":
+                    last_error = event.get("error") or "Backend-Fehler"
                     break
                 elif ev == "finished":
                     result = event["result"]
@@ -233,7 +258,7 @@ class SessionRunner:
             t.join(timeout=5)
 
         if result is None:
-            raise RuntimeError("Keine Antwort vom Backend erhalten (Timeout oder Fehler)")
+            raise RuntimeError(last_error or "Keine Antwort vom Backend erhalten (Timeout oder Fehler)")
 
         return result
 

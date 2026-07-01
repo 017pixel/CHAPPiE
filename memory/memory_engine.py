@@ -47,7 +47,7 @@ from sentence_transformers import SentenceTransformer
 from config.config import settings, CHROMA_DB_DIR, LLMProvider
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
-from brain.response_parser import looks_like_model_error
+from brain.response_parser import looks_like_model_error, strip_role_prefixes
 from config.prompts import format_query_extraction_prompt
 
 
@@ -133,6 +133,10 @@ class MemoryEngine:
         else:
             print("   WARNUNG: Memory Engine im degradierten Modus (keine Speicherung)")
             self._init_failed = True
+
+    @staticmethod
+    def _is_memory_contaminated(content: str) -> bool:
+        return looks_like_model_error(strip_role_prefixes(content or ""))
     
     def _init_chromadb_persistent(self):
         """Versucht ChromaDB im persistenten Modus zu initialisieren."""
@@ -218,6 +222,11 @@ class MemoryEngine:
         if self.collection is None:
             if settings.debug:
                 print("   WARNUNG: Memory-Speicherung übersprungen (keine Collection)")
+            return ""
+
+        if role == "assistant" and self._is_memory_contaminated(content):
+            if settings.debug:
+                print("   WARNUNG: Assistant-Memory wegen Backend-Fehlerstring uebersprungen")
             return ""
         
         import time
@@ -613,6 +622,8 @@ class MemoryEngine:
         memories: list[Memory] = []
 
         for idx, content in enumerate(documents):
+            if self._is_memory_contaminated(str(content or "")):
+                continue
             memory_id = str(ids[idx]) if idx < len(ids) else ""
             if memory_id and memory_id in exclude_ids:
                 continue
@@ -806,6 +817,8 @@ class MemoryEngine:
                 memories = []
                 if results and results["documents"] and results["documents"][0]:
                     for i, doc in enumerate(results["documents"][0]):
+                        if self._is_memory_contaminated(str(doc or "")):
+                            continue
                         # ChromaDB gibt Cosine Distance zurueck (0-2), nicht Aehnlichkeit
                         # 0 = identisch, 1 = orthogonal, 2 = gegensaetzlich
                         distance = results["distances"][0][i] if results["distances"] else 0
@@ -1107,6 +1120,8 @@ class MemoryEngine:
         
         lines = ["=== RELEVANTE ERINNERUNGEN ==="]
         for i, mem in enumerate(memories, 1):
+            if self._is_memory_contaminated(mem.content):
+                continue
             role_label = "USER" if mem.role == "user" else "CHAPIE"
             score_percent = int(mem.relevance_score * 100)
             lines.append(f"\n[{i}] {role_label} (Relevanz: {score_percent}%)")
@@ -1125,6 +1140,8 @@ class MemoryEngine:
             "Bei Widerspruechen neuere und exaktere Treffer bevorzugen; nutze sie nicht, wenn sie nicht zur Frage passen.",
         ]
         for memory in memories:
+            if self._is_memory_contaminated(memory.content):
+                continue
             role_label = "USER" if memory.role == "user" else "CHAPPIE"
             match_type = memory.match_type or "Keyword"
             score_percent = int(min(1.0, max(0.0, memory.relevance_score)) * 100)

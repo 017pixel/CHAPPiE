@@ -99,14 +99,56 @@ def looks_like_model_error(response: str) -> bool:
     """Erkennt typische Backend-Fehlerstrings oder leere Modellantworten."""
     if not isinstance(response, str) or not response.strip():
         return True
-    stripped = response.strip()
-    error_prefixes = (
-        "Ollama Fehler",
-        "Groq Fehler",
-        "vLLM Fehler",
-        "VLLM Fehler",
+    stripped = strip_role_prefixes(response).strip()
+    lowered = stripped.lower()
+    error_markers = (
+        "ollama fehler",
+        "groq fehler",
+        "vllm fehler",
+        "steering-server fehler",
+        "stream lieferte keinen text",
+        "stream lieferte nur reasoning_content",
+        "completions.create() got an unexpected key",
+        "leere modellantwort",
+        "api lieferte keine choices",
+        "verbindungsfehler",
+        "connection error",
     )
-    return stripped.startswith(error_prefixes)
+    if any(marker in lowered for marker in error_markers):
+        return True
+    if not re.search(r"[A-Za-zÄÖÜäöüß0-9]", stripped):
+        return True
+    return False
+
+
+def strip_role_prefixes(text: str) -> str:
+    """Entfernt einfache Chat-Rollenpraefixe vor Fehler-/Qualitaetschecks."""
+    if not isinstance(text, str):
+        return ""
+    stripped = text.strip()
+    role_prefix_re = re.compile(r"^(?:CHAPP?i?E|Assistant|Assistent|Bot|AI|KI|User)\s*:\s*", re.IGNORECASE)
+    previous = None
+    while stripped and stripped != previous:
+        previous = stripped
+        stripped = role_prefix_re.sub("", stripped, count=1).strip()
+    return stripped
+
+
+def contains_cot_leak(text: str) -> bool:
+    """Erkennt sichtbare Reasoning-/Draft-Artefakte in finalen Antworten."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    patterns = (
+        r"<\s*/?\s*(think|thinking|thought|reasoning|model_reasoning|gedanke)\b",
+        r"\bDraft\s*idea\b",
+        r"\bDraftidea\b",
+        r"\bImportant\s*:\s*Keep\b",
+        r"\bReasoning\s*:\s*",
+        r"\bAnalysis\s*:\s*",
+        r"\bFinal\s*Response\s*:\s*",
+        r"\bHmm,\s*der\s+User\b",
+    )
+    return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
 
 def has_chain_of_thought_format(response: str) -> bool:

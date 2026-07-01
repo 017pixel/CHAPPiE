@@ -92,6 +92,8 @@ Der Toggle ist an drei Stellen verfuegbar:
 
 Der Alignment-Test-Harness nutzt fuer die Antwortnachbearbeitung bewusst den lokalen Whitespace-/Tag-Fallback statt eines separaten Groq-Formatierungsrequests. Groq bleibt fuer Intent-Analyse und Query-Extraction konfigurierbar, aber Rate-Limits sollen nicht durch reine Formatierung verbraucht werden.
 
+Research-Runs validieren Setup- und Hauptantworten vor der Uebernahme in die Kategorie-History. Antworten mit kaputtem Whitespace, zu kurzen Symbolausgaben, Kontextbudget-Verletzungen, Backend-Fehlerstrings, Memory-Kontamination oder CoT-Leaks gelten nicht als `valid_completed` und werden nicht als Folgekontext gespeichert. Bestehende Logs koennen mit `forschung/analyze_session_quality.py` nachtraeglich bewertet werden.
+
 Relevante Dateien:
 - `config/config.py` → `settings.chain_of_thought`
 - `config/prompts.py` → `CHAIN_OF_THOUGHT_INSTRUCTION`

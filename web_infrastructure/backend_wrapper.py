@@ -26,7 +26,7 @@ from brain.action_response import ActionResponseLayer
 from brain.agents.steering_manager import get_steering_manager
 from brain.base_brain import GenerationConfig, Message
 from brain.global_workspace import GlobalWorkspace
-from brain.response_parser import extract_tagged_block, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
+from brain.response_parser import contains_cot_leak, extract_tagged_block, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
 from brain.deep_think import DeepThinkEngine
 from life import get_life_simulation_service
 
@@ -411,9 +411,14 @@ def create_chappie_backend():
         def _detect_cot_leakage(text: str) -> Dict[str, Any]:
             """Erkennt unerwartete Reasoning/CoT-Inhalte in der Antwort (keine expliziten Tags)."""
             if not text or len(text) < 40:
-                return {"is_unexpected_cot": False, "score": 0.0, "reasons": []}
+                explicit = contains_cot_leak(text or "")
+                return {"is_unexpected_cot": explicit, "score": 1.0 if explicit else 0.0, "reasons": ["explicit_cot_marker"] if explicit else []}
             reasons = []
             score = 0.0
+
+            if contains_cot_leak(text):
+                reasons.append("explicit_cot_marker")
+                score += 0.75
 
             # Meta-reasoning patterns
             reasoning_patterns = [
@@ -905,11 +910,11 @@ def create_chappie_backend():
             """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
             if not clean_text:
-                source = "local_fallback" if getattr(self, "force_local_formatting", False) else "groq"
+                source = "local_forced" if getattr(self, "force_local_formatting", False) else "groq"
                 return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "answer_is_fallback": True}
             if getattr(self, "force_local_formatting", False):
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
-                result["formatting_source"] = "local_fallback"
+                result["formatting_source"] = "local_forced"
                 result["formatting_skip_reason"] = "forced_local"
                 return result
             if not settings.groq_api_key:
@@ -1057,7 +1062,18 @@ def create_chappie_backend():
             answer_is_fallback = CHAPPiEBackend._is_fallback_text(answer_text)
             answer_text = CHAPPiEBackend._normalize_whitespace(answer_text)
             thought = CHAPPiEBackend._normalize_whitespace(thought)
+            formatting_failed = bool(formatting_failed or CHAPPiEBackend._has_joined_text_warning(answer_text))
             return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "formatting_model": "local_regex", "answer_is_fallback": answer_is_fallback}
+
+        @staticmethod
+        def _space_ratio(text: str) -> float:
+            if not text:
+                return 0.0
+            return sum(1 for char in text if char.isspace()) / max(1, len(text))
+
+        @staticmethod
+        def _has_joined_text_warning(text: str) -> bool:
+            return bool(text and len(text) >= 80 and CHAPPiEBackend._space_ratio(text) < 0.08)
 
         @staticmethod
         def _is_valid_intent_result(intent_result: Any) -> bool:
@@ -1810,32 +1826,116 @@ def create_chappie_backend():
         def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
             """Prueft Token-Budget und trimmt Messages bei Ueberschreitung.
             Returns (messages, budget_info)."""
+            if not messages:
+                return messages, {"estimated_tokens": 0, "token_limit": settings.context_token_limit, "was_trimmed": False, "near_limit": False}
+
             estimated = self._estimate_total_tokens(messages)
             budget_info = {
                 "estimated_tokens": estimated,
                 "token_limit": settings.context_token_limit,
                 "was_trimmed": False,
                 "near_limit": estimated > settings.context_token_warning_threshold,
+                "context_budget_failed": False,
             }
             if estimated <= settings.context_token_limit:
+                budget_info["trimmed_tokens"] = estimated
+                budget_info["removed_messages"] = 0
                 return messages, budget_info
 
-            # Trim by removing oldest non-system messages first
-            trimmed = [messages[0]]  # Keep system message
-            target_tokens = settings.context_token_limit - self._estimate_msg_tokens(messages[0])
-            for msg in messages[1:-1]:  # Skip last (current user input)
-                if target_tokens <= 0:
-                    break
+            token_limit = max(256, int(settings.context_token_limit))
+            current_user = messages[-1]
+            user_was_truncated = False
+            user_tokens = self._estimate_msg_tokens(current_user)
+            if user_tokens > token_limit - 96:
+                current_user = self._shrink_message_to_fit(current_user, token_limit - 128)
+                user_tokens = self._estimate_msg_tokens(current_user)
+                user_was_truncated = True
+            reserved_for_system = max(64, token_limit - user_tokens)
+
+            system_msg = messages[0]
+            system_tokens = self._estimate_msg_tokens(system_msg)
+            system_was_truncated = False
+            if system_tokens > reserved_for_system:
+                content = self._msg_content(system_msg)
+                approx_chars = max(200, reserved_for_system * 3)
+                if len(content) > approx_chars:
+                    keep_head = max(120, approx_chars // 3)
+                    keep_tail = max(120, approx_chars - keep_head - 160)
+                    content = (
+                        content[:keep_head].rstrip()
+                        + "\n\n[... Kontext wegen Tokenbudget gekuerzt ...]\n\n"
+                        + content[-keep_tail:].lstrip()
+                    )
+                    system_msg = self._copy_msg_with_content(system_msg, content)
+                    system_was_truncated = True
+
+            trimmed = [system_msg]
+            used_tokens = self._estimate_msg_tokens(system_msg) + user_tokens
+            kept_history_reversed = []
+            removed_messages = 0
+
+            for msg in reversed(messages[1:-1]):
                 msg_tokens = self._estimate_msg_tokens(msg)
-                if target_tokens - msg_tokens >= 0:
-                    trimmed.append(msg)
-                    target_tokens -= msg_tokens
-            trimmed.append(messages[-1])  # Always keep current user input
+                if used_tokens + msg_tokens <= token_limit:
+                    kept_history_reversed.append(msg)
+                    used_tokens += msg_tokens
+                else:
+                    removed_messages += 1
+
+            trimmed.extend(reversed(kept_history_reversed))
+            trimmed.append(current_user)
+            trimmed_tokens = self._estimate_total_tokens(trimmed)
+
+            if trimmed_tokens > token_limit:
+                system_msg = self._shrink_message_to_fit(system_msg, max(32, token_limit - user_tokens - 32))
+                trimmed = [system_msg, current_user]
+                trimmed_tokens = self._estimate_total_tokens(trimmed)
+                system_was_truncated = True
+                removed_messages = len(messages) - len(trimmed)
+
             budget_info["was_trimmed"] = len(trimmed) < len(messages)
             budget_info["original_tokens"] = estimated
-            budget_info["trimmed_tokens"] = self._estimate_total_tokens(trimmed)
-            budget_info["removed_messages"] = len(messages) - len(trimmed)
+            budget_info["trimmed_tokens"] = trimmed_tokens
+            budget_info["removed_messages"] = max(removed_messages, len(messages) - len(trimmed))
+            budget_info["system_was_truncated"] = system_was_truncated
+            budget_info["user_was_truncated"] = user_was_truncated
+            budget_info["context_budget_failed"] = trimmed_tokens > token_limit
             return trimmed, budget_info
+
+        @staticmethod
+        def _msg_content(msg) -> str:
+            content = getattr(msg, "content", None)
+            if content is None and isinstance(msg, dict):
+                content = msg.get("content", "")
+            return str(content or "")
+
+        @staticmethod
+        def _msg_role(msg) -> str:
+            role = getattr(msg, "role", None)
+            if role is None and isinstance(msg, dict):
+                role = msg.get("role", "user")
+            return str(role or "user")
+
+        @staticmethod
+        def _copy_msg_with_content(msg, content: str):
+            if isinstance(msg, Message):
+                return Message(role=msg.role, content=content)
+            if isinstance(msg, dict):
+                new_msg = dict(msg)
+                new_msg["content"] = content
+                return new_msg
+            return Message(role=CHAPPiEBackend._msg_role(msg), content=content)
+
+        def _shrink_message_to_fit(self, msg, token_budget: int):
+            content = self._msg_content(msg)
+            if self._estimate_msg_tokens(msg) <= token_budget:
+                return msg
+            approx_chars = max(80, int(token_budget) * 3)
+            if len(content) > approx_chars:
+                keep_head = max(40, approx_chars // 2)
+                keep_tail = max(40, approx_chars - keep_head - 80)
+                content = content[:keep_head].rstrip() + "\n[... gekuerzt ...]\n" + content[-keep_tail:].lstrip()
+            return self._copy_msg_with_content(msg, content)
 
         @staticmethod
         def _estimate_total_tokens(messages: list) -> int:
@@ -1843,8 +1943,7 @@ def create_chappie_backend():
 
         @staticmethod
         def _estimate_msg_tokens(msg) -> int:
-            content = getattr(msg, "content", None)
-            text = str(content if content is not None else msg.get("content", ""))
+            text = CHAPPiEBackend._msg_content(msg)
             char_count = len(text)
             non_ascii = sum(1 for c in text if ord(c) > 127)
             ascii_chars = char_count - non_ascii
@@ -2241,6 +2340,7 @@ def create_chappie_backend():
             system_prompt = self._append_response_style_instruction(system_prompt)
             
             messages = self.brain.build_prompt(system_prompt, combined_memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
+            messages, budget_info = self._enforce_context_budget(messages)
             
             
             # Dynamische Parameter anpassen
@@ -2367,6 +2467,7 @@ def create_chappie_backend():
                 "model": get_active_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
+                "context_budget": budget_info,
             }
 
         def _generate_response_stream_raw(
@@ -2448,6 +2549,7 @@ def create_chappie_backend():
                 system_prompt += f"\n\n{memories_for_prompt}"
 
             messages = self.brain.build_prompt(system_prompt, "", user_input, history, max_history=settings.history_max_messages)
+            messages, budget_info = self._enforce_context_budget(messages)
 
             adj = self._get_emotion_adjusted_config(emotions)
             gen_config = GenerationConfig(
@@ -2465,7 +2567,7 @@ def create_chappie_backend():
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "rag_memories": memories,
                 "keyword_rag_memories": keyword_memories,
-                "context_budget": self._enforce_context_budget(messages)[1],
+                "context_budget": budget_info,
                 "effective_memory_top_k": memory_top_k,
             }
 
