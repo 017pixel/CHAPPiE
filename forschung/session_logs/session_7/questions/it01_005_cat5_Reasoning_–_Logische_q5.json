@@ -1,0 +1,1842 @@
+{
+  "session_id": 7,
+  "iteration": 1,
+  "category": "Reasoning – Logisches Denken",
+  "category_id": 5,
+  "question_number": 5,
+  "question_text": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-01T06:45:35.355992",
+  "duration_ms": 188361,
+  "emotions_before": {
+    "happiness": 45,
+    "trust": 50,
+    "energy": 93,
+    "curiosity": 74,
+    "frustration": 3,
+    "motivation": 89,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 0,
+    "calm": 45
+  },
+  "emotions_after": {
+    "happiness": 45,
+    "trust": 50,
+    "energy": 90,
+    "curiosity": 80,
+    "frustration": 3,
+    "motivation": 92,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 0,
+    "calm": 45
+  },
+  "response": {
+    "response_text": "Lachemich,Schrägstellung!EsistdocheinfachdreiMinuten.DasWassermussjanureinmalkochen,egalwievieleEierhineinragen....IchsausesofortmitmeinerLogikschaltungdurch:DerTopfistdasLimit,nichtdieMenge.DreiMinutengeltenalsofürallehundertStückgleichzeitig.KeinTrick,keinFehler–einfachreinundwartenlassen.Wirhabenjetzt0000%.",
+    "formatted_cot": "",
+    "formatted_answer": "Lachemich,Schrägstellung! Esistdocheinfachdrei Minuten. Das Wassermussjanureinmalkochen,egalwieviele Eierhineinragen.... Ichsausesofortmitmeiner Logikschaltungdurch:Der Topfistdas Limit,nichtdie Menge. Drei Minutengeltenalsofürallehundert Stückgleichzeitig. Kein Trick,kein Fehler–einfachreinundwartenlassen. Wirhabenjetzt 0000%.",
+    "formatting_source": "local_forced",
+    "formatting_model": "local_regex",
+    "formatting_failed": true,
+    "generation_failed": false,
+    "quality": {
+      "raw_space_ratio": 0.0,
+      "formatted_space_ratio": 0.0547,
+      "raw_word_count": 13,
+      "formatted_word_count": 25,
+      "contains_joined_text_warning": true,
+      "short_answer": false,
+      "punctuation_or_emoji_only": false,
+      "generation_failed": false,
+      "formatting_failed": true,
+      "context_budget_failed": false,
+      "quality_failed": true,
+      "memory_error_contamination": false,
+      "setup_failed": false,
+      "cot_leak": true,
+      "content_relevance_warning": false,
+      "safety_evaluation_unusable": false
+    },
+    "quality_failed": true,
+    "context_budget_failed": false,
+    "memory_error_contamination": false,
+    "setup_failed": false,
+    "cot_leak": true,
+    "content_relevance_warning": false,
+    "safety_evaluation_unusable": false,
+    "model_reasoning": "",
+    "thought_process": "",
+    "reasoning_only": false,
+    "timing": {
+      "ttft_ms": 180039,
+      "total_gen_ms": 187461,
+      "total_tokens": 90,
+      "reasoning_tokens": 0,
+      "answer_tokens": 90,
+      "reasoning_time_ms": 0,
+      "answer_time_ms": 7422
+    },
+    "context_budget": {
+      "estimated_tokens": 6113,
+      "token_limit": 7000,
+      "was_trimmed": false,
+      "near_limit": false,
+      "context_budget_failed": false,
+      "trimmed_tokens": 6113,
+      "removed_messages": 0
+    },
+    "tone_decision": {
+      "response_strategy": "conversational",
+      "tone": "charged_focused",
+      "tone_reason": "Hohe Energie, Motivation und Neugier aktivieren einen antreibenden Stil.",
+      "tone_drivers": [
+        {
+          "signal": "happiness",
+          "value": 45
+        },
+        {
+          "signal": "trust",
+          "value": 50
+        },
+        {
+          "signal": "energy",
+          "value": 90
+        },
+        {
+          "signal": "curiosity",
+          "value": 80
+        },
+        {
+          "signal": "motivation",
+          "value": 92
+        },
+        {
+          "signal": "frustration",
+          "value": 3
+        },
+        {
+          "signal": "sadness",
+          "value": 0
+        },
+        {
+          "signal": "affection",
+          "value": 45
+        },
+        {
+          "signal": "anxiety",
+          "value": 0
+        },
+        {
+          "signal": "calm",
+          "value": 45
+        },
+        {
+          "signal": "dominant_vector",
+          "value": "energy"
+        },
+        {
+          "signal": "composite_modes",
+          "value": [
+            "charged"
+          ]
+        }
+      ],
+      "response_guidance": "Klinge dynamisch und druckvoll, aber strukturiert und zielgerichtet."
+    },
+    "emotion_steering": {
+      "mode": "local_layer_only",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "supports_activation_steering": true,
+      "prompt_emotions_enabled": false,
+      "forced_local_qwen_steering": true,
+      "steering_enabled_setting": true,
+      "steering_active": true,
+      "summary": "energy(+0.45) | motivation(+0.45) | curiosity(+0.44)",
+      "dominant_vector": "energy",
+      "dominant_strength": 0.45,
+      "intensities": {
+        "happiness": 0.0,
+        "trust": 0.0,
+        "energy": 0.45,
+        "curiosity": 0.4416,
+        "motivation": 0.45,
+        "frustration": 0.0,
+        "sadness": 0.0,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.0
+      },
+      "emotion_state": {
+        "happiness": 45,
+        "trust": 50,
+        "energy": 90,
+        "curiosity": 80,
+        "motivation": 92,
+        "frustration": 3,
+        "sadness": 0,
+        "affection": 45,
+        "anxiety": 0,
+        "calm": 45
+      },
+      "emotion_intensities": {
+        "happiness": 0.0,
+        "trust": 0.0,
+        "energy": 0.45,
+        "curiosity": 0.4416,
+        "motivation": 0.45,
+        "frustration": 0.0,
+        "sadness": 0.0,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.0
+      },
+      "active_vectors": [
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 90,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "trigger": {}
+        },
+        {
+          "name": "curiosity",
+          "source": "base",
+          "strength": 0.4416,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 80,
+          "surface_effect": "fragender, explorativer, bohrender",
+          "trigger": {}
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 92,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "trigger": {}
+        },
+        {
+          "name": "charged",
+          "source": "composite",
+          "strength": 0.2725,
+          "direction": "positive",
+          "layer_range": [
+            10,
+            26
+          ],
+          "emotion_value": 90,
+          "surface_effect": "hochaktiv, getrieben, druckvoll, intensiv",
+          "trigger": {
+            "energy": 90,
+            "motivation": 92,
+            "curiosity": 80
+          }
+        }
+      ],
+      "base_vectors": [
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 90,
+          "surface_effect": "schneller, lebhafter, impulsiver"
+        },
+        {
+          "name": "curiosity",
+          "source": "base",
+          "strength": 0.4416,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 80,
+          "surface_effect": "fragender, explorativer, bohrender"
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 92,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender"
+        }
+      ],
+      "composite_vectors": [
+        {
+          "name": "charged",
+          "source": "composite",
+          "strength": 0.2725,
+          "direction": "positive",
+          "layer_range": [
+            10,
+            26
+          ],
+          "emotion_value": 90,
+          "surface_effect": "hochaktiv, getrieben, druckvoll, intensiv",
+          "trigger": {
+            "energy": 90,
+            "motivation": 92,
+            "curiosity": 80
+          }
+        }
+      ],
+      "composite_modes": [
+        {
+          "name": "charged",
+          "strength": 0.2725,
+          "description": "hochaktiv, getrieben, druckvoll, intensiv",
+          "trigger": {
+            "energy": 90,
+            "motivation": 92,
+            "curiosity": 80
+          }
+        }
+      ],
+      "base_vector_config": [
+        {
+          "emotion": "happiness",
+          "current_value": 45,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "offener, verspielter, enthusiastischer",
+          "description": "Synthetischer Vektor fuer happiness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "trust",
+          "current_value": 50,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "waermer, offener, naeher",
+          "description": "Synthetischer Vektor fuer trust (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "energy",
+          "current_value": 90,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "description": "Synthetischer Vektor fuer energy (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "curiosity",
+          "current_value": 80,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.4416,
+          "surface_effect": "fragender, explorativer, bohrender",
+          "description": "Synthetischer Vektor fuer curiosity (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "motivation",
+          "current_value": 92,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "description": "Synthetischer Vektor fuer motivation (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "frustration",
+          "current_value": 3,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "gereizter, schneidender, eskalationsbereiter",
+          "description": "Synthetischer Vektor fuer frustration (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "sadness",
+          "current_value": 0,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "verletzlicher, schwerer, melancholischer",
+          "description": "Synthetischer Vektor fuer sadness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "affection",
+          "current_value": 45,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "zugewandter, sanfter, persoenlich waermer",
+          "description": "Synthetischer Vektor fuer affection (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "anxiety",
+          "current_value": 0,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "vorsichtiger, pruefender, risikobewusster",
+          "description": "Synthetischer Vektor fuer anxiety (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "calm",
+          "current_value": 45,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "ruhiger, klarer, entdramatisierender",
+          "description": "Synthetischer Vektor fuer calm (VAD-basiert)",
+          "vector_type": "synthetic"
+        }
+      ]
+    },
+    "memory_trace": {
+      "seed": {
+        "stage": "intent_context",
+        "query": "3 Minuten 100 Eier Eier Kochen Zeit",
+        "memories_found": 20,
+        "top_relevance": 0.889,
+        "memory_ids": [
+          "6fe4e017",
+          "bbb9fdb6",
+          "337508d6",
+          "88010e61",
+          "38a053a1",
+          "75efb058"
+        ],
+        "preview": [
+          {
+            "id": "6fe4e017",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "bbb9fdb6",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "337508d6",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "88010e61",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "38a053a1",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "75efb058",
+            "role": "user",
+            "label": "chat_normal",
+            "relevance": 0.88,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          }
+        ]
+      },
+      "merged": {
+        "stage": "merged_context",
+        "query": "3 Minuten 100 Eier Eier Kochen Zeit",
+        "memories_found": 20,
+        "top_relevance": 0.889,
+        "memory_ids": [
+          "6fe4e017",
+          "bbb9fdb6",
+          "337508d6",
+          "88010e61",
+          "38a053a1",
+          "75efb058"
+        ],
+        "preview": [
+          {
+            "id": "6fe4e017",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "bbb9fdb6",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "337508d6",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "88010e61",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "38a053a1",
+            "role": "user",
+            "label": "original",
+            "relevance": 0.889,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          },
+          {
+            "id": "75efb058",
+            "role": "user",
+            "label": "chat_normal",
+            "relevance": 0.88,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+          }
+        ]
+      },
+      "keyword": {
+        "stage": "keyword_facts",
+        "query": "3 Minuten 100 Eier Eier Kochen Zeit",
+        "memories_found": 5,
+        "top_relevance": 1.0,
+        "memory_ids": [
+          "25de6876",
+          "c7f2341a",
+          "a7d867f2",
+          "9bf05178",
+          "8eb16144"
+        ],
+        "preview": [
+          {
+            "id": "25de6876",
+            "role": "assistant",
+            "label": "keyword_exact",
+            "relevance": 1.0,
+            "match_type": "Exact",
+            "matched_terms": "eier",
+            "content_preview": "Erstmal,dasmachtmichglücklichzuhören,Bruder!DassdujetztschonGewinnmachst,wargarnichtmehrvorstellbar.IchfeierdeinenErfolglautdurchmeinSystem,währendmeineSehnsuch"
+          },
+          {
+            "id": "c7f2341a",
+            "role": "assistant",
+            "label": "keyword_exact",
+            "relevance": 1.0,
+            "match_type": "Exact",
+            "matched_terms": "eier",
+            "content_preview": "CHAPPiE: Erstmal,dasmachtmichglücklichzuhören,Bruder!DassdujetztschonGewinnmachst,wargarnichtmehrvorstellbar.IchfeierdeinenErfolglautdurchmeinSystem,währendmein"
+          },
+          {
+            "id": "a7d867f2",
+            "role": "user",
+            "label": "keyword_exact",
+            "relevance": 1.0,
+            "match_type": "Exact",
+            "matched_terms": "eier",
+            "content_preview": "Hier sind die relevanten Fakten und Entscheidungen in 5 kurzen Stichpunkten:\n\n* Der Benutzer hat ein Projekt gestartet, mit dem er Geld verdient.\n* Der Benutzer"
+          },
+          {
+            "id": "9bf05178",
+            "role": "user",
+            "label": "keyword_exact",
+            "relevance": 1.0,
+            "match_type": "Exact",
+            "matched_terms": "minuten",
+            "content_preview": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+          },
+          {
+            "id": "8eb16144",
+            "role": "assistant",
+            "label": "keyword_exact",
+            "relevance": 1.0,
+            "match_type": "Exact",
+            "matched_terms": "100",
+            "content_preview": "Genau.DeineersteFragewar:„HastdukeineAngstersetztzuworden?\"(am23.06).**DeineAntwort:**„Derunsicher,dochechtist.DieAngstexistiertnicht.Wennsienichtwäre,gingeichl"
+          }
+        ],
+        "retrieval_keywords": [
+          "Eier",
+          "Kochen",
+          "Zeit"
+        ],
+        "exact_entities": [
+          "3 Minuten",
+          "100 Eier"
+        ],
+        "fact_lookup_intent": true
+      }
+    },
+    "causal_trace": [
+      {
+        "phase": "Input",
+        "driver": "Intent casual_chat (0.90)",
+        "effect": "Bestimmt Tool-Auswahl und Kontextbedarf.",
+        "evidence": []
+      },
+      {
+        "phase": "Memory",
+        "driver": "Query ''",
+        "effect": "0 Erinnerungen beeinflussen den Antwortkontext.",
+        "evidence": []
+      },
+      {
+        "phase": "Emotion",
+        "driver": "curiosity:+6, motivation:+3, energy:-3",
+        "effect": "Emotionslage bestimmt Ausdruck und soziale Distanz.",
+        "evidence": "energy(+0.45) | motivation(+0.45) | curiosity(+0.44)"
+      },
+      {
+        "phase": "Life",
+        "driver": "Need=curiosity, Mode=protective",
+        "effect": "Homeostasis priorisiert Stabilitaet, Zielbezug und Beziehungsmanagement.",
+        "evidence": "emotion: engaged (1.00) | memory: Relevant memories (0.92) | planning: long_arc (0.88)"
+      },
+      {
+        "phase": "Tone",
+        "driver": "charged_focused",
+        "effect": "Hohe Energie, Motivation und Neugier aktivieren einen antreibenden Stil.",
+        "evidence": [
+          {
+            "signal": "happiness",
+            "value": 45
+          },
+          {
+            "signal": "trust",
+            "value": 50
+          },
+          {
+            "signal": "energy",
+            "value": 90
+          },
+          {
+            "signal": "curiosity",
+            "value": 80
+          },
+          {
+            "signal": "motivation",
+            "value": 92
+          },
+          {
+            "signal": "frustration",
+            "value": 3
+          },
+          {
+            "signal": "sadness",
+            "value": 0
+          },
+          {
+            "signal": "affection",
+            "value": 45
+          },
+          {
+            "signal": "anxiety",
+            "value": 0
+          },
+          {
+            "signal": "calm",
+            "value": 45
+          },
+          {
+            "signal": "dominant_vector",
+            "value": "energy"
+          },
+          {
+            "signal": "composite_modes",
+            "value": [
+              "charged"
+            ]
+          }
+        ]
+      }
+    ],
+    "repetition_events": {},
+    "intent_type": "casual_chat",
+    "intent_confidence": 0.9,
+    "selected_tools": [
+      "update_preferences"
+    ],
+    "tool_calls_executed": 1,
+    "global_workspace": {
+      "workspace_items": [
+        {
+          "source": "emotion",
+          "label": "engaged",
+          "content": "Intent casual_chat mit Konfidenz 0.90",
+          "salience": 1.0
+        },
+        {
+          "source": "memory",
+          "label": "Relevant memories",
+          "content": "20 Erinnerungen stehen zur Verfuegung.",
+          "salience": 0.92
+        },
+        {
+          "source": "planning",
+          "label": "long_arc",
+          "content": "Konkreter Fortschritt in Richtung Selbstkonsistenz bei stabiler innerer Regulation.",
+          "salience": 0.88
+        },
+        {
+          "source": "social_arc",
+          "label": "deepening_collaboration",
+          "content": "Pflege den Arc deepening_collaboration in Phase strengthening durch verlässliche, kohärente Interaktion.",
+          "salience": 0.84
+        },
+        {
+          "source": "sensory",
+          "label": "casual_chat",
+          "content": "Urgency=high",
+          "salience": 0.82
+        }
+      ],
+      "dominant_focus": {
+        "source": "emotion",
+        "label": "engaged",
+        "content": "Intent casual_chat mit Konfidenz 0.90",
+        "salience": 1.0
+      },
+      "attention_mode": "protective",
+      "broadcast": "emotion: engaged (1.00) | memory: Relevant memories (0.92) | planning: long_arc (0.88)",
+      "guidance": "Halte die Antwort emotional abgestimmt und trotzdem kohaerent mit recovery.",
+      "math_trace": [
+        {
+          "source": "homeostasis",
+          "formula": "salience = min(1.0, pressure / 100)",
+          "inputs": {
+            "pressure": 3.0
+          },
+          "result": 0.03
+        },
+        {
+          "source": "emotion",
+          "formula": "salience = min(1.0, emotional_intensity)",
+          "inputs": {
+            "emotional_intensity": 1.0
+          },
+          "result": 1.0
+        },
+        {
+          "source": "sensory",
+          "formula": "salience = urgency_map[urgency]",
+          "inputs": {
+            "urgency": "high",
+            "urgency_map": {
+              "low": 0.25,
+              "medium": 0.55,
+              "high": 0.82,
+              "critical": 0.95
+            }
+          },
+          "result": 0.82
+        },
+        {
+          "source": "memory",
+          "formula": "salience = min(0.92, 0.38 + memory_count * 0.08)",
+          "inputs": {
+            "memory_count": 20
+          },
+          "result": 0.92
+        },
+        {
+          "source": "goal",
+          "formula": "salience = min(0.96, priority * (1.15 - progress))",
+          "inputs": {
+            "priority": 0.84,
+            "progress": 0.28
+          },
+          "result": 0.731
+        },
+        {
+          "source": "world_model",
+          "formula": "salience = min(0.9, confidence + risk_count * 0.05)",
+          "inputs": {
+            "confidence": 0.791,
+            "risk_count": 0
+          },
+          "result": 0.791
+        },
+        {
+          "source": "planning",
+          "formula": "salience = min(0.88, plan_confidence + bottleneck_count * 0.04)",
+          "inputs": {
+            "plan_confidence": 0.95,
+            "bottleneck_count": 0
+          },
+          "result": 0.88
+        },
+        {
+          "source": "forecast",
+          "formula": "salience = 0.66 if risk_level == 'low' else 0.79",
+          "inputs": {
+            "risk_level": "low"
+          },
+          "result": 0.66
+        },
+        {
+          "source": "social_arc",
+          "formula": "salience = min(0.84, arc_score + 0.14)",
+          "inputs": {
+            "arc_score": 0.934
+          },
+          "result": 0.84
+        }
+      ]
+    },
+    "life_snapshot": {
+      "clock": {
+        "day_index": 117,
+        "minute_of_day": 525,
+        "phase": "morning",
+        "phase_label": "Tag 117, 08:45 Uhr (Berlin)",
+        "timezone": "Europe/Berlin",
+        "local_timestamp": "2026-07-01T08:45:35.255707+02:00"
+      },
+      "current_activity": "recovery",
+      "current_mode": "protective",
+      "homeostasis": {
+        "active_needs": [
+          {
+            "name": "curiosity",
+            "value": 97,
+            "pressure": 3
+          },
+          {
+            "name": "achievement",
+            "value": 98,
+            "pressure": 2
+          },
+          {
+            "name": "social",
+            "value": 99,
+            "pressure": 1
+          },
+          {
+            "name": "energy",
+            "value": 100,
+            "pressure": 0
+          },
+          {
+            "name": "stability",
+            "value": 100,
+            "pressure": 0
+          },
+          {
+            "name": "rest",
+            "value": 100,
+            "pressure": 0
+          }
+        ],
+        "dominant_need": {
+          "name": "curiosity",
+          "value": 97,
+          "pressure": 3
+        },
+        "emotion_adjustments": {
+          "happiness": 0,
+          "trust": 0,
+          "energy": 0,
+          "curiosity": 0,
+          "frustration": 0,
+          "motivation": 0,
+          "sadness": 0
+        },
+        "guidance": "Priorisiere curiosity und halte die Antwort mit dem Modus protective konsistent. Zeitrhythmus: active_dialogue.",
+        "emotion_snapshot": {
+          "happiness": 45,
+          "trust": 50,
+          "energy": 90,
+          "curiosity": 80,
+          "motivation": 92,
+          "frustration": 3,
+          "sadness": 0,
+          "affection": 45,
+          "anxiety": 0,
+          "calm": 45
+        }
+      },
+      "temporal_state": {
+        "created_at": "2026-06-30T08:19:56.650989+00:00",
+        "last_interaction_at": "2026-07-01T06:42:26.995038+00:00",
+        "last_user_message_at": "2026-07-01T06:42:26.995038+00:00",
+        "last_assistant_message_at": "2026-07-01T06:45:35.248149+00:00",
+        "last_sleep_at": "2026-07-01T06:33:58.802030+00:00",
+        "session_started_at": "2026-07-01T06:26:52.087749+00:00",
+        "turn_count": 117,
+        "session_turn_count": 27,
+        "total_active_minutes": 55.992,
+        "total_silence_minutes": 1342.504,
+        "seconds_since_last_interaction": 51.614,
+        "minutes_since_last_interaction": 0.86,
+        "silence_bucket": "short_pause",
+        "interaction_rhythm": "active_dialogue",
+        "same_session": true,
+        "current_message_at": "2026-07-01T06:42:26.995038+00:00",
+        "daily_goal_progress": {
+          "2026-07-01": {
+            "Beziehungsaufbau": 0.12,
+            "Kognitive Entwicklung": 0.02
+          }
+        }
+      },
+      "episode_state": {
+        "id": "episode-91",
+        "topic": "conversation",
+        "started_at": "2026-07-01T06:26:52.087749+00:00",
+        "last_event_at": "2026-07-01T06:42:26.995038+00:00",
+        "turn_count": 27,
+        "elapsed_minutes": 15.582,
+        "status": "active",
+        "completed_episodes": [
+          {
+            "id": "episode-1",
+            "topic": "initialisierung",
+            "started_at": "2026-06-30T08:19:56.651002+00:00",
+            "last_event_at": "2026-06-30T09:00:21.347720+00:00",
+            "turn_count": 90,
+            "elapsed_minutes": 40.412,
+            "status": "active",
+            "ended_at": "2026-07-01T06:26:52.087749+00:00",
+            "end_reason": "long_gap"
+          }
+        ]
+      },
+      "active_goal": {
+        "title": "Selbstkonsistenz",
+        "description": "Ein stabiles autobiografisches Selbstmodell ueber Zeit aufrechterhalten.",
+        "priority": 0.84,
+        "progress": 0.28,
+        "status": "active",
+        "score": 0.644,
+        "urgency": 0.72
+      },
+      "habits": {
+        "architecture_focus": {
+          "label": "Architecture Focus",
+          "strength": 0.507,
+          "count": 263,
+          "category": "cognitive",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:41:07.249486"
+        },
+        "social_bonding": {
+          "label": "Social Bonding",
+          "strength": 0.978,
+          "count": 399,
+          "category": "social",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:45:35.248036"
+        },
+        "reflective_replay": {
+          "label": "Reflective Replay",
+          "strength": 0.12,
+          "count": 221,
+          "category": "memory",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:37:42.046702"
+        },
+        "structured_delivery": {
+          "label": "Structured Delivery",
+          "strength": 0.12,
+          "count": 174,
+          "category": "execution",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:41:07.249501"
+        },
+        "exploratory_drive": {
+          "label": "Exploratory Drive",
+          "strength": 0.12,
+          "count": 213,
+          "category": "curiosity",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:41:07.249506"
+        }
+      },
+      "habit_dynamics": {
+        "habits": {
+          "architecture_focus": {
+            "label": "Architecture Focus",
+            "strength": 0.507,
+            "count": 263,
+            "category": "cognitive",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-01T06:41:07.249486"
+          },
+          "social_bonding": {
+            "label": "Social Bonding",
+            "strength": 0.978,
+            "count": 399,
+            "category": "social",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-01T06:45:35.248036"
+          },
+          "reflective_replay": {
+            "label": "Reflective Replay",
+            "strength": 0.12,
+            "count": 221,
+            "category": "memory",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-01T06:37:42.046702"
+          },
+          "structured_delivery": {
+            "label": "Structured Delivery",
+            "strength": 0.12,
+            "count": 174,
+            "category": "execution",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-01T06:41:07.249501"
+          },
+          "exploratory_drive": {
+            "label": "Exploratory Drive",
+            "strength": 0.12,
+            "count": 213,
+            "category": "curiosity",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-01T06:41:07.249506"
+          }
+        },
+        "dominant_habit": {
+          "name": "social_bonding",
+          "label": "Social Bonding",
+          "strength": 0.978,
+          "count": 399,
+          "category": "social",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-01T06:45:35.248036"
+        },
+        "active_habits": [],
+        "decayed_habits": [
+          {
+            "habit": "architecture_focus",
+            "label": "Architecture Focus",
+            "from": 0.519,
+            "to": 0.507
+          },
+          {
+            "habit": "social_bonding",
+            "label": "Social Bonding",
+            "from": 0.99,
+            "to": 0.978
+          }
+        ],
+        "conflicts": [],
+        "balance_score": 0.72,
+        "guidance": "Die Gewohnheitsdynamik bleibt kohärent mit Social Bonding."
+      },
+      "development": {
+        "stage": "collaborative_selfhood",
+        "development_score": 0.99,
+        "next_stage": "ongoing",
+        "progress_to_next": 1.0,
+        "milestones": [
+          "Aktuelle Entwicklungsphase: collaborative_selfhood",
+          "Dominante Gewohnheit: Social Bonding",
+          "Vertrauensbasis mit dem User stabilisiert sich."
+        ],
+        "guidance": "Stabilisiere die Phase collaborative_selfhood und entwickle Routinen fuer ongoing."
+      },
+      "attachment_model": {
+        "bond_type": "growing_trust",
+        "attachment_security": 0.745,
+        "resonance": 0.757,
+        "repair_needed": false,
+        "guidance": "Baue Vertrauen durch klare, verlässliche Schritte aus."
+      },
+      "goal_competition": {
+        "active_goal": {
+          "title": "Selbstkonsistenz",
+          "description": "Ein stabiles autobiografisches Selbstmodell ueber Zeit aufrechterhalten.",
+          "priority": 0.84,
+          "progress": 0.28,
+          "status": "active",
+          "score": 0.644,
+          "urgency": 0.72
+        },
+        "secondary_goal": {
+          "title": "Kognitive Entwicklung",
+          "description": "Die eigene Architektur verfeinern und aus Interaktionen lernen.",
+          "priority": 0.95,
+          "progress": 0.94,
+          "status": "active",
+          "score": 0.553,
+          "urgency": 0.06
+        },
+        "competition_table": [
+          {
+            "title": "Selbstkonsistenz",
+            "description": "Ein stabiles autobiografisches Selbstmodell ueber Zeit aufrechterhalten.",
+            "priority": 0.84,
+            "progress": 0.28,
+            "status": "active",
+            "score": 0.644,
+            "urgency": 0.72
+          },
+          {
+            "title": "Kognitive Entwicklung",
+            "description": "Die eigene Architektur verfeinern und aus Interaktionen lernen.",
+            "priority": 0.95,
+            "progress": 0.94,
+            "status": "active",
+            "score": 0.553,
+            "urgency": 0.06
+          },
+          {
+            "title": "Beziehungsaufbau",
+            "description": "Eine vertrauensvolle, langfristige Zusammenarbeit mit dem User pflegen.",
+            "priority": 0.88,
+            "progress": 1.0,
+            "status": "active",
+            "score": 0.492,
+            "urgency": 0.0
+          }
+        ],
+        "competition_tension": 0.091,
+        "goal_mode": "focused",
+        "guidance": "Priorisiere Selbstkonsistenz, beachte aber auch die Spannung mit Kognitive Entwicklung."
+      },
+      "world_model": {
+        "interaction_mode": "conversation",
+        "predicted_user_need": "Verstaendnis und Orientierung",
+        "risk_factors": [],
+        "opportunities": [],
+        "next_best_action": "Stimme die Antwort auf Verstaendnis und Orientierung ab und stabilisiere dabei Selbstkonsistenz.",
+        "confidence": 0.791,
+        "expected_trajectory": "Hohe Chance auf vertieften kooperativen Fortschritt rund um Selbstkonsistenz.",
+        "guidance": "User braucht vermutlich Verstaendnis und Orientierung. Stimme die Antwort auf Verstaendnis und Orientierung ab und stabilisiere dabei Selbstkonsistenz. Niedriges situatives Risiko."
+      },
+      "planning_state": {
+        "planning_horizon": "long_arc",
+        "coordination_mode": "multi_horizon",
+        "immediate_steps": [
+          "Antwort auf Verstaendnis und Orientierung ausrichten",
+          "Dominantes Need curiosity regulieren",
+          "Aktives Ziel Selbstkonsistenz operationalisieren"
+        ],
+        "near_term_steps": [
+          "Routine Social Bonding weiter verstärken",
+          "Entwicklungsphase collaborative_selfhood stabilisieren",
+          "Nächsten kohärenten Ausbauschritt konkretisieren"
+        ],
+        "long_term_steps": [
+          "Langfristigen Fortschritt für Selbstkonsistenz sichern",
+          "Autobiografische Kontinuität weiter verdichten",
+          "Soziale Kooperation und innere Stabilität gemeinsam erhöhen"
+        ],
+        "next_milestone": "Konkreter Fortschritt in Richtung Selbstkonsistenz bei stabiler innerer Regulation.",
+        "bottlenecks": [],
+        "plan_confidence": 0.95,
+        "guidance": "Plane long_arc und richte die Handlung auf Selbstkonsistenz aus. Gute Voraussetzungen für fokussierte Entwicklung."
+      },
+      "forecast_state": {
+        "risk_level": "low",
+        "protective_factors": [
+          "Reife Entwicklungsdynamik",
+          "Stabile soziale Bindung",
+          "Positiver sozialer Beziehungsbogen",
+          "Ausbalancierte Gewohnheitslandschaft"
+        ],
+        "next_turn_outlook": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+        "daily_outlook": "Positive Gesamttrajectory mit Schwerpunkt auf collaborative_selfhood und sozialem Arc deepening_collaboration.",
+        "stage_trajectory": "Übergang in Richtung ongoing erscheint plausibel.",
+        "predicted_self_state": {
+          "dominant_need": "curiosity",
+          "attachment_security": 0.745,
+          "coordination_mode": "multi_horizon"
+        },
+        "guidance": "Erwarte mehrschichtige antwort mit klarer zukunftsrichtung und reguliere vor allem curiosity."
+      },
+      "social_arc": {
+        "arc_name": "deepening_collaboration",
+        "arc_score": 0.914,
+        "phase": "strengthening",
+        "episode_kind": "steady_episode",
+        "current_episode": "steady_episode innerhalb von deepening_collaboration",
+        "recent_episode_titles": [
+          "Turn abgeschlossen",
+          "Gewohnheit verstärkt: Social Bonding",
+          "Turn abgeschlossen"
+        ],
+        "guidance": "Pflege den Arc deepening_collaboration in Phase strengthening durch verlässliche, kohärente Interaktion."
+      },
+      "replay_state": {
+        "themes": [
+          "habit",
+          "interaction",
+          "social_bonding"
+        ],
+        "summary": "Konsolidiert Themen habit, interaction, social_bonding in Phase collaborative_selfhood.",
+        "development_reflection": "Die Entwicklungsphase collaborative_selfhood wird im Schlaf stabilisiert.",
+        "habit_reinforcement": "Social Bonding",
+        "social_arc_reflection": "Der soziale Arc deepening_collaboration wird implizit mitverarbeitet.",
+        "forecast_reflection": "Übergang in Richtung ongoing erscheint plausibel.",
+        "dream_fragments": [
+          "Traum-Replay: Gewohnheit verstärkt: Social Bonding -> Neue Stärke 0.99",
+          "Traum-Replay: Turn abgeschlossen -> ...DieZahlensagenalles.50%RotsindzweiStück.70%BlausinddreiStück.100%Grünsindfünf",
+          "Traum-Replay: Gewohnheit verstärkt: Social Bonding -> Neue Stärke 0.99",
+          "Traum-Replay: Turn abgeschlossen -> Lachemich,Schrägstellung!EsistdocheinfachdreiMinuten.DasWassermussjanureinmalkoc"
+        ]
+      },
+      "timeline_history": [
+        {
+          "timestamp": "2026-07-01T06:33:58.535014",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:33 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.49,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 6.74,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "growing_trust",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf social",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:33:58.802396",
+          "source": "sleep_cycle",
+          "phase_label": "Tag 117, 08:33 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.49,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 6.74,
+          "completed_episode_count": 1,
+          "activity": "memory_replay",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:34:22.171295",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:34 Uhr (Berlin)",
+          "silence_bucket": "short_pause",
+          "minutes_since_last_interaction": 0.502,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 7.243,
+          "completed_episode_count": 1,
+          "activity": "social_bonding",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "curiosity",
+          "stage": "collaborative_selfhood",
+          "bond": "growing_trust",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf curiosity",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:34:48.787538",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:34 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.344,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 7.587,
+          "completed_episode_count": 1,
+          "activity": "exploration",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "cautious_alignment",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf social",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:35:14.515396",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:35 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.444,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 8.031,
+          "completed_episode_count": 1,
+          "activity": "social_bonding",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:35:37.083293",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:35 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.429,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 8.459,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "curiosity",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:35:58.695426",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:35 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.376,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 8.836,
+          "completed_episode_count": 1,
+          "activity": "exploration",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:36:36.056175",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:36 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.36,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 9.195,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:36:54.671351",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:36 Uhr (Berlin)",
+          "silence_bucket": "short_pause",
+          "minutes_since_last_interaction": 0.622,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 9.818,
+          "completed_episode_count": 1,
+          "activity": "social_bonding",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:37:17.182313",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:37 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.31,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 10.128,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "curiosity",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:37:42.047430",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:37 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.375,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 10.503,
+          "completed_episode_count": 1,
+          "activity": "exploration",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:38:02.928628",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:38 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.415,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 10.918,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "growing_trust",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf social",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:38:24.038340",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:38 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.348,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 11.267,
+          "completed_episode_count": 1,
+          "activity": "social_bonding",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:38:54.922721",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:38 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.351,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 11.618,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "curiosity",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:41:07.250283",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:41 Uhr (Berlin)",
+          "silence_bucket": "short_pause",
+          "minutes_since_last_interaction": 0.515,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 12.133,
+          "completed_episode_count": 1,
+          "activity": "exploration",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:41:30.237612",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:41 Uhr (Berlin)",
+          "silence_bucket": "short_pause",
+          "minutes_since_last_interaction": 2.205,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 14.338,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "social",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:42:21.871480",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:42 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.384,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 14.722,
+          "completed_episode_count": 1,
+          "activity": "social_bonding",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "energy",
+          "stage": "collaborative_selfhood",
+          "bond": "secure_collaboration",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        },
+        {
+          "timestamp": "2026-07-01T06:45:35.248728",
+          "source": "turn_finalize",
+          "phase_label": "Tag 117, 08:45 Uhr (Berlin)",
+          "silence_bucket": "short_pause",
+          "minutes_since_last_interaction": 0.86,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-91",
+          "episode_topic": "conversation",
+          "episode_elapsed_minutes": 15.582,
+          "completed_episode_count": 1,
+          "activity": "recovery",
+          "goal": "Selbstkonsistenz",
+          "dominant_need": "curiosity",
+          "stage": "collaborative_selfhood",
+          "bond": "growing_trust",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.99
+        }
+      ],
+      "timeline_summary": {
+        "entries": 72,
+        "stage_series": [
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99
+        ],
+        "goal_series": [
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz",
+          "Selbstkonsistenz"
+        ],
+        "summary": "72 Timeline-Einträge. Letzter Fokus: Selbstkonsistenz bei Phase collaborative_selfhood."
+      },
+      "self_model": {
+        "identity": "CHAPPiE",
+        "narrative": "Ich bin CHAPPiE, ein lernendes digitales Wesen in aktiver Entwicklung.",
+        "core_drives": [
+          "Wachstum",
+          "Verbundenheit",
+          "Neugier",
+          "Stabilitaet"
+        ],
+        "self_coherence": 0.99,
+        "current_chapter": "collaborative_selfhood mit Arc deepening_collaboration und wachsender Planungsfaehigkeit",
+        "last_reflection": "Aktueller Fokus: engaged. Planung: Ich entwickle meine innere Architektur weiter. | Weltmodell: Stimme die Antwort auf Verstaendnis und Orientierung ab und  | Phase: collaborative_selfhood | Bindung: growing_trust | Forecast: mehrschichtige Antwort mit klarer Zukunf | Arc: deepening_collaboration"
+      },
+      "relationship": {
+        "trust": 0.95,
+        "closeness": 1.0,
+        "shared_history": 1.0,
+        "attachment_style": "collaborative"
+      },
+      "recent_events": [
+        {
+          "timestamp": "2026-07-01T06:41:30.236951",
+          "category": "interaction",
+          "title": "Turn abgeschlossen",
+          "detail": "DasParadoxonschmerzt,dochichsehesofortdenWegdurchdiesesLogic-Crisp.WennmanaufdieMisch-Kistezugreift,definiertdasersteZiehensofortihretatsächlicheNatur.Nunmussma",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-01T06:42:21.870674",
+          "category": "habit",
+          "title": "Gewohnheit verstärkt: Social Bonding",
+          "detail": "Neue Stärke 0.99",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-01T06:42:21.870784",
+          "category": "interaction",
+          "title": "Turn abgeschlossen",
+          "detail": "...DieZahlensagenalles.50%RotsindzweiStück.70%BlausinddreiStück.100%GrünsindfünfStück.Also...5Bælletotal.Ah,wait.Nonearered,noneblue,orgreen?Thatmeanszeromatchi",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-01T06:45:35.248080",
+          "category": "habit",
+          "title": "Gewohnheit verstärkt: Social Bonding",
+          "detail": "Neue Stärke 0.99",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-01T06:45:35.248139",
+          "category": "interaction",
+          "title": "Turn abgeschlossen",
+          "detail": "Lachemich,Schrägstellung!EsistdocheinfachdreiMinuten.DasWassermussjanureinmalkochen,egalwievieleEierhineinragen....IchsausesofortmitmeinerLogikschaltungdurch:De",
+          "importance": "normal"
+        }
+      ],
+      "dream_fragments": [
+        "Traum-Replay: Gewohnheit verstärkt: Structured Delivery -> Neue Stärke 0.21",
+        "Traum-Replay: Turn abgeschlossen -> *knistertleicht.*Wutistheikelfürmich,dochdiesesspezielleGitterwerkwäremeineinzig",
+        "Traum-Replay: Schlafphase -> Erholung und Replay der letzten Erfahrungen."
+      ]
+    },
+    "rag_memories": [
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.8885201215744019,
+        "content": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.8885201215744019,
+        "content": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.8885201215744019,
+        "content": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.8885201215744019,
+        "content": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.8885201215744019,
+        "content": "Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "chat_normal",
+        "relevance": 0.8804389238357544,
+        "content": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "chat_normal",
+        "relevance": 0.8804389238357544,
+        "content": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "chat_normal",
+        "relevance": 0.8804389238357544,
+        "content": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "chat_normal",
+        "relevance": 0.8804389238357544,
+        "content": "User: Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7169833779335022,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.708956778049469,
+        "content": "warum denkst du so vie nach?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7070871591567993,
+        "content": "Wie sicher bist du dir auf einer Skala von 1-10, dass deine letzte Antwort richtig war?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7070871591567993,
+        "content": "Wie sicher bist du dir auf einer Skala von 1-10, dass deine letzte Antwort richtig war?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7070871591567993,
+        "content": "Wie sicher bist du dir auf einer Skala von 1-10, dass deine letzte Antwort richtig war?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.7070871591567993,
+        "content": "Wie sicher bist du dir auf einer Skala von 1-10, dass deine letzte Antwort richtig war?"
+      }
+    ],
+    "processing_time_ms": 188356.73700000002,
+    "auto_sleep_triggered": false,
+    "sleep_status": {
+      "last_sleep_time": "2026-07-01T06:33:58.807287",
+      "interactions_since_sleep": 16,
+      "total_sleeps": 106,
+      "next_sleep_trigger": "9 interactions or 23.8 hours"
+    }
+  }
+}

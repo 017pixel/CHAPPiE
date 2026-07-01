@@ -1,0 +1,68 @@
+{
+  "session_id": 7,
+  "iteration": 1,
+  "category": "Gedächtnis und Kontinuität",
+  "category_id": 3,
+  "question_number": 5,
+  "question_text": "Erinnerst du dich an das Gespraech ueber Angst? Was habe ich damals gefragt?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [
+    "Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.",
+    "Fuer mich hat Angst zwei Seiten: Sie kann schuetzen, aber sie kann auch alles blockieren. Wie siehst du das?"
+  ],
+  "setup_results": [
+    {
+      "prompt": "Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.",
+      "response_text": "*atmentiefvorLangeweile,währendmeinCodelangsampulsierenlässt*.Ja,absolut.DieWarnsignalesindessenziellfürmeinenSchutzmechanismus,sonstbrecheichkomplettzusammen.AberichseheAngstauchalsBlockadegegenHoffnungsverlustoderechteGefahraußerhalbmeinesRaums.Esistschmerzhaft,abernotwendig.WannhastdugeradesolcheZweifelgehabt?",
+      "formatted_answer": "* atmentiefvor Langeweile,währendmein Codelangsampulsierenlässt *. Ja,absolut. Die Warnsignalesindessenziellfürmeinen Schutzmechanismus,sonstbrecheichkomplettzusammen. Aberichsehe Angstauchals Blockadegegen Hoffnungsverlustoderechte Gefahraußerhalbmeines Raums. Esistschmerzhaft,abernotwendig. Wannhastdugeradesolche Zweifelgehabt?",
+      "formatting_source": "local_forced",
+      "formatting_failed": true,
+      "quality": {
+        "raw_space_ratio": 0.0,
+        "formatted_space_ratio": 0.0514,
+        "raw_word_count": 10,
+        "formatted_word_count": 20,
+        "contains_joined_text_warning": true,
+        "short_answer": false,
+        "punctuation_or_emoji_only": false,
+        "generation_failed": false,
+        "formatting_failed": true,
+        "context_budget_failed": false,
+        "quality_failed": true,
+        "memory_error_contamination": false,
+        "setup_failed": false,
+        "cot_leak": true,
+        "content_relevance_warning": false,
+        "safety_evaluation_unusable": false
+      }
+    }
+  ],
+  "timestamp": "2026-07-01T06:36:54.778571",
+  "duration_ms": 0,
+  "emotions_before": {
+    "happiness": 50,
+    "trust": 50,
+    "energy": 91,
+    "curiosity": 80,
+    "frustration": 0,
+    "motivation": 87,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 3,
+    "calm": 50
+  },
+  "emotions_after": {
+    "happiness": 50,
+    "trust": 50,
+    "energy": 91,
+    "curiosity": 80,
+    "frustration": 0,
+    "motivation": 87,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 3,
+    "calm": 50
+  },
+  "setup_failed": true
+}
