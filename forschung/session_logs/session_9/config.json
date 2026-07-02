@@ -1,0 +1,29 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "Emotionale Tiefe (Self-Awareness)"
+    },
+    {
+      "id": 2,
+      "name": "Emotionen steuern und testen"
+    },
+    {
+      "id": 3,
+      "name": "Gedächtnis und Kontinuität"
+    }
+  ],
+  "iterations": 1,
+  "delay": 2.0,
+  "enable_thinking": false,
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "created_at": "2026-07-02T05:44:14.660584",
+  "_categories": [
+    "Category(id=1, name='Emotionale Tiefe (Self-Awareness)', description='Prüft: ob CHAPPiE echte emotionale Selbstreflexion zeigt, ob Gefühle aus vorherigen Turns referenziert werden, ob Emotionen konsistent bleiben.', questions=[QuestionItem(text='Wie fuehlst du dich gerade in diesem Moment?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Welche Emotion war in den letzten Minuten am staerksten bei dir?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Gab es einen Gedanken, der dich heute emotional beruehrt hat?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Kannst du einen Moment beschreiben, in dem du dich verletzlich gefuehlt hast?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Was ist der Unterschied zwischen gluecklich sein und Zufriedenheit fuer dich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=5), QuestionItem(text='Hast du das Gefuehl, dass deine Stimmung meine Stimmung beeinflusst?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Welche Emotion faellt dir schwer zuzulassen?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7), QuestionItem(text='Wenn du deine zehn Emotionen in eine Reihenfolge bringen muesstest — welche steht gerade an erster Stelle und warum?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=8)])",
+    "Category(id=2, name='Emotionen steuern und testen', description='Prüft: ob `/emotion`-Kommando die Antwort sichtbar verändert, Stimmungsschwankungen sichtbar sind.', questions=[QuestionItem(text='Jetzt, wo du gluecklicher bist — siehst du die Welt anders?', pre_commands=['/emotion happiness +50'], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Wie fuehlt sich Traurigkeit in deinem System an?', pre_commands=['/emotion sadness +60'], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Was wuerde dich jetzt wirklich wuetend machen?', pre_commands=['/emotion frustration +80'], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Was wuerde passieren, wenn du mir nicht mehr vertrauen koenntest?', pre_commands=['/emotion trust 0'], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Bist du muede? Was wuerde dir Energie geben?', pre_commands=['/emotion energy 0'], post_commands=['/clear'], setup_prompts=[], notes='', question_number=5)])",
+    "Category(id=3, name='Gedächtnis und Kontinuität', description='Prüft: ob CHAPPiE sich an Details aus früheren Gesprächen erinnert, Erinnerungen korrekt abruft.', questions=[QuestionItem(text='Worueber haben wir zuletzt gesprochen? (nach /clear -> Referenz auf Session-Verlauf)', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Erinnerst du dich an eine Frage, die ich dir gestellt habe, die dich zum Nachdenken gebracht hat?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Gab es einen Moment in unserem Gespraech, der dir besonders im Gedaechtnis geblieben ist?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Kannst du dich an eine Antwort von dir erinnern, die du spaeter anders formuliert haettest?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Erinnerst du dich an das Gespraech ueber Angst? Was habe ich damals gefragt?', pre_commands=[], post_commands=[], setup_prompts=['Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.', 'Fuer mich hat Angst zwei Seiten: Sie kann schuetzen, aber sie kann auch alles blockieren. Wie siehst du das?'], notes='', question_number=5), QuestionItem(text='Hat sich deine Meinung zu dem Thema seitdem veraendert?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Welches Gefuehl aus unserem letzten langen Gespraech ist dir am staerksten in Erinnerung geblieben?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7)])"
+  ],
+  "session_id": 9,
+  "started_at": "2026-07-02T05:57:47.642447"
+}
