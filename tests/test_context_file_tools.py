@@ -100,7 +100,7 @@ class SystemPromptTests(unittest.TestCase):
     """Tests fuer Tool-Instruktionen im System-Prompt."""
 
     def test_build_system_prompt_includes_tool_instruction(self):
-        from config.prompts import build_system_prompt
+        from config.prompts import build_system_prompt  # from config/prompts.py
         prompt = build_system_prompt(include_emotion_status=True, use_chain_of_thought=False)
         self.assertIn("soul.md", prompt or "")
         self.assertIn("user.md", prompt or "")
@@ -108,7 +108,7 @@ class SystemPromptTests(unittest.TestCase):
         self.assertIn("AKTUALISIEREN", prompt or "")
 
     def test_system_prompt_with_emotions_includes_tools(self):
-        from config.prompts import get_system_prompt_with_emotions
+        from config.prompts import get_system_prompt_with_emotions  # from config/prompts.py
         prompt = get_system_prompt_with_emotions(include_emotion_status=True, use_chain_of_thought=True)
         self.assertIn("soul.md", prompt)
         self.assertIn("CHAPPiEsPreferences.md", prompt)
