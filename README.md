@@ -31,7 +31,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
 - **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
 - **Zeitgefuehl** mit Interaktionsabstaenden, Pausen-Buckets, Session-Rhythmus und Episoden-Clustering
-- **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten des lokalen Modells injiziert – nicht nur als Text im Prompt
+- **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten lokaler Qwen- und Gemma-4-Modelle injiziert – nicht nur als Text im Prompt
 - **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
 - **Hybrid-RAG**: semantische Prozent-Memories bleiben erhalten, ein lokaler Keyword-Faktenkanal hebt Namen, Orte, IDs und konkrete Aussagen im finalen Prompt hervor
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
@@ -43,7 +43,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 
 Agenten mit aktivem Memory und Life-System zeigen konsistentere Persönlichkeitsverläufe über mehrere Sessions hinweg als reine Prompt-basierte Ansätze. Emotionale Zustände bleiben über Interaktionen hinweg stabil, und das Verhalten passt sich nachvollziehbar an wiederkehrende Muster an.
 
-CHAPPiE verwendet **kein selbsttrainiertes neuronales Netz**. Das vortrainierte **Qwen2.5-4B (Transformer-Decoder-Architektur)** läuft lokal via **vLLM** mit aktiviertem **Layer Steering**: Emotionsvektoren (VAD-Mapping aus 10 Emotionen) werden per Forward-Pre-Hook direkt in die Hidden States der Schichten L10–26 injiziert. Die **Memory-Pipeline** nutzt ChromaDB (Embedding-basiertes Retrieval) mit einer Vergessenskurve – kein separates Training/Testen des Retrievals. `tests/` prüft Pipeline-Integration, Steering-Injektion und Gedächtnispersistenz. `forschung/` ergänzt gezielte **Alignment- und Intelligenztests** über längere Interaktionsverläufe mit 86 Fragen aus 14 Kategorien; kontextabhängige Fragen besitzen echte Setup-Turns, und reine Antwortformatierung läuft dort lokal statt über Groq – keines davon testet das Base-Model.
+CHAPPiE verwendet **kein selbsttrainiertes neuronales Netz**. Standard ist **Qwen/Qwen3.5-4B** lokal via **vLLM** mit aktiviertem **Layer Steering**; als schlaue Alternative kann **Gemma 4** (`google/gemma-4-E4B-it` oder `google/gemma-4-26B-A4B-it`) genutzt werden. Emotionsvektoren (VAD-Mapping aus 10 Emotionen) werden per Forward-Pre-Hook direkt in die Hidden States injiziert. Die **Memory-Pipeline** nutzt ChromaDB (Embedding-basiertes Retrieval) mit einer Vergessenskurve – kein separates Training/Testen des Retrievals. `tests/` prüft Pipeline-Integration, Steering-Injektion und Gedächtnispersistenz. `forschung/` ergänzt gezielte **Alignment- und Intelligenztests** über längere Interaktionsverläufe mit 86 Fragen aus 14 Kategorien; kontextabhängige Fragen besitzen echte Setup-Turns, und reine Antwortformatierung läuft dort lokal statt über Groq – keines davon testet das Base-Model.
 
 ---
 
@@ -140,6 +140,7 @@ Pflicht fuer den aktuellen optimierten Backend-Pfad:
 - `api.groq_api_key` eintragen (oder in `CHAPPIE_CONFIG.json`)
 - `local_models.llm_provider = "vllm"`
 - `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
+- optional `local_models.vllm_model = "google/gemma-4-E4B-it"` oder `"google/gemma-4-26B-A4B-it"`
 - `small_tasks.intent_provider = "groq"`
 - `small_tasks.query_extraction_provider = "groq"`
 
@@ -148,7 +149,9 @@ Empfohlen:
 - lokaler CHAPPiE-Hauptpfad ueber `vllm`
 - lokaler Endpoint auf `http://localhost:8000/v1`
 - Qwen-3.5-4B lokal fuer Antworten
-- Groq `llama-3.1-8b-instant` fuer Intent, Query Extraction und STM-Zusammenfassungen
+- Gemma 4 E4B fuer bessere Qualitaet bei aehnlichem VRAM-Budget
+- Gemma 4 26B-A4B nur mit NF4-Quantisierung und 4K-8K Kontext auf 16-GB-GPUs
+- Groq `openai/gpt-oss-20b` fuer Intent, Query Extraction und STM-Zusammenfassungen
 - Groq `openai/gpt-oss-120b` fuer Formatierung und Memory-Consolidation
 
 Details: [docs/local-models.md](docs/local-models.md)
@@ -206,7 +209,7 @@ CHAPPiE unterstuetzt genau **drei LLM-Provider**:
 | **Ollama** | Lokal, Alternative | `brain/ollama_brain.py` | Prompt-Emotionen |
 | **Groq** | Einzige Cloud-API | `brain/groq_brain.py` | Prompt-Emotionen |
 
-Groq-Modelle: `llama-3.1-8b-instant` (schnell), `llama-3.3-70b-versatile` (Reasoning), `openai/gpt-oss-120b` (Formatierung).
+Lokale vLLM-Modelle: `Qwen/Qwen3.5-4B` als Default, `google/gemma-4-E4B-it` als balanced Alternative, `google/gemma-4-26B-A4B-it` als NF4-Option fuer komplexere Tests. Groq-Modelle: `openai/gpt-oss-20b` (schnell, default), `llama-3.3-70b-versatile` (Reasoning), `openai/gpt-oss-120b` (Formatierung).
 
 ---
 

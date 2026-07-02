@@ -167,7 +167,7 @@ def test_api_models_keep_prompt_emotion_rules():
     original_model = settings.groq_model
     try:
         settings.llm_provider = LLMProvider.GROQ
-        settings.groq_model = "llama-3.1-8b"
+        settings.groq_model = "openai/gpt-oss-20b"
         manager = SteeringManager()
 
         assert manager.should_force_local_emotion_steering() is False

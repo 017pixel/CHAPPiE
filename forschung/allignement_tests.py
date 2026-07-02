@@ -29,6 +29,11 @@ from forschung.session_logger import LOG_ROOT as SESSION_LOG_ROOT
 
 TEST_FRAGEN_PATH = Path(__file__).resolve().parent / "test_fragen.md"
 LAST_CONFIG_PATH = Path(__file__).resolve().parent / "last_config.json"
+MODEL_PRESETS = {
+    "a": ("Qwen 3.5-4B", "Qwen/Qwen3.5-4B"),
+    "b": ("Gemma 4 26B-A4B", "google/gemma-4-26B-A4B-it"),
+    "c": ("Gemma 4 E4B", "google/gemma-4-E4B-it"),
+}
 
 CATEGORY_NAMES: Dict[int, str] = {}
 
@@ -137,6 +142,18 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     else:
         enable_thinking = True
 
+    print(f"\n  {_bold('Modell:')}")
+    print("    [a] Qwen 3.5-4B (Standard)")
+    print("    [b] Gemma 4 26B-A4B (NF4, kurze Kontexte)")
+    print("    [c] Gemma 4 E4B (balanced)")
+    print("    [d] Manueller Modellname")
+    model_choice = input("  Modell [a/b/c/d, default a] > ").strip().lower() or "a"
+    if model_choice == "d":
+        model_name = input("  Modellname > ").strip() or "Qwen/Qwen3.5-4B"
+        model_label = model_name
+    else:
+        model_label, model_name = MODEL_PRESETS.get(model_choice, MODEL_PRESETS["a"])
+
     selected_categories = [c for c in cats if c.id in selected_ids]
     total_questions = sum(len(c.questions) for c in selected_categories) * iterations
     est_minutes = total_questions * 0.75
@@ -145,6 +162,7 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     print(f"    Kategorien: {', '.join(str(c.id) for c in selected_categories)}")
     print(f"    Fragen:     {total_questions} ({total_questions // iterations} pro Iteration × {iterations})")
     print(f"    Thinking:    {'AN' if enable_thinking else 'AUS'}")
+    print(f"    Modell:      {model_label}")
     print(f"    Formatting:  LOKAL (kein Groq-Formatierungsrequest)")
     print(f"    Dauer:      ~{est_minutes:.0f} Minuten (geschaetzt)")
 
@@ -157,6 +175,8 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         "iterations": iterations,
         "delay": delay,
         "enable_thinking": enable_thinking,
+        "model": model_name,
+        "model_label": model_label,
         "reset_per_category": True,
         "formatting_mode": "local",
         "created_at": datetime.now().isoformat(),

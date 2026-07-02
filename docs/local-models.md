@@ -29,9 +29,9 @@ local_models.vllm_model = "Qwen/Qwen3.5-4B"
 local_models.vllm_force_single_model = true
 
 small_tasks.intent_provider = "groq"
-small_tasks.intent_processor_model_groq = "llama-3.1-8b-instant"
+small_tasks.intent_processor_model_groq = "openai/gpt-oss-20b"
 small_tasks.query_extraction_provider = "groq"
-small_tasks.query_extraction_groq_model = "llama-3.1-8b-instant"
+small_tasks.query_extraction_groq_model = "openai/gpt-oss-20b"
 ```
 
 Wichtig:

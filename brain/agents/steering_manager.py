@@ -149,6 +149,42 @@ MODEL_LAYER_PROFILES = {
         "reasoning_range": (16, 28),
         "hidden_dim": 3584,
     },
+    "gemma-4-26b-a4b": {
+        "total_layers": 42,
+        "personality_range": (10, 28),
+        "emotion_range": (12, 30),
+        "reasoning_range": (20, 40),
+        "hidden_dim": 2560,
+        "architecture": "gemma4",
+        "supports_layer_steering": True,
+        "quantize_required": True,
+        "attn_implementation": "sdpa",
+        "generation_defaults": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
+    },
+    "gemma-4-12b": {
+        "total_layers": 48,
+        "personality_range": (14, 34),
+        "emotion_range": (16, 38),
+        "reasoning_range": (24, 46),
+        "hidden_dim": 3840,
+        "architecture": "gemma4",
+        "supports_layer_steering": True,
+        "quantize_required": False,
+        "attn_implementation": "sdpa",
+        "generation_defaults": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
+    },
+    "gemma-4-e4b": {
+        "total_layers": 42,
+        "personality_range": (10, 28),
+        "emotion_range": (12, 30),
+        "reasoning_range": (20, 40),
+        "hidden_dim": 2560,
+        "architecture": "gemma4",
+        "supports_layer_steering": True,
+        "quantize_required": False,
+        "attn_implementation": "sdpa",
+        "generation_defaults": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
+    },
     "default": {
         "total_layers": 32,
         "personality_range": (8, 24),
@@ -256,6 +292,14 @@ class SteeringManager:
         for key, profile in MODEL_LAYER_PROFILES.items():
             if key != "default" and key in model_lower:
                 return profile
+
+        if "gemma-4" in model_lower or "gemma4" in model_lower:
+            if "26b" in model_lower or "a4b" in model_lower:
+                return MODEL_LAYER_PROFILES["gemma-4-26b-a4b"]
+            if "12b" in model_lower:
+                return MODEL_LAYER_PROFILES["gemma-4-12b"]
+            if "e4b" in model_lower:
+                return MODEL_LAYER_PROFILES["gemma-4-e4b"]
 
         return MODEL_LAYER_PROFILES["default"]
 
@@ -397,8 +441,18 @@ class SteeringManager:
         model_lower = self._effective_model(model).lower()
         return effective_provider in (LLMProvider.VLLM, LLMProvider.OLLAMA) and "qwen" in model_lower
 
+    def is_local_vector_steerable_model(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
+        """Prueft, ob das aktive lokale Modell Vektor-Steering unterstuetzt."""
+        effective_provider = self._effective_provider(provider)
+        model_lower = self._effective_model(model).lower()
+        if "qwen" in model_lower:
+            return effective_provider in (LLMProvider.VLLM, LLMProvider.OLLAMA)
+        if "gemma-4" in model_lower or "gemma4" in model_lower:
+            return effective_provider == LLMProvider.VLLM
+        return False
+
     def should_force_local_emotion_steering(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
-        return self.supports_activation_steering(provider) and self.is_local_qwen_model(provider, model)
+        return self.supports_activation_steering(provider) and self.is_local_vector_steerable_model(provider, model)
 
     def should_use_prompt_emotions(self, provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> bool:
         effective_provider = self._effective_provider(provider)
@@ -654,7 +708,7 @@ class SteeringManager:
             return {}
 
         # Echtes Activation Steering nur ueber vLLM.
-        if not self.supports_activation_steering():
+        if not self.supports_activation_steering() or not self.is_local_vector_steerable_model():
             return {}
 
         intensities = self.compute_emotion_intensity(current_emotions)
@@ -770,6 +824,7 @@ class SteeringManager:
             "provider": effective_provider.value,
             "model": effective_model,
             "supports_activation_steering": self.supports_activation_steering(effective_provider),
+            "vector_steerable_model": self.is_local_vector_steerable_model(effective_provider, effective_model),
             "prompt_emotions_enabled": prompt_emotions_enabled,
             "forced_local_qwen_steering": force,
             "steering_enabled_setting": bool(settings.enable_steering),

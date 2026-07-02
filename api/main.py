@@ -10,7 +10,7 @@ from config.config import settings, get_active_model
 
 app = FastAPI(
     title="CHAPPiE App API",
-    version="15.4.2026-api",
+    version="14.0",
     description="FastAPI-Schicht fuer CHAPPiEs React-Frontend.",
 )
 
@@ -51,7 +51,7 @@ def root_overview():
     return JSONResponse({
         "app": {
             "name": "CHAPPiE App API",
-            "version": "15.4.2026-api",
+            "version": "14.0",
             "docs": "/docs",
             "openapi": "/openapi.json",
         },

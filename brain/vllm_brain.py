@@ -17,7 +17,7 @@ from typing import Generator, Optional, Any, Dict
 from openai import OpenAI
 
 from .base_brain import BaseBrain, Message, GenerationConfig
-from config.config import settings
+from config.config import get_model_generation_defaults, is_gemma4_model, is_qwen_model, settings
 
 
 class VLLMBrain(BaseBrain):
@@ -63,9 +63,10 @@ class VLLMBrain(BaseBrain):
         Generiert eine Antwort mit vLLM.
         """
         if config is None:
+            defaults = get_model_generation_defaults(self.model)
             config = GenerationConfig(
                 max_tokens=settings.max_tokens,
-                temperature=settings.temperature,
+                temperature=float(settings.temperature if settings.temperature is not None else defaults["temperature"]),
                 stream=settings.stream
             )
 
@@ -292,15 +293,19 @@ class VLLMBrain(BaseBrain):
     def _prepare_extra_body(self, extra_body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Bereitet provider-spezifische Optionen vor.
         
-        enable_thinking wird aus settings.chain_of_thought gelesen.
-        Default: True (Reasoning aktiv).
+        enable_thinking und Sampling-Defaults werden modell-spezifisch gesetzt.
         """
-        from config.config import settings
         payload = dict(extra_body or {})
         if "chat_template_kwargs" not in payload:
             payload["chat_template_kwargs"] = {}
         if isinstance(payload["chat_template_kwargs"], dict):
-            payload["chat_template_kwargs"]["enable_thinking"] = bool(settings.chain_of_thought)
+            if is_qwen_model(self.model) or is_gemma4_model(self.model):
+                payload["chat_template_kwargs"]["enable_thinking"] = bool(settings.chain_of_thought)
+        defaults = get_model_generation_defaults(self.model)
+        if "top_p" not in payload:
+            payload["top_p"] = float(settings.top_p if settings.top_p is not None else defaults["top_p"])
+        if "top_k" not in payload:
+            payload["top_k"] = int(settings.top_k if settings.top_k is not None else defaults["top_k"])
         return payload
 
     @staticmethod
@@ -342,13 +347,13 @@ class VLLMBrain(BaseBrain):
                 dumped = message_like.model_dump()
             except Exception:
                 dumped = {}
-            for key in ("reasoning_content", "reasoning", "reasoningContent"):
+            for key in ("reasoning_content", "reasoning", "reasoningContent", "thinking", "thinking_content"):
                 reasoning = self._normalize_content(dumped.get(key))
                 if reasoning:
                     return reasoning
 
         if isinstance(message_like, dict):
-            for key in ("reasoning_content", "reasoning", "reasoningContent"):
+            for key in ("reasoning_content", "reasoning", "reasoningContent", "thinking", "thinking_content"):
                 reasoning = self._normalize_content(message_like.get(key))
                 if reasoning:
                     return reasoning

@@ -1,12 +1,46 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SectionCard } from "../components/section-card";
+import { SteeringRestartModal } from "../components/steering-restart-modal";
 import { api } from "../services/api";
 
 const PROVIDER_OPTIONS = [
   { value: "vllm", label: "vLLM (Local GPU)" },
   { value: "ollama", label: "Ollama (Local)" },
   { value: "groq", label: "Groq (Cloud)" },
+];
+
+const MODEL_PRESETS = [
+  {
+    id: "qwen3_5_4b",
+    label: "Qwen 3.5-4B",
+    detail: "Standard, schnell, grosser VRAM-Puffer",
+    vllm_model: "Qwen/Qwen3.5-4B",
+    steering_model: "Qwen/Qwen3.5-4B",
+    quantize: false,
+    steering_context_length: 8192,
+    defaults: { temperature: 0.7, top_p: 0.9, top_k: 50 },
+  },
+  {
+    id: "gemma4_e4b",
+    label: "Gemma 4 E4B",
+    detail: "Balanced, 4B dense, FP16-tauglich",
+    vllm_model: "google/gemma-4-E4B-it",
+    steering_model: "google/gemma-4-E4B-it",
+    quantize: false,
+    steering_context_length: 8192,
+    defaults: { temperature: 1.0, top_p: 0.95, top_k: 64 },
+  },
+  {
+    id: "gemma4_26b",
+    label: "Gemma 4 26B-A4B",
+    detail: "Schlau, MoE, NF4 fuer 16 GB VRAM",
+    vllm_model: "google/gemma-4-26B-A4B-it",
+    steering_model: "google/gemma-4-26B-A4B-it",
+    quantize: true,
+    steering_context_length: 4096,
+    defaults: { temperature: 1.0, top_p: 0.95, top_k: 64 },
+  },
 ];
 
 interface SettingDef {
@@ -39,6 +73,9 @@ const SETTINGS_DEFS: SettingDef[] = [
   { key: "groq_memory_model", label: "Groq Memory Model", type: "string", group: "provider", icon: "cloud" },
 
   { key: "temperature", label: "Temperature", type: "number", group: "generation", icon: "thermostat" },
+  { key: "top_p", label: "Top-P", type: "number", group: "generation", icon: "filter_alt" },
+  { key: "top_k", label: "Top-K", type: "number", group: "generation", icon: "filter_list" },
+  { key: "use_model_defaults", label: "Use Model Defaults", type: "boolean", group: "generation", icon: "auto_fix_high" },
   { key: "repetition_penalty", label: "Repetition Penalty", type: "number", group: "generation", icon: "repeat" },
   { key: "max_tokens", label: "Max Tokens", type: "number", group: "generation", icon: "token" },
   { key: "chappie_thinking_token_limit", label: "Thinking Token Limit", type: "number", group: "generation", icon: "psychology" },
@@ -87,11 +124,12 @@ const FALLBACK_EMOTION_META: Record<string, { label: string; icon: string; color
   calm: { label: "Calm", icon: "spa", color: "#38bdf8", default: 50 },
 };
 
-function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; onChange: (key: string, val: any) => void }) {
+function SettingInput({ def, value, onChange, disabled = false }: { def: SettingDef; value: any; onChange: (key: string, val: any) => void; disabled?: boolean }) {
   if (def.type === "boolean") {
     return (
       <button
         onClick={() => onChange(def.key, !value)}
+        disabled={disabled}
         className={`w-12 h-6 rounded-none border transition-all ${value ? "bg-ember border-ember" : "bg-white/10 border-white/20"}`}
       >
         <div className={`h-4 w-4 rounded-none bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`} />
@@ -103,6 +141,7 @@ function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; o
       <select
         value={String(value ?? "")}
         onChange={(e) => onChange(def.key, e.target.value)}
+        disabled={disabled}
         className="rounded-none border border-white/5 bg-input px-3 py-2 text-xs text-mist outline-none focus:border-ember/50"
       >
         <option value="">auto</option>
@@ -118,7 +157,8 @@ function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; o
         type="number"
         value={value ?? ""}
         onChange={(e) => onChange(def.key, e.target.value === "" ? null : Number(e.target.value))}
-        className="w-24 rounded-none border border-white/5 bg-input px-3 py-2 text-xs text-mist outline-none focus:border-ember/50 font-mono"
+        disabled={disabled}
+        className="w-24 rounded-none border border-white/5 bg-input px-3 py-2 text-xs text-mist outline-none focus:border-ember/50 font-mono disabled:cursor-not-allowed disabled:opacity-40"
       />
     );
   }
@@ -126,7 +166,8 @@ function SettingInput({ def, value, onChange }: { def: SettingDef; value: any; o
     <input
       value={String(value ?? "")}
       onChange={(e) => onChange(def.key, e.target.value)}
-      className="w-full rounded-none border border-white/5 bg-input px-3 py-2 text-xs text-mist outline-none focus:border-ember/50 font-mono"
+      disabled={disabled}
+      className="w-full rounded-none border border-white/5 bg-input px-3 py-2 text-xs text-mist outline-none focus:border-ember/50 font-mono disabled:cursor-not-allowed disabled:opacity-40"
     />
   );
 }
@@ -140,6 +181,11 @@ export function SettingsPage() {
   const [filter, setFilter] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["provider", "generation", "memory"]));
   const [draft, setDraft] = useState<Record<string, any>>({});
+  const [restartModal, setRestartModal] = useState<{ isOpen: boolean; oldModel: string; newModel: string; quantize?: boolean; error?: string }>({
+    isOpen: false,
+    oldModel: "",
+    newModel: "",
+  });
   const [emotionValues, setEmotionValues] = useState<Record<string, number>>({});
   const [layerEdits, setLayerEdits] = useState<Record<string, { layer_start: number; layer_end: number; default_alpha: number }>>({});
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -268,6 +314,35 @@ export function SettingsPage() {
   }, [filteredDefs]);
 
   const getValue = (key: string) => (key in draft ? draft[key] : settings[key]);
+  const selectedPreset = MODEL_PRESETS.find((preset) => preset.vllm_model === getValue("vllm_model"));
+  const steeringBaseUrl = String(getValue("vllm_url") || "http://localhost:8000/v1").replace(/\/v1\/?$/, "").replace(/\/+$/, "");
+
+  const handleModelPresetChange = useCallback(
+    async (presetId: string) => {
+      const preset = MODEL_PRESETS.find((item) => item.id === presetId);
+      if (!preset) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      const oldModel = String(getValue("vllm_model") || "");
+      const payload = {
+        llm_provider: "vllm",
+        vllm_model: preset.vllm_model,
+        steering_model: preset.steering_model,
+        steering_quantize: preset.quantize,
+        steering_context_length: preset.steering_context_length,
+        use_model_defaults: true,
+        temperature: preset.defaults.temperature,
+        top_p: preset.defaults.top_p,
+        top_k: preset.defaults.top_k,
+      };
+      setDraft((prev) => ({ ...prev, ...payload }));
+      await saveMutation.mutateAsync(payload);
+      setDraft({});
+      if (Boolean(getValue("enable_steering"))) {
+        setRestartModal({ isOpen: true, oldModel, newModel: preset.vllm_model, quantize: preset.quantize });
+      }
+    },
+    [draft, saveMutation, settings],
+  );
 
   return (
     <div className="space-y-8">
@@ -288,6 +363,32 @@ export function SettingsPage() {
       </div>
 
       {/* Manual Emotion Control */}
+      <SectionCard eyebrow="Local Model" title="Model Presets" subtitle="Switch CHAPPiE between fast Qwen and Gemma 4 profiles. Steering reloads automatically when active.">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div>
+            <p className="mb-2 text-[10px] uppercase tracking-widest text-slate">Preset</p>
+            <select
+              value={selectedPreset?.id ?? "custom"}
+              onChange={(event) => handleModelPresetChange(event.target.value)}
+              className="w-full rounded-none border border-white/10 bg-input px-4 py-3 text-sm text-mist outline-none focus:border-ember/50"
+            >
+              <option value="custom" disabled>Custom: {String(getValue("vllm_model") || "kein Modell")}</option>
+              {MODEL_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="rounded-none border border-white/5 bg-white/[0.02] p-4 text-xs text-slate lg:min-w-80">
+            <p className="text-mist">{selectedPreset?.label ?? "Manuelles Modell"}</p>
+            <p className="mt-1">{selectedPreset?.detail ?? "Freier Modellname aus den Settings"}</p>
+            <p className="mt-3 font-mono text-[10px]">T {Number(getValue("temperature") ?? 0).toFixed(2)} · P {Number(getValue("top_p") ?? 0).toFixed(2)} · K {Number(getValue("top_k") ?? 0)}</p>
+          </div>
+        </div>
+        {restartModal.error && (
+          <p className="mt-4 border border-red-400/20 bg-red-400/10 p-3 text-xs text-red-200">{restartModal.error}</p>
+        )}
+      </SectionCard>
+
       <SectionCard eyebrow="Live Emotion Control" title="Manual Emotion Steering" subtitle="Set CHAPPiE's emotional state directly. Adjust the slider, then click Apply to update each emotion.">
         <div className="space-y-2">
           {Object.entries(emotionMeta).map(([key, meta]) => (
@@ -356,15 +457,18 @@ export function SettingsPage() {
             </button>
             {expandedGroups.has(group.id) && (
               <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {defs.map((def) => (
+                {defs.map((def) => {
+                  const modelDefaultLocked = Boolean(getValue("use_model_defaults")) && ["temperature", "top_p", "top_k"].includes(def.key);
+                  return (
                   <label key={def.key} className="flex items-center justify-between gap-3 rounded-none border border-white/5 bg-white/[0.02] px-4 py-3 hover:border-ember/30 transition-all">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="material-symbols-outlined text-[14px] text-slate shrink-0">{def.icon}</span>
                       <span className="text-[10px] uppercase tracking-wider text-slate truncate">{def.label}</span>
                     </div>
-                    <SettingInput def={def} value={getValue(def.key)} onChange={handleSettingsChange} />
+                    <SettingInput def={def} value={getValue(def.key)} onChange={handleSettingsChange} disabled={modelDefaultLocked} />
                   </label>
-                ))}
+                  );
+                })}
               </div>
             )}
           </SectionCard>
@@ -431,6 +535,18 @@ export function SettingsPage() {
           Saving settings...
         </div>
       )}
+      <SteeringRestartModal
+        isOpen={restartModal.isOpen}
+        oldModel={restartModal.oldModel}
+        newModel={restartModal.newModel}
+        quantize={restartModal.quantize}
+        steeringBaseUrl={steeringBaseUrl}
+        onComplete={() => {
+          setRestartModal({ isOpen: false, oldModel: "", newModel: "" });
+          settingsQuery.refetch();
+        }}
+        onError={(error) => setRestartModal((prev) => ({ ...prev, error }))}
+      />
     </div>
   );
 }

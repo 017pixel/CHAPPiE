@@ -73,6 +73,8 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "llm_provider": "vllm",
         "vllm_url": "http://localhost:8000/v1",
         "vllm_model": "Qwen/Qwen3.5-4B",
+        "gemma4_model": "google/gemma-4-26B-A4B-it",
+        "gemma4_steering_model": "google/gemma-4-26B-A4B-it",
         "vllm_force_single_model": True,
         "ollama_host": "http://localhost:11434",
         "ollama_model": "qwen3.5:9b",
@@ -89,12 +91,12 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "small_tasks": {
         "intent_provider": "groq",
-        "intent_processor_model_groq": "llama-3.1-8b-instant",
+        "intent_processor_model_groq": "openai/gpt-oss-20b",
         "intent_processor_model_ollama": "qwen3.5:9b",
         "intent_processor_model_vllm": "Qwen/Qwen3.5-4B",
         "enable_two_step_processing": True,
         "query_extraction_provider": "groq",
-        "query_extraction_groq_model": "llama-3.1-8b-instant",
+        "query_extraction_groq_model": "openai/gpt-oss-20b",
         "query_extraction_ollama_model": "llama3.2:1b",
         "query_extraction_vllm_model": "Qwen/Qwen3.5-4B",
         "enable_query_extraction": True,
@@ -107,6 +109,19 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "chappie_thinking_token_limit": 650,
         "chappie_answer_token_limit": 450,
         "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 50,
+        "use_model_defaults": True,
+        "qwen_defaults": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "top_k": 50,
+        },
+        "gemma4_defaults": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 64,
+        },
         "repetition_penalty": 1.15,
         "stream": True,
         "chain_of_thought": True,
@@ -166,6 +181,36 @@ KEY_PATHS = {
     for section, values in DEFAULT_CONFIG.items()
     for key in values
 }
+
+
+def is_gemma4_model(model_name: str) -> bool:
+    """Erkennt Gemma-4-Modelle anhand stabiler Namensbestandteile."""
+    lower = (model_name or "").lower()
+    return "gemma-4" in lower or "gemma4" in lower
+
+
+def is_qwen_model(model_name: str) -> bool:
+    """Erkennt Qwen-Modelle anhand stabiler Namensbestandteile."""
+    return "qwen" in (model_name or "").lower()
+
+
+def get_model_generation_defaults(model_name: str) -> Dict[str, Any]:
+    """Liefert modell-spezifische Generierungs-Defaults fuer lokale vLLM-Modelle."""
+    if is_gemma4_model(model_name):
+        return dict(DEFAULT_CONFIG["generation"]["gemma4_defaults"])
+    if is_qwen_model(model_name):
+        return dict(DEFAULT_CONFIG["generation"]["qwen_defaults"])
+    return dict(DEFAULT_CONFIG["generation"]["qwen_defaults"])
+
+
+def apply_model_defaults_if_unset(model_name: str, runtime_settings: Any) -> None:
+    """Setzt Defaults nur, wenn Runtime-Settings Modell-Defaults verwenden sollen."""
+    if not bool(getattr(runtime_settings, "use_model_defaults", True)):
+        return
+    defaults = get_model_generation_defaults(model_name)
+    runtime_settings.temperature = float(defaults["temperature"])
+    runtime_settings.top_p = float(defaults["top_p"])
+    runtime_settings.top_k = int(defaults["top_k"])
 
 
 # ----------
@@ -317,6 +362,8 @@ class Settings:
         self.ollama_model = self._get_val("OLLAMA_MODEL", "qwen3.5:9b")
         self.vllm_url = self._get_val("VLLM_URL", "http://localhost:8000/v1")
         self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-4B")
+        self.gemma4_model = self._get_val("GEMMA4_MODEL", "google/gemma-4-26B-A4B-it")
+        self.gemma4_steering_model = self._get_val("GEMMA4_STEERING_MODEL", "google/gemma-4-26B-A4B-it")
         self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
 
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
@@ -325,7 +372,7 @@ class Settings:
         self.groq_memory_model = self._get_val("GROQ_MEMORY_MODEL", "openai/gpt-oss-120b")
 
         self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "groq"))
-        self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "llama-3.1-8b-instant")
+        self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-20b")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen3.5:9b")
         self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-4B")
         self.enable_two_step_processing = bool(self._get_val("ENABLE_TWO_STEP_PROCESSING", True))
@@ -333,7 +380,7 @@ class Settings:
         self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "groq"))
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
         self.query_extraction_vllm_model = self._get_val("QUERY_EXTRACTION_VLLM_MODEL", "Qwen/Qwen3.5-4B")
-        self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "llama-3.1-8b-instant")
+        self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "openai/gpt-oss-20b")
         self.enable_query_extraction = bool(self._get_val("ENABLE_QUERY_EXTRACTION", True))
         self.query_extraction_min_words_for_llm = int(self._get_val("QUERY_EXTRACTION_MIN_WORDS_FOR_LLM", 7))
 
@@ -375,7 +422,10 @@ class Settings:
         self.max_tokens = int(self._get_val("MAX_TOKENS", 450))
         self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 650))
         self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 450))
+        self.use_model_defaults = bool(self._get_val("USE_MODEL_DEFAULTS", True))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))
+        self.top_p = float(self._get_val("TOP_P", 0.9))
+        self.top_k = int(self._get_val("TOP_K", 50))
         self.repetition_penalty = float(self._get_val("REPETITION_PENALTY", 1.15))
         self.stream = bool(self._get_val("STREAM", True))
         self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))
@@ -386,6 +436,8 @@ class Settings:
         self.history_max_messages = int(self._get_val("HISTORY_MAX_MESSAGES", 20))
         self.context_token_limit = int(self._get_val("CONTEXT_TOKEN_LIMIT", 7000))
         self.context_token_warning_threshold = int(self._get_val("CONTEXT_TOKEN_WARNING_THRESHOLD", 6500))
+
+        apply_model_defaults_if_unset(self.vllm_model, self)
 
         self.groq_requests_per_minute = int(self._get_val("GROQ_REQUESTS_PER_MINUTE", 250))
         self.groq_requests_per_hour = int(self._get_val("GROQ_REQUESTS_PER_HOUR", 6000))
@@ -427,6 +479,7 @@ class Settings:
 
     def update_from_ui(self, **kwargs: Any) -> None:
         old_provider = self.llm_provider
+        old_vllm_model = self.vllm_model
         if kwargs.get("llm_provider"):
             parsed = _parse_provider(kwargs["llm_provider"])
             if parsed:
@@ -438,7 +491,7 @@ class Settings:
 
         string_keys = [
             "groq_model", "groq_format_model", "groq_memory_model",
-            "vllm_model", "vllm_url", "ollama_model", "ollama_host",
+            "vllm_model", "gemma4_model", "gemma4_steering_model", "vllm_url", "ollama_model", "ollama_host",
             "memory_consolidation_groq_model", "intent_processor_model_groq",
             "intent_processor_model_ollama", "intent_processor_model_vllm",
             "query_extraction_ollama_model", "query_extraction_vllm_model",
@@ -461,6 +514,7 @@ class Settings:
             "vllm_force_single_model", "enable_steering", "steering_quantize",
             "training_use_global_settings", "chain_of_thought",
             "memory_consolidation_enabled", "enable_two_step_processing",
+            "use_model_defaults",
         ]
         for key in bool_keys:
             if key in kwargs and kwargs[key] is not None:
@@ -468,6 +522,7 @@ class Settings:
 
         numeric_keys = [
             "temperature", "repetition_penalty", "max_tokens", "memory_top_k",
+            "top_p", "top_k",
             "memory_min_relevance", "memory_consolidation_max_tokens",
             "chappie_thinking_token_limit", "chappie_answer_token_limit",
             "history_max_messages", "context_token_limit",
@@ -481,6 +536,9 @@ class Settings:
         for key in numeric_keys:
             if key in kwargs and kwargs[key] is not None:
                 setattr(self, key, kwargs[key])
+
+        if self.vllm_model != old_vllm_model or kwargs.get("use_model_defaults") is True:
+            apply_model_defaults_if_unset(self.vllm_model, self)
 
         self._persist_to_root_config()
         self._needs_reload = True
@@ -496,6 +554,8 @@ class Settings:
             "GROQ_FORMAT_MODEL": self.groq_format_model,
             "GROQ_MEMORY_MODEL": self.groq_memory_model,
             "VLLM_MODEL": self.vllm_model,
+            "GEMMA4_MODEL": self.gemma4_model,
+            "GEMMA4_STEERING_MODEL": self.gemma4_steering_model,
             "VLLM_URL": self.vllm_url,
             "VLLM_FORCE_SINGLE_MODEL": self.vllm_force_single_model,
             "OLLAMA_MODEL": self.ollama_model,
@@ -527,7 +587,10 @@ class Settings:
             "MAX_TOKENS": self.max_tokens,
             "CHAPPIE_THINKING_TOKEN_LIMIT": self.chappie_thinking_token_limit,
             "CHAPPIE_ANSWER_TOKEN_LIMIT": self.chappie_answer_token_limit,
+            "USE_MODEL_DEFAULTS": self.use_model_defaults,
             "TEMPERATURE": self.temperature,
+            "TOP_P": self.top_p,
+            "TOP_K": self.top_k,
             "REPETITION_PENALTY": self.repetition_penalty,
             "STREAM": self.stream,
             "CHAIN_OF_THOUGHT": self.chain_of_thought,
@@ -620,6 +683,8 @@ def print_config() -> None:
     table.add_row("Embedding Modell", settings.embedding_model)
     table.add_row("Memory Top-K", str(settings.memory_top_k))
     table.add_row("Temperature", str(settings.temperature))
+    table.add_row("Top-P", str(settings.top_p))
+    table.add_row("Top-K", str(settings.top_k))
     console.print(table)
 
 

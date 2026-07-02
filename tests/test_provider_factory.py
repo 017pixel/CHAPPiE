@@ -40,7 +40,7 @@ def test_get_brain_vllm_returns_vllmbrain():
 
 
 def test_get_brain_groq_returns_groqbrain():
-    brain = get_brain(LLMProvider.GROQ, model="llama-3.1-8b")
+    brain = get_brain(LLMProvider.GROQ, model="openai/gpt-oss-20b")
     assert isinstance(brain, GroqBrain)
 
 

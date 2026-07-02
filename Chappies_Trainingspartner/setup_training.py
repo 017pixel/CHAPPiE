@@ -34,7 +34,7 @@ console = Console()
 
 # === Verfügbare Modelle pro Provider ===
 CEREBRAS_MODELS = {
-    "1": ("llama-3.1-8b", "Llama 3.1 8B - Schnell & Kompakt (Empfohlen)"),
+    "1": ("openai/gpt-oss-20b", "GPT-OSS 20B - Schnell & Kompakt (Empfohlen)"),
     "2": ("qwen-3-235b-a22b-instruct-2507", "Qwen 3 235B - Hochwertiges Reasoning"),
 }
 

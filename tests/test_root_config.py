@@ -35,7 +35,7 @@ def test_build_root_config_contains_generation_budgets():
     assert config["generation"]["max_tokens"] == 450
     assert config["generation"]["chappie_thinking_token_limit"] == 650
     assert config["generation"]["chappie_answer_token_limit"] == 450
-    assert config["small_tasks"]["intent_processor_model_groq"] == "llama-3.1-8b-instant"
+    assert config["small_tasks"]["intent_processor_model_groq"] == "openai/gpt-oss-20b"
 
 
 if __name__ == "__main__":

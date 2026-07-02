@@ -82,7 +82,7 @@ def test_is_available_false_without_key():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="llama-3.1-8b-instant", api_key="")
+        brain = GroqBrain(model="openai/gpt-oss-20b", api_key="")
         assert brain.is_available() is False
     finally:
         settings.groq_api_key = original_key
@@ -94,7 +94,7 @@ def test_is_available_true_with_valid_key():
         settings.groq_api_key = ""
         with patch("brain.groq_brain.OpenAI") as mock_openai:
             mock_openai.return_value = MagicMock()
-            brain = GroqBrain(model="llama-3.1-8b-instant", api_key="gsk_testkey123")
+            brain = GroqBrain(model="openai/gpt-oss-20b", api_key="gsk_testkey123")
             assert brain.is_available() is True
     finally:
         settings.groq_api_key = original_key
@@ -104,7 +104,7 @@ def test_generate_returns_error_when_not_initialized():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="llama-3.1-8b-instant", api_key="")
+        brain = GroqBrain(model="openai/gpt-oss-20b", api_key="")
         messages = [Message(role="user", content="Hallo")]
         config = GenerationConfig(max_tokens=50, temperature=0.7, stream=False)
         response = brain.generate(messages, config)
@@ -118,7 +118,7 @@ def test_list_models_returns_empty_when_not_initialized():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="llama-3.1-8b-instant", api_key="")
+        brain = GroqBrain(model="openai/gpt-oss-20b", api_key="")
         assert brain.list_models() == []
     finally:
         settings.groq_api_key = original_key
@@ -126,7 +126,7 @@ def test_list_models_returns_empty_when_not_initialized():
 
 def test_groq_models_dict_not_empty():
     assert len(GROQ_MODELS) >= 5
-    assert "llama-3.1-8b-instant" in GROQ_MODELS
+    assert "openai/gpt-oss-20b" in GROQ_MODELS
     assert "openai/gpt-oss-120b" in GROQ_MODELS
 
 
@@ -157,7 +157,7 @@ def test_api_key_explicit_overrides_settings():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(api_key="gsk_explicit", model="llama-3.1-8b-instant")
+        brain = GroqBrain(api_key="gsk_explicit", model="openai/gpt-oss-20b")
         assert brain.api_key == "gsk_explicit"
     finally:
         settings.groq_api_key = original_key

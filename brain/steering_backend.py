@@ -27,7 +27,11 @@ ANCHOR_VARIANTS = (
     "Du bist gepraegt von {description}. Formuliere eine spontane kurze Reaktion.",
     "Deine Persoenlichkeit wirkt gerade {description}. Antworte mit einem einzelnen natuerlichen Satz.",
 )
-ANCHOR_SCALE_FACTOR = 0.012
+ANCHOR_SCALE_FACTORS = {
+    "qwen": 0.012,
+    "gemma4": 0.015,
+    "default": 0.012,
+}
 PLAN_STRENGTH_SOFT_CAP = 1.2
 PLAN_VECTOR_NORM_CAP = 1.6
 NEUTRAL_ANCHORS = (
@@ -145,6 +149,23 @@ EMOTION_STATE_SUMMARIES = {
 
 def sanitize_model_slug(model_name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", model_name).strip("_") or "model"
+
+
+def is_gemma4_name(model_name: str) -> bool:
+    model_lower = (model_name or "").lower()
+    return "gemma-4" in model_lower or "gemma4" in model_lower
+
+
+def is_qwen_name(model_name: str) -> bool:
+    return "qwen" in (model_name or "").lower()
+
+
+def anchor_scale_for_model(model_name: str) -> float:
+    if is_gemma4_name(model_name):
+        return ANCHOR_SCALE_FACTORS["gemma4"]
+    if is_qwen_name(model_name):
+        return ANCHOR_SCALE_FACTORS["qwen"]
+    return ANCHOR_SCALE_FACTORS["default"]
 
 
 def extract_steering_payload(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -361,6 +382,7 @@ class ActivationVectorResolver:
         self.device = device
         self.hidden_size = int(getattr(model.config, "hidden_size", 0) or 0)
         self.num_layers = int(getattr(model.config, "num_hidden_layers", 0) or 0)
+        self.anchor_scale_factor = anchor_scale_for_model(model_name)
         self._cache_lock = threading.Lock()
 
     def resolve(self, item: Dict[str, Any], start: int, end: int) -> Dict[int, torch.Tensor]:
@@ -377,8 +399,8 @@ class ActivationVectorResolver:
 
     def _basis_cache_path(self, item: Dict[str, Any]) -> Path:
         payload = {
-            "version": 7,
-            "scale_factor": ANCHOR_SCALE_FACTOR,
+            "version": 8,
+            "scale_factor": self.anchor_scale_factor,
             "name": item.get("name"),
             "vector": item.get("vector"),
             "surface_effect": item.get("surface_effect"),
@@ -446,7 +468,7 @@ class ActivationVectorResolver:
             reference_norm = max(1.0, neutral_norms[layer] / count)
             scaled = torch.nn.functional.normalize(delta, dim=0)
             layers[layer] = scaled.cpu()
-            scales[layer] = float(reference_norm * ANCHOR_SCALE_FACTOR)
+            scales[layer] = float(reference_norm * self.anchor_scale_factor)
 
         return {"layers": layers, "scales": scales, "meta": {"name": name, "description": description}}
 
@@ -496,7 +518,7 @@ class LocalSteeringEngine:
         LOGGER.info("Steering-Modell %s: max_position_embeddings auf %d begrenzt (KV-Cache-Schutz).",
                      model_name, model_config.max_position_embeddings)
         quantization_config = self._build_quantization_config() if self.quantize else None
-        loader_kwargs = self._build_loader_kwargs()
+        loader_kwargs = self._build_loader_kwargs(for_model=True)
         if quantization_config is not None:
             loader_kwargs["quantization_config"] = quantization_config
         if not self.quantize:
@@ -505,12 +527,13 @@ class LocalSteeringEngine:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 config=model_config,
-                attn_implementation="sdpa",
                 **loader_kwargs,
             )
         except TypeError:
             fallback_kwargs = dict(loader_kwargs)
             fallback_kwargs.pop("quantization_config", None)
+            fallback_kwargs.pop("attn_implementation", None)
+            fallback_kwargs.pop("torch_dtype", None)
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 config=model_config,
@@ -551,8 +574,7 @@ class LocalSteeringEngine:
             return torch.device("cpu")
         return torch.device("cuda:0")
 
-    @staticmethod
-    def _resolve_quantize(explicit: Optional[bool]) -> bool:
+    def _resolve_quantize(self, explicit: Optional[bool] = None) -> bool:
         if explicit is not None:
             return explicit
         env_val = os.getenv(QUANTIZE_ENV, "").strip().lower()
@@ -564,6 +586,9 @@ class LocalSteeringEngine:
             return False
         try:
             total_gib = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+            model_name = getattr(self, "model_name", "") if self is not None else ""
+            if is_gemma4_name(model_name) and ("26b" in model_name.lower() or "a4b" in model_name.lower()):
+                return total_gib < 48.0
             return total_gib < 24.0
         except Exception:
             return False
@@ -580,16 +605,35 @@ class LocalSteeringEngine:
     def _estimate_required_gpu_gib(self) -> float:
         model_lower = (self.model_name or "").lower()
         match = re.search(r"qwen/qwen3(?:\.5)?-(\d+)b", model_lower)
-        if not match:
-            return 0.0
-        try:
-            billions = float(match.group(1))
-        except ValueError:
-            return 0.0
-        per_billion = 0.6 if self.quantize else 2.2
-        weights_gib = billions * per_billion
-        kv_cache_gib = billions * 0.08 * (self.context_length / 1024)
-        overhead_gib = 1.0 if self.quantize else 1.5
+        if match:
+            try:
+                billions = float(match.group(1))
+            except ValueError:
+                return 0.0
+            per_billion = 0.6 if self.quantize else 2.2
+            weights_gib = billions * per_billion
+            kv_cache_gib = billions * 0.08 * (self.context_length / 1024)
+            overhead_gib = 1.0 if self.quantize else 1.5
+        elif is_gemma4_name(model_lower):
+            if "26b" in model_lower or "a4b" in model_lower:
+                total_b = 26.0
+                active_b = 4.0
+                per_billion = 0.5 if self.quantize else 2.0
+                overhead_gib = 1.5 if self.quantize else 2.0
+            elif "12b" in model_lower:
+                total_b = 12.0
+                active_b = 12.0
+                per_billion = 0.6 if self.quantize else 2.2
+                overhead_gib = 1.0 if self.quantize else 1.5
+            else:
+                total_b = 4.0
+                active_b = 4.0
+                per_billion = 0.6 if self.quantize else 2.2
+                overhead_gib = 1.0 if self.quantize else 1.5
+            weights_gib = total_b * per_billion
+            kv_cache_gib = active_b * 0.08 * (self.context_length / 1024)
+        else:
+            return 8.0
         total_gib = weights_gib + kv_cache_gib + overhead_gib
         LOGGER.debug("GPU-Speicher-Schaetzung fuer %s (ctx %d, quantize=%s): %.2f GiB (%.2f weights + %.2f KV-cache + %.2f overhead).",
                       self.model_name, self.context_length, self.quantize, total_gib, weights_gib, kv_cache_gib, overhead_gib)
@@ -604,12 +648,15 @@ class LocalSteeringEngine:
         except Exception:
             return 0.0
 
-    def _build_loader_kwargs(self) -> Dict[str, Any]:
+    def _build_loader_kwargs(self, for_model: bool = False) -> Dict[str, Any]:
         """Erlaubt Remote-Code fuer Modellfamilien, die lokal noch nicht nativ im Transformers-Pin stecken."""
         model_lower = (self.model_name or "").lower()
-        if "qwen/qwen3.5" in model_lower:
-            return {"trust_remote_code": True}
-        return {}
+        kwargs: Dict[str, Any] = {}
+        if "qwen/qwen3.5" in model_lower or is_gemma4_name(model_lower):
+            kwargs["trust_remote_code"] = True
+        if for_model and ("qwen" in model_lower or is_gemma4_name(model_lower)):
+            kwargs["attn_implementation"] = "sdpa"
+        return kwargs
 
     def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
@@ -632,9 +679,9 @@ class LocalSteeringEngine:
         except Exception:
             pass
 
-    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15) -> Dict[str, Any]:
+    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty)
+        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
         self._log_gpu_stats("pre-generate")
         with self._generation_lock:
             with self._apply_activation_plan(steering_payload):
@@ -658,32 +705,44 @@ class LocalSteeringEngine:
         return result
 
     def _split_thinking_output(self, token_ids: torch.Tensor) -> tuple[str, str]:
-        """Trennt Reasoning und Answer aus Qwen3.5 Thinking-Output.
-        Nutzt die Token 151667 (`) und 151668 (``) als Marker.
-        Returns (reasoning_text, answer_text)."""
+        """Trennt Reasoning und Antwort fuer Qwen- und Gemma-4-Chat-Templates."""
         if token_ids.numel() == 0:
             return "", ""
         ids_list = token_ids.tolist()
-        think_start = 151667
-        think_end = 151668
-        try:
-            if think_start in ids_list and think_end in ids_list:
-                idx_start = ids_list.index(think_start)
-                idx_end = ids_list.index(think_end, idx_start + 1 if idx_start < len(ids_list) - 1 else idx_start)
-                if idx_start < idx_end:
-                    reasoning_ids = token_ids[idx_start + 1:idx_end]
-                    answer_ids = token_ids[idx_end + 1:]
-                    reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-                    answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-                    return reasoning_text, answer_text
-        except Exception:
-            pass
+        if is_qwen_name(self.model_name):
+            think_start = 151667
+            think_end = 151668
+            try:
+                if think_start in ids_list and think_end in ids_list:
+                    idx_start = ids_list.index(think_start)
+                    idx_end = ids_list.index(think_end, idx_start + 1 if idx_start < len(ids_list) - 1 else idx_start)
+                    if idx_start < idx_end:
+                        reasoning_ids = token_ids[idx_start + 1:idx_end]
+                        answer_ids = token_ids[idx_end + 1:]
+                        reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                        answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                        return reasoning_text, answer_text
+            except Exception:
+                pass
+        if is_gemma4_name(self.model_name):
+            raw_text = self.tokenizer.decode(token_ids, skip_special_tokens=False, clean_up_tokenization_spaces=True)
+            think_start = "<|channel>thought"
+            think_end = "<|channel|>"
+            if think_start in raw_text and think_end in raw_text:
+                start_idx = raw_text.find(think_start) + len(think_start)
+                end_idx = raw_text.find(think_end, start_idx)
+                if end_idx > start_idx:
+                    reasoning = raw_text[start_idx:end_idx].strip()
+                    answer_raw = raw_text[end_idx + len(think_end):].strip()
+                    answer_ids = self.tokenizer(answer_raw, add_special_tokens=False, return_tensors="pt")["input_ids"][0]
+                    answer = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                    return reasoning, answer
         return "", self.tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
-    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15) -> Iterator[str]:
+    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Iterator[str]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
         streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty)
+        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
         generation_kwargs["streamer"] = streamer
         error_box: Dict[str, BaseException] = {}
         self._log_gpu_stats("pre-stream")
@@ -709,7 +768,7 @@ class LocalSteeringEngine:
         if error_box:
             raise error_box["error"]
 
-    def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float, repetition_penalty: float = 1.15) -> Dict[str, Any]:
+    def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
         do_sample = float(temperature or 0.0) > 0.01
         input_len = int(inputs["input_ids"].shape[1])
         kwargs: Dict[str, Any] = {
@@ -724,6 +783,10 @@ class LocalSteeringEngine:
         }
         if do_sample:
             kwargs["temperature"] = max(0.05, float(temperature))
+            if top_p is not None:
+                kwargs["top_p"] = max(0.01, min(1.0, float(top_p)))
+            if top_k is not None and int(top_k) > 0:
+                kwargs["top_k"] = int(top_k)
         return kwargs
 
     @contextmanager

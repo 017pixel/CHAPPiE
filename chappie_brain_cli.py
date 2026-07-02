@@ -1,4 +1,4 @@
-"""CHAPPiE Terminal Interface v6.1
+"""CHAPPiE Terminal Interface v14.0
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
@@ -97,6 +97,15 @@ def _bar(value: int, max_val: int = 100, width: int = 10) -> str:
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
+MODEL_ALIASES = {
+    "qwen": "Qwen/Qwen3.5-4B",
+    "qwen3.5": "Qwen/Qwen3.5-4B",
+    "gemma": "google/gemma-4-26B-A4B-it",
+    "gemma4": "google/gemma-4-26B-A4B-it",
+    "gemma4-26b": "google/gemma-4-26B-A4B-it",
+    "gemma4-e4b": "google/gemma-4-E4B-it",
+}
+
 
 def _v(d: dict, key: str, default: Any = "") -> Any:
     return d.get(key, default) if isinstance(d, dict) else default
@@ -189,7 +198,7 @@ class CHAPPiEBrainCLI:
         self._use_remote = remote_url is not None
         self._show_full_report = _FULL_REPORT_DEFAULT
 
-        _log("INIT", "Initialisiere CHAPPiE Brain Interface v6.0...", Colors.AI)
+        _log("INIT", "Initialisiere CHAPPiE Brain Interface v14.0...", Colors.AI)
 
         if self._use_remote:
             if not HAS_REQUESTS:
@@ -228,6 +237,16 @@ class CHAPPiEBrainCLI:
     def _settings():
         from config.config import settings
         return settings
+
+    @staticmethod
+    def _resolve_model_alias(value: str) -> str:
+        raw = value.strip()
+        return MODEL_ALIASES.get(raw.lower(), raw)
+
+    @staticmethod
+    def _steering_base_url() -> str:
+        s = CHAPPiEBrainCLI._settings()
+        return str(s.vllm_url or "http://localhost:8000/v1").rstrip("/").removesuffix("/v1")
 
     # ── streaming processing ──────────────────────────────────────
 
@@ -1180,6 +1199,22 @@ class CHAPPiEBrainCLI:
             print(f"{'═' * 50}{Colors.RESET}\n")
             return True
 
+        if cmd_lower == "/model" or cmd_lower.startswith("/model "):
+            if self._use_remote:
+                _log("MODEL", "Nur im lokalen Modus verfuegbar", Colors.WARN)
+                return True
+            args = cmd.split(maxsplit=1)
+            if len(args) == 1:
+                s = self._settings()
+                print(f"\n{Colors.AI}Aktives Modell: {Colors.BOLD}{s.vllm_model}{Colors.RESET}")
+                print(f"  Provider: {s.llm_provider.value}")
+                print(f"  Steering: {s.steering_model}")
+                print(f"  Presets: qwen | gemma4-e4b | gemma4-26b")
+                print(f"\n{Colors.DIM}Syntax: /model <preset|model-name>{Colors.RESET}\n")
+                return True
+            self._handle_model_command(args[1])
+            return True
+
         if cmd_lower == "/thinking":
             s = self._settings()
             status_str = "AN" if s.chain_of_thought else "AUS"
@@ -1457,12 +1492,78 @@ class CHAPPiEBrainCLI:
         print("  Tippe /help fuer alle Befehle")
         return True
 
+    def _handle_model_command(self, args: str) -> None:
+        model_name = self._resolve_model_alias(args)
+        if not model_name:
+            _error("Kein Modell angegeben")
+            return
+
+        s = self._settings()
+        old_model = s.vllm_model
+        is_gemma_26b = "gemma" in model_name.lower() and ("26b" in model_name.lower() or "a4b" in model_name.lower())
+        context_length = 4096 if is_gemma_26b else 8192
+        s.update_from_ui(
+            llm_provider="vllm",
+            vllm_model=model_name,
+            steering_model=model_name,
+            steering_quantize=is_gemma_26b,
+            steering_context_length=context_length,
+            use_model_defaults=True,
+        )
+
+        print(f"\nModell-Wechsel: {old_model} -> {model_name}")
+        if s.enable_steering:
+            self._restart_steering_server(model_name, quantize=is_gemma_26b)
+        if self.backend:
+            self.backend.apply_runtime_settings(force=True)
+        _success(f"Modell gewechselt zu: {model_name}")
+
+    def _restart_steering_server(self, model_name: str, quantize: bool = False) -> None:
+        if not HAS_REQUESTS:
+            _warn("requests nicht installiert; Steering-Restart uebersprungen")
+            return
+        base_url = self._steering_base_url()
+        try:
+            requests.post(f"{base_url}/v1/steering/restart", json={"model": model_name, "quantize": quantize}, timeout=10)
+        except Exception as exc:
+            _warn(f"Steering-Restart konnte nicht gestartet werden: {exc}")
+            return
+
+        start_time = time.time()
+        timeout = 180
+        while time.time() - start_time < timeout:
+            try:
+                response = requests.get(f"{base_url}/v1/steering/restart-status", timeout=5)
+                response.raise_for_status()
+                status = response.json()
+            except Exception:
+                print("\r  Steering-Server startet...", end="", flush=True)
+                time.sleep(2)
+                continue
+
+            progress = int(status.get("progress", 0) or 0)
+            step = status.get("current_step", "")
+            remaining = int(status.get("estimated_remaining", 0) or 0)
+            filled = int(30 * progress / 100)
+            bar = "=" * filled + "-" * (30 - filled)
+            print(f"\r  [{bar}] {progress}% - {step} (~{remaining}s)", end="", flush=True)
+
+            if status.get("status") == "ready":
+                print("\nSteering-Server ist bereit.")
+                return
+            if status.get("status") == "error":
+                print(f"\nSteering-Fehler: {status.get('error') or step}")
+                return
+            time.sleep(2)
+        print("\nTimeout: Steering-Server meldet keinen Abschluss.")
+
     def _print_help(self):
         print(f"""
-{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v6.0{Colors.RESET}
+{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v14.0{Colors.RESET}
 {Colors.DEBUG}───────────────────────────────────────────────
   /status        Emotionaler Status + Life-Simulation
   /runtime       Modell, Provider, Steering-Konfiguration
+  /model [preset|name]       Aktives vLLM-Modell wechseln
   /thinking [true|false]  Chain-of-Thought/Reasoning ein-/ausschalten
   /steering      Detaillierter Steering-Report
   /emotion <n> [+/-]<0-100>  Emotion setzen/erhoehen/senken
@@ -1503,7 +1604,7 @@ class CHAPPiEBrainCLI:
   ██╔══██╗██╔══██╗██╔══██║██║██║╚██╗██║
   ██████╔╝██║  ██║██║  ██║██║██║ ╚████║
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
-{Colors.AI}CHAPPiE Terminal Interface v6.0 [{mode_str}]
+{Colors.AI}CHAPPiE Terminal Interface v14.0 [{mode_str}]
 {Colors.STEER}Steering: {steering_info} | {len(EMOTION_NAMES)} Emotionale Dimensionen
 {Colors.DEBUG}Live Streaming + Debug-Report | Tippe /help fuer alle Befehle
 {Colors.RESET}""")
@@ -1539,10 +1640,26 @@ class CHAPPiEBrainCLI:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v6.0")
+    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v14.0")
     parser.add_argument("--remote", action="store_true", help="Connect to remote backend via SSE")
     parser.add_argument("--url", default="http://localhost:8010", help="Backend URL (default: localhost:8010)")
+    parser.add_argument("--model", type=str, default=None, help="Lokales vLLM-Modell ueberschreiben (z.B. gemma4-26b)")
     args = parser.parse_args()
+
+    if args.model and not args.remote:
+        from config.config import settings
+
+        model_name = CHAPPiEBrainCLI._resolve_model_alias(args.model)
+        is_gemma_26b = "gemma" in model_name.lower() and ("26b" in model_name.lower() or "a4b" in model_name.lower())
+        context_length = 4096 if is_gemma_26b else 8192
+        settings.update_from_ui(
+            llm_provider="vllm",
+            vllm_model=model_name,
+            steering_model=model_name,
+            steering_quantize=is_gemma_26b,
+            steering_context_length=context_length,
+            use_model_defaults=True,
+        )
 
     remote_url = args.url if args.remote else None
     cli = CHAPPiEBrainCLI(remote_url=remote_url)

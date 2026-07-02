@@ -246,10 +246,9 @@ class GroqBrain(BaseBrain):
 
 # === Verfügbare Groq Modelle ===
 GROQ_MODELS = {
-    "llama-3.1-8b-instant": "Llama 3.1 8B - Sehr schnell & günstig",
+    "openai/gpt-oss-20b": "GPT-OSS 20B - Schnell & günstig (Ersatz für Llama 3.1 8B)",
     "llama-3.3-70b-versatile": "Llama 3.3 70B - Starkes Reasoning",
     "openai/gpt-oss-120b": "GPT-OSS 120B - Hochwertige Formatierung",
-    "openai/gpt-oss-20b": "GPT-OSS 20B - Extrem schnell",
     "qwen/qwen3-32b": "Qwen3 32B - Gutes Reasoning",
     "meta-llama/llama-4-scout-17b-16e-instruct": "Llama 4 Scout 17B - Vision & Text",
 }

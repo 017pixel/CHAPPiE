@@ -127,12 +127,12 @@ def test_provider_switch_groq_to_ollama_keeps_groq_model():
     backup = _backup_settings_state()
     try:
         settings.llm_provider = LLMProvider.GROQ
-        settings.groq_model = "llama-3.1-8b"
+        settings.groq_model = "openai/gpt-oss-20b"
         settings.llm_provider = LLMProvider.OLLAMA
 
         from config.config import get_active_model
         assert get_active_model() == settings.ollama_model
-        assert settings.groq_model == "llama-3.1-8b"
+        assert settings.groq_model == "openai/gpt-oss-20b"
     finally:
         _restore_settings_state(*backup)
 

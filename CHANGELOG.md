@@ -2,6 +2,31 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [14.0] - 2026-07-02
+
+### Erstellt
+- Gemma 4 E4B als lokale Modellalternative hinzugefuegt
+- Gemma 4 26B-A4B als NF4-Option fuer komplexe Tests hinzugefuegt
+- Modell-Presets in den Einstellungen erstellt
+- Steering-Restart-Modal mit Fortschrittsanzeige erstellt
+- `/model` Befehl fuer die Terminal-CLI erstellt
+
+### Verändert
+- vLLM-Generierung nutzt jetzt modell-spezifische Defaults
+- Steering-Backend erkennt Qwen und Gemma 4 getrennt
+- Steering-Server kann Modelle per Hot-Swap neu laden
+- Alignment-Tests koennen das Laufzeitmodell auswaehlen
+- Dokumentation beschreibt Qwen- und Gemma-4-Betrieb gemeinsam
+
+### Gelöscht
+- Qwen-only-Erkennung im Steering-Pfad entfernt
+- Fest verdrahtete Qwen-Thinking-Annahme entfernt
+- Manuelle Modellwechsel ohne Default-Anpassung entfernt
+- Fehlende Restart-Status-Sicht im Frontend entfernt
+- Veralteter Versionsstand 13.6 in der UI entfernt
+
+---
+
 ## [0.11.1] - 2026-06-11
 
 ### Verändert

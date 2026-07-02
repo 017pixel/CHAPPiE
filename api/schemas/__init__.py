@@ -115,6 +115,8 @@ class SettingsSnapshot(BaseModel):
     ollama_model: str
     vllm_url: str
     vllm_model: str
+    gemma4_model: str
+    gemma4_steering_model: str
     vllm_force_single_model: bool
     groq_model: str
     groq_format_model: str
@@ -145,7 +147,10 @@ class SettingsSnapshot(BaseModel):
     steering_model: str
     steering_quantize: bool
     steering_context_length: int
+    use_model_defaults: bool
     temperature: float
+    top_p: float
+    top_k: int
     repetition_penalty: float
     max_tokens: int
     chappie_thinking_token_limit: int
@@ -167,6 +172,64 @@ class SettingsSnapshot(BaseModel):
 
 class SettingsUpdate(BaseModel):
     llm_provider: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    groq_model: Optional[str] = None
+    groq_format_model: Optional[str] = None
+    groq_memory_model: Optional[str] = None
+    vllm_model: Optional[str] = None
+    gemma4_model: Optional[str] = None
+    gemma4_steering_model: Optional[str] = None
+    vllm_url: Optional[str] = None
+    vllm_force_single_model: Optional[bool] = None
+    ollama_model: Optional[str] = None
+    ollama_host: Optional[str] = None
+    intent_provider: Optional[str] = None
+    intent_processor_model_groq: Optional[str] = None
+    intent_processor_model_ollama: Optional[str] = None
+    intent_processor_model_vllm: Optional[str] = None
+    query_extraction_provider: Optional[str] = None
+    query_extraction_ollama_model: Optional[str] = None
+    query_extraction_vllm_model: Optional[str] = None
+    query_extraction_groq_model: Optional[str] = None
+    query_extraction_min_words_for_llm: Optional[int] = None
+    emotion_analysis_model: Optional[str] = None
+    emotion_analysis_host: Optional[str] = None
+    embedding_model: Optional[str] = None
+    training_use_global_settings: Optional[bool] = None
+    training_chappie_provider: Optional[str] = None
+    training_chappie_model: Optional[str] = None
+    training_trainer_provider: Optional[str] = None
+    training_trainer_model: Optional[str] = None
+    memory_top_k: Optional[int] = None
+    memory_min_relevance: Optional[float] = None
+    memory_consolidation_enabled: Optional[bool] = None
+    memory_consolidation_max_tokens: Optional[int] = None
+    enable_steering: Optional[bool] = None
+    steering_provider: Optional[str] = None
+    steering_model: Optional[str] = None
+    steering_quantize: Optional[bool] = None
+    steering_context_length: Optional[int] = None
+    use_model_defaults: Optional[bool] = None
+    temperature: Optional[float] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    repetition_penalty: Optional[float] = None
+    max_tokens: Optional[int] = None
+    chappie_thinking_token_limit: Optional[int] = None
+    chappie_answer_token_limit: Optional[int] = None
+    history_max_messages: Optional[int] = None
+    context_token_limit: Optional[int] = None
+    context_token_warning_threshold: Optional[int] = None
+    chain_of_thought: Optional[bool] = None
+    enable_two_step_processing: Optional[bool] = None
+    stm_summary_threshold: Optional[int] = None
+    stm_summary_batch_size: Optional[int] = None
+    groq_requests_per_minute: Optional[int] = None
+    groq_requests_per_hour: Optional[int] = None
+    groq_requests_per_day: Optional[int] = None
+    groq_tokens_per_minute: Optional[int] = None
+    groq_tokens_per_hour: Optional[int] = None
+    groq_tokens_per_day: Optional[int] = None
 
 
 class ContextFileUpdate(BaseModel):

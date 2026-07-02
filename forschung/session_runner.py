@@ -31,13 +31,27 @@ class SessionRunner:
 
     def run(self) -> str:
         from web_infrastructure.backend_wrapper import create_chappie_backend
-        from config.config import settings, PROJECT_ROOT
+        from config.config import apply_model_defaults_if_unset, is_gemma4_model, settings, PROJECT_ROOT
 
         os.chdir(str(PROJECT_ROOT))
 
         enable_thinking = self.config.get("enable_thinking")
         if enable_thinking is not None:
             settings.update_from_ui(chain_of_thought=bool(enable_thinking))
+
+        model_name = str(self.config.get("model") or "").strip()
+        if model_name:
+            is_gemma_26b = is_gemma4_model(model_name) and ("26b" in model_name.lower() or "a4b" in model_name.lower())
+            context_length = 4096 if is_gemma_26b else 8192
+            settings.update_from_ui(
+                llm_provider="vllm",
+                vllm_model=model_name,
+                steering_model=model_name,
+                steering_quantize=is_gemma_26b,
+                steering_context_length=context_length,
+                use_model_defaults=True,
+            )
+            apply_model_defaults_if_unset(model_name, settings)
 
         if self.backend is None:
             try:
@@ -47,6 +61,8 @@ class SessionRunner:
 
         if self.config.get("formatting_mode", "local") == "local":
             setattr(self.backend, "force_local_formatting", True)
+        if model_name:
+            self.backend.apply_runtime_settings(force=True)
 
         self.logger = SessionLogger(self.config)
         history: List[Dict[str, str]] = []
