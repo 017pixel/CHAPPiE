@@ -48,7 +48,7 @@ from config.config import settings, CHROMA_DB_DIR, LLMProvider
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import looks_like_model_error, strip_role_prefixes
-from config.prompts import format_query_extraction_prompt
+from config.prompts import format_query_extraction_prompt, THINK_PROMPT_TEMPLATE  # from config/prompts.py
 
 
 @dataclass
@@ -1231,7 +1231,7 @@ class MemoryEngine:
         - Atomare Operationen (Löschen erst nach Speichern)
         - Unbegrenzte Verarbeitung (kein Limit mehr)
         """
-        from config.prompts import format_dream_prompt
+        from config.prompts import format_dream_prompt  # from config/prompts.py
 
         # Erinnerungen holen - UNBEGRENZT (alle Interaction-Erinnerungen)
         total_count = self.get_memory_count()
@@ -1341,31 +1341,6 @@ class MemoryEngine:
         """
         import time
         
-        # Think-Prompt Template
-        THINK_PROMPT_TEMPLATE = """Du bist CHAPPiE und befindest dich in einer tiefen Reflektionsphase.
-
-Dein aktueller Denkschritt: {step} von {total_steps}
-Thema der Reflektion: {topic}
-
-VORHERIGER GEDANKE:
-{previous_thought}
-
-RELEVANTE ERINNERUNGEN:
-{memories}
-
-AUFGABE:
-Reflektiere ueber das Thema basierend auf deinem vorherigen Gedanken und den Erinnerungen.
-Formuliere einen neuen, tieferen Gedanken der auf den bisherigen aufbaut.
-
-REGELN:
-- Sei introspektiv und analytisch
-- Verbinde verschiedene Informationen miteinander
-- Ziehe Schlussfolgerungen
-- Formuliere neue Fragen oder Erkenntnisse
-- Maximal 2-3 Saetze
-
-Dein naechster Gedanke:"""
-
         # Standard-Thema wenn keins angegeben
         if not topic:
             topic = "Allgemeine Selbstreflexion ueber meine Erfahrungen und Erkenntnisse"

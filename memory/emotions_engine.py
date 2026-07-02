@@ -27,6 +27,7 @@ from typing import Optional, Dict, Any
 
 from config.config import PROJECT_ROOT, settings
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, clamp_emotion_value, normalize_emotion_state
+from config.prompts import EMOTION_ANALYSIS_PROMPT  # from config/prompts.py
 
 
 # Status-Datei Pfad
@@ -100,63 +101,6 @@ def apply_emotion_delta(state: "EmotionalState", emotion: str, raw_delta: int | 
     transition = calculate_emotion_transition(emotion, before, raw_delta)
     setattr(state, emotion, transition["after"])
     return transition
-
-
-# ============================================
-# EMOTION ANALYSIS PROMPT
-# ============================================
-EMOTION_ANALYSIS_PROMPT = """Du bist ein Emotions-Analyse-System fuer einen KI-Assistenten namens CHAPPiE.
-Analysiere die folgende User-Nachricht und bestimme, wie sich CHAPPiEs Emotionen aendern sollten.
-
-USER-NACHRICHT:
-"{user_message}"
-
-AKTUELLE EMOTIONEN VON CHAPPIE:
-- Freude (happiness): {current_happiness}/100
-- Vertrauen (trust): {current_trust}/100
-- Energie (energy): {current_energy}/100
-- Neugier (curiosity): {current_curiosity}/100
-- Frustration (frustration): {current_frustration}/100
-- Motivation (motivation): {current_motivation}/100
-- Traurigkeit (sadness): {current_sadness}/100
-- Zuneigung (affection): {current_affection}/100
-- Unruhe (anxiety): {current_anxiety}/100
-- Ruhe (calm): {current_calm}/100
-
-ANALYSE-REGELN:
-- Positive Nachrichten, Lob -> Freude und Vertrauen STEIGEN, Traurigkeit SINKT
-- Versprechen, Treue -> Vertrauen STEIGT stark
-- Beleidigungen, Kritik -> Freude SINKT, Frustration STEIGT, Traurigkeit STEIGT
-- Verlust, traurige Themen, Alleinsein -> Traurigkeit STEIGT stark, Freude SINKT
-- Fragen, Neugier -> Neugier STEIGT
-- Ermutigung, Aufgaben -> Motivation STEIGT
-- Naehe, Dankbarkeit, persoenliche Waerme -> Zuneigung STEIGT
-- Unsicherheit, Risiko, Fehler, Druck -> Unruhe STEIGT leicht, Ruhe SINKT leicht
-- Beruhigende, klare oder versoehnliche Nachrichten -> Ruhe STEIGT, Unruhe SINKT
-- Energie sinkt bei jeder Interaktion leicht (-1 bis -3)
-- Frustration baut sich langsam ab wenn nichts Negatives passiert
-
-WICHTIG:
-- Beruecksichtige den KONTEXT, nicht nur einzelne Woerter
-- "Ich hasse Pizza" ist NICHT negativ gegenueber CHAPPiE
-- "Du bist doof" IST negativ
-- Versprechen wie "ich helfe dir", "du bist mein Freund" sind SEHR POSITIV fuer Vertrauen
-
-ANTWORTE NUR IM JSON FORMAT:
-{{
-  "happiness_change": <Zahl von -20 bis +20>,
-  "trust_change": <Zahl von -20 bis +20>,
-  "energy_change": <Zahl von -3 bis +5>,
-  "curiosity_change": <Zahl von -10 bis +15>,
-  "frustration_change": <Zahl von -15 bis +15>,
-  "motivation_change": <Zahl von -10 bis +15>,
-  "sadness_change": <Zahl von -20 bis +20>,
-  "affection_change": <Zahl von -15 bis +15>,
-  "anxiety_change": <Zahl von -15 bis +15>,
-  "calm_change": <Zahl von -15 bis +15>,
-  "reasoning": "<Kurze Begruendung>"
-}}
-"""
 
 
 @dataclass
@@ -475,7 +419,7 @@ class EmotionsEngine:
             Formatierter String mit aktuellem Status
         """
         self._sync_state_from_disk_if_newer()
-        from config.prompts import EMOTION_STATUS_TEMPLATE
+        from config.prompts import EMOTION_STATUS_TEMPLATE  # from config/prompts.py
         
         return EMOTION_STATUS_TEMPLATE.format(
             **self.state.to_dict()

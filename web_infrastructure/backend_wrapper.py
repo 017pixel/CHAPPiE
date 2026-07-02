@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Callable, Optional, Generator
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, normalize_emotion_state
-from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories
+from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories, FORMATTER_WITH_COT_PROMPT, FORMATTER_WHITESPACE_PROMPT, RESPONSE_STYLE_CASUAL, RESPONSE_STYLE_DEFAULT  # from config/prompts.py
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
 from memory.chat_manager import ChatManager
@@ -609,8 +609,8 @@ def create_chappie_backend():
         def _response_style_instruction(intent_type: Any = None) -> str:
             intent = getattr(intent_type, "value", intent_type)
             if str(intent or "").lower() == "casual_chat":
-                return "ANTWORTSTIL: Antworte kurz und konkret, normalerweise in 3-6 Saetzen."
-            return "ANTWORTSTIL: Beginne kurz und konkret; werde nur so ausfuehrlich wie die Aufgabe es braucht."
+                return RESPONSE_STYLE_CASUAL
+            return RESPONSE_STYLE_DEFAULT
 
         @staticmethod
         def _append_response_style_instruction(system_prompt: str, intent_type: Any = None) -> str:
@@ -939,56 +939,9 @@ def create_chappie_backend():
                     api_key=settings.groq_api_key,
                 )
                 if settings.chain_of_thought:
-                    system_prompt = (
-                        "You are a precise text formatter. Your ONLY job is to fix whitespace and split\n"
-                        "the raw model output into reasoning (cot) and final answer (antwort) blocks.\n\n"
-                        "== WHITESPACE FIXES (apply to ALL text) ==\n"
-                        "- Words glued together: 'HalloWelt' -> 'Hallo Welt'\n"
-                        "- Punctuation followed by word: 'text.Weiter' -> 'text. Weiter'\n"
-                        "- Asterisks touching words: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
-                        "- Numbers touching words: 'Code007' -> 'Code 007'\n"
-                        "- Single letters separated by dots: 's.c.h.w.e.r' -> 'schwer'\n"
-                        "- Underscores joining words: 'weil_ich_bin' -> 'weil ich bin'\n"
-                        "- Multiple punctuation marks: '?!' keep as-is, never separate\n\n"
-                        "== TEXT STRUCTURE ==\n"
-                        "- Insert empty line between major conversational turns for readability\n"
-                        "- Preserve ALL content exactly as written: poetic text, emotional markers (*...*),\n"
-                        "  asterisks, quotes, special characters, repetition, and glitched text\n"
-                        "- Do NOT merge separate lines into a single paragraph block\n"
-                        "- Every word, character, and marker from the input must be present unchanged\n\n"
-                        "== COT / ANTWORT SPLITTING ==\n"
-                        "- Everything inside <think>, <thinking>, <gedanke>, or <reasoning> tags -> into <cot>\n"
-                        "- The part after the CLOSING tag (</think>, </thinking>, etc.) -> into <antwort>\n"
-                        "- If the text uses numbered sections like '1.**AnalyzeRequest:**...' -> into <cot>\n"
-                        "- Text containing '*atmet...*', '*seufzt...*', '*starrt...*' action markers -> into <cot>\n"
-                        "- The final conversational response, poetic text, or direct speech -> into <antwort>\n\n"
-                        "== OUTPUT FORMAT ==\n"
-                        "<cot>\n[all reasoning/thinking/analysis content, whitespace-fixed]\n</cot>\n"
-                        "<antwort>\n[all final answer/dialogue content, whitespace-fixed]\n</antwort>\n\n"
-                        "== CHECKS BEFORE OUTPUT ==\n"
-                        "1. Every word in the input must appear unchanged in the output\n"
-                        "2. Nothing added, removed, replaced, summarized, or rephrased\n"
-                        "3. Line breaks only added for readability, never removed\n"
-                        "4. If no reasoning exists: <cot>\\n</cot> (empty block)\n"
-                        "5. If the entire text is thinking with no answer: <antwort>\\n</antwort> (empty block)\n\n"
-                        "Do not explain. Output ONLY the tagged blocks."
-                    )
+                    system_prompt = FORMATTER_WITH_COT_PROMPT
                 else:
-                    system_prompt = (
-                        "You are a precise whitespace formatter. Fix spacing and punctuation layout.\n\n"
-                        "== WHITESPACE FIXES ==\n"
-                        "- Insert spaces between merged words: 'HalloWelt' -> 'Hallo Welt'\n"
-                        "- Insert spaces after punctuation: 'text.Weiter' -> 'text. Weiter'\n"
-                        "- Insert spaces around asterisks: '*seufzt*Hallo' -> '*seufzt* Hallo'\n"
-                        "- Fix dot-separated letters: 's.c.h.w.e.r' -> 'schwer'\n"
-                        "- Fix underscore-joined words: 'weil_ich_bin' -> 'weil ich bin'\n"
-                        "- Keep multiple punctuation marks together: '?!' stays as '?!'\n\n"
-                        "== TEXT STRUCTURE ==\n"
-                        "- Insert line breaks for readability at sentence boundaries\n"
-                        "- Preserve ALL words, punctuation, asterisks, quotes, and special characters exactly\n"
-                        "- Nothing added, removed, replaced, summarized, or rephrased\n\n"
-                        "Output ONLY the corrected text. No tags. No explanations."
-                    )
+                    system_prompt = FORMATTER_WHITESPACE_PROMPT
                 response = client.chat.completions.create(
                     model=self.GROQ_FORMAT_MODEL,
                     messages=[

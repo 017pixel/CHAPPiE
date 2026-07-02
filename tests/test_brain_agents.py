@@ -47,7 +47,7 @@ def test_config():
     print("\nTEST 2: Testing brain configuration...")
     
     try:
-        from config.brain_config import (
+        from config.config import (
             BRAIN_AGENT_CONFIGS,
             get_agent_config,
             get_sleep_config,

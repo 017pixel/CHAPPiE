@@ -13,7 +13,7 @@ for mod in ("ollama", "chromadb", "chromadb.config", "requests", "openai", "sent
         sys.modules[mod] = MagicMock()
 
 from config.config import LLMProvider  # noqa: E402
-from config.prompts import get_system_prompt_with_emotions  # noqa: E402
+from config.prompts import get_system_prompt_with_emotions  # from config/prompts.py
 from web_infrastructure.backend_wrapper import prompt_chain_of_thought_enabled, response_memory_top_k_for_intent  # noqa: E402
 
 

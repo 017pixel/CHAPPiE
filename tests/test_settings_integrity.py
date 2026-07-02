@@ -14,7 +14,7 @@ sys.modules["chromadb"] = MagicMock()
 sys.modules["sentence_transformers"] = MagicMock()
 
 from config.config import settings, LLMProvider
-from config.root_config import DEFAULT_ROOT_CONFIG
+from config.config import DEFAULT_ROOT_CONFIG
 
 
 def test_llm_provider_has_groq():

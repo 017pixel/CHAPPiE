@@ -9,8 +9,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from config.config import settings, LLMProvider
-from config.brain_config import get_agent_config
+from config.config import settings, LLMProvider, get_agent_config
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 

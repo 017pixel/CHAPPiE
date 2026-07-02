@@ -16,6 +16,7 @@ import re
 from typing import Dict, Any
 from datetime import datetime
 
+from config.prompts import SENSORY_CORTEX_SYSTEM_PROMPT, SENSORY_CORTEX_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -69,42 +70,11 @@ class SensoryCortexAgent(BaseAgent):
     def _classify_input(self, user_input: str, history: list) -> Dict[str, Any]:
         """Classify the input and determine routing."""
         
-        system_prompt = """DU BIST DER SENSORY CORTEX VON CHAPPiE.
-
-Deine Aufgabe: Klassifiziere den User-Input und entscheide, welche Agenten benoetigt werden.
-
-KATEGORIEN:
-- conversation: Normale Konversation, Smalltalk
-- information: Informationsanfrage, Wissensfrage  
-- emotional: Emotionale Inhalte, persoenliches Teilen
-- task: Aufgaben, Anfragen die Tools benoetigen
-- memory_query: Frage nach vergangenen Gesprachen/Erinnerungen
-- urgent: Dringende Anfrage, needs immediate attention
-
-ROUTING:
-- amygdala: Bei emotionalen Inhalten
-- hippocampus: Bei Memory-Queries oder wichtigen Infos zum Speichern
-- prefrontal: Immer (Hauptverarbeitung)
-
-ANTWORTE NUR MIT JSON:
-{
-  "input_type": "conversation|information|emotional|task|memory_query|urgent",
-  "language": "de|en",
-  "urgency": "high|medium|low",
-  "emotional_content": true|false,
-  "requires_memory_search": true|false,
-  "requires_tools": true|false,
-  "suggested_agents": ["amygdala", "hippocampus", "prefrontal"],
-  "preprocessed_text": "Bereinigter Input",
-  "confidence": 0.0-1.0
-}"""
-
-        user_prompt = f"""User Input: {user_input}
-
-Letzte Nachrichten (Kontext):
-{self._format_history(history)}
-
-Klassifiziere den Input (NUR JSON):"""
+        system_prompt = SENSORY_CORTEX_SYSTEM_PROMPT
+        user_prompt = SENSORY_CORTEX_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            history=self._format_history(history),
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

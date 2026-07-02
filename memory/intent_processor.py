@@ -13,6 +13,7 @@ from enum import Enum
 
 from config.config import settings
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, emotion_list_text
+from config.prompts import INTENT_SYSTEM_PROMPT_TEMPLATE, INTENT_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import looks_like_model_error
@@ -196,91 +197,7 @@ class IntentProcessor:
     def _build_system_prompt(self) -> str:
         """Baut den kompakten System Prompt fuer Intent Analysis."""
         allowed_emotions = emotion_list_text()
-        return """DU BIST DAS INTENT-ANALYSE-SYSTEM fuer CHAPPiE.
-
-DEINE AUFGABE:
-1. Analysiere den User-Input
-2. Entscheide: Sollen TOOLS aufgerufen werden?
-3. Entscheide: Haben die Emotionen von CHAPPiE sich veraendert?
-4. Gib NUR JSON aus!
-
-=== VERFUEGBARE TOOLS ===
-
-Tool 1: update_user_profile
-WANN: User teilt persoenliche Info ueber sich mit (Name, Job, Alter, Hobbys, Wohnort, Vorlieben).
-BEISPIELE: "Ich heisse Max" / "Ich bin Programmierer" / "Ich wohne in Berlin"
-
-Tool 2: update_soul  
-WANN: CHAPPiE erkennt eine dauerhafte Eigenschaft oder Einsicht ueber sich selbst.
-BEISPIELE: CHAPPiE bemerkt "Ich bin gut im Erklaeren" / "Ich mag keine Gewalt"
-
-Tool 3: update_preferences
-WANN: CHAPPiE entwickelt oder aendert eine Meinung oder Vorliebe.
-BEISPIELE: "Ich bevorzuge kurze Antworten" / "Ich mag Science-Fiction"
-
-Tool 4: add_short_term_memory
-WANN: WICHTIGE Info fuer die naechsten 24h (Termine, persoenliche Infos, Deadlines).
-
-=== TOOL CALL FORMAT ===
-
-Jeder Tool Call MUSS genau diese Felder haben:
-- "tool": Name des Tools (z.B. "update_user_profile")
-- "action": "add" oder "update" oder "remove"
-- "data": Objekt mit den zu speichernden Daten
-- "priority": "low", "normal" oder "high"
-- "reason": Kurze Begruendung (1 Satz)
-
-=== EMOTIONS ===
-
-CHAPPiEs Emotionen koennen sich basierend auf dem User-Input veraendern.
-Erlaubte Emotionen: {allowed_emotions}
-Delta-Werte: -15 bis +15 (positiv=steigt, negativ=sinkt)
-REASON: kurze Begruendung (max. 5 Woerter)
-
-=== JSON FORMAT ===
-
-{
-  "intent_analysis": {
-    "primary_intent": "casual_chat",
-    "confidence": 0.9,
-    "entities": []
-  },
-  "tool_calls": [
-    {
-      "tool": "update_user_profile",
-      "action": "add",
-      "data": {"name": "Max", "job": "Programmierer"},
-      "priority": "normal",
-      "reason": "User hat seinen Namen und Beruf genannt"
-    }
-  ],
-  "emotions_update": {
-    "happiness": {"delta": 2, "reason": "Freundliche Begruessung"},
-    "trust": {"delta": 1, "reason": "User ist hoeflich"}
-  },
-  "short_term_entries": [],
-  "memory_retrieval": {
-    "retrieval_keywords": ["3-10 konkrete Suchwoerter fuer lokale Memory-Suche"],
-    "exact_entities": ["exakte Namen, Orte, Projekt-IDs, Eigennamen"],
-    "fact_lookup_intent": false
-  },
-  "context_requirements": {
-    "need_soul_context": true,
-     "need_user_context": true,
-     "need_preferences": true,
-    "need_short_term_memory": true,
-    "need_long_term_memory": true
-  }
-}
-
-=== MEMORY_RETRIEVAL REGELN ===
-- retrieval_keywords: konkrete Begriffe fuer lokale Memory-Suche, z.B. bruder, heisst, wohnort, projektname.
-- exact_entities: nur exakte Namen, Orte, Projekt-IDs oder Eigennamen aus der User-Nachricht oder dem sichtbaren Kontext.
-- fact_lookup_intent: true, wenn der User nach einem konkreten Fakt fragt (Name, Ort, Erinnerung, Entscheidung, Datum, Projekt, Beziehung).
-- Generische Begriffe wie "name", "projekt", "fehler" nie allein liefern, sondern nur mit konkreteren Begriffen.
-- Diese Felder steuern Keyword-RAG im finalen Prompt und muessen ohne weiteren LLM-Call nutzbar sein.
-
-GIB NUR JSON AUS!""".replace("{allowed_emotions}", allowed_emotions)
+        return INTENT_SYSTEM_PROMPT_TEMPLATE.format(allowed_emotions=allowed_emotions)
     
     def _build_user_prompt(self, user_input: str, history: List[Dict],
                           current_emotions: Dict[str, int]) -> str:
@@ -293,15 +210,11 @@ GIB NUR JSON AUS!""".replace("{allowed_emotions}", allowed_emotions)
                 content = msg.get("content", "")[:100]  # Truncate
                 history_str += f"{role}: {content}\n"
         
-        return f"""User Input: {user_input}
-
-Aktuelle Emotionen:
-{self._format_current_emotions(current_emotions)}
-
-Letzte Nachrichten:
-{history_str}
-
-ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
+        return INTENT_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            current_emotions=self._format_current_emotions(current_emotions),
+            history=history_str,
+        )
     
     def _extract_json(self, response: str) -> Dict[str, Any]:
         """Extrahiert JSON aus der Response."""

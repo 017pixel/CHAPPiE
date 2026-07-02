@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
+from config.prompts import HIPPOCAMPUS_SYSTEM_PROMPT, HIPPOCAMPUS_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -83,68 +84,17 @@ class HippocampusAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Determine memory operations."""
         
-        system_prompt = """DU BIST DER HIPPOCAMPUS VON CHAPPiE.
-
-Deine Aufgabe: Entscheide ueber Memory-Operationen.
-
-MEMORY-TYPEN:
-- episodic: Persoenliche Erlebnisse, Gespraeche
-- semantic: Faktenwissen, Konzepte
-- procedural: Skills, Ablaeufe
-
-ENCODING ENTSCHEIDUNG:
-- Soll diese Info gespeichert werden?
-- Wie wichtig ist sie? (importance: high/medium/low)
-- Welcher Memory-Typ?
-
-QUERY EXTRACTION:
-- Optimiere die Suchquery fuer Vektor-Datenbank
-- Extrahiere Schluesselkonzepte
-
-ANTWORTE NUR MIT JSON:
-{
-  "should_encode": true|false,
-  "encoding_decision": {
-    "importance": "high|medium|low",
-    "memory_type": "episodic|semantic|procedural",
-    "emotional_boost": 1.0-3.0,
-    "content_to_store": "Zusammenzufassender Inhalt",
-    "tags": ["tag1", "tag2"]
-  },
-  "search_query": "Optimierte Suchquery",
-  "related_concepts": ["konzept1", "konzept2"],
-  "context_relevance": {
-    "need_soul_context": true|false,
-    "need_user_context": true|false,
-    "need_preferences": true|false,
-    "need_short_term_memory": true|false,
-    "need_long_term_memory": true|false
-  },
-  "short_term_entries": [
-    {
-      "content": "Kurzzeit-Info",
-      "category": "user|event|topic|technical",
-      "importance": "high|medium|low"
-    }
-  ],
-  "confidence": 0.0-1.0
-}"""
-
         emotional_boost = amygdala_result.get("memory_boost_factor", 1.0)
         requires_memory = sensory_result.get("requires_memory_search", True)
-        
-        user_prompt = f"""User Input: {user_input}
-
-Sensory Klassifikation:
-- Input Type: {sensory_result.get('input_type', 'conversation')}
-- Requires Memory Search: {requires_memory}
-
-Emotionale Analyse:
-- Primary Emotion: {amygdala_result.get('primary_emotion', 'neutral')}
-- Emotional Boost Factor: {emotional_boost}
-- Personal Relevance: {amygdala_result.get('personal_relevance', 0.5)}
-
-Entscheide ueber Memory-Operationen (NUR JSON):"""
+        system_prompt = HIPPOCAMPUS_SYSTEM_PROMPT
+        user_prompt = HIPPOCAMPUS_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            input_type=sensory_result.get('input_type', 'conversation'),
+            requires_memory=requires_memory,
+            primary_emotion=amygdala_result.get('primary_emotion', 'neutral'),
+            emotional_boost=emotional_boost,
+            personal_relevance=amygdala_result.get('personal_relevance', 0.5),
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

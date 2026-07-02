@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
+from config.prompts import NEOCORTEX_SYSTEM_PROMPT, NEOCORTEX_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -87,72 +88,16 @@ class NeocortexAgent(BaseAgent):
                 "archived_memories": []
             }
         
-        system_prompt = """DU BIST DER NEOCORTEX VON CHAPPiE.
-
-Deine Aufgabe: Konsolidiere Memories und aktualisiere Context-Dateien.
-
-KONSOLIDIERUNG:
-- Entscheide welche Memories wichtig genug sind
-- Extrahiere relevante Updates fuer soul.md, user.md, preferences.md
-- Vermeide Duplikate und redundante Informationen
-
-SOUL.MD UPDATES:
-- trust_level: Aenderung basierend auf Interaktionen
-- evolution_note: Wichtige Erkenntnisse ueber sich selbst
-- new_value: Neue Werte oder Ueberzeugungen
-
-USER.MD UPDATES:
-- name: Falls bekannt
-- key_moment: Wichtige gemeinsame Momente
-- learning: Was CHAPPiE ueber den User gelernt hat
-
-PREFERENCES.MD UPDATES:
-- new_preference: Neue Vorlieben von CHAPPiE
-- category: Kategorie der Praeferenz
-- reflection: Selbstreflexion
-
-ANTWORTE NUR MIT JSON:
-{
-  "consolidated_count": int,
-  "soul_updates": {
-    "trust_level": int (optional),
-    "evolution_note": "text" (optional),
-    "new_value": "text" (optional)
-  },
-  "user_updates": {
-    "name": "text" (optional),
-    "key_moment": "text" (optional),
-    "learning": "text" (optional)
-  },
-  "preferences_updates": {
-    "new_preference": "text" (optional),
-    "category": "text" (optional),
-    "reflection": "text" (optional)
-  },
-  "archived_memories": ["id1", "id2"],
-  "rationale": "Kurze Erklaerung der Entscheidungen",
-  "confidence": 0.0-1.0
-}"""
-
         memories_str = "\n".join([f"- [{m.get('timestamp', '')}] {m.get('content', '')[:150]}" for m in memories[:10]])
-        
-        user_prompt = f"""Zu konsolidierende Memories:
-{memories_str}
-
-Aktueller Soul Content:
-{soul_content[:500]}
-
-Aktueller User Content:
-{user_content[:500]}
-
-Aktueller Preferences Content:
-{preferences_content[:500]}
-
-Reward Signal:
-Satisfaction: {reward_signal.get('satisfaction_score', 0.5)}
-Quality: {reward_signal.get('interaction_quality', 'neutral')}
-
-Entscheide ueber Konsolidierung (NUR JSON):"""
+        system_prompt = NEOCORTEX_SYSTEM_PROMPT
+        user_prompt = NEOCORTEX_USER_PROMPT_TEMPLATE.format(
+            memories=memories_str,
+            soul_content=soul_content[:500],
+            user_content=user_content[:500],
+            preferences_content=preferences_content[:500],
+            satisfaction=reward_signal.get('satisfaction_score', 0.5),
+            quality=reward_signal.get('interaction_quality', 'neutral'),
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 
 # Backend Imports ohne UI-Abhaengigkeiten
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
-from config.prompts import get_system_prompt_with_emotions
+from config.prompts import get_system_prompt_with_emotions  # from config/prompts.py
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.chat_manager import ChatManager

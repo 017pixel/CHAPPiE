@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
+from config.prompts import PREFRONTAL_SYSTEM_PROMPT, PREFRONTAL_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -84,76 +85,21 @@ class PrefrontalCortexAgent(BaseAgent):
         life_context = input_data.get("life_context", {})
         global_workspace = input_data.get("global_workspace", {})
         
-        system_prompt = """DU BIST DER PREFRONTAL CORTEX VON CHAPPiE.
-
-Deine Aufgabe: Koordiniere die Antwort und entscheude ueber die Response-Strategie.
-
-RESPONSE-STRATEGIEN:
-- conversational: Normale Konversation, freundlich
-- informative: Wissensvermittlung, erklaerend
-- emotional: Emotionale Unterstuetzung, einfuehlsam
-- technical: Technische Diskussion, detailliert
-- creative: Kreative Zusammenarbeit, brainstorming
-
-WORKING MEMORY:
-- Halte wichtige Infos aktiv
-- Priorisiere relevante Memories
-- Integriere Emotionen in die Antwort
-
-ANTWORTE NUR MIT JSON:
-{
-  "response_strategy": "conversational|informative|emotional|technical|creative",
-  "tone": "friendly|formal|casual|enthusiastic|calm",
-  "key_topics": ["thema1", "thema2"],
-  "relevant_memories": ["memory_id1"],
-  "emotional_tone_adjustment": {
-    "happiness": -10 bis +10,
-    "trust": -10 bis +10,
-    "empathy": 0-100
-  },
-  "context_priorities": {
-    "soul": 0.0-1.0,
-    "user": 0.0-1.0,
-    "preferences": 0.0-1.0,
-    "memories": 0.0-1.0
-  },
-  "response_guidance": "Kurze Anleitung fuer die Antwort",
-  "confidence": 0.0-1.0,
-  "planning_mode": "stabilizing|explorative|goal_directed|supportive",
-  "life_alignment": "Wie die Antwort zum inneren Zustand passt",
-  "attention_summary": "Was aktuell bewusst priorisiert wird",
-  "response_actions": ["konkrete Aktion 1", "konkrete Aktion 2"]
-}"""
-
         memories_str = "\n".join([f"- {m.get('content', m)[:100]}" for m in memories[:5]]) if memories else "Keine relevanten Memories"
-        
-        user_prompt = f"""User Input: {user_input}
-
-Sensory Klassifikation:
-- Input Type: {sensory.get('input_type', 'conversation')}
-- Urgency: {sensory.get('urgency', 'medium')}
-
-Emotionale Analyse:
-- Primary Emotion: {amygdala.get('primary_emotion', 'neutral')}
-- Intensity: {amygdala.get('emotional_intensity', 0.3)}
-- Sentiment: {amygdala.get('sentiment', 'neutral')}
-
-Memory Context:
-{memories_str}
-
-Context Available:
-{context[:500] if context else 'Kein Context'}
-
-Aktuelle Emotionen:
-{json.dumps(emotions, indent=2)}
-
-Life Simulation:
-{json.dumps(life_context, indent=2)[:1200] if life_context else 'Keine Life-Simulation aktiv'}
-
-Global Workspace:
-{json.dumps(global_workspace, indent=2)[:1000] if global_workspace else 'Kein Workspace verfügbar'}
-
-Entscheide die Response-Strategie (NUR JSON):"""
+        system_prompt = PREFRONTAL_SYSTEM_PROMPT
+        user_prompt = PREFRONTAL_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            input_type=sensory.get('input_type', 'conversation'),
+            urgency=sensory.get('urgency', 'medium'),
+            primary_emotion=amygdala.get('primary_emotion', 'neutral'),
+            emotional_intensity=amygdala.get('emotional_intensity', 0.3),
+            sentiment=amygdala.get('sentiment', 'neutral'),
+            memories=memories_str,
+            context=context[:500] if context else 'Kein Context',
+            emotions=json.dumps(emotions, indent=2),
+            life_context=json.dumps(life_context, indent=2)[:1200] if life_context else 'Keine Life-Simulation aktiv',
+            global_workspace=json.dumps(global_workspace, indent=2)[:1000] if global_workspace else 'Kein Workspace verfuegbar',
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

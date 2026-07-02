@@ -1,141 +1,85 @@
 # CHAPPiE Agent Guide
 
-Kanonische Arbeitsanweisung für KI-Agents, die in diesem Repository Änderungen vornehmen.
+Framework-basierte Anweisungen für diesen Agenten: `.agents/skills/` (OpenCode) + `.claude/skills/` (Architektur, Testing, Backend, Frontend, Prompts, Config, Update).
 
-## Pflicht vor jeder Änderung
+## Entrypoints
 
-1. `README.md` lesen
-2. prüfen, welche Detailseite unter `docs/` die Aufgabe erklärt
-3. betroffene Quellpfade bestätigen
-4. nach jeder strukturellen oder funktionalen Änderung die Doku-Relevanz prüfen
-
-## Pflicht vor jedem Push / Merge Request
-
-Vor jedem GitHub-Push-Update muss geprüft werden, ob eine oder mehrere dieser Dateien aktualisiert werden müssen:
-
-- `README.md`
-- `AGENTS.md`
-- `docs/architecture.md`
-- `docs/workflows.md`
-- `docs/local-models.md`
-- `docs/project-map.md`
-- `docs/testing.md`
-- `docs/deployment.md`
-- `tests/README.md`
-- betroffene Brückendateien in `Info Dateien/`
-
-## Unverhandelbare Regeln
-
-### 1. Training-Service
-
-- korrekt: `ExecStart=... -m Chappies_Trainingspartner.training_daemon`
-- falsch: `ExecStart=... -m Chappies_Trainingspartner.training_loop`
-- `training_loop.py` ist kein systemd-Entry-Point
-
-### 2. Service-Zuverlässigkeit
-
-- `Restart=always` beibehalten
-- absolute Pfade in `ExecStart` und `WorkingDirectory`
-
-### 3. Doku-Prüfung vor Pushes
-
-Vor jedem GitHub-Push-Update muss geprüft werden, ob mindestens eine dieser Dateien angepasst werden muss:
-
-- `README.md`
-- `AGENTS.md`
-- `docs/*`
-- `tests/README.md`
-- betroffene Brückendateien in `Info Dateien/`
-
-### 4. Modellstrategie
-
-- lokale **Qwen-3.5-Modelle zuerst**
-- `vLLM` bevorzugt
-- APIs nur Fallback, wenn lokal nicht praktikabel
-
-### 5. Lange Downloads / Modellstarts
-
-- lange Modell-Downloads, Cache-Warmups oder aehnliche Jobs nicht unnoetig blockierend im Vordergrund laufen lassen
-- stattdessen `nohup`-artig als Hintergrundprozess oder ueber den bestehenden Service starten, Logs beobachten und waehrenddessen an unabhaengigen Schritten weiterarbeiten
-- erst fuer den eigentlichen Health-/Live-Test wieder gezielt auf Abschluss und Erreichbarkeit warten
-
-### 6. Projektstruktur
-
-- **Root** enthält nur Einstiegspunkte: `app.py` (API), `chappie_brain_cli.py` (Terminal), Projekt-Config (`requirements.txt`, `CHAPPIE_CONFIG.example.json`)
-- **`api/`** — FastAPI Backend (Routers, Schemas, Services)
-- **`brain/`** — LLM-Pipeline (vLLM, Groq, Ollama, Steering, Global Workspace)
-- **`config/`** — Zentrale Konfiguration (`config.py`, `prompts.py`, `brain_config.py`)
-- **`data/`** — Laufzeitdaten (ChromaDB, Steering-Vektoren, Personality-Files)
-- **`deploy/`** — Systemd-Services und Deployment-Scripts
-- **`frontend/`** — React + Vite + Tailwind Frontend
-- **`life/`** — Life-Simulation (Homeostasis, Goals, Planning, Social Arc)
-- **`memory/`** — Gedächtnis-Subsystem (LTM, STM, Intent, Sleep, Context)
-- **`scripts/`** — Setup, Cleanup, Backup, Validierung; `scripts/archive/` für Legacy-Dateien
-- **`tests/`** — Alle Test-Dateien
-- **`web_infrastructure/`** — Backend-Wrapper (`CHAPPiEBackend`)
-- **`Chappies_Trainingspartner/`** — Autonomes Training (Daemon + Loop)
-- **`docs/`** — Alle Dokumentation
-- **CLI** ist `chappie_brain_cli.py` (nicht `main.py` — das ist legacy in `scripts/archive/`)
-
-### 7. CLI-Einstiegspunkte
-
-| Zweck | Datei |
+| Zweck | Befehl |
 |---|---|
-| App-API starten | `app.py` |
+| API starten | `python app.py` (uvicorn auf :8010) |
 | Terminal-CLI (lokal) | `python chappie_brain_cli.py` |
 | Terminal-CLI (remote) | `python chappie_brain_cli.py --remote` |
 | Training-Daemon | `python -m Chappies_Trainingspartner.training_daemon` |
+| Frontend dev | `cd frontend && npm run dev` (:5173) |
+| Frontend build | `cd frontend && npm run build` (tsc + vite) |
 
-## Dokumentationskarte
+## Services (systemd)
 
-| Frage | Datei |
+Startreihenfolge: `chappie-vllm.service` -> `chappie-web.service` -> `chappie-frontend.service`.
+Training läuft separat via `chappie-training.service`.
+Steering API (vLLM) läuft auf :8000, Web-API auf :8010, Frontend Preview auf :4173.
+
+## Tests
+
+**Kein pytest** – Tests laufen als standalone Scripte: `python tests/test_foo.py`.
+
+- **Schnelle Logiktests** (CI-Pflicht): `test_forgetting_curve`, `test_life_simulation`, `test_debug_monitor_data`, `test_local_first_runtime`, `test_config_package_import`, `test_chat_ui_formatting`, `test_reasoning_layering`, `test_web_ui_consistency`, `test_root_config`, `test_settings_integrity`, `test_cli_*`, `test_forschung_harness` u.a.
+- **Erweiterte Tests** (CI can fail): `test_vllm_response_handling`, `test_ollama_response_handling`, `test_chat_manager_persistence`, `test_short_term_memory`, `test_training_config_ui`, `test_api_contract`
+- **Live/Integrationsnah** (nur bei Bedarf): `test_brain_agents`, `test_integration`, `test_query_extraction`
+- **Manuelle Tests**: `tests/manual/`
+- Syntax-Check: `python -m py_compile datei.py` (genutzte Liste in `.github/workflows/ci.yml`)
+
+## Konfiguration & Secrets
+
+- `CHAPPIE_CONFIG.json` und `config/secrets.py` sind **gitignored** – nach `config/example_config.py` und `config/secrets.py` richten
+- API-Keys in `config/APIs/` sind ebenfalls gitignored
+- Modell-Provider werden in `config/config.py` verwaltet
+- ALLE  configurations Sachen sollen im /config Ordner liegen!
+- ALLE Promts, die benutzt werden sollen n promts.py liegen
+- 
+
+## Modell-Strategie
+
+- Lokale Qwen3.5-Modelle zuerst, vLLM bevorzugt
+- APIs (Groq) nur Fallback
+- Steering (Layer Editing) aktiviert, Vektoren in L10–26
+
+## Projekt-Struktur (kondensiert)
+
+| Verzeichnis | Inhalt |
 |---|---|
-| Worum geht es im Projekt? | `README.md` |
-| Wie ist das Gehirnmodell gemeint? | `docs/architecture.md` |
-| Wie laufen Anfrage, Schlafphase, Training und UI ab? | `docs/workflows.md` |
-| Welche Modelle sind bevorzugt? | `docs/local-models.md`, `docs/vLLM-Setup.md` |
-| Wo liegt was im Projekt? | `docs/project-map.md` |
-| Welche Tests sind sicher oder teuer? | `docs/testing.md`, `tests/README.md` |
-| Wie laufen Services und Deployment? | `docs/deployment.md` |
+| **Root** | `app.py` (API), `chappie_brain_cli.py` (CLI), Config |
+| `api/` | FastAPI (Routers, Schemas, Services) |
+| `brain/` | LLM-Pipeline (Agenten, Global Workspace, Steering) |
+| `config/` | Zentrale Config, Prompts, Emotionen |
+| `frontend/` | React + Vite + Tailwind + Three.js |
+| `memory/` | Gedächtnis (LTM, STM, Intent, Sleep, Context) |
+| `life/` | Life-Simulation (Homeostasis, Goals, Social) |
+| `Chappies_Trainingspartner/` | Autonomes Training (Daemon + Loop) |
+| `deploy/` | Systemd-Services, Deploy-Scripts |
+| `tests/` | Test-Suite (alle standalone) |
+| `docs/` | Dokumentation |
+| `scripts/` | Setup, Backup, Validierung; `scripts/archive/` für Legacy |
 
-## Versionsregel
+## Versionierung
 
-- bei **kleinen Änderungen** wird die **zweite Zahl** erhöht (`13.4` → `13.5`)
-- bei **großen Updates** wird die **erste Zahl** erhöht (`13.4` → `14.0`)
-- wenn sichtbare Versionsanzeigen in UI oder Doku betroffen sind, müssen diese mitgepflegt werden
+- Kleine Änderungen: zweite Zahl erhöhen (`13.4` -> `13.5`)
+- Große Updates: erste Zahl erhöhen (`13.4` -> `14.0`)
+- Bei sichtbaren Versionsanzeigen (UI/Doku) mitpflegen
+- `CHANGELOG.md` manuell in 5 Stichpunkten pro Version
 
-Bei Änderungen an der Modelllogik immer diese Pfade gemeinsam prüfen:
+## Bei Änderungen an der Modelllogik
 
-- `config/config.py`
-- `config/brain_config.py`
-- `config/prompts.py`
-- `config/secrets_example.py`
-- `brain/agents/*.py`
-- `brain/vllm_brain.py`
-- `brain/ollama_brain.py`
-- `README.md` + `docs/local-models.md`
+Gemeinsam prüfen: `config/config.py`, `config/example_config.py`, `config/prompts.py`, `brain/agents/*.py`, `brain/vllm_brain.py`, `brain/ollama_brain.py`, `README.md`, `docs/local-models.md`.
 
-## Arbeitsstil für Agents
+## Doku-Prüfung vor Push
 
-- kleine, präzise Änderungen bevorzugen
-- erst Quellpfade prüfen, dann editieren
-- Links in Doku immer pfadgenau setzen
-- Brain-Metapher als **technische Analogie**, nicht als biologische 1:1-Behauptung formulieren
-- bei Architekturänderungen Diagramme mitpflegen
-- bei Web-Änderungen `app.py`, `api/` und `frontend/` gemeinsam mitdenken
+Betroffene Pfade prüfen: `README.md`, `AGENTS.md`, `docs/*`, `tests/README.md`, ggf. Brückendateien in `Info Dateien/`. Auch wenn neue Ordner/Entrypoints, geänderte Provider-Priorität oder Brain/Memory/Life-Workflows angepasst wurden.
 
-## Doku-Änderung ist Pflicht, wenn ...
+## Notes
 
-- neue Ordner oder Einstiegspunkte entstehen
-- Commands hinzukommen oder verschwinden
-- Modellstrategie oder Provider-Priorität geändert wird
-- Brain-/Memory-/Life-Workflows angepasst werden
-- Services, Deploy-Skripte oder Startanleitungen geändert werden
-- Tests verschoben oder neu kategorisiert werden
-
-## Empfohlene Validierung nach Änderungen
-
-1. kleinsten passenden Test wählen
-2. keine teuren Live-Tests ohne Bedarf
-3. bei Doku-/Konfig-Änderungen mindestens Struktur-/Import-Check durchführen
-4. bei Service-/Training-Änderungen Startpfade explizit prüfen
+- Kein Linter/Formatter konfiguriert – Code-Konsistenz manuell wahren
+- `brain/steering_api_server.py` ist der vLLM-Steering-Service-Entrypoint (`-m brain.steering_api_server`)
+- `training_daemon.py` ist der korrekte systemd-Entrypoint, **nicht** `training_loop.py`
+- VAD-Mapping und 10 Emotionen in `config/emotions.py`; Änderungen erfordern Tests aus `tests/README.md` Abschnitt "Emotionsmodell"
+- Alignment-Forschung in `forschung/` (86 Fragen, 14 Kategorien)

@@ -15,6 +15,7 @@ import re
 from typing import Dict, Any
 from datetime import datetime
 
+from config.prompts import BASAL_GANGLIA_SYSTEM_PROMPT, BASAL_GANGLIA_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -82,55 +83,17 @@ class BasalGangliaAgent(BaseAgent):
         emotions_before = input_data.get("emotions_before", {})
         emotions_after = input_data.get("emotions_after", {})
         
-        system_prompt = """DU BIST DIE BASAL GANGLIA VON CHAPPiE.
-
-Deine Aufgabe: Bewerte die Interaktion und generiere Lernsignale.
-
-REWARD EVALUATION:
-- Satisfaction Score: Wie zufrieden war der User?
-- Prediction Error: War die Interaktion besser/schlechter als erwartet?
-- Learning Signal: Was soll CHAPPiE lernen?
-
-HABIT FORMATION:
-- Bei positiver Interaktion: Verstaerke dieses Verhalten
-- Bei negativer Interaktion: Reduziere dieses Verhalten
-
-ANTWORTE NUR MIT JSON:
-{
-  "satisfaction_score": 0.0-1.0,
-  "reward_prediction_error": -1.0 bis 1.0,
-  "interaction_quality": "excellent|good|neutral|poor|bad",
-  "learning_update": {
-    "personality_adjustment": {
-      "trait": "friendliness|empathy|curiosity|humor|formality",
-      "adjustment": -0.1 bis +0.1,
-      "reason": "Grund"
-    },
-    "preference_update": {
-      "topic": "Thema",
-      "preference_change": "Beschreibung"
-    }
-  },
-  "habit_formation_signal": 0.0-1.0,
-  "dopamine_level": 0.0-1.0,
-  "confidence": 0.0-1.0
-}"""
-
         emotions_delta = {}
         for key in emotions_before:
             if key in emotions_after:
                 emotions_delta[key] = emotions_after[key] - emotions_before.get(key, 0)
-        
-        user_prompt = f"""User Input: {user_input}
-
-CHAPPiE Response: {response[:300]}
-
-User Feedback: {user_feedback if user_feedback else "Kein explizites Feedback"}
-
-Emotions-Aenderung:
-{json.dumps(emotions_delta, indent=2)}
-
-Bewerte die Interaktion (NUR JSON):"""
+        system_prompt = BASAL_GANGLIA_SYSTEM_PROMPT
+        user_prompt = BASAL_GANGLIA_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            response=response[:300],
+            user_feedback=user_feedback if user_feedback else "Kein explizites Feedback",
+            emotions_delta=json.dumps(emotions_delta, indent=2),
+        )
 
         response_text = self._generate(
             system_prompt=system_prompt,
