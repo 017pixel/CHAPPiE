@@ -420,9 +420,8 @@ def create_chappie_backend():
                 reasons.append("explicit_cot_marker")
                 score += 0.75
 
-            # Meta-reasoning patterns
+            # Meta-reasoning patterns (ohne CHAPPiE-Persona-Aktionen wie *seufzt*, *atmet*)
             reasoning_patterns = [
-                (r'(?:^|\n)\s*\*{1,2}(?:atmet|seufzt|denkt|starrt|faehrt|bricht|haelt)\s.*?\*{1,2}', 0.35, "action_description"),
                 (r'(?:^|\n)\s*(?:Last known thought|Looking at chronology|Review relevant|Identify Persona|Action Planning|Final draft)', 0.45, "meta_reasoning_label"),
                 (r'(?:^|\n)\s*(?:Step \d|Output in|Direct Response)', 0.30, "step_instruction"),
                 (r'(?:^|\n)\s*\*{1,2}(?:Analyze|Analysis|Recollection|Connection|Memory)\b.*?\*{1,2}', 0.30, "analysis_marker"),

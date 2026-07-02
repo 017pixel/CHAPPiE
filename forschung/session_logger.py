@@ -93,7 +93,12 @@ def evaluate_response_quality(
     )
 
     visible_text = "\n".join([raw_text, answer_for_checks, formatted_cot, thought_process, model_reasoning])
-    cot_leak = bool(result.get("cot_leak")) or contains_cot_leak(visible_text)
+    raw_cot = result.get("cot_leak", {})
+    if isinstance(raw_cot, dict):
+        cot_leak = raw_cot.get("is_unexpected_cot", False)
+    else:
+        cot_leak = bool(raw_cot)
+    cot_leak = cot_leak or contains_cot_leak(visible_text)
     if enable_thinking is False and (formatted_cot.strip() or thought_process.strip() or model_reasoning.strip()):
         cot_leak = True
 
