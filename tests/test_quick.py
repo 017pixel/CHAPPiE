@@ -41,7 +41,7 @@ def test_imports():
         print(f"  [OK] Groq Model: {settings.groq_model}")
         print(f"  [OK] Groq Key: {'SET' if settings.groq_api_key else 'NOT SET'}")
 
-        from config.brain_config import BRAIN_AGENT_CONFIGS
+        from config.config import BRAIN_AGENT_CONFIGS
         print(f"  [OK] Brain configs: {len(BRAIN_AGENT_CONFIGS)} agents")
 
         from memory.forgetting_curve import get_forgetting_curve

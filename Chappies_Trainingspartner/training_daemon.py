@@ -39,6 +39,11 @@ except ImportError as e:
     from trainer_agent import TrainerAgent, TrainerConfig
     from training_loop import TrainingLoop
 
+try:
+    from config.prompts import TRAINING_START_PROMPT  # from config/prompts.py
+except ImportError:
+    TRAINING_START_PROMPT = "Hallo Chappie! Lass uns ein Gespraech fuehren."
+
 def setup_logging():
     """Setup logging to file for headless operation."""
     log_file = os.path.join(PROJECT_ROOT, 'training_daemon.log')
@@ -136,7 +141,7 @@ def get_interactive_config() -> dict:
     print("Beispiel: Hallo Chappie, erklaer mir bitte...")
     start_prompt = input("Start-Prompt: ").strip()
     if not start_prompt:
-        start_prompt = "Hallo Chappie! Lass uns ein Gespraech fuehren."
+        start_prompt = TRAINING_START_PROMPT
     
     return {
         "persona": persona,

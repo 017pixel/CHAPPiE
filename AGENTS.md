@@ -31,9 +31,9 @@ Steering API (vLLM) läuft auf :8000, Web-API auf :8010, Frontend Preview auf :4
 
 ## Konfiguration & Secrets
 
-- `CHAPPIE_CONFIG.json` und `config/secrets.py` sind **gitignored** – nach `CHAPPIE_CONFIG.example.json` und `config/secrets_example.py` richten
+- `CHAPPIE_CONFIG.json` und `config/secrets.py` sind **gitignored** – nach `config/example_config.py` und `config/secrets.py` richten
 - API-Keys in `config/APIs/` sind ebenfalls gitignored
-- Modell-Provider werden in `config/config.py` + `config/brain_config.py` verwaltet
+- Modell-Provider werden in `config/config.py` verwaltet
 - ALLE  configurations Sachen sollen im /config Ordner liegen!
 - ALLE Promts, die benutzt werden sollen n promts.py liegen
 - 
@@ -70,7 +70,7 @@ Steering API (vLLM) läuft auf :8000, Web-API auf :8010, Frontend Preview auf :4
 
 ## Bei Änderungen an der Modelllogik
 
-Gemeinsam prüfen: `config/config.py`, `config/brain_config.py`, `config/prompts.py`, `config/secrets_example.py`, `brain/agents/*.py`, `brain/vllm_brain.py`, `brain/ollama_brain.py`, `README.md`, `docs/local-models.md`.
+Gemeinsam prüfen: `config/config.py`, `config/example_config.py`, `config/prompts.py`, `brain/agents/*.py`, `brain/vllm_brain.py`, `brain/ollama_brain.py`, `README.md`, `docs/local-models.md`.
 
 ## Doku-Prüfung vor Push
 

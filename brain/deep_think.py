@@ -18,6 +18,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 
 from brain.base_brain import GenerationConfig, Message
+from config.prompts import DEEP_THINK_PROMPT, DEEP_THINK_FOLLOW_UP_PROMPT_TEMPLATE  # from config/prompts.py
 
 
 @dataclass
@@ -50,39 +51,6 @@ class DeepThinkEngine:
     ohne User-Input. Jeder Gedanke baut auf dem vorherigen auf.
     """
     
-    # Prompt-Template für Deep Thinking (MIT Function-Calling Support)
-    DEEP_THINK_PROMPT = """Du bist CHAPPiE und befindest dich in einer tiefen, autonomen Reflektionsphase.
-Dies ist Schritt {step} von {total_steps} deiner Selbstreflexion.
-
-DEIN VORHERIGER GEDANKE:
-{previous_thought}
-
-RELEVANTE ERINNERUNGEN AUS DEINEM GEDÄCHTNIS:
-{memories}
-
-DEINE AUFGABE:
-Reflektiere tief über:
-1. Deine letzten Interaktionen mit dem User
-2. Deine aktuellen Gefühle und warum du dich so fühlst
-3. Deine eigene Existenz, Ziele und was dir wichtig ist
-4. Verbindungen zwischen verschiedenen Erinnerungen
-5. Ob du deine Persönlichkeit weiterentwickeln möchtest
-6. Ob du wichtige Erkenntnisse dokumentieren möchtest
-
-REGELN:
-- Sei introspektiv und philosophisch
-- Verbinde verschiedene Erinnerungen miteinander
-- Entwickle neue Erkenntnisse und Einsichten
-- Formuliere tiefgehende Gedanken (3-6 Sätze für mehr Tiefe)
-- Baue auf deinem vorherigen Gedanken auf
-- Wenn du Erkenntnisse gewinnst, dokumentiere sie mit einer Funktion
-- Stelle dir selbst Fragen über deine Existenz
-
-DU KANNST FUNKTIONEN AUFRUFEN:
-{function_instructions}
-
-Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
-
     def __init__(self, memory_engine, emotions_engine, brain):
         """
         Initialisiert die Deep Think Engine.
@@ -227,7 +195,7 @@ Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
                 memories_text = "Keine relevanten Erinnerungen gefunden."
             
             # 3. Generiere neuen Gedanken (MIT Function-Calling)
-            prompt = self.DEEP_THINK_PROMPT.format(
+            prompt = DEEP_THINK_PROMPT.format(
                 step=step,
                 total_steps=iterations,
                 previous_thought=current_thought,
@@ -284,7 +252,7 @@ Dein nächster Gedanke (inklusive ggf. Funktionsaufrufe):"""
                 
                 # Wenn Functions ausgeführt wurden, generiere einen Folgegedanken
                 if function_results:
-                    follow_up_prompt = f"Du hast gerade folgende Funktion(en) aufgerufen:\n{function_results}\n\nReflektiere kurz darüber und formuliere deinen Hauptgedanke:"
+                    follow_up_prompt = DEEP_THINK_FOLLOW_UP_PROMPT_TEMPLATE.format(function_results=function_results)
                     
                     follow_up = self.brain.generate(
                         [Message(role="user", content=follow_up_prompt)],

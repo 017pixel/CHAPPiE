@@ -13,6 +13,7 @@ import re
 from typing import Dict, Any, List
 from datetime import datetime
 
+from config.prompts import MEMORY_AGENT_SYSTEM_PROMPT, MEMORY_AGENT_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -82,93 +83,21 @@ class MemoryAgent(BaseAgent):
         hippocampus = input_data.get("hippocampus_result", {})
         basal_ganglia = input_data.get("basal_ganglia_result", {})
         
-        system_prompt = """DU BIST DER MEMORY AGENT VON CHAPPiE.
-
-Deine Aufgabe: Entscheide, welche Informationen in die Context-Dateien geschrieben werden sollen.
-
-DATEIEN:
-1. soul.md - CHAPPiE's Identitaet und Selbstwahrnehmung
-   - trust_level (0-100)
-   - evolution_note (Wichtiges ueber sich selbst gelernt)
-   - new_value (Neue Werte/Ueberzeugungen)
-
-2. user.md - Benutzerprofil
-   - name (Falls User Namen nennt)
-   - key_moment (Wichtige gemeinsame Momente)
-   - learning (Was CHAPPiE ueber User gelernt hat)
-
-3. CHAPPiEsPreferences.md - CHAPPiE's eigene Vorlieben
-   - new_preference (Neue Praeferenz)
-   - category (My Personality Preferences, Topics I Find Interesting, etc.)
-   - reflection (Selbstreflexion)
-
-REGELN:
-- Schreibe NUR wenn wirklich neue, wichtige Information
-- Vermeide Duplikate
-- Persoenliche Infos vom User -> user.md
-- CHAPPiE lernt ueber sich selbst -> soul.md
-- CHAPPiE entwickelt Meinung -> preferences.md
-
-ANTWORTE NUR MIT JSON:
-{
-  "tool_calls": [
-    {
-      "tool": "update_user_profile|update_soul|update_preferences",
-      "action": "update",
-      "data": {
-        "key": "value"
-      },
-      "priority": "high|medium|low",
-      "reason": "Warum diese Aenderung"
-    }
-  ],
-  "soul_updates": {
-    "trust_level": int (optional),
-    "evolution_note": "text" (optional),
-    "new_value": "text" (optional)
-  },
-  "user_updates": {
-    "name": "text" (optional),
-    "key_moment": "text" (optional),
-    "learning": "text" (optional)
-  },
-  "preferences_updates": {
-    "new_preference": "text" (optional),
-    "category": "text" (optional),
-    "reflection": "text" (optional)
-  },
-  "no_update_needed": true|false,
-  "rationale": "Erklaerung der Entscheidungen",
-  "confidence": 0.0-1.0
-}"""
-
-        user_prompt = f"""User Input: {user_input}
-
-CHAPPiE Response: {chappie_response[:300]}
-
-Aktueller Soul Content:
-{current_soul[:400]}
-
-Aktueller User Content:
-{current_user[:400]}
-
-Aktuelle Preferences:
-{current_preferences[:400]}
-
-Emotionale Analyse:
-- Primary Emotion: {amygdala.get('primary_emotion', 'neutral')}
-- Sentiment: {amygdala.get('sentiment', 'neutral')}
-- Personal Relevance: {amygdala.get('personal_relevance', 0.5)}
-
-Memory Analysis:
-- Should Encode: {hippocampus.get('should_encode', False)}
-- Memory Type: {hippocampus.get('encoding_decision', {}).get('memory_type', 'episodic')}
-
-Reward Signal:
-- Satisfaction: {basal_ganglia.get('satisfaction_score', 0.5)}
-- Quality: {basal_ganglia.get('interaction_quality', 'neutral')}
-
-Entscheide ueber Tool Calls (NUR JSON):"""
+        system_prompt = MEMORY_AGENT_SYSTEM_PROMPT
+        user_prompt = MEMORY_AGENT_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            chappie_response=chappie_response[:300],
+            current_soul=current_soul[:400],
+            current_user=current_user[:400],
+            current_preferences=current_preferences[:400],
+            primary_emotion=amygdala.get('primary_emotion', 'neutral'),
+            sentiment=amygdala.get('sentiment', 'neutral'),
+            personal_relevance=amygdala.get('personal_relevance', 0.5),
+            should_encode=hippocampus.get('should_encode', False),
+            memory_type=hippocampus.get('encoding_decision', {}).get('memory_type', 'episodic'),
+            satisfaction=basal_ganglia.get('satisfaction_score', 0.5),
+            quality=basal_ganglia.get('interaction_quality', 'neutral'),
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

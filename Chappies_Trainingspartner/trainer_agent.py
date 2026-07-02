@@ -18,6 +18,7 @@ import logging
 log = logging.getLogger(__name__)
 
 from config.config import settings, get_active_model, LLMProvider
+from config.prompts import TRAINER_SYSTEM_PROMPT_TEMPLATE  # from config/prompts.py
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
@@ -226,30 +227,12 @@ class TrainerAgent:
         """
         current_focus = self.get_current_focus()
         diversity_feedback = self.repetition_tracker.get_diversity_feedback()
-        
-        return f"""Du bist ein Trainingspartner fuer eine KI namens CHAPPiE.
-Deine Persona: {self.config.persona}
-Aktueller Trainings-Fokus: {current_focus}
-
-{diversity_feedback}
-
-DEINE AUFGABE:
-- Fuehre ein natuerliches Gespraech mit CHAPPiE
-- Stelle Fragen zum aktuellen Fokus-Thema
-- Reagiere auf CHAPPiEs Antworten mit Folgefragen oder neuen Inputs  
-- Sei {self.config.persona.lower()} in deinen Reaktionen
-- Gib auch mal kritisches Feedback wenn CHAPPiEs Antwort schwach ist
-
-WICHTIGE REGELN:
-- Antworte IMMER auf Deutsch
-- Schreibe 1-3 Saetze pro Nachricht (keine langen Texte)
-- Bleibe beim aktuellen Fokus-Thema
-- WIEDERHOLE DICH NICHT - jeder Beitrag muss NEUE Informationen enthalten
-- Wenn ihr im Kreis dreht, wechsle RADIKAL das Thema
-- Sei abwechslungsreich - nutze verschiedene Ausdruecke
-
-Du antwortest direkt als User, OHNE Meta-Kommentare wie "Als Trainer wuerde ich..."
-"""
+        return TRAINER_SYSTEM_PROMPT_TEMPLATE.format(
+            persona=self.config.persona,
+            current_focus=current_focus,
+            diversity_feedback=diversity_feedback,
+            persona_lower=self.config.persona.lower(),
+        )
     
     def generate_reply(self, chappie_response: str, conversation_history: List[dict]) -> str:
         """

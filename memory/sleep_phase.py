@@ -17,8 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import threading
 
-from config.config import DATA_DIR
-from config.brain_config import get_sleep_config, get_forgetting_curve_config
+from config.config import DATA_DIR, get_sleep_config, get_forgetting_curve_config
 from memory.forgetting_curve import get_decay_manager
 from life import get_life_simulation_service
 

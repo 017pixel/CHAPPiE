@@ -15,6 +15,7 @@ from typing import Dict, Any
 from datetime import datetime
 
 from config.emotions import EMOTION_ORDER, zero_emotion_updates
+from config.prompts import AMYGDALA_SYSTEM_PROMPT, AMYGDALA_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from .base_agent import BaseAgent, AgentResult
 
 
@@ -71,62 +72,12 @@ class AmygdalaAgent(BaseAgent):
     def _analyze_emotions(self, user_input: str, current_emotions: Dict[str, int]) -> Dict[str, Any]:
         """Analyze emotional content and calculate memory boost."""
         
-        system_prompt = """DU BIST DIE AMYGDALA VON CHAPPiE.
-
-Deine Aufgabe: Analysiere die emotionale Valenz und Intensitaet des Inputs.
-
-EMOTIONEN (Skala 0-100):
-- joy: Freude, Humor, positive Stimmung
-- sadness: Trauer, Melancholie
-- anger: AErger, Frustration
-- fear: Angst, Sorge
-- surprise: Ueberraschung, Neuheit
-- trust: Vertrauen, Offenheit
-- affection: Zuneigung, Naehe, Waerme
-- anxiety: Unruhe, Sorge, Risiko
-- calm: Ruhe, Regulation, Klarheit
-- disgust: Ablehnung, Ekel
-
-MEMORY BOOST:
-- Faktor 1.0-3.0 basierend auf emotionaler Intensitaet
-- Hohe Emotion = staerkere Speicherung
-- Positive Emotionen = staerkere Vertrauensbildung
-
-ANTWORTE NUR MIT JSON:
-{
-  "primary_emotion": "joy|sadness|anger|fear|surprise|neutral",
-  "emotional_intensity": 0.0-1.0,
-  "memory_boost_factor": 1.0-3.0,
-  "emotional_tags": ["tag1", "tag2"],
-  "emotions_update": {
-    "happiness": {"delta": -10 bis +10, "reason": "Grund"},
-    "trust": {"delta": -10 bis +10, "reason": "Grund"},
-    "energy": {"delta": -10 bis +10, "reason": "Grund"},
-    "curiosity": {"delta": -10 bis +10, "reason": "Grund"},
-    "frustration": {"delta": -10 bis +10, "reason": "Grund"},
-    "motivation": {"delta": -10 bis +10, "reason": "Grund"},
-    "sadness": {"delta": -10 bis +10, "reason": "Grund"},
-    "affection": {"delta": -10 bis +10, "reason": "Grund"},
-    "anxiety": {"delta": -10 bis +10, "reason": "Grund"},
-    "calm": {"delta": -10 bis +10, "reason": "Grund"}
-  },
-  "steering_hints": {
-    "target_emotion": "Wunsch-Emotion für das Modell-Steering",
-    "alpha": 0.0-1.0
-  },
-  "sentiment": "positive|negative|neutral",
-  "personal_relevance": 0.0-1.0,
-  "confidence": 0.0-1.0
-}"""
-
         emotions_str = "\n".join([f"- {k}: {v}" for k, v in current_emotions.items()])
-        
-        user_prompt = f"""User Input: {user_input}
-
-Aktuelle Emotionen:
-{emotions_str}
-
-Analysiere die emotionalen Aspekte (NUR JSON):"""
+        system_prompt = AMYGDALA_SYSTEM_PROMPT
+        user_prompt = AMYGDALA_USER_PROMPT_TEMPLATE.format(
+            user_input=user_input,
+            emotions=emotions_str,
+        )
 
         response = self._generate(
             system_prompt=system_prompt,

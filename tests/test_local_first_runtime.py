@@ -36,9 +36,9 @@ from brain.agents.sensory_cortex import SensoryCortexAgent
 from brain.agents.steering_manager import SteeringManager
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
-from config.brain_config import BRAIN_AGENT_CONFIGS
+from config.config import BRAIN_AGENT_CONFIGS
 from config.config import LLMProvider, get_active_model, settings
-from config.prompts import build_system_prompt
+from config.prompts import build_system_prompt  # from config/prompts.py
 
 
 def assert_agent_matches_config(agent, config_key: str):

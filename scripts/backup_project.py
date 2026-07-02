@@ -6,7 +6,7 @@ Erstellt eine saubere Kopie des Projekts ohne venv, __pycache__ und andere unnö
 WICHTIG: 
 - ChromaDB-Daten (data/chroma_db) werden in ein separates Backup-Archiv verpackt
 - API-Keys werden NICHT kopiert (secrets.py, addSecrets.py)
-- Nach dem Restore: secrets_example.py -> secrets.py kopieren und Keys eintragen
+- Nach dem Restore: Groq-API-Key in CHAPPIE_CONFIG.json unter api.groq_api_key eintragen
 
 Verwendung:
     python backup_project.py
@@ -206,7 +206,7 @@ pip install -r requirements.txt
 ```
 
 ## Schritt 3: API-Keys konfigurieren
-1. Kopiere `config/secrets_example.py` nach `config/secrets.py`
+1. API-Key in `CHAPPIE_CONFIG.json` unter `api.groq_api_key` eintragen
 2. Trage deine API-Keys ein:
    - GROQ_API_KEY (von https://console.groq.com/keys)
    - GROQ_API_KEY (von https://console.groq.com/keys)

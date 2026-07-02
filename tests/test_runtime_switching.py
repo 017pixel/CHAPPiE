@@ -27,7 +27,7 @@ for mod in (
 sys.modules["ollama"] = MagicMock()
 
 from config.config import LLMProvider, settings
-from config.root_config import ROOT_CONFIG_PATH as USER_SETTINGS_PATH
+from config.config import ROOT_CONFIG_PATH as USER_SETTINGS_PATH
 from brain.response_parser import looks_like_model_error
 from life.service import LifeSimulationService
 
