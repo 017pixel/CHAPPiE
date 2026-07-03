@@ -85,7 +85,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "steering_context_length": 4096,
     },
     "cloud_models": {
-        "groq_model": "llama-3.3-70b-versatile",
+        "groq_model": "openai/gpt-oss-120b",
         "groq_format_model": "openai/gpt-oss-120b",
         "groq_memory_model": "openai/gpt-oss-120b",
     },
@@ -367,7 +367,7 @@ class Settings:
         self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
 
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
-        self.groq_model = self._get_val("GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.groq_model = self._get_val("GROQ_MODEL", "openai/gpt-oss-120b")
         self.groq_format_model = self._get_val("GROQ_FORMAT_MODEL", "openai/gpt-oss-120b")
         self.groq_memory_model = self._get_val("GROQ_MEMORY_MODEL", "openai/gpt-oss-120b")
 

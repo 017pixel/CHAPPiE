@@ -209,7 +209,7 @@ CHAPPiE unterstuetzt genau **drei LLM-Provider**:
 | **Ollama** | Lokal, Alternative | `brain/ollama_brain.py` | Prompt-Emotionen |
 | **Groq** | Einzige Cloud-API | `brain/groq_brain.py` | Prompt-Emotionen |
 
-Lokale vLLM-Modelle: `Qwen/Qwen3.5-4B` als Default, `google/gemma-4-E4B-it` als balanced Alternative, `google/gemma-4-26B-A4B-it` als NF4-Option fuer komplexere Tests. Groq-Modelle: `openai/gpt-oss-20b` (schnell, default), `llama-3.3-70b-versatile` (Reasoning), `openai/gpt-oss-120b` (Formatierung).
+Lokale vLLM-Modelle: `Qwen/Qwen3.5-4B` als Default, `google/gemma-4-E4B-it` als balanced Alternative, `google/gemma-4-26B-A4B-it` als NF4-Option fuer komplexere Tests. Groq-Modelle: `openai/gpt-oss-20b` (schnell, default), `openai/gpt-oss-120b` (Reasoning & Formatierung).
 
 ---
 

@@ -222,7 +222,7 @@ def test_groq_brain_import():
 
         assert len(GROQ_MODELS) >= 5, "Groq models dict should have at least 5 entries"
         assert "openai/gpt-oss-20b" in GROQ_MODELS
-        assert "llama-3.3-70b-versatile" in GROQ_MODELS
+        assert "openai/gpt-oss-120b" in GROQ_MODELS
 
         brain = GroqBrain(api_key="test-key", model="openai/gpt-oss-20b")
         info = brain.get_model_info()

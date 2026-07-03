@@ -54,9 +54,9 @@ def test_get_model_info_without_key():
     original_key = settings.groq_api_key
     try:
         settings.groq_api_key = ""
-        brain = GroqBrain(model="llama-3.3-70b-versatile", api_key="")
+        brain = GroqBrain(model="openai/gpt-oss-120b", api_key="")
         info = brain.get_model_info()
-        assert info["name"] == "llama-3.3-70b-versatile"
+        assert info["name"] == "openai/gpt-oss-120b"
         assert info["provider"] == "groq"
         assert info["local"] is False
         assert info["api_configured"] is False
