@@ -520,7 +520,7 @@ export function ChatPage() {
                     {(entry.metadata as any)?.formatting_failed ? (
                       <span className="text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen</span>
                     ) : (
-                      <span className="text-[9px] text-slate/60">{(entry.metadata as any).formatted_cot ? "formatted" : "raw"}</span>
+                      <span className="text-[9px] text-slate/60">{(entry.metadata as any)?.formatted_cot ? "formatted" : "raw"}</span>
                     )}
                   </div>
                   <div className={`px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-line ${(entry.metadata as any)?.formatting_failed ? 'text-ember/70' : 'text-slate/70'}`}>

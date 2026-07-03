@@ -19,26 +19,45 @@ const MODEL_PRESETS = [
     steering_model: "Qwen/Qwen3.5-4B",
     quantize: false,
     steering_context_length: 8192,
+    max_tokens: 450,
+    chappie_thinking_token_limit: 650,
+    chappie_answer_token_limit: 450,
+    context_token_limit: 7000,
+    context_token_warning_threshold: 6500,
+    history_max_messages: 20,
     defaults: { temperature: 0.7, top_p: 0.9, top_k: 50 },
   },
   {
     id: "gemma4_e4b",
     label: "Gemma 4 E4B",
-    detail: "Balanced, 4B dense, FP16-tauglich",
+    detail: "Balanced, 4B dense, NF4 fuer T4-Stabilitaet",
     vllm_model: "google/gemma-4-E4B-it",
     steering_model: "google/gemma-4-E4B-it",
-    quantize: false,
-    steering_context_length: 8192,
+    quantize: true,
+    steering_context_length: 4096,
+    max_tokens: 450,
+    chappie_thinking_token_limit: 650,
+    chappie_answer_token_limit: 450,
+    context_token_limit: 3200,
+    context_token_warning_threshold: 2800,
+    history_max_messages: 8,
     defaults: { temperature: 1.0, top_p: 0.95, top_k: 64 },
   },
   {
     id: "gemma4_26b",
     label: "Gemma 4 26B-A4B",
-    detail: "Schlau, MoE, NF4 fuer 16 GB VRAM",
+    detail: "Experimentell, auf T4 16 GB nicht stabil ladbar",
     vllm_model: "google/gemma-4-26B-A4B-it",
     steering_model: "google/gemma-4-26B-A4B-it",
     quantize: true,
+    disabled: true,
     steering_context_length: 4096,
+    max_tokens: 320,
+    chappie_thinking_token_limit: 500,
+    chappie_answer_token_limit: 320,
+    context_token_limit: 3000,
+    context_token_warning_threshold: 2600,
+    history_max_messages: 6,
     defaults: { temperature: 1.0, top_p: 0.95, top_k: 64 },
   },
 ];
@@ -315,12 +334,12 @@ export function SettingsPage() {
 
   const getValue = (key: string) => (key in draft ? draft[key] : settings[key]);
   const selectedPreset = MODEL_PRESETS.find((preset) => preset.vllm_model === getValue("vllm_model"));
-  const steeringBaseUrl = String(getValue("vllm_url") || "http://localhost:8000/v1").replace(/\/v1\/?$/, "").replace(/\/+$/, "");
+  const steeringBaseUrl = api.baseUrl;
 
   const handleModelPresetChange = useCallback(
     async (presetId: string) => {
       const preset = MODEL_PRESETS.find((item) => item.id === presetId);
-      if (!preset) return;
+      if (!preset || preset.disabled) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const oldModel = String(getValue("vllm_model") || "");
       const payload = {
@@ -329,6 +348,12 @@ export function SettingsPage() {
         steering_model: preset.steering_model,
         steering_quantize: preset.quantize,
         steering_context_length: preset.steering_context_length,
+        max_tokens: preset.max_tokens,
+        chappie_thinking_token_limit: preset.chappie_thinking_token_limit,
+        chappie_answer_token_limit: preset.chappie_answer_token_limit,
+        context_token_limit: preset.context_token_limit,
+        context_token_warning_threshold: preset.context_token_warning_threshold,
+        history_max_messages: preset.history_max_messages,
         use_model_defaults: true,
         temperature: preset.defaults.temperature,
         top_p: preset.defaults.top_p,
@@ -374,7 +399,7 @@ export function SettingsPage() {
             >
               <option value="custom" disabled>Custom: {String(getValue("vllm_model") || "kein Modell")}</option>
               {MODEL_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>{preset.label}</option>
+                <option key={preset.id} value={preset.id} disabled={preset.disabled}>{preset.label}{preset.disabled ? " (nicht T4-stabil)" : ""}</option>
               ))}
             </select>
           </div>

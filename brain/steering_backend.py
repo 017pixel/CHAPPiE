@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import gc
 import json
 import logging
 import os
@@ -166,6 +167,24 @@ def anchor_scale_for_model(model_name: str) -> float:
     if is_qwen_name(model_name):
         return ANCHOR_SCALE_FACTORS["qwen"]
     return ANCHOR_SCALE_FACTORS["default"]
+
+
+def model_config_int(model: Any, attr: str, default: int = 0) -> int:
+    config = getattr(model, "config", None)
+    candidates = (
+        config,
+        getattr(config, "text_config", None),
+        getattr(config, "language_config", None),
+        getattr(config, "decoder_config", None),
+    )
+    for candidate in candidates:
+        value = getattr(candidate, attr, None)
+        if value:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                continue
+    return default
 
 
 def extract_steering_payload(payload: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -380,8 +399,8 @@ class ActivationVectorResolver:
         self.tokenizer = tokenizer
         self.model = model
         self.device = device
-        self.hidden_size = int(getattr(model.config, "hidden_size", 0) or 0)
-        self.num_layers = int(getattr(model.config, "num_hidden_layers", 0) or 0)
+        self.hidden_size = model_config_int(model, "hidden_size")
+        self.num_layers = model_config_int(model, "num_hidden_layers")
         self.anchor_scale_factor = anchor_scale_for_model(model_name)
         self._cache_lock = threading.Lock()
 
@@ -551,8 +570,61 @@ class LocalSteeringEngine:
             self.model = PeftModel.from_pretrained(self.model, adapter_path)
             LOGGER.info("Steering: LoRA-Adapter erfolgreich geladen.")
 
-        self.layers = list(getattr(getattr(self.model, "model", self.model), "layers"))
+        self.layers = self._find_transformer_layers()
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
+
+    @staticmethod
+    def _nested_attr(root: Any, path: str) -> Any:
+        current = root
+        for part in path.split("."):
+            current = getattr(current, part, None)
+            if current is None:
+                return None
+        return current
+
+    def _find_transformer_layers(self) -> list[Any]:
+        candidates = (
+            "model.layers",
+            "model.language_model.layers",
+            "language_model.layers",
+            "language_model.model.layers",
+            "model.decoder.layers",
+            "decoder.layers",
+            "transformer.h",
+            "gpt_neox.layers",
+        )
+        for path in candidates:
+            layers = self._nested_attr(self.model, path)
+            if layers is None:
+                continue
+            try:
+                resolved = list(layers)
+            except TypeError:
+                continue
+            if resolved:
+                LOGGER.info("Steering-Layer fuer %s via %s erkannt (%d Layer).", self.model_name, path, len(resolved))
+                return resolved
+        raise AttributeError(f"Keine Transformer-Layer fuer {self.model_name} gefunden.")
+
+    def close(self) -> None:
+        """Gibt Modellreferenzen frei, bevor ein anderes Modell geladen wird."""
+        try:
+            if hasattr(self, "model"):
+                self.model.to("cpu")
+        except Exception:
+            pass
+        for attr in ("resolver", "layers", "model", "tokenizer"):
+            try:
+                setattr(self, attr, None)
+            except Exception:
+                pass
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            try:
+                torch.cuda.ipc_collect()
+            except Exception:
+                pass
 
     def _select_device(self) -> torch.device:
         force_cpu = os.getenv(FORCE_CPU_ENV, "").strip().lower()
@@ -658,14 +730,22 @@ class LocalSteeringEngine:
             kwargs["attn_implementation"] = "sdpa"
         return kwargs
 
-    def build_prompt(self, messages: list[dict], chat_template_kwargs: Optional[Dict[str, Any]] = None, steering_payload: Optional[Dict[str, Any]] = None) -> tuple[str, Dict[str, torch.Tensor]]:
+    def build_prompt(
+        self,
+        messages: list[dict],
+        chat_template_kwargs: Optional[Dict[str, Any]] = None,
+        steering_payload: Optional[Dict[str, Any]] = None,
+        reserve_new_tokens: int = 0,
+    ) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
         prompt_messages = [dict(message) for message in messages]
         prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
-        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=self.context_length)
+        reserved = max(0, min(int(reserve_new_tokens or 0), max(0, self.context_length - 128)))
+        max_input_length = max(128, self.context_length - reserved)
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
         actual_len = int(inputs["input_ids"].shape[1])
-        if actual_len > self.context_length:
-            LOGGER.warning("Prompt nach Truncation immer noch %d Token (Limit %d). Das sollte nicht passieren.", actual_len, self.context_length)
+        if actual_len > max_input_length:
+            LOGGER.warning("Prompt nach Truncation immer noch %d Token (Limit %d). Das sollte nicht passieren.", actual_len, max_input_length)
         return prompt, {key: value.to(self.device) for key, value in inputs.items()}
 
     def _log_gpu_stats(self, label: str) -> None:
@@ -680,7 +760,7 @@ class LocalSteeringEngine:
             pass
 
     def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
-        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
+        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload, reserve_new_tokens=max_tokens)
         generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
         self._log_gpu_stats("pre-generate")
         with self._generation_lock:
@@ -740,7 +820,7 @@ class LocalSteeringEngine:
         return "", self.tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
     def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Iterator[str]:
-        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload)
+        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload, reserve_new_tokens=max_tokens)
         streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
         generation_kwargs["streamer"] = streamer
@@ -771,10 +851,17 @@ class LocalSteeringEngine:
     def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
         do_sample = float(temperature or 0.0) > 0.01
         input_len = int(inputs["input_ids"].shape[1])
+        requested_tokens = max(1, int(max_tokens or 1))
+        available_tokens = max(1, int(getattr(self, "context_length", 8192)) - input_len)
+        generation_tokens = min(requested_tokens, available_tokens)
+        if generation_tokens < requested_tokens:
+            LOGGER.warning(
+                "Max Tokens von %d auf %d reduziert, weil Prompt %d/%d Kontexttokens belegt.",
+                requested_tokens, generation_tokens, input_len, getattr(self, "context_length", 8192),
+            )
         kwargs: Dict[str, Any] = {
             **inputs,
-            "max_new_tokens": int(max_tokens),
-            "max_length": min(input_len + int(max_tokens), getattr(self, 'context_length', 8192)),
+            "max_new_tokens": generation_tokens,
             "do_sample": do_sample,
             "pad_token_id": self.tokenizer.pad_token_id,
             "eos_token_id": self.tokenizer.eos_token_id,

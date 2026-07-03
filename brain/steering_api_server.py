@@ -14,9 +14,51 @@ from uuid import uuid4
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .steering_backend import LocalSteeringEngine, extract_steering_payload, QUANTIZE_ENV
+
+
+def _default_model_name() -> str:
+    env_model = os.getenv("CHAPPIE_STEERING_MODEL", "").strip()
+    if env_model:
+        return env_model
+    try:
+        from config.config import settings
+
+        return str(getattr(settings, "steering_model", "") or getattr(settings, "vllm_model", "") or "Qwen/Qwen3.5-4B")
+    except Exception:
+        return "Qwen/Qwen3.5-4B"
+
+
+def _default_context_length() -> int:
+    env_value = os.getenv("CHAPPIE_STEERING_CONTEXT_LENGTH", "").strip()
+    if env_value:
+        try:
+            return int(env_value)
+        except ValueError:
+            pass
+    try:
+        from config.config import settings
+
+        return int(getattr(settings, "steering_context_length", 8192))
+    except Exception:
+        return 8192
+
+
+def _default_quantize() -> Optional[bool]:
+    env_value = os.getenv(QUANTIZE_ENV, "").strip().lower()
+    if env_value in {"1", "true", "yes", "on"}:
+        return True
+    if env_value in {"0", "false", "no", "off"}:
+        return False
+    try:
+        from config.config import settings
+
+        return bool(getattr(settings, "steering_quantize", False))
+    except Exception:
+        return None
 
 
 def _auto_quantize_for_model(model_name: str, explicit: Optional[bool]) -> Optional[bool]:
@@ -49,6 +91,12 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
         yield
 
     app = FastAPI(title="CHAPPiE Steering API", version="1.0.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.model_name = model_name
     app.state.engine = None
     app.state.context_length = context_length
@@ -182,6 +230,8 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
             app.state.restart_error = ""
             old_engine = app.state.engine
             app.state.engine = None
+            if old_engine is not None and hasattr(old_engine, "close"):
+                old_engine.close()
             del old_engine
             gc.collect()
             try:
@@ -189,6 +239,10 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+                    try:
+                        torch.cuda.ipc_collect()
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -278,11 +332,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CHAPPiE Steering API Server")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--model", default=os.getenv("CHAPPIE_STEERING_MODEL", "Qwen/Qwen3.5-4B"))
-    parser.add_argument("--context-length", type=int, default=int(os.getenv("CHAPPIE_STEERING_CONTEXT_LENGTH", "8192")),
+    parser.add_argument("--model", default=_default_model_name())
+    parser.add_argument("--context-length", type=int, default=_default_context_length(),
                         help="max_position_embeddings cap to limit KV-cache VRAM (default: 8192)")
     parser.add_argument("--quantize", nargs="?", const=True, type=lambda v: bool(v) if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes", "on"),
-                        default=os.getenv(QUANTIZE_ENV, "").strip().lower() in ("1", "true", "yes", "on") if os.getenv(QUANTIZE_ENV) else None,
+                        default=_default_quantize(),
                         help="Enable NF4 4-bit quantization to reduce VRAM (default: auto-detect)")
     parser.add_argument("--adapter", default=os.getenv("CHAPPIE_STEERING_ADAPTER", None),
                         help="Pfad zum LoRA-Adapter (optional)")

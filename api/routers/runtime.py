@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict
+import json
+from typing import Any, Dict
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencies import get_backend
 from api.schemas import EmotionLayerUpdate, EmotionStateUpdate, SettingsSnapshot, SettingsUpdate
@@ -79,6 +83,45 @@ def _settings_snapshot() -> SettingsSnapshot:
     )
 
 
+def _steering_base_url() -> str:
+    return str(settings.vllm_url or "http://127.0.0.1:8000/v1").replace("/v1", "").rstrip("/")
+
+
+def _proxy_steering_request(method: str, path: str, payload: Dict[str, Any] | None = None, timeout: int = 15) -> Dict[str, Any]:
+    url = f"{_steering_base_url()}{path}"
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = UrlRequest(
+        url,
+        data=body,
+        method=method,
+        headers={"Content-Type": "application/json"} if payload is not None else {},
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8") or str(exc)
+        raise HTTPException(status_code=exc.code, detail=detail) from exc
+    except TimeoutError as exc:
+        if method == "GET" and path.endswith("/restart-status"):
+            return {
+                "status": "loading",
+                "progress": 25,
+                "current_step": "Steering Server laedt Modell...",
+                "estimated_remaining": 60,
+                "error": "",
+            }
+        raise HTTPException(status_code=504, detail="Steering Server Timeout") from exc
+    except URLError as exc:
+        raise HTTPException(status_code=502, detail=f"Steering Server nicht erreichbar: {exc.reason}") from exc
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"raw": raw}
+
+
 @router.get("/settings", response_model=SettingsSnapshot)
 def get_settings():
     return _settings_snapshot()
@@ -90,6 +133,16 @@ def save_settings(request: SettingsUpdate, backend=Depends(get_backend)):
     settings.update_from_ui(**payload)
     backend.apply_runtime_settings(force=True)
     return _settings_snapshot()
+
+
+@router.post("/v1/steering/restart")
+def restart_steering(payload: Dict[str, Any]):
+    return _proxy_steering_request("POST", "/v1/steering/restart", payload, timeout=20)
+
+
+@router.get("/v1/steering/restart-status")
+def steering_restart_status():
+    return _proxy_steering_request("GET", "/v1/steering/restart-status", timeout=5)
 
 
 @router.get("/emotion-layer-config")
