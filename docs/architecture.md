@@ -98,21 +98,15 @@ Relevante Dateien:
 - `brain/steering_backend.py`
 - `brain/steering_api_server.py`
 
-## 3D Emotion Lattice
+## Emotionssteuerung
 
-CHAPPiEs emotionale Zustaende werden in einer 3D-Visualisierung sichtbar:
-
-- **Living Orb**: Verformte Geometrie mit Vertex Displacement via FBM Noise
-- **Emotion-Mapping**: Alle 10 Emotionen steuern Farbe, Oberflaechenstruktur, Puls und Partikel; Zuneigung waermt den Glow, Unruhe erzeugt leichte Spannung, Ruhe stabilisiert Bewegung
-- **Inner Core**: Zweiter transparenter Kern mit eigenem Puls
-- **Partikel-Feld**: 100 schwebende Partikel, deren Bewegung von Frustration und Energie gesteuert wird
-- **Material**: `meshPhysicalMaterial` mit `transmission`, `clearcoat`, `iridescence`
+CHAPPiEs emotionale Zustaende werden im Debug-Flow, in Settings und in den Antwort-Metadaten sichtbar. vLLM nutzt Activation-Steering ueber `extra_body`, Ollama und Groq bekommen dieselben Werte prompt-basiert ueber den System-Prompt.
 
 Relevante Dateien:
 
-- `frontend/src/components/visualizer-canvas.tsx`
-- `frontend/src/pages/visualizer-page.tsx`
-- `api/services/command_service.py` (`build_visualizer_payload`)
+- `brain/agents/steering_manager.py`
+- `memory/emotions_engine.py`
+- `frontend/src/pages/settings-page.tsx`
 
 ## Debug- und Entscheidungsspuren
 

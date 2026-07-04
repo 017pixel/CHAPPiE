@@ -236,14 +236,13 @@ Das Frontend bildet die frueheren Ansichten jetzt ueber eigene Seiten ab:
 | **Settings** | Runtime-Konfiguration |
 | **Training** | Trainings-Status und Steuerung |
 | **Debug** | Debug-Logs und Causal Trace |
-| **Visualizer** | 3D Emotion Lattice – lebendiger Orb mit Vertex Displacement und Partikeln |
 
 Relevante Pfade:
 
 - `frontend/src/router.tsx`
 - `frontend/src/pages/*.tsx`
 - `frontend/src/services/api.ts`
-- `frontend/src/components/visualizer-canvas.tsx`
+- `frontend/src/components/app-shell.tsx`
 
 ## Weiterfuehrend
 

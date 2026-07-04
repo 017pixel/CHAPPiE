@@ -166,6 +166,27 @@ def test_remote_handle_command_error():
     assert result.startswith("Error")
 
 
+# ── remote reset emotions ────────────────────────────────────────
+
+def test_remote_resetemotions_posts_reset_endpoint():
+    m = _get_module()
+    cli = m.CHAPPiEBrainCLI.__new__(m.CHAPPiEBrainCLI)
+    cli._use_remote = True
+    cli.remote_url = "http://localhost:8010"
+    cli._show_status = MagicMock()
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_post = MagicMock(return_value=mock_resp)
+
+    with patch.object(m.requests, "post", mock_post):
+        handled = cli._handle_command("/resetemotions")
+
+    assert handled is True
+    mock_post.assert_called_once_with("http://localhost:8010/emotions/reset", timeout=5)
+    cli._show_status.assert_called_once()
+
+
 # ── remote_meta_to_result edge cases ─────────────────────────────
 
 def test_remote_meta_to_result_empty_metadata():
@@ -207,6 +228,7 @@ if __name__ == "__main__":
     test_stream_events_connection_error()
     test_remote_handle_command_success()
     test_remote_handle_command_error()
+    test_remote_resetemotions_posts_reset_endpoint()
     test_remote_meta_to_result_empty_metadata()
     test_remote_meta_to_result_all_life_fields()
     print("OK: CLI v6.0 remote backend")

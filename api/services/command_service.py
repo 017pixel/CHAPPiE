@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from config.config import get_active_model, settings
+from config.config import settings
 from config.emotions import EMOTION_ORDER
 
 HELP_TEXT = """**CHAPPiE Commands:**
@@ -196,16 +196,3 @@ def execute_slash_command(command: str, backend) -> Dict[str, Any]:
     if lower in {"/daily", "/personality", "/consolidate", "/reflect", "/functions", "/life", "/needs", "/goals", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline", "/debug", "/step1", "/soul", "/user", "/prefs", "/preferences", "/twostep"}:
         return _base_result(backend, backend.handle_command(lower))
     return _base_result(backend, backend.handle_command(cmd))
-
-
-def build_visualizer_payload(backend) -> Dict[str, Any]:
-    emotions = backend._get_emotions_snapshot()
-    life_snapshot = backend.life_simulation.get_snapshot()
-    report = backend.steering_manager.build_debug_report(emotions)
-    return {
-        "model": get_active_model(),
-        "provider": settings.llm_provider.value,
-        "emotions": emotions,
-        "life_snapshot": life_snapshot,
-        "steering_report": report,
-    }

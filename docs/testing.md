@@ -82,7 +82,7 @@ Zusammen pruefen:
 Bei Emotionsmodell-Aenderungen zusaetzlich pruefen:
 
 - alte 7-Emotionen-States werden mit den aktuellen Defaults auf 10 Emotionen normalisiert
-- neue Emotionen erscheinen in `/emotions/state`, `/emotion`, Settings, Debug und Visualizer
+- neue Emotionen erscheinen in `/emotions/state`, `/emotion`, Settings und Debug
 - neue Steering-Vektoren bleiben konservativ gecappt und erzeugen keine Anti-Vektoren bei niedrigen negativen Werten
 
 ## Bei Web-Aenderungen

@@ -9,7 +9,7 @@ from typing import Optional, Dict, Tuple, Any
 
 from .base_brain import BaseBrain, Message, GenerationConfig
 
-from config.config import settings, LLMProvider
+from config.config import settings, LLMProvider, _parse_provider
 
 _brain_cache: Dict[Tuple[str, str], BaseBrain] = {}
 
@@ -48,7 +48,14 @@ def __getattr__(name: str) -> Any:
     return _load_export(name)
 
 
-def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = None) -> BaseBrain:
+def _normalize_provider(provider: Optional[LLMProvider | str]) -> LLMProvider:
+    if isinstance(provider, LLMProvider):
+        return provider
+    parsed = _parse_provider(provider)
+    return parsed or LLMProvider.OLLAMA
+
+
+def get_brain(provider: Optional[LLMProvider | str] = None, model: Optional[str] = None) -> BaseBrain:
     """
     Factory-Funktion: Gibt das konfigurierte Brain zurueck (gecached).
 
@@ -63,7 +70,7 @@ def get_brain(provider: Optional[LLMProvider] = None, model: Optional[str] = Non
     Returns:
         Initialisiertes Brain-Objekt
     """
-    effective_provider = provider or settings.llm_provider
+    effective_provider = _normalize_provider(provider or settings.llm_provider)
     effective_model = model or None
     cache_key = (effective_provider.value, effective_model or "")
 

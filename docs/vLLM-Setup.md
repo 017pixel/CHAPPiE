@@ -51,7 +51,7 @@ Relevante Dateien:
 
 ## 4. Runtime pruefen
 
-Im neuen Webpfad kannst du ueber Settings, Debug und Visualizer kontrollieren:
+Im neuen Webpfad kannst du ueber Settings und Debug kontrollieren:
 
 - aktiven Provider
 - Modell und Endpoint

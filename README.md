@@ -37,7 +37,7 @@ CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeuge
 - **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
 - **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
 - **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden
-- **3D Emotion Lattice**: Lebendiger 3D-Orb, der sich in Echtzeit an alle 10 Emotionen anpasst – Farbe, Oberflaeche, Puls und Partikel reagieren auf emotionale Zustaende
+- **Provider-kompatible Emotionssteuerung**: vLLM nutzt Layer-Steering, Ollama und Groq nutzen denselben Emotionszustand im System-Prompt
 
 ## Erste Beobachtungen
 

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { parseEmotionalText } from "../lib/format";
+import { EmotionalTextPart, parseEmotionalText } from "../lib/format";
 import { api } from "../services/api";
 import { useUiStore } from "../store/ui";
 
@@ -42,7 +42,25 @@ const THINKING_MESSAGES = [
   "Die Antwort formt sich...",
 ];
 
-const EMOTION_NAMES = ["happiness", "trust", "energy", "curiosity", "motivation", "frustration", "sadness"] as const;
+const EMOTION_NAMES = [
+  "happiness",
+  "trust",
+  "energy",
+  "curiosity",
+  "frustration",
+  "motivation",
+  "sadness",
+  "affection",
+  "anxiety",
+  "calm",
+] as const;
+
+function emotionalPartClass(part: EmotionalTextPart): string {
+  if (part.tone === "ember") return "text-ember italic";
+  if (part.tone === "pine") return "text-pine italic";
+  if (part.tone === "muted") return "text-slate/50 italic";
+  return "";
+}
 
 function isPending(msg: ChatMessage): boolean {
   return msg.metadata?.pending === true;
@@ -580,10 +598,13 @@ export function ChatPage() {
                       )}
                     </div>
                   ) : (
-                    <div
-                      className="text-sm leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: parseEmotionalText(entry.content).replace(/\n/g, "<br/>") }}
-                    />
+                    <div className="text-sm leading-relaxed whitespace-pre-line">
+                      {parseEmotionalText(entry.content).map((part, index) => (
+                        <span key={`${index}-${part.tone}`} className={emotionalPartClass(part)}>
+                          {part.text}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
                 {/* Info + Raw Buttons */}

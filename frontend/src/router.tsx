@@ -9,7 +9,6 @@ import { LifePage } from "./pages/life-page";
 import { MemoriesPage } from "./pages/memories-page";
 import { SettingsPage } from "./pages/settings-page";
 import { TrainingPage } from "./pages/training-page";
-import { VisualizerPage } from "./pages/visualizer-page";
 
 export const router = createBrowserRouter([
   {
@@ -23,8 +22,7 @@ export const router = createBrowserRouter([
       { path: "growth", element: <GrowthPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "training", element: <TrainingPage /> },
-      { path: "debug", element: <DebugPage /> },
-      { path: "visualizer", element: <VisualizerPage /> }
+      { path: "debug", element: <DebugPage /> }
     ]
   }
 ]);

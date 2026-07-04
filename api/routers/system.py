@@ -4,7 +4,6 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
 
-from api.services.command_service import build_visualizer_payload
 from api.dependencies import get_backend
 from api.schemas import HealthResponse, StatusResponse
 from config.config import settings
@@ -62,8 +61,3 @@ def get_debug(backend=Depends(get_backend)):
         "formatted_log": backend.debug_logger.get_formatted_log() if backend.debug_logger.enabled else "",
         "last_assistant_message": last_assistant_message,
     }
-
-
-@router.get("/visualizer")
-def get_visualizer_state(backend=Depends(get_backend)):
-    return build_visualizer_payload(backend)

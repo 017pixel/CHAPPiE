@@ -1353,11 +1353,15 @@ class CHAPPiEBrainCLI:
         if cmd_lower == "/resetemotions":
             if self._use_remote:
                 try:
-                    requests.get(f"{self.remote_url}/emotions/state", timeout=5)
-                except Exception:
-                    pass
+                    response = requests.post(f"{self.remote_url}/emotions/reset", timeout=5)
+                    response.raise_for_status()
+                    _success("Remote-Emotionen zurueckgesetzt")
+                except Exception as e:
+                    _error(f"Remote-Reset fehlgeschlagen: {e}")
+                    return True
             else:
                 self.emotions.reset()
+                _success("Emotionen zurueckgesetzt")
             self._show_status()
             return True
 

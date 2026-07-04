@@ -2,6 +2,31 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [15.0] - 2026-07-04
+
+### Erstellt
+- Remote-Endpoint `/emotions/reset` fuer echte CLI-Resets erstellt
+- Provider-Auswahl fuer Forschungssessions mit vLLM, Ollama und Groq erstellt
+- Provider-spezifische Modell-Presets fuer den Forschungsharness erstellt
+- Tests fuer providerfaehige Forschungskonfiguration ergaenzt
+- API-Version 15.0 fuer den reparierten Runtime-Stand gesetzt
+
+### Verändert
+- Emotions-Fallback senkt Energy nicht mehr pauschal bei jedem Turn
+- Positive und neugierige Interaktionen koennen Energy wieder leicht erhoehen
+- Desktop-Sidebar ist jetzt per Header-Button ein- und ausklappbar
+- Forschungssessions setzen Runtime-Provider und Modell passend zur Auswahl
+- CLI `/resetemotions` nutzt remote jetzt einen schreibenden Reset statt nur Status zu lesen
+
+### Gelöscht
+- 3D-Visualizer-Route und Navigation aus dem Frontend entfernt
+- React-Three-Fiber, Three.js, Drei und Postprocessing aus den Frontend-Abhaengigkeiten entfernt
+- Unbenutzten `/visualizer` API-Endpunkt entfernt
+- Visualizer-Komponenten und Canvas-spezifische Mobile-CSS entfernt
+- Visualizer-Erwartung aus API-Contract-Test und aktueller Doku entfernt
+
+---
+
 ## [14.0] - 2026-07-02
 
 ### Erstellt

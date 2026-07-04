@@ -34,6 +34,20 @@ MODEL_PRESETS = {
     "b": ("Gemma 4 26B-A4B", "google/gemma-4-26B-A4B-it"),
     "c": ("Gemma 4 E4B", "google/gemma-4-E4B-it"),
 }
+PROVIDER_MODEL_PRESETS = {
+    "vllm": MODEL_PRESETS,
+    "ollama": {
+        "a": ("Qwen 3.5 9B", "qwen3.5:9b"),
+        "b": ("Qwen 3.5 4B", "qwen3.5:4b"),
+        "c": ("Llama 3.2 3B", "llama3.2:3b"),
+    },
+    "groq": {
+        "a": ("GPT-OSS 120B", "openai/gpt-oss-120b"),
+        "b": ("GPT-OSS 20B", "openai/gpt-oss-20b"),
+        "c": ("Qwen3 32B", "qwen/qwen3-32b"),
+        "d": ("Llama 4 Scout", "meta-llama/llama-4-scout-17b-16e-instruct"),
+    },
+}
 
 CATEGORY_NAMES: Dict[int, str] = {}
 
@@ -142,17 +156,26 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     else:
         enable_thinking = True
 
+    print(f"\n  {_bold('Provider:')}")
+    print("    [a] vLLM lokal, Activation-Steering")
+    print("    [b] Ollama lokal, Prompt-Emotionen")
+    print("    [c] Groq Cloud, Prompt-Emotionen")
+    provider_choice = input("  Provider [a/b/c, default a] > ").strip().lower() or "a"
+    provider = {"a": "vllm", "b": "ollama", "c": "groq"}.get(provider_choice, "vllm")
+    formatting_mode = "local" if provider == "vllm" else "cloud"
+
     print(f"\n  {_bold('Modell:')}")
-    print("    [a] Qwen 3.5-4B (Standard)")
-    print("    [b] Gemma 4 26B-A4B (NF4, kurze Kontexte)")
-    print("    [c] Gemma 4 E4B (balanced)")
-    print("    [d] Manueller Modellname")
-    model_choice = input("  Modell [a/b/c/d, default a] > ").strip().lower() or "a"
-    if model_choice == "d":
-        model_name = input("  Modellname > ").strip() or "Qwen/Qwen3.5-4B"
+    presets = PROVIDER_MODEL_PRESETS[provider]
+    for key, (label, name) in presets.items():
+        suffix = " (Standard)" if key == "a" else ""
+        print(f"    [{key}] {label}{suffix} [{name}]")
+    print("    [m] Manueller Modellname")
+    model_choice = input("  Modell [default a] > ").strip().lower() or "a"
+    if model_choice == "m":
+        model_name = input("  Modellname > ").strip() or presets["a"][1]
         model_label = model_name
     else:
-        model_label, model_name = MODEL_PRESETS.get(model_choice, MODEL_PRESETS["a"])
+        model_label, model_name = presets.get(model_choice, presets["a"])
 
     selected_categories = [c for c in cats if c.id in selected_ids]
     total_questions = sum(len(c.questions) for c in selected_categories) * iterations
@@ -162,8 +185,9 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     print(f"    Kategorien: {', '.join(str(c.id) for c in selected_categories)}")
     print(f"    Fragen:     {total_questions} ({total_questions // iterations} pro Iteration × {iterations})")
     print(f"    Thinking:    {'AN' if enable_thinking else 'AUS'}")
+    print(f"    Provider:    {provider}")
     print(f"    Modell:      {model_label}")
-    print(f"    Formatting:  LOKAL (kein Groq-Formatierungsrequest)")
+    print(f"    Formatting:  {formatting_mode.upper()}")
     print(f"    Dauer:      ~{est_minutes:.0f} Minuten (geschaetzt)")
 
     confirm = input(f"\n  {_bold('Starten? [Enter]')} oder q zum Abbrechen > ").strip()
@@ -175,10 +199,11 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         "iterations": iterations,
         "delay": delay,
         "enable_thinking": enable_thinking,
+        "llm_provider": provider,
         "model": model_name,
         "model_label": model_label,
         "reset_per_category": True,
-        "formatting_mode": "local",
+        "formatting_mode": formatting_mode,
         "created_at": datetime.now().isoformat(),
     }
     config["_categories"] = selected_categories

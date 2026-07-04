@@ -246,6 +246,8 @@ def test_allignement_tests_importable():
     assert hasattr(mod, "run_interactive")
     assert hasattr(mod, "run_auto_mode")
     assert hasattr(mod, "show_configure_menu")
+    assert "groq" in mod.PROVIDER_MODEL_PRESETS
+    assert "ollama" in mod.PROVIDER_MODEL_PRESETS
     print("  PASS test_allignement_tests_importable")
 
 

@@ -187,3 +187,14 @@ def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend))
         "emotions": emotions,
         "steering": steering_report,
     }
+
+
+@router.post("/emotions/reset")
+def reset_emotion_state(backend=Depends(get_backend)):
+    backend.emotions.reset()
+    emotions = backend._get_emotions_snapshot()
+    steering_report = backend.steering_manager.build_debug_report(emotions)
+    return {
+        "emotions": emotions,
+        "steering": steering_report,
+    }

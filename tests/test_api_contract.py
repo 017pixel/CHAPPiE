@@ -3,12 +3,27 @@
 import os
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
+
+for module_name in (
+    "chromadb",
+    "chromadb.config",
+    "ollama",
+    "openai",
+    "sentence_transformers",
+    "rich",
+    "rich.console",
+    "rich.panel",
+    "rich.table",
+    "rich.live",
+):
+    sys.modules.setdefault(module_name, MagicMock())
 
 from api.dependencies import get_backend  # noqa: E402
 from api.main import app  # noqa: E402
@@ -290,14 +305,13 @@ def test_chat_route_returns_serialized_turn_payload():
     app.dependency_overrides.clear()
 
 
-def test_memory_context_and_visualizer_routes_return_expected_shapes():
+def test_memory_context_and_runtime_routes_return_expected_shapes():
     app.dependency_overrides[get_backend] = lambda: _DummyBackend()
     client = TestClient(app)
 
     memories = client.get("/memories")
     short_term = client.get("/memories/short-term")
     context = client.get("/context-files")
-    visualizer = client.get("/visualizer")
     debug = client.get("/debug")
     settings = client.get("/settings")
     training = client.get("/training/status")
@@ -308,8 +322,6 @@ def test_memory_context_and_visualizer_routes_return_expected_shapes():
     assert short_term.json()["items"][0]["id"] == "stm-1"
     assert context.status_code == 200
     assert context.json()["preferences"] == "Preferences"
-    assert visualizer.status_code == 200
-    assert visualizer.json()["model"]
     assert debug.status_code == 200
     assert "entries" in debug.json()
     assert settings.status_code == 200
@@ -322,5 +334,5 @@ def test_memory_context_and_visualizer_routes_return_expected_shapes():
 if __name__ == "__main__":
     test_health_and_status_routes()
     test_chat_route_returns_serialized_turn_payload()
-    test_memory_context_and_visualizer_routes_return_expected_shapes()
+    test_memory_context_and_runtime_routes_return_expected_shapes()
     print("OK: api contract")

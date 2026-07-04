@@ -39,19 +39,28 @@ class SessionRunner:
         if enable_thinking is not None:
             settings.update_from_ui(chain_of_thought=bool(enable_thinking))
 
+        llm_provider = str(self.config.get("llm_provider") or self.config.get("provider") or "vllm").strip().lower()
+        if llm_provider not in {"vllm", "ollama", "groq"}:
+            llm_provider = "vllm"
+
         model_name = str(self.config.get("model") or "").strip()
         if model_name:
             is_gemma_26b = is_gemma4_model(model_name) and ("26b" in model_name.lower() or "a4b" in model_name.lower())
             context_length = 4096 if is_gemma_26b else 8192
-            settings.update_from_ui(
-                llm_provider="vllm",
-                vllm_model=model_name,
-                steering_model=model_name,
-                steering_quantize=is_gemma_26b,
-                steering_context_length=context_length,
-                use_model_defaults=True,
-            )
-            apply_model_defaults_if_unset(model_name, settings)
+            updates: Dict[str, Any] = {"llm_provider": llm_provider, "use_model_defaults": True}
+            if llm_provider == "vllm":
+                updates.update(
+                    vllm_model=model_name,
+                    steering_model=model_name,
+                    steering_quantize=is_gemma_26b,
+                    steering_context_length=context_length,
+                )
+                apply_model_defaults_if_unset(model_name, settings)
+            elif llm_provider == "ollama":
+                updates["ollama_model"] = model_name
+            elif llm_provider == "groq":
+                updates["groq_model"] = model_name
+            settings.update_from_ui(**updates)
 
         if self.backend is None:
             try:
@@ -59,7 +68,7 @@ class SessionRunner:
             except Exception as exc:
                 raise RuntimeError(f"Backend-Initialisierung fehlgeschlagen: {exc}") from exc
 
-        if self.config.get("formatting_mode", "local") == "local":
+        if self.config.get("formatting_mode", "local" if llm_provider == "vllm" else "cloud") == "local":
             setattr(self.backend, "force_local_formatting", True)
         if model_name:
             self.backend.apply_runtime_settings(force=True)

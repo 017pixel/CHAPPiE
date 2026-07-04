@@ -332,7 +332,7 @@ class EmotionsEngine:
         if llm_result:
             # LLM-basierte Aenderungen anwenden
             llm_changes = {key: llm_result.get(f"{key}_change", 0) for key in EMOTION_ORDER}
-            llm_changes["energy"] = llm_result.get("energy_change", -1)
+            llm_changes["energy"] = llm_result.get("energy_change", 0)
             for emotion_name, raw_delta in llm_changes.items():
                 apply_emotion_delta(self.state, emotion_name, raw_delta)
             
@@ -353,27 +353,27 @@ class EmotionsEngine:
     
     def _apply_simple_sentiment(self, sentiment: str):
         """Wendet einfache Sentiment-basierte Aenderungen an (Fallback)."""
-        changes = {
-            **{key: 0 for key in EMOTION_ORDER},
-            "energy": -1,
-        }
+        changes = {key: 0 for key in EMOTION_ORDER}
 
         if sentiment == "POSITIV":
             changes["happiness"] = 3
             changes["trust"] = 1
             changes["motivation"] = 2
+            changes["energy"] = 1
             changes["frustration"] = -3
             changes["affection"] = 2
             changes["calm"] = 1
             changes["anxiety"] = -2
         elif sentiment == "NEGATIV":
             changes["happiness"] = -5
+            changes["energy"] = -1
             changes["frustration"] = 8
             changes["anxiety"] = 3
             changes["calm"] = -2
         elif sentiment == "NEUGIERIG":
             changes["curiosity"] = 8
             changes["motivation"] = 2
+            changes["energy"] = 1
         elif sentiment == "VERTRAUEN":
             changes["trust"] = 10
             changes["happiness"] = 3
