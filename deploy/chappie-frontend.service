@@ -7,9 +7,9 @@ Wants=chappie-web.service
 User=bbecker
 Group=bbecker
 WorkingDirectory=/home/bbecker/CHAPPiE/frontend
-Environment="PATH=/home/bbecker/.nvm/versions/node/v22.14.0/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/home/bbecker/.local/share/fnm/node-versions/v24.14.0/installation/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="NODE_ENV=production"
-ExecStart=/home/bbecker/.nvm/versions/node/v22.14.0/bin/npm run preview -- --host 0.0.0.0 --port 4173
+ExecStart=/home/bbecker/.local/share/fnm/node-versions/v24.14.0/installation/bin/npm run preview -- --host 0.0.0.0 --port 4173
 Restart=always
 RestartSec=5
 TimeoutStopSec=10
