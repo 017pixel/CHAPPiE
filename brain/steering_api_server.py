@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import gc
 import json
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
@@ -17,7 +18,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from .steering_backend import LocalSteeringEngine, extract_steering_payload, QUANTIZE_ENV
+from .steering_backend import FORCE_CPU_ENV, LocalSteeringEngine, extract_steering_payload, QUANTIZE_ENV
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _default_model_name() -> str:
@@ -238,13 +242,27 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 import torch
 
                 if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                     torch.cuda.empty_cache()
-                    try:
-                        torch.cuda.ipc_collect()
-                    except Exception:
-                        pass
+                    torch.cuda.reset_peak_memory_stats()
             except Exception:
                 pass
+
+            await asyncio.sleep(1.5)
+
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    free, total = torch.cuda.mem_get_info()
+                    free_gib = free / (1024 ** 3)
+                    total_gib = total / (1024 ** 3)
+                    LOGGER.info("GPU nach Cleanup: %.2f GiB frei / %.2f GiB total", free_gib, total_gib)
+                    if free_gib < 2.0:
+                        LOGGER.warning("Nur %.2f GiB frei - versuche CPU-Fallback", free_gib)
+                        os.environ[FORCE_CPU_ENV] = "1"
+            except Exception:
+                LOGGER.exception("Freier GPU-Speicher konnte nach Cleanup nicht ermittelt werden.")
 
             app.state.restart_status = "loading"
             app.state.restart_progress = 25

@@ -607,24 +607,40 @@ class LocalSteeringEngine:
         raise AttributeError(f"Keine Transformer-Layer fuer {self.model_name} gefunden.")
 
     def close(self) -> None:
-        """Gibt Modellreferenzen frei, bevor ein anderes Modell geladen wird."""
+        """Gibt alle GPU-Ressourcen frei (altes Modell vollstaendig entfernen)."""
         try:
-            if hasattr(self, "model"):
-                self.model.to("cpu")
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
         except Exception:
             pass
+
         for attr in ("resolver", "layers", "model", "tokenizer"):
             try:
                 setattr(self, attr, None)
             except Exception:
                 pass
-        gc.collect()
+
+        for _ in range(3):
+            gc.collect()
+
         if torch.cuda.is_available():
+            torch.cuda.synchronize()
             torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
             try:
                 torch.cuda.ipc_collect()
             except Exception:
                 pass
+
+    @staticmethod
+    def _cuda_free_gib() -> float:
+        if not torch.cuda.is_available():
+            return 0.0
+        try:
+            free, _total = torch.cuda.mem_get_info()
+            return float(free) / float(1024 ** 3)
+        except Exception:
+            return 0.0
 
     def _select_device(self) -> torch.device:
         force_cpu = os.getenv(FORCE_CPU_ENV, "").strip().lower()
@@ -635,7 +651,7 @@ class LocalSteeringEngine:
             return torch.device("cpu")
 
         required_gpu_gib = self._estimate_required_gpu_gib()
-        available_gpu_gib = self._cuda_total_gib()
+        available_gpu_gib = self._cuda_free_gib()
         if required_gpu_gib and available_gpu_gib and available_gpu_gib < required_gpu_gib:
             LOGGER.warning(
                 "Steering-Backend nutzt CPU-Fallback: %.2f GiB GPU-RAM sind fuer %s zu klein (ca. %.2f GiB benoetigt).",

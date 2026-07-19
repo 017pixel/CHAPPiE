@@ -14,6 +14,8 @@ Usage:
   python chappie_brain_cli.py --remote --url http://100.105.94.71:8010
 """
 
+# Command aus meiner neuen Dev Workbench :) (hat nix mit dem Projekt zu tun)
+
 from __future__ import annotations
 
 import argparse

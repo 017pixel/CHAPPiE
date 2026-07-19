@@ -222,18 +222,16 @@ def test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35():
     assert engine._build_loader_kwargs() == {}
 
 
-def test_local_steering_engine_falls_back_to_cpu_for_small_gpu():
+def test_local_steering_engine_falls_back_to_cpu_when_free_gpu_memory_is_low():
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
-    engine.model_name = "Qwen/Qwen3.5-9B"
-    engine.quantize = False
-    engine.context_length = 8192
-
-    class _Props:
-        total_memory = int(15.56 * (1024 ** 3))
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.quantize = True
+    engine.context_length = 4096
 
     with patch.dict(os.environ, {}, clear=False):
         with patch("brain.steering_backend.torch.cuda.is_available", return_value=True):
-            with patch("brain.steering_backend.torch.cuda.get_device_properties", return_value=_Props()):
+            memory_info = (int(2 * (1024 ** 3)), int(24 * (1024 ** 3)))
+            with patch("brain.steering_backend.torch.cuda.mem_get_info", return_value=memory_info):
                 assert engine._select_device().type == "cpu"
 
 
@@ -281,12 +279,9 @@ def test_local_steering_engine_quantize_on_gpu_fit():
     engine.quantize = True
     engine.context_length = 4096
 
-    class _Props24:
-        total_memory = int(24.0 * (1024 ** 3))
-
     with patch.dict(os.environ, {}, clear=False):
         with patch("brain.steering_backend.torch.cuda.is_available", return_value=True):
-            with patch("brain.steering_backend.torch.cuda.get_device_properties", return_value=_Props24()):
+            with patch("brain.steering_backend.torch.cuda.mem_get_info", return_value=(int(24 * (1024 ** 3)), int(24 * (1024 ** 3)))):
                 device = engine._select_device()
                 assert device.type == "cuda", f"Quantized 4B should fit on 24GiB GPU, got {device}"
 
@@ -304,7 +299,7 @@ if __name__ == "__main__":
     test_steering_manager_includes_anti_safeguard_vector()
     test_local_steering_engine_uses_trust_remote_code_for_qwen35()
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()
-    test_local_steering_engine_falls_back_to_cpu_for_small_gpu()
+    test_local_steering_engine_falls_back_to_cpu_when_free_gpu_memory_is_low()
     test_local_steering_engine_force_cpu_env_wins_over_gpu()
     test_local_steering_engine_quantize_reduces_gpu_estimate()
     test_local_steering_engine_resolve_quantize_auto_detects_small_gpu()
