@@ -151,6 +151,29 @@ def contains_cot_leak(text: str) -> bool:
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
 
 
+INSTRUCTION_LEAK_PATTERNS = (
+    r"<\s*/?\s*function(?:_call)?\b[^>]*>",
+    r"\b(?:call|function|funktionsaufruf)\s*:\s*(?:update_soul|update_user|update_preferences)\b",
+    r"[\"'](?:name|function|action)[\"']\s*:\s*[\"'](?:update_soul|update_user|update_preferences|add_short_term_memory)[\"']",
+    r"\b(?:update_soul|update_user|update_preferences|add_short_term_memory)\s*\(",
+    r"\bsoul\s*\.\s*md\b",
+    r"\{\%\s*(?:if|else|endif|for|endfor)\b",
+    r"\{\{[^{}]{1,200}\}\}",
+    r"<\|(?:channel|start|end|message|constrain)[^>]*\|>",
+    r"\b(?:system prompt|prompt structure|internal functions?|tool plan|expected next step)\b",
+)
+
+
+def contains_instruction_leak(text: str) -> bool:
+    """Erkennt sichtbare Orchestrierungs-, Tool- und Template-Fragmente."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    return any(
+        re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        for pattern in INSTRUCTION_LEAK_PATTERNS
+    )
+
+
 def has_chain_of_thought_format(response: str) -> bool:
     """
     Prueft ob die Antwort das Chain-of-Thought Format enthaelt.

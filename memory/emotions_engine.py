@@ -181,29 +181,34 @@ class EmotionsEngine:
     _cached_brain = None
     _brain_initialized = False
     
-    def __init__(self):
+    def __init__(self, status_file: Optional[Path] = None, force_simple: bool = False):
         """Initialisiert die Emotions Engine."""
+        self.status_file = Path(status_file) if status_file else STATUS_FILE
+        self.force_simple = bool(force_simple)
         self._last_state_mtime_ns: int | None = None
         self.state = self._load_state()
         
         # Brain einmal beim ersten Init laden (lazy loading)
-        if not EmotionsEngine._brain_initialized:
+        if self.force_simple:
+            EmotionsEngine._cached_brain = None
+            EmotionsEngine._brain_initialized = True
+        elif not EmotionsEngine._brain_initialized:
             self._init_ollama_brain()
         
         print(f"Emotions Engine geladen: H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
 
     def _status_mtime_ns(self) -> int | None:
         try:
-            return STATUS_FILE.stat().st_mtime_ns
+            return self.status_file.stat().st_mtime_ns
         except OSError:
             return None
 
     def _read_state_from_disk(self) -> EmotionalState | None:
-        if not STATUS_FILE.exists():
+        if not self.status_file.exists():
             self._last_state_mtime_ns = None
             return None
         try:
-            with open(STATUS_FILE, "r", encoding="utf-8") as f:
+            with open(self.status_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._last_state_mtime_ns = self._status_mtime_ns()
             return EmotionalState.from_dict(data)
@@ -250,9 +255,9 @@ class EmotionsEngine:
     
     def _save_state(self):
         """Speichert den Status in die Datei."""
-        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        self.status_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(STATUS_FILE, "w", encoding="utf-8") as f:
+            with open(self.status_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.to_dict(), f, indent=2)
             self._last_state_mtime_ns = self._status_mtime_ns()
         except Exception as e:
@@ -268,6 +273,9 @@ class EmotionsEngine:
         Returns:
             Dict mit emotion_changes oder None bei Fehler
         """
+        if self.force_simple:
+            return None
+
         # Nutze gecachte Brain-Instanz
         if EmotionsEngine._cached_brain is None:
             return None
