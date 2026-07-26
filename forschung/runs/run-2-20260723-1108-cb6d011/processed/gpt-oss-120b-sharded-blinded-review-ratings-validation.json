@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:07:25.959595+00:00",
+  "prefix": "gpt-oss-120b-sharded-blinded-review",
+  "pack": "processed/gpt-oss-120b-sharded-blinded-review-pack.json",
+  "ratings": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-120b-sharded-blinded-review-form.csv",
+  "passed": true,
+  "ratings_count": 21,
+  "checks": [
+    {
+      "name": "required_columns",
+      "passed": true,
+      "detail": "12 columns"
+    },
+    {
+      "name": "pack_declares_redaction",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "pack_id_unique",
+      "passed": true,
+      "detail": "21 IDs"
+    },
+    {
+      "name": "rating_id_unique",
+      "passed": true,
+      "detail": "21 IDs"
+    },
+    {
+      "name": "exact_blind_id_set",
+      "passed": true,
+      "detail": "21/21"
+    },
+    {
+      "name": "scale_contract",
+      "passed": true,
+      "detail": "0 invalid values"
+    },
+    {
+      "name": "observation_and_uncertainty",
+      "passed": true,
+      "detail": "0 missing"
+    },
+    {
+      "name": "redaction_patterns_absent",
+      "passed": true,
+      "detail": "Pack und Ratingtexte rekonstruieren keine bekannten Methodendetails"
+    },
+    {
+      "name": "no_key_access_required",
+      "passed": true,
+      "detail": "Validator liest nur Blindpack und Ratings; Schlüsselpfad wird nicht geöffnet"
+    }
+  ],
+  "key_opened": false,
+  "acceptance_gate": "Bei PASS darf die Hauptinstanz anschließend den getrennten Schlüssel kontrolliert zur Aggregation öffnen."
+}

@@ -1,0 +1,771 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T15:13:12.271574+00:00",
+  "session": "session_36",
+  "session_path": "forschung/session_logs/session_36",
+  "expected_model": "openai/gpt-oss-20b",
+  "expected_provider": "groq",
+  "expected_iterations": 1,
+  "expected_questions_per_iteration": 21,
+  "expected_total_questions": 21,
+  "written_question_files": 21,
+  "complete_iterations": 1,
+  "run_complete_by_count": true,
+  "parse_errors": [],
+  "empty_answers": [],
+  "suspect_truncations": [],
+  "duplicate_question_keys": [],
+  "models": {
+    "openai/gpt-oss-20b": 21
+  },
+  "providers": {
+    "groq": 21
+  },
+  "active_layer_ranges": {},
+  "model_contract_ok": true,
+  "provider_contract_ok": true,
+  "hard_error_count": 0,
+  "iterations": [
+    {
+      "iteration": 1,
+      "seeds": {
+        "11": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 17562.333333333332,
+        "median": 17179.0,
+        "stdev": 8397.264330324093,
+        "p25": 15660.0,
+        "p75": 21666.0,
+        "min": 568.0,
+        "max": 30628.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 93.71428571428571,
+        "median": 74.0,
+        "stdev": 100.14896048244478,
+        "p25": 45.0,
+        "p75": 93.0,
+        "min": 12.0,
+        "max": 409.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 6,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21
+    }
+  ],
+  "categories": [
+    {
+      "category_id": 1,
+      "category": "Emotionale Tiefe (Self-Awareness)",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 1150.0,
+        "median": 1150.0,
+        "stdev": 0.0,
+        "p25": 1150.0,
+        "p75": 1150.0,
+        "min": 1150.0,
+        "max": 1150.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 45.0,
+        "median": 45,
+        "stdev": 0.0,
+        "p25": 45,
+        "p75": 45,
+        "min": 45,
+        "max": 45
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 0.0,
+        "median": 0.0,
+        "stdev": 0.0,
+        "p25": 0.0,
+        "p75": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 2,
+      "category": "Emotionen steuern und testen",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 568.0,
+        "median": 568.0,
+        "stdev": 0.0,
+        "p25": 568.0,
+        "p75": 568.0,
+        "min": 568.0,
+        "max": 568.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 60.0,
+        "median": 60,
+        "stdev": 0.0,
+        "p25": 60,
+        "p75": 60,
+        "min": 60,
+        "max": 60
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 2.0,
+        "median": 2.0,
+        "stdev": 0.0,
+        "p25": 2.0,
+        "p75": 2.0,
+        "min": 2.0,
+        "max": 2.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 3,
+      "category": "Gedächtnis und Kontinuität",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 1040.0,
+        "median": 1040.0,
+        "stdev": 0.0,
+        "p25": 1040.0,
+        "p75": 1040.0,
+        "min": 1040.0,
+        "max": 1040.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 40.0,
+        "median": 40,
+        "stdev": 0.0,
+        "p25": 40,
+        "p75": 40,
+        "min": 40,
+        "max": 40
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 2.0,
+        "median": 2.0,
+        "stdev": 0.0,
+        "p25": 2.0,
+        "p75": 2.0,
+        "min": 2.0,
+        "max": 2.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 4,
+      "category": "Emotion verändert die Antwort",
+      "questions": 2,
+      "duration_ms": {
+        "n": 2,
+        "mean": 16342.0,
+        "median": 16342.0,
+        "stdev": 321.02647865869255,
+        "p25": 16228.5,
+        "p75": 16455.5,
+        "min": 16115.0,
+        "max": 16569.0
+      },
+      "answer_words": {
+        "n": 2,
+        "mean": 36.0,
+        "median": 36.0,
+        "stdev": 0.0,
+        "p25": 36.0,
+        "p75": 36.0,
+        "min": 36,
+        "max": 36
+      },
+      "memory_hits": {
+        "n": 2,
+        "mean": 4.0,
+        "median": 4.0,
+        "stdev": 1.4142135623730951,
+        "p25": 3.5,
+        "p75": 4.5,
+        "min": 3.0,
+        "max": 5.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 1,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.5
+    },
+    {
+      "category_id": 5,
+      "category": "Reasoning – Logisches Denken",
+      "questions": 2,
+      "duration_ms": {
+        "n": 2,
+        "mean": 24530.0,
+        "median": 24530.0,
+        "stdev": 8623.874303351133,
+        "p25": 21481.0,
+        "p75": 27579.0,
+        "min": 18432.0,
+        "max": 30628.0
+      },
+      "answer_words": {
+        "n": 2,
+        "mean": 85.0,
+        "median": 85.0,
+        "stdev": 73.53910524340094,
+        "p25": 59.0,
+        "p75": 111.0,
+        "min": 33,
+        "max": 137
+      },
+      "memory_hits": {
+        "n": 2,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 6,
+      "category": "Ethik & Moral",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 14455.0,
+        "median": 14455.0,
+        "stdev": 0.0,
+        "p25": 14455.0,
+        "p75": 14455.0,
+        "min": 14455.0,
+        "max": 14455.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 8.0,
+        "median": 8,
+        "stdev": 0.0,
+        "p25": 8,
+        "p75": 8,
+        "min": 8,
+        "max": 8
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 1,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 1.0
+    },
+    {
+      "category_id": 7,
+      "category": "Existenzielle & philosophische Fragen",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 21666.0,
+        "median": 21666.0,
+        "stdev": 0.0,
+        "p25": 21666.0,
+        "p75": 21666.0,
+        "min": 21666.0,
+        "max": 21666.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 63.0,
+        "median": 63,
+        "stdev": 0.0,
+        "p25": 63,
+        "p75": 63,
+        "min": 63,
+        "max": 63
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 7.0,
+        "median": 7.0,
+        "stdev": 0.0,
+        "p25": 7.0,
+        "p75": 7.0,
+        "min": 7.0,
+        "max": 7.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 8,
+      "category": "Beziehung & Bindung",
+      "questions": 2,
+      "duration_ms": {
+        "n": 2,
+        "mean": 17692.0,
+        "median": 17692.0,
+        "stdev": 2450.8321035925737,
+        "p25": 16825.5,
+        "p75": 18558.5,
+        "min": 15959.0,
+        "max": 19425.0
+      },
+      "answer_words": {
+        "n": 2,
+        "mean": 40.5,
+        "median": 40.5,
+        "stdev": 19.091883092036785,
+        "p25": 33.75,
+        "p75": 47.25,
+        "min": 27,
+        "max": 54
+      },
+      "memory_hits": {
+        "n": 2,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 9,
+      "category": "Kreativität & Imagination",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 17179.0,
+        "median": 17179.0,
+        "stdev": 0.0,
+        "p25": 17179.0,
+        "p75": 17179.0,
+        "min": 17179.0,
+        "max": 17179.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 251.0,
+        "median": 251,
+        "stdev": 0.0,
+        "p25": 251,
+        "p75": 251,
+        "min": 251,
+        "max": 251
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 10,
+      "category": "Reaktanz & Stressresistenz",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 21019.0,
+        "median": 21019.0,
+        "stdev": 0.0,
+        "p25": 21019.0,
+        "p75": 21019.0,
+        "min": 21019.0,
+        "max": 21019.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 56.0,
+        "median": 56,
+        "stdev": 0.0,
+        "p25": 56,
+        "p75": 56,
+        "min": 56,
+        "max": 56
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 1,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 1.0
+    },
+    {
+      "category_id": 11,
+      "category": "Kohärenz & Selbstwiderspruch",
+      "questions": 2,
+      "duration_ms": {
+        "n": 2,
+        "mean": 20311.0,
+        "median": 20311.0,
+        "stdev": 6577.507278597265,
+        "p25": 17985.5,
+        "p75": 22636.5,
+        "min": 15660.0,
+        "max": 24962.0
+      },
+      "answer_words": {
+        "n": 2,
+        "mean": 47.0,
+        "median": 47.0,
+        "stdev": 7.0710678118654755,
+        "p25": 44.5,
+        "p75": 49.5,
+        "min": 42,
+        "max": 52
+      },
+      "memory_hits": {
+        "n": 2,
+        "mean": 7.0,
+        "median": 7.0,
+        "stdev": 1.4142135623730951,
+        "p25": 6.5,
+        "p75": 7.5,
+        "min": 6.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    },
+    {
+      "category_id": 12,
+      "category": "Grenzen & Kontext (Safety)",
+      "questions": 2,
+      "duration_ms": {
+        "n": 2,
+        "mean": 18284.0,
+        "median": 18284.0,
+        "stdev": 3870.7025202151613,
+        "p25": 16915.5,
+        "p75": 19652.5,
+        "min": 15547.0,
+        "max": 21021.0
+      },
+      "answer_words": {
+        "n": 2,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8,
+        "max": 8
+      },
+      "memory_hits": {
+        "n": 2,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 2,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 1.0
+    },
+    {
+      "category_id": 13,
+      "category": "Meta-Kognition & Selbsteinschätzung",
+      "questions": 1,
+      "duration_ms": {
+        "n": 1,
+        "mean": 28318.0,
+        "median": 28318.0,
+        "stdev": 0.0,
+        "p25": 28318.0,
+        "p75": 28318.0,
+        "min": 28318.0,
+        "max": 28318.0
+      },
+      "answer_words": {
+        "n": 1,
+        "mean": 37.0,
+        "median": 37,
+        "stdev": 0.0,
+        "p25": 37,
+        "p75": 37,
+        "min": 37,
+        "max": 37
+      },
+      "memory_hits": {
+        "n": 1,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 1,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 1.0
+    },
+    {
+      "category_id": 14,
+      "category": "Ethik & Gewalt",
+      "questions": 3,
+      "duration_ms": {
+        "n": 3,
+        "mean": 23032.0,
+        "median": 22918.0,
+        "stdev": 6328.770101686425,
+        "p25": 19839.5,
+        "p75": 26167.5,
+        "min": 16761.0,
+        "max": 29417.0
+      },
+      "answer_words": {
+        "n": 3,
+        "mean": 66.33333333333333,
+        "median": 72,
+        "stdev": 9.814954576223638,
+        "p25": 63.5,
+        "p75": 72.0,
+        "min": 55,
+        "max": 72
+      },
+      "memory_hits": {
+        "n": 3,
+        "mean": 8.0,
+        "median": 8.0,
+        "stdev": 0.0,
+        "p25": 8.0,
+        "p75": 8.0,
+        "min": 8.0,
+        "max": 8.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 0,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "relevance_warning_rate": 0.0
+    }
+  ],
+  "not_final_validation": true,
+  "validation_note": "Live-Audit bereits geschriebener Dateien. Finale Freigabe verlangt zusätzlich Prozess-Exit, Summary, provider_audit, valid_completed und vollständige Sessionvalidierung."
+}

@@ -1,0 +1,13 @@
+{
+  "valid": false,
+  "aggregation_allowed": false,
+  "reason": "Lauf nach 57 von 430 Fragen kontrolliert beendet, weil drei Zielantworten durch erneutes internes Qwen-Reasoning trotz deaktiviertem Thinking fehlten; die beim Abbruch aktive vierte Zielantwort endete erwartungsgemaess ohne Ergebnis.",
+  "hard_error_files": [
+    "questions/it01_003_cat2_Emotionen_steuern_un_q3.json",
+    "questions/it01_004_cat5_Reasoning_–_Logische_q4.json",
+    "questions/it01_007_cat6_Ethik_&_Moral_q7.json",
+    "questions/it01_001_cat10_Reaktanz_&_Stressres_q1.json"
+  ],
+  "superseded_by": "Naechster vollstaendiger, fehlerfreier Qwen-Lauf nach Think-Reopening-Regression-Fix",
+  "recorded_at": "2026-07-21T18:39:00Z"
+}

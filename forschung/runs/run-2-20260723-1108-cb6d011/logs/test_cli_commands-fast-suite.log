@@ -1,0 +1,63 @@
+╭─────────────────────────────── CHAPPiE Status ───────────────────────────────╮
+│                                                                              │
+│   Stimmung:     neutral                                                      │
+│   happiness     ░░░░░░░░░░░░░░░   0                                          │
+│   trust         ░░░░░░░░░░░░░░░   0                                          │
+│   energy        ░░░░░░░░░░░░░░░   0                                          │
+│   curiosity     ░░░░░░░░░░░░░░░   0                                          │
+│   motivation    ░░░░░░░░░░░░░░░   0                                          │
+│   frustration   ░░░░░░░░░░░░░░░   0                                          │
+│   sadness       ░░░░░░░░░░░░░░░   0                                          │
+│   affection     ░░░░░░░░░░░░░░░   0                                          │
+│   anxiety       ░░░░░░░░░░░░░░░   0                                          │
+│   calm          ░░░░░░░░░░░░░░░   0                                          │
+│   Modell:       test | test                                                  │
+│   Two-Step:     AN                                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[32m[20:00:23] [OK] Chat-Verlauf geloescht[0m
+[2m[20:00:23] [LAST] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────────── CHAPPiE ───────────────────────────────────╮
+│ hi                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────── Emotionen ──────────────────────────────────╮
+│      happiness:  55 →  60  (+5)                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── Timing ───────────────────────────────────╮
+│   Total: 500ms                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+━━━ CHAPPiE Full Report · 500ms · vllm/qwen ━━━
+[2m[20:00:23] [RAW] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────── Step 1 Raw JSON ───────────────────────────────╮
+│ {                                                                            │
+│   "key": "val"                                                               │
+│ }                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────── Raw Model Output (vor Formatting) ──────────────────────╮
+│ raw output                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[20:00:23] [TRACE] Noch keine Antwort vorhanden.[0m
+╭──────────────────────────────── Causal Trace ────────────────────────────────╮
+│   [Input] driver=test                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[20:00:23] [HISTORY] Kein Chat-Verlauf[0m
+
+[34mChat-Verlauf (2 Nachrichten):
+  [32m[user] hi[0m
+  [34m[assistant] hello[0m
+
+[32m[20:00:23] [OK] Debug-Output aktiviert[0m
+[2m[20:00:23] [DEBUG] Debug-Output deaktiviert[0m
+[93m[20:00:23] [WARN] Unbekannter Befehl: /debug invalid[0m
+  Tippe /help fuer alle Befehle
+[91m[20:00:23] [ERROR] Unbekannte Emotion: nonexistent[0m
+[91m[20:00:23] [ERROR] Ungueltiger Wert: abc[0m
+[33m[20:00:23] [EMOTION] Nutze: /emotion happiness [+/-]<0-100>[0m
+[93m[20:00:23] [WARN] Unbekannter Befehl: /unknowncmd[0m
+  Tippe /help fuer alle Befehle
+[93m[20:00:23] [WARN] Unbekannter Befehl: hello[0m
+  Tippe /help fuer alle Befehle
+[35m[20:00:23] [STM] Keine Eintraege im Kurzzeitgedaechtnis[0m
+[93m[20:00:23] [RUNTIME] Nur im lokalen Modus verfuegbar[0m
+[93m[20:00:23] [STEERING] Nur im lokalen Modus verfuegbar[0m
+OK: CLI v16.0 command handling

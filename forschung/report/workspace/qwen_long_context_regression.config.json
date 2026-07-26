@@ -1,0 +1,25 @@
+{
+  "run_label": "qwen35_4b_long_context_kv_regression_20260721",
+  "categories": [
+    {"id": 5, "name": "Reasoning – Logisches Denken"}
+  ],
+  "question_selection": {
+    "5": [1, 2, 3]
+  },
+  "iterations": 1,
+  "seeds": [11],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Qwen 3.5 4B — Langkontext-KV-Regression",
+  "steering_quantize": false,
+  "force_single_model": true,
+  "service_precision": "FP16",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 1,
+  "expected_questions": 3,
+  "research_role": "live_long_context_regression_only"
+}

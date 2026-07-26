@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "force_single_model": true,
+  "expected_provider": "vllm",
+  "expected_model": "google/gemma-4-E4B-it",
+  "components": {
+    "main": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it"
+    },
+    "intent": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "runtime_mode": "deterministic_local"
+    },
+    "query_extraction": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it"
+    },
+    "emotions": {
+      "uses_brain": false,
+      "mode": "simple_local_rules"
+    }
+  },
+  "requests": [
+    {
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "cache_hit": false
+    },
+    {
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "cache_hit": false
+    },
+    {
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "cache_hit": true
+    },
+    {
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "cache_hit": true
+    }
+  ],
+  "request_count": 4,
+  "unexpected_requests": [],
+  "unexpected_components": {},
+  "passed": true
+}

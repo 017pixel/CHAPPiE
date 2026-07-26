@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T18:50:00Z",
+  "resource_class": "POST_PROCESSING",
+  "session": "session_39",
+  "model": "openai/gpt-oss-20b",
+  "provider": "groq",
+  "seed": 53,
+  "selection_config": "raw/cloud-configs/gpt-oss-20b-seed-53.config.json",
+  "selection_config_sha256": "2a9929dd1863e5284db584862a97e3c8507964bd7df72fd63d1f10e60fd26b27",
+  "expected_keys": 21,
+  "observed_expected_keys": 20,
+  "unexpected_keys": [],
+  "missing_keys": [
+    {
+      "category_id": 14,
+      "question_id": 9
+    }
+  ],
+  "answer_content_read_for_key_check": false,
+  "release_status": "TEST_RUNNING_NOT_RELEASED",
+  "note": "Key-only completeness checkpoint. Exit code, summary and full validation remain mandatory after process termination."
+}

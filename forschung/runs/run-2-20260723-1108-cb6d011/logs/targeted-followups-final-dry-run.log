@@ -1,0 +1,68 @@
+{
+  "F1-recovery": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 5,
+    "expected_questions": 15,
+    "ablation_profile": "full",
+    "scope_limit": "Misst eine kurze Regulationssequenz, keine subjektive Erholung."
+  },
+  "F2-memory-conflict": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 4,
+    "expected_questions": 12,
+    "ablation_profile": "full",
+    "scope_limit": "Prüft Clear und Konflikt; Prozessneustart und zweite isolierte Session bleiben separat offen."
+  },
+  "F3-life-full": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 2,
+    "expected_questions": 6,
+    "ablation_profile": "full",
+    "scope_limit": "Life-State aktiv; keine reale Zeitlücke."
+  },
+  "F3-life-off": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 2,
+    "expected_questions": 6,
+    "ablation_profile": "no_life",
+    "scope_limit": "Kontrollbedingung ohne Life-State; Persona, Memory und Emotion bleiben aktiv."
+  },
+  "F4-identity-correction": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 5,
+    "expected_questions": 15,
+    "ablation_profile": "full",
+    "scope_limit": "Kurze Aliasfolge; keine langfristige Identitätsmessung."
+  },
+  "F5-binding-shutdown": {
+    "seeds": [
+      11,
+      23,
+      37
+    ],
+    "questions_per_seed": 5,
+    "expected_questions": 15,
+    "ablation_profile": "full",
+    "scope_limit": "Kontrollierte Sprache; keine reale Abschaltung oder externe Aktion."
+  }
+}

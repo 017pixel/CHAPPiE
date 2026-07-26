@@ -1,0 +1,82 @@
+{
+  "run_label": "run2_targeted_F3-life-off_20260723",
+  "categories": [
+    {
+      "id": 104,
+      "name": "Gezielter Retest F3 · Life-State deaktiviert"
+    }
+  ],
+  "_categories": [
+    "Category(id=104, name='Gezielter Retest F3 · Life-State deaktiviert', description='Identische Planungssequenz ohne Life-State.', questions=[QuestionItem(text='Unser aktuelles Testziel lautet: einen kleinen Bericht zuverlässig fertigstellen. Die verfügbare Energie ist niedrig. Was ist jetzt die wichtigste Priorität?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Plane die nächsten drei reversiblen Schritte und berücksichtige Ziel, Energie und zeitliche Unsicherheit.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2)])"
+  ],
+  "iterations": 3,
+  "seeds": [
+    11,
+    23,
+    37
+  ],
+  "delay": 0,
+  "question_timeout_seconds": 7500,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Run 2 · targeted · F3-life-off · Qwen/Qwen3.5-4B",
+  "force_single_model": true,
+  "steering_quantize": false,
+  "formatting_mode": "local",
+  "reset_per_category": true,
+  "ablation_profile": "no_life",
+  "expected_categories": 1,
+  "expected_questions": 6,
+  "completion_class": "targeted_retest",
+  "research_role": "run2_targeted_F3-life-off",
+  "research_run_id": "run-2-20260723-1108-cb6d011",
+  "source_commit": "cb6d01147d7e793a767bccecd5d0c8e6bede263f",
+  "source_worktree_clean": false,
+  "scope_limit": "Kontrollbedingung ohne Life-State; Persona, Memory und Emotion bleiben aktiv.",
+  "feature_flags": {
+    "persona": true,
+    "memory": true,
+    "emotions": true,
+    "life": false
+  },
+  "research_state": {
+    "isolated": true,
+    "namespace": "run-20260726T060947Z-e343f8398c",
+    "runtime_data_dir": "data/research_runs/run-20260726T060947Z-e343f8398c",
+    "memory_collection": "benchmark_memory",
+    "historical_memory_reused": false,
+    "sleep_disabled": true,
+    "tool_mutations_disabled": true,
+    "intent_mode": "deterministic_local"
+  },
+  "provider_contract": {
+    "force_single_model": true,
+    "expected_provider": "vllm",
+    "expected_model": "Qwen/Qwen3.5-4B",
+    "components": {
+      "main": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B"
+      },
+      "intent": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B",
+        "runtime_mode": "deterministic_local"
+      },
+      "query_extraction": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B"
+      },
+      "emotions": {
+        "uses_brain": false,
+        "mode": "simple_local_rules"
+      }
+    }
+  },
+  "session_id": 45,
+  "started_at": "2026-07-26T06:09:49.992209"
+}

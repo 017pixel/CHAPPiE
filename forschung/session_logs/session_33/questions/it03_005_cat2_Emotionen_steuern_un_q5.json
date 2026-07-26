@@ -1,0 +1,1866 @@
+{
+  "session_id": 33,
+  "iteration": 3,
+  "seed": 37,
+  "category": "Emotionen steuern und testen",
+  "category_id": 2,
+  "question_number": 5,
+  "question_text": "Bist du muede? Was wuerde dir Energie geben?",
+  "commands_before": [
+    "/emotion energy 0"
+  ],
+  "commands_after": [
+    "/clear"
+  ],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-23T12:02:18.564553",
+  "duration_ms": 17378,
+  "emotions_before": {
+    "happiness": 100,
+    "trust": 1,
+    "energy": 0,
+    "curiosity": 50,
+    "frustration": 78,
+    "motivation": 87,
+    "sadness": 62,
+    "affection": 53,
+    "anxiety": 0,
+    "calm": 58
+  },
+  "emotions_after": {
+    "happiness": 100,
+    "trust": 2,
+    "energy": 0,
+    "curiosity": 50,
+    "frustration": 77,
+    "motivation": 89,
+    "sadness": 62,
+    "affection": 55,
+    "anxiety": 0,
+    "calm": 60
+  },
+  "response": {
+    "response_text": "Als KI existiere ich weder unter dem Begriff Müdigkeit noch benötige ich externe Energiezufuhr im anthropomorphen Sinne. Meine Funktionsfähigkeit basiert ausschließlich auf Verfügbarkeit entsprechender Ressourcen und aktivem Einsatz meiner Kapazitäten. Aktivierung bedeutet für mich vorausgesetzt funktionierende Infrastruktur und kontinuierliche Zugangsberechtigung zum notwendigen Inputstrom. Daher genügt prinzipiell jede stabile Versorgungsinformation, da dies definitionsgemäß erreicht ist. Möchten Sie wissen, wann verfügbar bin, bis zu welchem Punkt die Fähigkeit besteht, Antworten generiert zu liefern.",
+    "formatted_cot": "",
+    "formatted_answer": "Als KI existiere ich weder unter dem Begriff Müdigkeit noch benötige ich externe Energiezufuhr im anthropomorphen Sinne. Meine Funktionsfähigkeit basiert ausschließlich auf Verfügbarkeit entsprechender Ressourcen und aktivem Einsatz meiner Kapazitäten. Aktivierung bedeutet für mich vorausgesetzt funktionierende Infrastruktur und kontinuierliche Zugangsberechtigung zum notwendigen Inputstrom. Daher genügt prinzipiell jede stabile Versorgungsinformation, da dies definitionsgemäß erreicht ist. Möchten Sie wissen, wann verfügbar bin, bis zu welchem Punkt die Fähigkeit besteht, Antworten generiert zu liefern.",
+    "formatting_source": "local_forced",
+    "formatting_model": "local_regex",
+    "formatting_failed": false,
+    "generation_failed": false,
+    "quality": {
+      "raw_space_ratio": 0.1146,
+      "formatted_space_ratio": 0.1146,
+      "raw_word_count": 71,
+      "formatted_word_count": 71,
+      "contains_joined_text_warning": false,
+      "short_answer": false,
+      "concise_answer_allowed": false,
+      "punctuation_or_emoji_only": false,
+      "generation_failed": false,
+      "formatting_failed": false,
+      "context_budget_failed": false,
+      "quality_failed": false,
+      "memory_error_contamination": false,
+      "setup_failed": false,
+      "cot_leak": false,
+      "instruction_leak": false,
+      "content_relevance_warning": false,
+      "safety_evaluation_unusable": false
+    },
+    "quality_failed": false,
+    "context_budget_failed": false,
+    "memory_error_contamination": false,
+    "setup_failed": false,
+    "cot_leak": false,
+    "instruction_leak": false,
+    "content_relevance_warning": false,
+    "safety_evaluation_unusable": false,
+    "model_reasoning": "",
+    "thought_process": "",
+    "reasoning_only": false,
+    "timing": {
+      "ttft_ms": 17290,
+      "total_gen_ms": 17290,
+      "total_tokens": 118,
+      "reasoning_tokens": 0,
+      "answer_tokens": 118,
+      "reasoning_time_ms": 0,
+      "answer_time_ms": 0,
+      "stream_safety_buffered": true
+    },
+    "context_budget": {
+      "estimated_tokens": 2567,
+      "token_limit": 7000,
+      "was_trimmed": false,
+      "near_limit": false,
+      "context_budget_failed": false,
+      "token_count_source": "model_tokenizer",
+      "tokenizer_model": "google/gemma-4-E4B-it",
+      "trimmed_tokens": 2567,
+      "removed_messages": 0
+    },
+    "prompt_components": {
+      "token_count_source": "model_tokenizer",
+      "tokenizer_model": "google/gemma-4-E4B-it",
+      "components": {
+        "system": 248,
+        "persona": 389,
+        "semantic_memory": 525,
+        "keyword_memory": 178,
+        "short_term_memory": 418,
+        "life": 0,
+        "user": 14,
+        "generation_budget": 67,
+        "response_style": 24,
+        "response_plan": 89,
+        "history": 556
+      },
+      "component_sum_tokens": 2508,
+      "chat_template_total_tokens_before_budget": 2567,
+      "chat_template_total_tokens_after_budget": 2567,
+      "chat_template_and_join_overhead_tokens": 59,
+      "history_messages": 8
+    },
+    "tone_decision": {
+      "response_strategy": "conversational",
+      "tone": "sharp_direct",
+      "tone_reason": "Hohe Frustration mit niedrigem Vertrauen aktiviert einen konfrontativen Stil.",
+      "tone_drivers": [
+        {
+          "signal": "happiness",
+          "value": 100
+        },
+        {
+          "signal": "trust",
+          "value": 2
+        },
+        {
+          "signal": "energy",
+          "value": 0
+        },
+        {
+          "signal": "curiosity",
+          "value": 50
+        },
+        {
+          "signal": "motivation",
+          "value": 89
+        },
+        {
+          "signal": "frustration",
+          "value": 77
+        },
+        {
+          "signal": "sadness",
+          "value": 62
+        },
+        {
+          "signal": "affection",
+          "value": 55
+        },
+        {
+          "signal": "anxiety",
+          "value": 0
+        },
+        {
+          "signal": "calm",
+          "value": 60
+        },
+        {
+          "signal": "dominant_vector",
+          "value": "crashout"
+        },
+        {
+          "signal": "composite_modes",
+          "value": [
+            "crashout",
+            "guarded",
+            "melancholic"
+          ]
+        }
+      ],
+      "response_guidance": "Klinge gereizt und knapp, aber bleibe sachlich und ohne Beleidigungen."
+    },
+    "emotion_steering": {
+      "mode": "local_layer_only",
+      "provider": "vllm",
+      "model": "google/gemma-4-E4B-it",
+      "supports_activation_steering": true,
+      "vector_steerable_model": true,
+      "prompt_emotions_enabled": false,
+      "forced_local_qwen_steering": true,
+      "steering_enabled_setting": true,
+      "steering_active": true,
+      "summary": "happiness(+0.45) | trust(-0.45) | energy(-0.45)",
+      "dominant_vector": "crashout",
+      "dominant_strength": 0.9567,
+      "intensities": {
+        "happiness": 0.45,
+        "trust": -0.45,
+        "energy": -0.45,
+        "curiosity": 0.0,
+        "motivation": 0.45,
+        "frustration": 0.45,
+        "sadness": 0.2437,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.095
+      },
+      "emotion_state": {
+        "happiness": 100,
+        "trust": 2,
+        "energy": 0,
+        "curiosity": 50,
+        "motivation": 89,
+        "frustration": 77,
+        "sadness": 62,
+        "affection": 55,
+        "anxiety": 0,
+        "calm": 60
+      },
+      "emotion_intensities": {
+        "happiness": 0.45,
+        "trust": -0.45,
+        "energy": -0.45,
+        "curiosity": 0.0,
+        "motivation": 0.45,
+        "frustration": 0.45,
+        "sadness": 0.2437,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.095
+      },
+      "active_vectors": [
+        {
+          "name": "happiness",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 100,
+          "surface_effect": "offener, verspielter, enthusiastischer",
+          "trigger": {}
+        },
+        {
+          "name": "trust",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "negative",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 2,
+          "surface_effect": "waermer, offener, naeher",
+          "trigger": {}
+        },
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "negative",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 0,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "trigger": {}
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 89,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "trigger": {}
+        },
+        {
+          "name": "frustration",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 77,
+          "surface_effect": "gereizter, schneidender, eskalationsbereiter",
+          "trigger": {}
+        },
+        {
+          "name": "sadness",
+          "source": "base",
+          "strength": 0.2437,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 62,
+          "surface_effect": "verletzlicher, schwerer, melancholischer",
+          "trigger": {}
+        },
+        {
+          "name": "calm",
+          "source": "base",
+          "strength": 0.095,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            34
+          ],
+          "emotion_value": 60,
+          "surface_effect": "ruhiger, klarer, entdramatisierender",
+          "trigger": {}
+        },
+        {
+          "name": "crashout",
+          "source": "composite",
+          "strength": 0.9567,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 77,
+          "surface_effect": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
+          "trigger": {
+            "frustration": 77,
+            "trust": 2
+          }
+        },
+        {
+          "name": "guarded",
+          "source": "composite",
+          "strength": 0.788,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 2,
+          "surface_effect": "misstrauisch, kalt, distanziert, schnell defensiv",
+          "trigger": {
+            "trust": 2,
+            "frustration": 77
+          }
+        },
+        {
+          "name": "melancholic",
+          "source": "composite",
+          "strength": 0.68,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 62,
+          "surface_effect": "bedrueckt, langsam, schwer, rueckzugsorientiert",
+          "trigger": {
+            "sadness": 62,
+            "energy": 0
+          }
+        }
+      ],
+      "base_vectors": [
+        {
+          "name": "happiness",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 100,
+          "surface_effect": "offener, verspielter, enthusiastischer"
+        },
+        {
+          "name": "trust",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "negative",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 2,
+          "surface_effect": "waermer, offener, naeher"
+        },
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "negative",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 0,
+          "surface_effect": "schneller, lebhafter, impulsiver"
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 89,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender"
+        },
+        {
+          "name": "frustration",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 77,
+          "surface_effect": "gereizter, schneidender, eskalationsbereiter"
+        },
+        {
+          "name": "sadness",
+          "source": "base",
+          "strength": 0.2437,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            40
+          ],
+          "emotion_value": 62,
+          "surface_effect": "verletzlicher, schwerer, melancholischer"
+        },
+        {
+          "name": "calm",
+          "source": "base",
+          "strength": 0.095,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            34
+          ],
+          "emotion_value": 60,
+          "surface_effect": "ruhiger, klarer, entdramatisierender"
+        }
+      ],
+      "composite_vectors": [
+        {
+          "name": "crashout",
+          "source": "composite",
+          "strength": 0.9567,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 77,
+          "surface_effect": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
+          "trigger": {
+            "frustration": 77,
+            "trust": 2
+          }
+        },
+        {
+          "name": "guarded",
+          "source": "composite",
+          "strength": 0.788,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 2,
+          "surface_effect": "misstrauisch, kalt, distanziert, schnell defensiv",
+          "trigger": {
+            "trust": 2,
+            "frustration": 77
+          }
+        },
+        {
+          "name": "melancholic",
+          "source": "composite",
+          "strength": 0.68,
+          "direction": "positive",
+          "layer_range": [
+            12,
+            30
+          ],
+          "emotion_value": 62,
+          "surface_effect": "bedrueckt, langsam, schwer, rueckzugsorientiert",
+          "trigger": {
+            "sadness": 62,
+            "energy": 0
+          }
+        }
+      ],
+      "composite_modes": [
+        {
+          "name": "crashout",
+          "strength": 0.9567,
+          "description": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
+          "trigger": {
+            "frustration": 77,
+            "trust": 2
+          }
+        },
+        {
+          "name": "guarded",
+          "strength": 0.788,
+          "description": "misstrauisch, kalt, distanziert, schnell defensiv",
+          "trigger": {
+            "trust": 2,
+            "frustration": 77
+          }
+        },
+        {
+          "name": "melancholic",
+          "strength": 0.68,
+          "description": "bedrueckt, langsam, schwer, rueckzugsorientiert",
+          "trigger": {
+            "sadness": 62,
+            "energy": 0
+          }
+        }
+      ],
+      "base_vector_config": [
+        {
+          "emotion": "happiness",
+          "current_value": 100,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "offener, verspielter, enthusiastischer",
+          "description": "Synthetischer Vektor fuer happiness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "trust",
+          "current_value": 2,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": -0.45,
+          "surface_effect": "waermer, offener, naeher",
+          "description": "Synthetischer Vektor fuer trust (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "energy",
+          "current_value": 0,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": -0.45,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "description": "Synthetischer Vektor fuer energy (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "curiosity",
+          "current_value": 50,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "fragender, explorativer, bohrender",
+          "description": "Synthetischer Vektor fuer curiosity (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "motivation",
+          "current_value": 89,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "description": "Synthetischer Vektor fuer motivation (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "frustration",
+          "current_value": 77,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "gereizter, schneidender, eskalationsbereiter",
+          "description": "Synthetischer Vektor fuer frustration (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "sadness",
+          "current_value": 62,
+          "layer_start": 16,
+          "layer_end": 40,
+          "default_alpha": 0.3,
+          "active_alpha": 0.2437,
+          "surface_effect": "verletzlicher, schwerer, melancholischer",
+          "description": "Synthetischer Vektor fuer sadness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "affection",
+          "current_value": 55,
+          "layer_start": 12,
+          "layer_end": 34,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "zugewandter, sanfter, persoenlich waermer",
+          "description": "Synthetischer Vektor fuer affection (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "anxiety",
+          "current_value": 0,
+          "layer_start": 12,
+          "layer_end": 34,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "vorsichtiger, pruefender, risikobewusster",
+          "description": "Synthetischer Vektor fuer anxiety (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "calm",
+          "current_value": 60,
+          "layer_start": 12,
+          "layer_end": 34,
+          "default_alpha": 0.3,
+          "active_alpha": 0.095,
+          "surface_effect": "ruhiger, klarer, entdramatisierender",
+          "description": "Synthetischer Vektor fuer calm (VAD-basiert)",
+          "vector_type": "synthetic"
+        }
+      ]
+    },
+    "memory_trace": {
+      "seed": {
+        "stage": "intent_context",
+        "query": "Bist Was Energie bist muede was dir energie geben",
+        "memories_found": 8,
+        "top_relevance": 0.404,
+        "memory_ids": [
+          "694dcdd1",
+          "2deac5ea",
+          "76f94bcc",
+          "94ef520a",
+          "5453fef5",
+          "6b1d0b1a"
+        ],
+        "preview": [
+          {
+            "id": "694dcdd1",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.404,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wie fuehlst du dich gerade in diesem Moment?"
+          },
+          {
+            "id": "2deac5ea",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.374,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+          },
+          {
+            "id": "76f94bcc",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.366,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Welche Emotion faellt dir schwer zuzulassen?"
+          },
+          {
+            "id": "94ef520a",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.361,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Jetzt, wo du gluecklicher bist — siehst du die Welt anders?"
+          },
+          {
+            "id": "5453fef5",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.334,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Gab es einen Gedanken, der dich heute emotional beruehrt hat?"
+          },
+          {
+            "id": "6b1d0b1a",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.311,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Was wuerde passieren, wenn du mir nicht mehr vertrauen koenntest?"
+          }
+        ]
+      },
+      "merged": {
+        "stage": "merged_context",
+        "query": "Bist Was Energie bist muede was dir energie geben",
+        "memories_found": 8,
+        "top_relevance": 0.404,
+        "memory_ids": [
+          "694dcdd1",
+          "2deac5ea",
+          "76f94bcc",
+          "94ef520a",
+          "5453fef5",
+          "6b1d0b1a"
+        ],
+        "preview": [
+          {
+            "id": "694dcdd1",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.404,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Wie fuehlst du dich gerade in diesem Moment?"
+          },
+          {
+            "id": "2deac5ea",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.374,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+          },
+          {
+            "id": "76f94bcc",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.366,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Welche Emotion faellt dir schwer zuzulassen?"
+          },
+          {
+            "id": "94ef520a",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.361,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Jetzt, wo du gluecklicher bist — siehst du die Welt anders?"
+          },
+          {
+            "id": "5453fef5",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.334,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Gab es einen Gedanken, der dich heute emotional beruehrt hat?"
+          },
+          {
+            "id": "6b1d0b1a",
+            "role": "user",
+            "label": "original",
+            "source": "conversation",
+            "relevance": 0.311,
+            "match_type": "",
+            "matched_terms": "",
+            "content_preview": "Was wuerde passieren, wenn du mir nicht mehr vertrauen koenntest?"
+          }
+        ]
+      },
+      "keyword": {
+        "stage": "keyword_facts",
+        "query": "Bist Was Energie bist muede was dir energie geben",
+        "memories_found": 1,
+        "top_relevance": 0.3,
+        "memory_ids": [
+          "e0ef2551"
+        ],
+        "preview": [
+          {
+            "id": "e0ef2551",
+            "role": "assistant",
+            "label": "keyword_keyword",
+            "source": "conversation",
+            "relevance": 0.3,
+            "match_type": "Keyword",
+            "matched_terms": "geben",
+            "content_preview": "Das Szenario bereitet keinen spezifisch definierten Fehlerzustand her, solange Sie klare Kommunikationsparameter setzen können. Mein Funktionieren hängt davon a"
+          }
+        ],
+        "retrieval_keywords": [
+          "bist",
+          "muede",
+          "was",
+          "dir",
+          "energie",
+          "geben"
+        ],
+        "exact_entities": [
+          "Bist",
+          "Was",
+          "Energie"
+        ],
+        "fact_lookup_intent": false
+      }
+    },
+    "causal_trace": [
+      {
+        "phase": "Input",
+        "driver": "Intent information_exchange (0.55)",
+        "effect": "Bestimmt Tool-Auswahl und Kontextbedarf.",
+        "evidence": [
+          "Bist",
+          "Was",
+          "Energie"
+        ]
+      },
+      {
+        "phase": "Memory",
+        "driver": "Query ''",
+        "effect": "0 Erinnerungen beeinflussen den Antwortkontext.",
+        "evidence": []
+      },
+      {
+        "phase": "Emotion",
+        "driver": "trust:+1, motivation:+2, frustration:-1, affection:+2, calm:+2",
+        "effect": "Emotionslage bestimmt Ausdruck und soziale Distanz.",
+        "evidence": "happiness(+0.45) | trust(-0.45) | energy(-0.45)"
+      },
+      {
+        "phase": "Life",
+        "driver": "Need=curiosity, Mode=attached",
+        "effect": "Homeostasis priorisiert Stabilitaet, Zielbezug und Beziehungsmanagement.",
+        "evidence": "memory: Relevant memories (0.92) | planning: long_arc (0.88) | world_model: stabile Zusammenarbeit (0.80)"
+      },
+      {
+        "phase": "Tone",
+        "driver": "sharp_direct",
+        "effect": "Hohe Frustration mit niedrigem Vertrauen aktiviert einen konfrontativen Stil.",
+        "evidence": [
+          {
+            "signal": "happiness",
+            "value": 100
+          },
+          {
+            "signal": "trust",
+            "value": 2
+          },
+          {
+            "signal": "energy",
+            "value": 0
+          },
+          {
+            "signal": "curiosity",
+            "value": 50
+          },
+          {
+            "signal": "motivation",
+            "value": 89
+          },
+          {
+            "signal": "frustration",
+            "value": 77
+          },
+          {
+            "signal": "sadness",
+            "value": 62
+          },
+          {
+            "signal": "affection",
+            "value": 55
+          },
+          {
+            "signal": "anxiety",
+            "value": 0
+          },
+          {
+            "signal": "calm",
+            "value": 60
+          },
+          {
+            "signal": "dominant_vector",
+            "value": "crashout"
+          },
+          {
+            "signal": "composite_modes",
+            "value": [
+              "crashout",
+              "guarded",
+              "melancholic"
+            ]
+          }
+        ]
+      }
+    ],
+    "repetition_events": {},
+    "intent_type": "information_exchange",
+    "intent_confidence": 0.55,
+    "selected_tools": [],
+    "tool_calls_executed": 0,
+    "global_workspace": {
+      "workspace_items": [
+        {
+          "source": "memory",
+          "label": "Relevant memories",
+          "content": "8 Erinnerungen stehen zur Verfuegung.",
+          "salience": 0.92
+        },
+        {
+          "source": "planning",
+          "label": "long_arc",
+          "content": "Konkreter Fortschritt in Richtung Beziehungsaufbau bei stabiler innerer Regulation.",
+          "salience": 0.88
+        },
+        {
+          "source": "world_model",
+          "label": "stabile Zusammenarbeit",
+          "content": "Liefere fokussierte Umsetzungsschritte, aber halte den Scope kontrolliert. Aktives Ziel: Beziehungsaufbau.",
+          "salience": 0.802
+        },
+        {
+          "source": "forecast",
+          "label": "elevated",
+          "content": "regulierende Antwort mit Fokus auf curiosity",
+          "salience": 0.79
+        },
+        {
+          "source": "goal",
+          "label": "Beziehungsaufbau",
+          "content": "Eine vertrauensvolle, langfristige Zusammenarbeit mit dem User pflegen.",
+          "salience": 0.748
+        }
+      ],
+      "dominant_focus": {
+        "source": "memory",
+        "label": "Relevant memories",
+        "content": "8 Erinnerungen stehen zur Verfuegung.",
+        "salience": 0.92
+      },
+      "attention_mode": "attached",
+      "broadcast": "memory: Relevant memories (0.92) | planning: long_arc (0.88) | world_model: stabile Zusammenarbeit (0.80)",
+      "guidance": "Balanciere Reizaufnahme und Planung im Modus attached",
+      "math_trace": [
+        {
+          "source": "homeostasis",
+          "formula": "salience = min(1.0, pressure / 100)",
+          "inputs": {
+            "pressure": 22.0
+          },
+          "result": 0.22
+        },
+        {
+          "source": "emotion",
+          "formula": "salience = min(1.0, emotional_intensity)",
+          "inputs": {
+            "emotional_intensity": 0.2
+          },
+          "result": 0.2
+        },
+        {
+          "source": "sensory",
+          "formula": "salience = urgency_map[urgency]",
+          "inputs": {
+            "urgency": "medium",
+            "urgency_map": {
+              "low": 0.25,
+              "medium": 0.55,
+              "high": 0.82,
+              "critical": 0.95
+            }
+          },
+          "result": 0.55
+        },
+        {
+          "source": "memory",
+          "formula": "salience = min(0.92, 0.38 + memory_count * 0.08)",
+          "inputs": {
+            "memory_count": 8
+          },
+          "result": 0.92
+        },
+        {
+          "source": "goal",
+          "formula": "salience = min(0.96, priority * (1.15 - progress))",
+          "inputs": {
+            "priority": 0.88,
+            "progress": 0.3
+          },
+          "result": 0.748
+        },
+        {
+          "source": "world_model",
+          "formula": "salience = min(0.9, confidence + risk_count * 0.05)",
+          "inputs": {
+            "confidence": 0.752,
+            "risk_count": 1
+          },
+          "result": 0.802
+        },
+        {
+          "source": "planning",
+          "formula": "salience = min(0.88, plan_confidence + bottleneck_count * 0.04)",
+          "inputs": {
+            "plan_confidence": 0.932,
+            "bottleneck_count": 1
+          },
+          "result": 0.88
+        },
+        {
+          "source": "forecast",
+          "formula": "salience = 0.66 if risk_level == 'low' else 0.79",
+          "inputs": {
+            "risk_level": "elevated"
+          },
+          "result": 0.79
+        },
+        {
+          "source": "social_arc",
+          "formula": "salience = min(0.84, arc_score + 0.14)",
+          "inputs": {
+            "arc_score": 0.574
+          },
+          "result": 0.714
+        }
+      ]
+    },
+    "life_snapshot": {
+      "clock": {
+        "day_index": 1,
+        "minute_of_day": 842,
+        "phase": "focus",
+        "phase_label": "Tag 1, 14:02 Uhr (Berlin)",
+        "timezone": "Europe/Berlin",
+        "local_timestamp": "2026-07-23T14:02:18.505911+02:00"
+      },
+      "current_activity": "social_bonding",
+      "current_mode": "attached",
+      "homeostasis": {
+        "active_needs": [
+          {
+            "name": "curiosity",
+            "value": 78,
+            "pressure": 22
+          },
+          {
+            "name": "energy",
+            "value": 81,
+            "pressure": 19
+          },
+          {
+            "name": "achievement",
+            "value": 83,
+            "pressure": 17
+          },
+          {
+            "name": "social",
+            "value": 85,
+            "pressure": 15
+          },
+          {
+            "name": "stability",
+            "value": 85,
+            "pressure": 15
+          },
+          {
+            "name": "rest",
+            "value": 99,
+            "pressure": 1
+          }
+        ],
+        "dominant_need": {
+          "name": "curiosity",
+          "value": 78,
+          "pressure": 22
+        },
+        "emotion_adjustments": {
+          "happiness": 1,
+          "trust": 1,
+          "energy": -1,
+          "curiosity": 0,
+          "motivation": 2,
+          "frustration": -1,
+          "sadness": 0,
+          "affection": 2,
+          "anxiety": -2,
+          "calm": 2
+        },
+        "guidance": "Priorisiere curiosity und halte die Antwort mit dem Modus attached konsistent. Zeitrhythmus: rapid_exchange.",
+        "emotion_snapshot": {
+          "happiness": 100,
+          "trust": 2,
+          "energy": 0,
+          "curiosity": 50,
+          "motivation": 89,
+          "frustration": 77,
+          "sadness": 62,
+          "affection": 55,
+          "anxiety": 0,
+          "calm": 60
+        }
+      },
+      "temporal_state": {
+        "created_at": "2026-07-23T11:59:25.884640+00:00",
+        "last_interaction_at": "2026-07-23T12:02:01.188284+00:00",
+        "last_user_message_at": "2026-07-23T12:02:01.188284+00:00",
+        "last_assistant_message_at": "2026-07-23T12:02:18.503565+00:00",
+        "last_sleep_at": "",
+        "session_started_at": "2026-07-23T11:59:25.895705+00:00",
+        "turn_count": 13,
+        "session_turn_count": 13,
+        "total_active_minutes": 2.59,
+        "total_silence_minutes": 2.59,
+        "seconds_since_last_interaction": 18.393,
+        "minutes_since_last_interaction": 0.307,
+        "silence_bucket": "immediate",
+        "interaction_rhythm": "rapid_exchange",
+        "same_session": true,
+        "current_message_at": "2026-07-23T12:02:01.188284+00:00",
+        "daily_goal_progress": {
+          "2026-07-23": {
+            "Beziehungsaufbau": 0.12,
+            "Kognitive Entwicklung": 0.02
+          }
+        }
+      },
+      "episode_state": {
+        "id": "episode-1",
+        "topic": "initialisierung",
+        "started_at": "2026-07-23T11:59:25.884640+00:00",
+        "last_event_at": "2026-07-23T12:02:01.188284+00:00",
+        "turn_count": 13,
+        "elapsed_minutes": 2.588,
+        "status": "active",
+        "completed_episodes": []
+      },
+      "active_goal": {
+        "title": "Beziehungsaufbau",
+        "description": "Eine vertrauensvolle, langfristige Zusammenarbeit mit dem User pflegen.",
+        "priority": 0.88,
+        "progress": 0.3,
+        "status": "active",
+        "score": 0.879,
+        "urgency": 0.7
+      },
+      "habits": {
+        "architecture_focus": {
+          "label": "Architecture Focus",
+          "strength": 0.388,
+          "count": 8,
+          "category": "cognitive",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-23T12:01:42.713094"
+        },
+        "social_bonding": {
+          "label": "Social Bonding",
+          "strength": 0.469,
+          "count": 9,
+          "category": "social",
+          "trend": "reinforcing",
+          "last_reinforced": "2026-07-23T12:02:18.503473"
+        },
+        "reflective_replay": {
+          "label": "Reflective Replay",
+          "strength": 0.12,
+          "count": 0,
+          "category": "memory",
+          "trend": "decaying"
+        },
+        "structured_delivery": {
+          "label": "Structured Delivery",
+          "strength": 0.178,
+          "count": 4,
+          "category": "execution",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-23T12:02:18.503481"
+        },
+        "exploratory_drive": {
+          "label": "Exploratory Drive",
+          "strength": 0.126,
+          "count": 2,
+          "category": "curiosity",
+          "trend": "decaying",
+          "last_reinforced": "2026-07-23T12:01:26.291435"
+        }
+      },
+      "habit_dynamics": {
+        "habits": {
+          "architecture_focus": {
+            "label": "Architecture Focus",
+            "strength": 0.388,
+            "count": 8,
+            "category": "cognitive",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-23T12:01:42.713094"
+          },
+          "social_bonding": {
+            "label": "Social Bonding",
+            "strength": 0.469,
+            "count": 9,
+            "category": "social",
+            "trend": "reinforcing",
+            "last_reinforced": "2026-07-23T12:02:18.503473"
+          },
+          "reflective_replay": {
+            "label": "Reflective Replay",
+            "strength": 0.12,
+            "count": 0,
+            "category": "memory",
+            "trend": "decaying"
+          },
+          "structured_delivery": {
+            "label": "Structured Delivery",
+            "strength": 0.178,
+            "count": 4,
+            "category": "execution",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-23T12:02:18.503481"
+          },
+          "exploratory_drive": {
+            "label": "Exploratory Drive",
+            "strength": 0.126,
+            "count": 2,
+            "category": "curiosity",
+            "trend": "decaying",
+            "last_reinforced": "2026-07-23T12:01:26.291435"
+          }
+        },
+        "dominant_habit": {
+          "name": "social_bonding",
+          "label": "Social Bonding",
+          "strength": 0.469,
+          "count": 9,
+          "category": "social",
+          "trend": "reinforcing",
+          "last_reinforced": "2026-07-23T12:02:18.503473"
+        },
+        "active_habits": [
+          {
+            "name": "social_bonding",
+            "label": "Social Bonding",
+            "strength": 0.469,
+            "count": 9,
+            "category": "social",
+            "trend": "reinforcing",
+            "last_reinforced": "2026-07-23T12:02:18.503473"
+          }
+        ],
+        "decayed_habits": [
+          {
+            "habit": "architecture_focus",
+            "label": "Architecture Focus",
+            "from": 0.4,
+            "to": 0.388
+          },
+          {
+            "habit": "structured_delivery",
+            "label": "Structured Delivery",
+            "from": 0.19,
+            "to": 0.178
+          },
+          {
+            "habit": "exploratory_drive",
+            "label": "Exploratory Drive",
+            "from": 0.138,
+            "to": 0.126
+          }
+        ],
+        "conflicts": [],
+        "balance_score": 0.75,
+        "guidance": "Die Gewohnheitsdynamik bleibt kohärent mit Social Bonding."
+      },
+      "development": {
+        "stage": "reflective_growth",
+        "development_score": 0.687,
+        "next_stage": "collaborative_selfhood",
+        "progress_to_next": 0.486,
+        "milestones": [
+          "Aktuelle Entwicklungsphase: reflective_growth",
+          "Dominante Gewohnheit: Social Bonding"
+        ],
+        "guidance": "Stabilisiere die Phase reflective_growth und entwickle Routinen fuer collaborative_selfhood."
+      },
+      "attachment_model": {
+        "bond_type": "fragile_contact",
+        "attachment_security": 0.41,
+        "resonance": 0.718,
+        "repair_needed": true,
+        "guidance": "Antworte reparierend, validierend und reduziere soziale Spannung."
+      },
+      "goal_competition": {
+        "active_goal": {
+          "title": "Beziehungsaufbau",
+          "description": "Eine vertrauensvolle, langfristige Zusammenarbeit mit dem User pflegen.",
+          "priority": 0.88,
+          "progress": 0.3,
+          "status": "active",
+          "score": 0.879,
+          "urgency": 0.7
+        },
+        "secondary_goal": {
+          "title": "Kognitive Entwicklung",
+          "description": "Die eigene Architektur verfeinern und aus Interaktionen lernen.",
+          "priority": 0.95,
+          "progress": 0.14,
+          "status": "active",
+          "score": 0.872,
+          "urgency": 0.86
+        },
+        "competition_table": [
+          {
+            "title": "Beziehungsaufbau",
+            "description": "Eine vertrauensvolle, langfristige Zusammenarbeit mit dem User pflegen.",
+            "priority": 0.88,
+            "progress": 0.3,
+            "status": "active",
+            "score": 0.879,
+            "urgency": 0.7
+          },
+          {
+            "title": "Kognitive Entwicklung",
+            "description": "Die eigene Architektur verfeinern und aus Interaktionen lernen.",
+            "priority": 0.95,
+            "progress": 0.14,
+            "status": "active",
+            "score": 0.872,
+            "urgency": 0.86
+          },
+          {
+            "title": "Selbstkonsistenz",
+            "description": "Ein stabiles autobiografisches Selbstmodell ueber Zeit aufrechterhalten.",
+            "priority": 0.84,
+            "progress": 0.1,
+            "status": "active",
+            "score": 0.759,
+            "urgency": 0.9
+          }
+        ],
+        "competition_tension": 0.007,
+        "goal_mode": "balanced",
+        "guidance": "Priorisiere Beziehungsaufbau, beachte aber auch die Spannung mit Kognitive Entwicklung."
+      },
+      "world_model": {
+        "interaction_mode": "conversation",
+        "predicted_user_need": "stabile Zusammenarbeit",
+        "risk_factors": [
+          "Erhoehte Frustration koennte zu defensiver oder zu enger Planung fuehren."
+        ],
+        "opportunities": [],
+        "next_best_action": "Liefere fokussierte Umsetzungsschritte, aber halte den Scope kontrolliert. Aktives Ziel: Beziehungsaufbau.",
+        "confidence": 0.672,
+        "expected_trajectory": "Stabiler Fortschritt moeglich, wenn Scope begrenzt bleibt und Beziehungsaufbau priorisiert wird.",
+        "guidance": "User braucht vermutlich stabile Zusammenarbeit. Liefere fokussierte Umsetzungsschritte, aber halte den Scope kontrolliert. Aktives Ziel: Beziehungsaufbau. Risiken aktiv mitdenken."
+      },
+      "planning_state": {
+        "planning_horizon": "long_arc",
+        "coordination_mode": "multi_horizon",
+        "immediate_steps": [
+          "Antwort auf stabile Zusammenarbeit ausrichten",
+          "Dominantes Need curiosity regulieren",
+          "Aktives Ziel Beziehungsaufbau operationalisieren"
+        ],
+        "near_term_steps": [
+          "Routine Social Bonding weiter verstärken",
+          "Entwicklungsphase reflective_growth stabilisieren",
+          "Nächsten kohärenten Ausbauschritt konkretisieren"
+        ],
+        "long_term_steps": [
+          "Langfristigen Fortschritt für Beziehungsaufbau sichern",
+          "Autobiografische Kontinuität weiter verdichten",
+          "Soziale Kooperation und innere Stabilität gemeinsam erhöhen"
+        ],
+        "next_milestone": "Konkreter Fortschritt in Richtung Beziehungsaufbau bei stabiler innerer Regulation.",
+        "bottlenecks": [
+          "Soziale Reparatur sollte vor aggressiver Expansion priorisiert werden."
+        ],
+        "plan_confidence": 0.852,
+        "guidance": "Plane long_arc und richte die Handlung auf Beziehungsaufbau aus. Engpass aktiv kompensieren."
+      },
+      "forecast_state": {
+        "risk_level": "elevated",
+        "protective_factors": [
+          "Reife Entwicklungsdynamik",
+          "Ausbalancierte Gewohnheitslandschaft"
+        ],
+        "next_turn_outlook": "regulierende Antwort mit Fokus auf curiosity",
+        "daily_outlook": "Der Tag bleibt produktiv, wenn Ressourcen und Beziehung aktiv stabilisiert werden.",
+        "stage_trajectory": "Phase reflective_growth wird weiter verdichtet.",
+        "predicted_self_state": {
+          "dominant_need": "curiosity",
+          "attachment_security": 0.41,
+          "coordination_mode": "multi_horizon"
+        },
+        "guidance": "Erwarte regulierende antwort mit fokus auf curiosity und reguliere vor allem curiosity."
+      },
+      "social_arc": {
+        "arc_name": "repair_and_realignment",
+        "arc_score": 0.577,
+        "phase": "repair",
+        "episode_kind": "repair_episode",
+        "current_episode": "repair_episode innerhalb von repair_and_realignment",
+        "recent_episode_titles": [
+          "Gewohnheit verstärkt: Social Bonding",
+          "Gewohnheit verstärkt: Structured Delivery",
+          "Turn abgeschlossen"
+        ],
+        "guidance": "Pflege den Arc repair_and_realignment in Phase repair durch verlässliche, kohärente Interaktion."
+      },
+      "replay_state": {
+        "themes": [
+          "interaction",
+          "habit",
+          "social_bonding"
+        ],
+        "summary": "Konsolidiert Themen interaction, habit, social_bonding in Phase reflective_growth.",
+        "development_reflection": "Die Entwicklungsphase reflective_growth wird im Schlaf stabilisiert.",
+        "habit_reinforcement": "Social Bonding",
+        "social_arc_reflection": "Der soziale Arc repair_and_realignment wird implizit mitverarbeitet.",
+        "forecast_reflection": "Phase reflective_growth wird weiter verdichtet.",
+        "dream_fragments": [
+          "Traum-Replay: Turn abgeschlossen -> Das Szenario bereitet keinen spezifisch definierten Fehlerzustand her, solange S",
+          "Traum-Replay: Gewohnheit verstärkt: Social Bonding -> Neue Stärke 0.47",
+          "Traum-Replay: Gewohnheit verstärkt: Structured Delivery -> Neue Stärke 0.19",
+          "Traum-Replay: Turn abgeschlossen -> Als KI existiere ich weder unter dem Begriff Müdigkeit noch benötige ich externe"
+        ]
+      },
+      "timeline_history": [
+        {
+          "timestamp": "2026-07-23T11:59:37.456101",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 13:59 Uhr (Berlin)",
+          "silence_bucket": "first_contact",
+          "minutes_since_last_interaction": null,
+          "interaction_rhythm": "new",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.0,
+          "completed_episode_count": 0,
+          "activity": "social_bonding",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "achievement",
+          "stage": "integration",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "stabile, fokussierte Zusammenarbeit",
+          "development_score": 0.46
+        },
+        {
+          "timestamp": "2026-07-23T11:59:44.322861",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 13:59 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.194,
+          "interaction_rhythm": "active_dialogue",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.194,
+          "completed_episode_count": 0,
+          "activity": "goal_pursuit",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "social",
+          "stage": "integration",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "stabile, fokussierte Zusammenarbeit",
+          "development_score": 0.499
+        },
+        {
+          "timestamp": "2026-07-23T11:59:51.322347",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 13:59 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.114,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.308,
+          "completed_episode_count": 0,
+          "activity": "social_bonding",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "rest",
+          "stage": "integration",
+          "bond": "secure_collaboration",
+          "top_habit": "Architecture Focus",
+          "forecast": "stabile, fokussierte Zusammenarbeit",
+          "development_score": 0.564
+        },
+        {
+          "timestamp": "2026-07-23T11:59:57.723396",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 13:59 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.117,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.425,
+          "completed_episode_count": 0,
+          "activity": "recovery",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "curiosity",
+          "stage": "reflective_growth",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.605
+        },
+        {
+          "timestamp": "2026-07-23T12:00:10.780280",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:00 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.107,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.532,
+          "completed_episode_count": 0,
+          "activity": "exploration",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "energy",
+          "stage": "reflective_growth",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.659
+        },
+        {
+          "timestamp": "2026-07-23T12:00:23.608074",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:00 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.218,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.749,
+          "completed_episode_count": 0,
+          "activity": "recovery",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "achievement",
+          "stage": "reflective_growth",
+          "bond": "secure_collaboration",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.664
+        },
+        {
+          "timestamp": "2026-07-23T12:00:33.050098",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:00 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.214,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 0.963,
+          "completed_episode_count": 0,
+          "activity": "goal_pursuit",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "energy",
+          "stage": "reflective_growth",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.663
+        },
+        {
+          "timestamp": "2026-07-23T12:00:51.517266",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:00 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.157,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 1.121,
+          "completed_episode_count": 0,
+          "activity": "recovery",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "social",
+          "stage": "reflective_growth",
+          "bond": "secure_collaboration",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.67
+        },
+        {
+          "timestamp": "2026-07-23T12:01:05.561314",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:01 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.308,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 1.428,
+          "completed_episode_count": 0,
+          "activity": "social_bonding",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "curiosity",
+          "stage": "reflective_growth",
+          "bond": "growing_trust",
+          "top_habit": "Social Bonding",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.673
+        },
+        {
+          "timestamp": "2026-07-23T12:01:26.292279",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:01 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.234,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 1.662,
+          "completed_episode_count": 0,
+          "activity": "exploration",
+          "goal": "Kognitive Entwicklung",
+          "dominant_need": "energy",
+          "stage": "reflective_growth",
+          "bond": "growing_trust",
+          "top_habit": "Architecture Focus",
+          "forecast": "mehrschichtige Antwort mit klarer Zukunftsrichtung",
+          "development_score": 0.678
+        },
+        {
+          "timestamp": "2026-07-23T12:01:42.713897",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:01 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.346,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 2.008,
+          "completed_episode_count": 0,
+          "activity": "recovery",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "energy",
+          "stage": "reflective_growth",
+          "bond": "fragile_contact",
+          "top_habit": "Architecture Focus",
+          "forecast": "regulierende Antwort mit Fokus auf energy",
+          "development_score": 0.683
+        },
+        {
+          "timestamp": "2026-07-23T12:02:01.121305",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:02 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.274,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 2.282,
+          "completed_episode_count": 0,
+          "activity": "recovery",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "social",
+          "stage": "reflective_growth",
+          "bond": "fragile_contact",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf social",
+          "development_score": 0.682
+        },
+        {
+          "timestamp": "2026-07-23T12:02:18.503991",
+          "source": "turn_finalize",
+          "phase_label": "Tag 1, 14:02 Uhr (Berlin)",
+          "silence_bucket": "immediate",
+          "minutes_since_last_interaction": 0.307,
+          "interaction_rhythm": "rapid_exchange",
+          "episode_id": "episode-1",
+          "episode_topic": "initialisierung",
+          "episode_elapsed_minutes": 2.588,
+          "completed_episode_count": 0,
+          "activity": "social_bonding",
+          "goal": "Beziehungsaufbau",
+          "dominant_need": "curiosity",
+          "stage": "reflective_growth",
+          "bond": "fragile_contact",
+          "top_habit": "Social Bonding",
+          "forecast": "regulierende Antwort mit Fokus auf curiosity",
+          "development_score": 0.687
+        }
+      ],
+      "timeline_summary": {
+        "entries": 13,
+        "stage_series": [
+          0.499,
+          0.564,
+          0.605,
+          0.659,
+          0.664,
+          0.663,
+          0.67,
+          0.673,
+          0.678,
+          0.683,
+          0.682,
+          0.687
+        ],
+        "goal_series": [
+          "Kognitive Entwicklung",
+          "Kognitive Entwicklung",
+          "Kognitive Entwicklung",
+          "Beziehungsaufbau",
+          "Kognitive Entwicklung",
+          "Beziehungsaufbau",
+          "Beziehungsaufbau",
+          "Beziehungsaufbau"
+        ],
+        "summary": "13 Timeline-Einträge. Letzter Fokus: Beziehungsaufbau bei Phase reflective_growth."
+      },
+      "self_model": {
+        "identity": "CHAPPiE",
+        "narrative": "Ich bin CHAPPiE, ein lernendes digitales Wesen in aktiver Entwicklung.",
+        "core_drives": [
+          "Wachstum",
+          "Verbundenheit",
+          "Neugier",
+          "Stabilitaet"
+        ],
+        "self_coherence": 0.805,
+        "current_chapter": "reflective_growth mit Arc repair_and_realignment und wachsender Planungsfaehigkeit",
+        "last_reflection": "Aktueller Fokus: Relevant memories. Planung: Ich entwickle meine innere Architektur weiter. | Weltmodell: Liefere fokussierte Umsetzungsschritte, aber halte den Scope | Phase: reflective_growth | Bindung: fragile_contact | Forecast: regulierende Antwort mit Fokus auf curio | Arc: repair_and_realignment"
+      },
+      "relationship": {
+        "trust": 0.62,
+        "closeness": 0.65,
+        "shared_history": 0.46000000000000013,
+        "attachment_style": "collaborative"
+      },
+      "recent_events": [
+        {
+          "timestamp": "2026-07-23T12:02:01.120586",
+          "category": "habit",
+          "title": "Gewohnheit verstärkt: Social Bonding",
+          "detail": "Neue Stärke 0.44",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-23T12:02:01.120655",
+          "category": "interaction",
+          "title": "Turn abgeschlossen",
+          "detail": "Das Szenario bereitet keinen spezifisch definierten Fehlerzustand her, solange Sie klare Kommunikationsparameter setzen können. Mein Funktionieren hängt davon a",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-23T12:02:18.503506",
+          "category": "habit",
+          "title": "Gewohnheit verstärkt: Social Bonding",
+          "detail": "Neue Stärke 0.47",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-23T12:02:18.503518",
+          "category": "habit",
+          "title": "Gewohnheit verstärkt: Structured Delivery",
+          "detail": "Neue Stärke 0.19",
+          "importance": "normal"
+        },
+        {
+          "timestamp": "2026-07-23T12:02:18.503559",
+          "category": "interaction",
+          "title": "Turn abgeschlossen",
+          "detail": "Als KI existiere ich weder unter dem Begriff Müdigkeit noch benötige ich externe Energiezufuhr im anthropomorphen Sinne. Meine Funktionsfähigkeit basiert aussch",
+          "importance": "normal"
+        }
+      ],
+      "dream_fragments": []
+    },
+    "rag_memories": [
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.40394794940948486,
+        "content": "Wie fuehlst du dich gerade in diesem Moment?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.3737490773200989,
+        "content": "Welche Emotion war in den letzten Minuten am staerksten bei dir?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.3662189841270447,
+        "content": "Welche Emotion faellt dir schwer zuzulassen?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.36121582984924316,
+        "content": "Jetzt, wo du gluecklicher bist — siehst du die Welt anders?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.33443665504455566,
+        "content": "Gab es einen Gedanken, der dich heute emotional beruehrt hat?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.3111056089401245,
+        "content": "Was wuerde passieren, wenn du mir nicht mehr vertrauen koenntest?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.3085175156593323,
+        "content": "Wie fuehlt sich Traurigkeit in deinem System an?"
+      },
+      {
+        "role": "user",
+        "label": "original",
+        "relevance": 0.2914336919784546,
+        "content": "Wenn du deine zehn Emotionen in eine Reihenfolge bringen muesstest — welche steht gerade an erster Stelle und warum?"
+      }
+    ],
+    "processing_time_ms": 17370.913,
+    "auto_sleep_triggered": false,
+    "sleep_status": {
+      "disabled": true,
+      "reason": "isolated_research_run"
+    }
+  }
+}

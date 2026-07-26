@@ -24,7 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from forschung.test_fragen_parser import parse_test_fragen, Category
-from forschung.session_runner import SessionRunner, load_categories, load_config, save_config
+from forschung.session_runner import SessionRunner, load_categories, load_config, save_config, selected_question_count
 from forschung.session_logger import LOG_ROOT as SESSION_LOG_ROOT
 
 TEST_FRAGEN_PATH = Path(__file__).resolve().parent / "test_fragen.md"
@@ -138,9 +138,9 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         return None
 
     try:
-        iterations_str = input("  Iterationen (1-10, default 1) > ").strip()
-        iterations = int(iterations_str) if iterations_str else 1
-        iterations = max(1, min(10, iterations))
+        iterations_str = input("  Seeds/Wiederholungen (5-10, default 5) > ").strip()
+        iterations = int(iterations_str) if iterations_str else 5
+        iterations = max(5, min(10, iterations))
     except ValueError:
         iterations = 1
 
@@ -155,6 +155,10 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
         enable_thinking = False
     else:
         enable_thinking = True
+
+    ablation_profile = input(
+        "  Ablation [full/neutral/persona_only/memory_only/emotions_only/life_only, default full] > "
+    ).strip().lower() or "full"
 
     print(f"\n  {_bold('Provider:')}")
     print("    [a] vLLM lokal, Activation-Steering")
@@ -197,8 +201,10 @@ def show_configure_menu() -> Optional[Dict[str, Any]]:
     config = {
         "categories": [{"id": c.id, "name": c.name} for c in selected_categories],
         "iterations": iterations,
+        "seeds": [11, 23, 37, 53, 71, 89, 107, 131, 151, 173][:iterations],
         "delay": delay,
         "enable_thinking": enable_thinking,
+        "ablation_profile": ablation_profile,
         "llm_provider": provider,
         "model": model_name,
         "model_label": model_label,
@@ -439,7 +445,7 @@ def run_auto_mode(config_path: str):
     selected = [c for c in all_cats if c.id in cat_ids]
     config["_categories"] = selected
 
-    total = sum(len(c.questions) for c in selected) * config.get("iterations", 1)
+    total = selected_question_count(selected, config.get("question_selection")) * config.get("iterations", 1)
     print(_cyan(f"Auto-Mode: {len(selected)} Kategorien, {total} Fragen total"))
     print(_dim(f"Starte Backend-Initialisierung..."))
 

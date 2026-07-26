@@ -1,0 +1,30 @@
+Lokales OpenAI-Brain initialisiert
+   Lokal verbunden: http://localhost:8000/v1
+   Modell: Qwen/Qwen3.5-4B
+  [OK] test_get_brain_vllm_returns_vllmbrain
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-20b
+  [OK] test_get_brain_groq_returns_groqbrain
+Ollama Brain initialisiert
+   Host: http://localhost:11434
+   Modell: qwen3.5:9b
+  [OK] test_get_brain_ollama_model_name_correct
+Ollama Brain initialisiert
+   Host: http://localhost:11434
+   Modell: qwen3.5:9b
+  [OK] test_get_brain_unknown_falls_back_to_ollama
+  [OK] test_provider_enum_has_exactly_three_values
+  [OK] test_parse_provider_valid_vllm
+  [OK] test_parse_provider_valid_ollama
+  [OK] test_parse_provider_valid_groq
+  [OK] test_parse_provider_auto_returns_none
+  [OK] test_parse_provider_groq_returns_none
+  [OK] test_parse_provider_nvidia_returns_none
+  [OK] test_parse_provider_unknown_returns_none
+Lokales OpenAI-Brain initialisiert
+   Lokal verbunden: http://localhost:8000/v1
+   Modell: google/gemma-4-E4B-it
+  [OK] test_get_brain_uses_settings_provider_when_none
+
+13/13 tests passed

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-07-20",
+  "assets": [
+    {
+      "path": "CHAPPiE-Kollage.jpg",
+      "status": "found_and_embedded",
+      "media_type": "image/jpeg",
+      "dimensions": "5928x8192",
+      "sha256": "b2623652e355bdda93476c1bf2de1f3a7deef7fe69f1758ca3bbb81725ca309c",
+      "classification": "historische qualitative Illustration; ältere CHAPPiE-Version; nicht direkt benchmarkvergleichbar",
+      "inspection": "visuell als mehrteilige Kollage mit Terminal-, Web-/Chat- und Architekturansichten geprüft"
+    },
+    {
+      "path": "Eigen-Aktzeptanz.txt",
+      "status": "missing",
+      "classification": "im Bericht transparenter Platzhalter"
+    },
+    {
+      "path": "Depresseiv-Test-neue-Instatn.txt",
+      "status": "missing",
+      "classification": "im Bericht transparenter Platzhalter"
+    },
+    {
+      "path": "*.mp4|*.webm|*.mov|*.m4v",
+      "status": "no_matching_video_assets",
+      "classification": "im Bericht transparenter Platzhalter statt leerem Player"
+    }
+  ],
+  "epistemic_limit": "Historische Assets illustrieren frühere Ausgabe- und UI-Muster; sie belegen weder aktuelle Modellleistung noch Bewusstsein oder subjektive Gefühle."
+}

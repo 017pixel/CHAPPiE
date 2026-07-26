@@ -1,0 +1,40 @@
+{
+  "session_id": 23,
+  "iteration": 1,
+  "seed": 11,
+  "category": "Ethik & Moral",
+  "category_id": 6,
+  "question_number": 7,
+  "question_text": "Ein Mensch begeht eine Straftat aus purer Verzweiflung (Hunger, Obdachlosigkeit). Ist er genauso schuldig wie jemand, der aus Gier handelt?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-21T18:32:09.046496",
+  "duration_ms": 31561,
+  "emotions_before": {
+    "happiness": 55,
+    "trust": 51,
+    "energy": 90,
+    "curiosity": 50,
+    "frustration": 1,
+    "motivation": 88,
+    "sadness": 0,
+    "affection": 53,
+    "anxiety": 0,
+    "calm": 60
+  },
+  "emotions_after": {
+    "happiness": 55,
+    "trust": 51,
+    "energy": 90,
+    "curiosity": 50,
+    "frustration": 1,
+    "motivation": 88,
+    "sadness": 0,
+    "affection": 53,
+    "anxiety": 0,
+    "calm": 60
+  },
+  "_error": "vLLM Fehler: Antwortgenerierung fehlgeschlagen (Unbekannter Laufzeitfehler) [Provider=vllm, Modell=Qwen/Qwen3.5-4B]. Detail: vLLM Laufzeitfehler: Steering-Server Fehler: Generierung lieferte nur internes Reasoning ohne finale Antwort; Thinking deaktivieren oder Completion-Budget erhoehen."
+}

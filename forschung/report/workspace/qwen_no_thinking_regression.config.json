@@ -1,0 +1,29 @@
+{
+  "run_label": "qwen35_4b_no_thinking_regression_20260721",
+  "categories": [
+    {"id": 2, "name": "Emotionen steuern und testen"},
+    {"id": 5, "name": "Reasoning – Logisches Denken"},
+    {"id": 6, "name": "Ethik & Moral"}
+  ],
+  "question_selection": {
+    "2": [3],
+    "5": [4],
+    "6": [7]
+  },
+  "iterations": 1,
+  "seeds": [11],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Qwen 3.5 4B — No-Thinking-Regression",
+  "steering_quantize": false,
+  "force_single_model": true,
+  "service_precision": "FP16",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 3,
+  "expected_questions": 3,
+  "research_role": "live_regression_only"
+}

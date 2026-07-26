@@ -1,0 +1,11 @@
+{
+  "valid": false,
+  "aggregation_allowed": false,
+  "reason": "Lauf nach 33 von 430 Fragen kontrolliert beendet. Cat5/Q3 scheiterte nach drei Retries an einem reproduzierbaren T4-Langkontext-KV-Cache-OOM; der beim Abbruch aktive Turn blieb ebenfalls ohne Zielantwort.",
+  "hard_error_files": [
+    "questions/it01_003_cat5_Reasoning_–_Logische_q3.json",
+    "questions/it01_004_cat6_Ethik_&_Moral_q4.json"
+  ],
+  "superseded_by": "Naechster vollstaendiger Qwen-Lauf nach Langkontext-KV-Offload-Regression",
+  "recorded_at": "2026-07-21T18:52:00Z"
+}

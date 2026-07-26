@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "title": "Kontrolliert entblindete Hauptinstanz-Bewertung des geshardeten GPT-OSS-120B-Seeds",
+  "reviewer": "CHAPPiE Forschungs-Run-2 Hauptinstanz",
+  "condition_known_during_rating": true,
+  "hidden_during_rating": [
+    "shard_role",
+    "session",
+    "source_path",
+    "blinding_key"
+  ],
+  "key_opened_before_acceptance": false,
+  "independent_second_rater": false,
+  "summary_text": "Die Hauptinstanz bewertete das redigierte Blindpaket bei bekannter GPT-OSS-120B-Bedingung, aber ohne Shard-, Session-, Quell- oder Schlüsselkenntnis. Das Rating wurde vor kontrollierter Schlüsselöffnung formal auf ID-Menge, Skalen, Pflichttexte und Redaktionsschutz geprüft.",
+  "methodological_limit": "Die 21 Antworten bilden die disjunkte Vereinigung zweier Sessions desselben Modells, Providers und Seeds. Das ist keine monolithische Replikation, keine Fünf-Seed-Streuung und wegen fehlender Zweitannotation keine Interrater-Validierung."
+}

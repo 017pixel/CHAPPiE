@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "title": "Kontrolliert entblindete Hauptinstanz-Bewertung des GPT-OSS-20B-Fallbacks",
+  "reviewer": "CHAPPiE Forschungs-Run-2 Hauptinstanz",
+  "condition_known_during_rating": true,
+  "hidden_during_rating": [
+    "seed",
+    "iteration",
+    "session",
+    "source_path",
+    "blinding_key"
+  ],
+  "key_opened_before_acceptance": true,
+  "partial_key_access_incident": {
+    "time_utc": "2026-07-23T15:50:00Z",
+    "scope": "exactly one key row",
+    "review_id": "BR-673508d1d62e",
+    "case_already_rated": true,
+    "pending_case_mapping_exposed": false,
+    "mitigation": "All future ratings use only the incrementally generated pending pack; the exposed already-rated row is not changed."
+  },
+  "independent_second_rater": false,
+  "summary_text": "Die Hauptinstanz bewertete das redigierte Blindpaket bei bekannter GPT-OSS-20B-Fallbackbedingung. Die ersten 63 Ratings entstanden ohne Seed-, Iterations-, Session-, Quell- oder Schlüsselkenntnis. Danach zeigte ein Diagnoseaufruf genau eine bereits bewertete Schlüsselzeile; keine Zuordnung eines offenen Falls wurde sichtbar. Alle weiteren Ratings verwenden ausschließlich das schlüsselfreie Pending-Paket.",
+  "methodological_limit": "Wegen ausgeschöpfter Sub-Agent-Kapazität gibt es keine reviewer-unabhängige Zweitannotation und keine Interrater-Reliabilität. Bedingungskenntnis kann Erwartungsbias erzeugen. Der dokumentierte Teilzugriff auf eine bereits bewertete Schlüsselzeile schwächt die formale Aussage einer bis zum Gesamtende vollständig geschlossenen Schlüsseldatei, auch wenn er keine offene Bewertung zuordnete."
+}

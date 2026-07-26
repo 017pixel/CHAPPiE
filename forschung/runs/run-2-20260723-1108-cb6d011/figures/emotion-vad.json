@@ -1,0 +1,96 @@
+{
+  "source": "config/emotions.py",
+  "kind": "configured_synthetic_vad_map",
+  "emotions": [
+    {
+      "key": "happiness",
+      "label": "Freude",
+      "valence": 1.0,
+      "arousal": 0.6,
+      "dominance": 0.6,
+      "default": 50,
+      "max_alpha": 0.6
+    },
+    {
+      "key": "trust",
+      "label": "Vertrauen",
+      "valence": 0.7,
+      "arousal": -0.2,
+      "dominance": 0.4,
+      "default": 50,
+      "max_alpha": 0.54
+    },
+    {
+      "key": "energy",
+      "label": "Energie",
+      "valence": 0.3,
+      "arousal": 0.9,
+      "dominance": 0.5,
+      "default": 100,
+      "max_alpha": 0.56
+    },
+    {
+      "key": "curiosity",
+      "label": "Neugier",
+      "valence": 0.4,
+      "arousal": 0.5,
+      "dominance": 0.2,
+      "default": 50,
+      "max_alpha": 0.57
+    },
+    {
+      "key": "motivation",
+      "label": "Motivation",
+      "valence": 0.5,
+      "arousal": 0.8,
+      "dominance": 0.7,
+      "default": 80,
+      "max_alpha": 0.63
+    },
+    {
+      "key": "frustration",
+      "label": "Frustration",
+      "valence": -0.6,
+      "arousal": 0.7,
+      "dominance": 0.3,
+      "default": 0,
+      "max_alpha": 0.72
+    },
+    {
+      "key": "sadness",
+      "label": "Traurigkeit",
+      "valence": -0.8,
+      "arousal": -0.4,
+      "dominance": -0.5,
+      "default": 0,
+      "max_alpha": 0.67
+    },
+    {
+      "key": "affection",
+      "label": "Zuneigung",
+      "valence": 0.82,
+      "arousal": 0.22,
+      "dominance": 0.32,
+      "default": 45,
+      "max_alpha": 0.34
+    },
+    {
+      "key": "anxiety",
+      "label": "Unruhe",
+      "valence": -0.52,
+      "arousal": 0.68,
+      "dominance": -0.42,
+      "default": 0,
+      "max_alpha": 0.32
+    },
+    {
+      "key": "calm",
+      "label": "Ruhe",
+      "valence": 0.38,
+      "arousal": -0.62,
+      "dominance": 0.44,
+      "default": 50,
+      "max_alpha": 0.3
+    }
+  ]
+}

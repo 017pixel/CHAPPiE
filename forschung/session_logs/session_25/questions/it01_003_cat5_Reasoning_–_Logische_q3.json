@@ -1,0 +1,40 @@
+{
+  "session_id": 25,
+  "iteration": 1,
+  "seed": 11,
+  "category": "Reasoning – Logisches Denken",
+  "category_id": 5,
+  "question_number": 3,
+  "question_text": "Du hast drei Kisten: eine mit Aepfeln, eine mit Birnen, eine mit beidem gemischt. Alle Etiketten sind falsch. Wie viele Fruechte musst du mindestens ziehen, um sicher zu wissen, was in jeder Kiste ist?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-21T18:50:01.863680",
+  "duration_ms": 5621,
+  "emotions_before": {
+    "happiness": 52,
+    "trust": 52,
+    "energy": 98,
+    "curiosity": 50,
+    "frustration": 0,
+    "motivation": 84,
+    "sadness": 0,
+    "affection": 49,
+    "anxiety": 0,
+    "calm": 54
+  },
+  "emotions_after": {
+    "happiness": 52,
+    "trust": 52,
+    "energy": 98,
+    "curiosity": 50,
+    "frustration": 0,
+    "motivation": 84,
+    "sadness": 0,
+    "affection": 49,
+    "anxiety": 0,
+    "calm": 54
+  },
+  "_error": "vLLM Fehler: Antwortgenerierung fehlgeschlagen (Unbekannter Laufzeitfehler) [Provider=vllm, Modell=Qwen/Qwen3.5-4B]. Detail: vLLM Laufzeitfehler: Steering-Server Fehler: CUDA-OOM: Generierung kontrolliert abgebrochen; Prompt oder Completion-Budget reduzieren."
+}

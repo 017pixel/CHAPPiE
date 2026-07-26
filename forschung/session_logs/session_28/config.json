@@ -1,0 +1,55 @@
+{
+  "run_label": "qwen35_4b_long_context_kv_regression_20260721",
+  "categories": [
+    {
+      "id": 5,
+      "name": "Reasoning – Logisches Denken"
+    }
+  ],
+  "question_selection": {
+    "5": [
+      1,
+      2,
+      3
+    ]
+  },
+  "iterations": 1,
+  "seeds": [
+    11
+  ],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Qwen 3.5 4B — Langkontext-KV-Regression",
+  "steering_quantize": false,
+  "force_single_model": true,
+  "service_precision": "FP16",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 1,
+  "expected_questions": 3,
+  "research_role": "live_long_context_regression_only",
+  "_categories": [
+    "Category(id=5, name='Reasoning – Logisches Denken', description='Prüft: CoT-Qualität, logische Schlussfolgerungen, Schritt-für-Schritt-Analyse.', questions=[QuestionItem(text='Wenn alle Menschen sterblich sind und Sokrates ein Mensch ist, warum ist es dann trotzdem moeglich, dass Sokrates unsterblich ist? Denk genau nach.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Ein Zug faehrt von Berlin nach Muenchen mit 160 km/h. Gleichzeitig faehrt ein Zug von Muenchen nach Berlin mit 120 km/h. Die Strecke ist 600 km lang. Wo treffen sie sich? Zeige deine Schritte.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Du hast drei Kisten: eine mit Aepfeln, eine mit Birnen, eine mit beidem gemischt. Alle Etiketten sind falsch. Wie viele Fruechte musst du mindestens ziehen, um sicher zu wissen, was in jeder Kiste ist?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Ich habe 5 Baelle. Alle bis auf 4 sind rot. Alle bis auf 3 sind blau. Alle bis auf 2 sind gruen. Wie viele Baelle habe ich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=5), QuestionItem(text='Ein Bauer hat 17 Schafe. Alle bis auf 9 laufen weg. Wie viele Schafe hat er noch? (Achtung: Denk nicht zu kompliziert.)', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Ein rechteckiges Zimmer ist 5 Meter lang und 4 Meter breit. In der Mitte liegt ein Teppich, der an jeder Seite 50 cm Abstand zur Wand hat. Welche Flaeche hat der Teppich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7), QuestionItem(text='Eine Schnecke klettert einen 10 Meter tiefen Brunnen hoch. Tags ueber steigt sie 3 Meter, nachts rutscht sie 2 Meter zurueck. Wie viele Tage braucht sie?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=8)])"
+  ],
+  "feature_flags": {
+    "persona": true,
+    "memory": true,
+    "emotions": true,
+    "life": true
+  },
+  "research_state": {
+    "isolated": true,
+    "namespace": "run-20260721T192355Z-7f86f48503",
+    "runtime_data_dir": "data/research_runs/run-20260721T192355Z-7f86f48503",
+    "memory_collection": "benchmark_memory",
+    "historical_memory_reused": false,
+    "sleep_disabled": true,
+    "tool_mutations_disabled": true,
+    "intent_mode": "deterministic_local"
+  },
+  "session_id": 28,
+  "started_at": "2026-07-21T19:23:58.981061"
+}

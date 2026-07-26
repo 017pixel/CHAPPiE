@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "title": "Kontrolliert entblindete Qwen-Erstbewertung",
+  "review_phases": [
+    {
+      "reviewer": "TERRA",
+      "items": 63,
+      "scope": "Replikationen 1 bis 3",
+      "blinding": "Modell, Provider, Seed, Iteration, Quelle und Schlüssel verborgen"
+    },
+    {
+      "reviewer": "Hauptinstanz",
+      "items": 42,
+      "scope": "Replikationen 4 und 5",
+      "blinding": "Schlüssel, Seed, Iteration und Quelle verborgen; die Qwen-Bedingung war der Hauptinstanz bekannt"
+    }
+  ],
+  "summary_text": "Alle 105 Ratings wurden vor Öffnung des Schlüssels formal abgenommen. TERRA bewertete die ersten 63 Fälle vollständig verblindet. Nach Erreichen des Sub-Agent-Nutzungslimits bewertete die Hauptinstanz die 42 neuen Fälle weiter ohne Schlüssel, Seed-, Iterations- oder Quellzuordnung, kannte jedoch die Qwen-Bedingung. Erst nach 105/105 bestandenen Struktur-, Skalen-, Pflichttext- und Redaktionsprüfungen wurden Modell, Seed, Iteration und Quellpfad zugespielt.",
+  "methodological_limit": "Die letzten 42 Bewertungen sind keine vom Hauptmodell unabhängige TERRA-Annotation. Bedingungskenntnis kann diese Teilstichprobe beeinflussen; Replikationen 4 und 5 werden deshalb nicht als vollständig reviewer-verblindet bezeichnet. Der gesamte Datensatz bleibt eine Einzelannotation ohne Interrater-Reliabilität."
+}

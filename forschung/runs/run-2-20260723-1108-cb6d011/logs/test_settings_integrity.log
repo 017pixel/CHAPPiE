@@ -1,0 +1,11 @@
+  [OK] test_llm_provider_has_groq
+  [OK] test_llm_provider_enum_no_nvidia
+  [OK] test_llm_provider_enum_has_exactly_three_values
+  [OK] test_settings_export_has_groq_keys
+  [OK] test_settings_has_groq_attributes
+  [OK] test_default_root_config_has_groq_keys
+  [OK] test_default_root_config_has_no_stale_cerebras_keys
+  [OK] test_get_intent_model_groq
+  [OK] test_get_query_extraction_model_groq
+
+9/9 tests passed

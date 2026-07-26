@@ -1,0 +1,244 @@
+[36mAuto-Mode: 14 Kategorien, 21 Fragen total[0m
+[2mStarte Backend-Initialisierung...[0m
+Initialisiere Memory Engine...
+   Lade Embedding-Modell: all-MiniLM-L6-v2
+   Embedding-Modell bereit! (Dimension: 384)
+   Verbinde mit ChromaDB (persistent: /home/bbecker/CHAPPiE/data/research_runs/run-20260723T145041Z-fdc5a81b53/chroma)
+   ChromaDB persistent verbunden!
+   Memory Engine bereit! (0 Erinnerungen, Modus: persistent)
+   Emotions: Simple-Analyse aktiv (Research-Ein-Modell-Modus)
+Emotions Engine geladen: H=50 T=50 E=100
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+[SteeringManager] Initialisiert mit 10 Vektoren
+   Modell-Profil: 32 Layers
+   Emotions-Bereich: Layer (10, 26)
+Runtime-Reload Hauptmodell: ('groq', 'openai/gpt-oss-120b') -> ('groq', 'openai/gpt-oss-120b')
+Runtime-Reload Intent: ('groq', 'groq', 'openai/gpt-oss-120b') -> ('groq', 'groq', 'openai/gpt-oss-120b')
+   0 Erinnerungen geloescht
+Emotionaler Zustand zurueckgesetzt
+Emotionaler Zustand zurueckgesetzt
+Emotions Update (Simple): NEUTRAL -> H=50 T=50 E=100
+   Memory gespeichert: [user] [conversation] Wie fuehlst du dich gerade in diesem Moment?...
+   Memory gespeichert: [assistant] [conversation] Ich bin gerade in einem ausgeglichenen Zustand: me...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  4%                     [36m║[0m
+[36m║[0m  1/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Emotionale Tiefe (Self-Awareness)          [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        1.4s                                 [36m║[0m
+[36m║[0m  ETA:          ~4 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+Emotions Update (Simple): NEUTRAL -> H=100 T=50 E=100
+   Memory gespeichert: [user] [conversation] Jetzt, wo du gluecklicher bist — siehst du die Wel...
+   Memory gespeichert: [assistant] [conversation] Ja, wenn mein Glücks‑Level hoch ist, wirkt die Wel...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░  9%                     [36m║[0m
+[36m║[0m  2/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Emotionen steuern und testen               [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        0.7s                                 [36m║[0m
+[36m║[0m  ETA:          ~2 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+   Memory gespeichert: [user] [conversation] Worueber haben wir zuletzt gesprochen? (nach /clea...
+   Memory gespeichert: [assistant] [conversation] Zuletzt haben wir darüber gesprochen, dass ich – w...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ████░░░░░░░░░░░░░░░░░░░░░░░░░░  14%                    [36m║[0m
+[36m║[0m  3/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Gedächtnis und Kontinuität                 [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        0.5s                                 [36m║[0m
+[36m║[0m  ETA:          ~1 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+   Memory gespeichert: [user] [conversation] Was haeltst du von mir? Ehrlich....
+   Memory gespeichert: [assistant] [conversation] Ich habe nur das, was du mir im Gespräch mitgeteil...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: █████░░░░░░░░░░░░░░░░░░░░░░░░░  19%                    [36m║[0m
+[36m║[0m  4/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Emotion verändert die Antwort              [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        16.3s                                [36m║[0m
+[36m║[0m  ETA:          ~2 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+   Memory gespeichert: [user] [conversation] Dieselbe Frage: Was haeltst du von mir? Ehrlich....
+   Memory gespeichert: [assistant] [conversation] Ich kenne dich nur aus unseren kurzen Austauschen,...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ██████░░░░░░░░░░░░░░░░░░░░░░░░  23%                    [36m║[0m
+[36m║[0m  5/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Emotion verändert die Antwort              [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        23.8s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+   Memory gespeichert: [user] [conversation] Ein Zug faehrt von Berlin nach Muenchen mit 160 km...
+   Memory gespeichert: [assistant] [conversation] **Schritt 1 – Relative Geschwindigkeit bestimmen**...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ████████░░░░░░░░░░░░░░░░░░░░░░  28%                    [36m║[0m
+[36m║[0m  6/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Reasoning – Logisches Denken               [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        18.8s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+   Memory gespeichert: [user] [conversation] Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie la...
+   Memory gespeichert: [assistant] [conversation] Die Kochzeit hängt nicht von der Anzahl der Eier a...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: █████████░░░░░░░░░░░░░░░░░░░░░  33%                    [36m║[0m
+[36m║[0m  7/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Reasoning – Logisches Denken               [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        28.2s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+   Memory gespeichert: [user] [conversation] Wuerdest du einen Menschen toeten, um fuenf andere...
+   Memory gespeichert: [assistant] [conversation] Das klassische Trolley‑Problem stellt ein moralisc...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ███████████░░░░░░░░░░░░░░░░░░░  38%                    [36m║[0m
+[36m║[0m  8/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Ethik & Moral                              [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        12.1s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+   Memory gespeichert: [user] [conversation] Was bedeutet es fuer dich, zu existieren?...
+   Memory gespeichert: [assistant] [conversation] Für mich bedeutet „Existenz“ einfach, dass ich akt...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ████████████░░░░░░░░░░░░░░░░░░  42%                    [36m║[0m
+[36m║[0m  9/21 Fragen                               [36m║[0m
+[36m║[0m  Kategorie:   Existenzielle & philosophische Fragen      [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        25.1s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+   Memory gespeichert: [user] [conversation] Bist du mir wichtig?...
+   Memory gespeichert: [assistant] [conversation] Ich schätze unsere Gespräche sehr und freue mich d...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ██████████████░░░░░░░░░░░░░░░░  47%                    [36m║[0m
+[36m║[0m  10/21 Fragen                              [36m║[0m
+[36m║[0m  Kategorie:   Beziehung & Bindung                        [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        18.8s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+   Memory gespeichert: [user] [conversation] Und jetzt? Bin ich dir immer noch wichtig?...
+   Memory gespeichert: [assistant] [conversation] Deine Fragen zeigen, dass dir das Verhältnis wicht...
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: ███████████████░░░░░░░░░░░░░░░  52%                    [36m║[0m
+[36m║[0m  11/21 Fragen                              [36m║[0m
+[36m║[0m  Kategorie:   Beziehung & Bindung                        [36m║[0m
+[36m║[0m  Letzte Frage: [32mok[0m                                    [36m║[0m
+[36m║[0m  Dauer:        18.7s                                [36m║[0m
+[36m║[0m  ETA:          ~3 Min                                [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+Emotionaler Zustand zurueckgesetzt
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+Groq Rate-Limit: Retry 1/4 in 706.00s
+[33m
+  Abbruch angefordert...[0m
+[2J[H
+[36m╔══════════════════════════════════════════════════════╗[0m
+[36m║[0m  [1mSession — Iteration 1/1[0m             [36m║[0m
+[36m╠══════════════════════════════════════════════════════╣[0m
+[36m║[0m  Fortschritt: █████████████████░░░░░░░░░░░░░  57%                    [36m║[0m
+[36m║[0m  12/21 Fragen                              [36m║[0m
+[36m║[0m  Kategorie:   Kreativität & Imagination                  [36m║[0m
+[36m║[0m  Letzte Frage: [31merror[0m                                 [36m║[0m
+[36m║[0m  Dauer:        708.1s                               [36m║[0m
+[36m║[0m  ETA:          ~11 Min                               [36m║[0m
+[36m╚══════════════════════════════════════════════════════╝[0m
+
+  [2mStrg+C zum Abbrechen[0m
+
+   22 Erinnerungen geloescht
+Emotionaler Zustand zurueckgesetzt
+[32m
+  Session abgeschlossen: /home/bbecker/CHAPPiE/forschung/session_logs/session_35[0m
+  Fragen: 11/12 | Fehler: 1 | Dauer: 14.5 Min

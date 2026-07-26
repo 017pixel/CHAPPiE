@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 820 250">
+  <title id="title">Nominale Layerprofile von Qwen und Gemma</title>
+  <desc id="desc">Qwen nominal L10 bis 26, Gemma nominal L12 bis 30. Tatsächliche Run-2-Payloads werden separat geprüft.</desc>
+  <rect width="820" height="250" fill="#1e1e1e" rx="8"/>
+  <style>
+    text { font-family: Inter, system-ui, sans-serif; fill: #eeeeee; }
+    .muted { fill: #a8a8a8; font-size: 12px; }
+    .label { fill: #a8a8a8; font-size: 11px; }
+  </style>
+  <text x="56" y="30" font-size="16" font-weight="600">Nominale Modellprofile</text><text class="muted" x="56" y="100">Qwen 3.5 4B</text><rect x="190" y="82" width="560" height="24" rx="4" fill="#2a2a2a"/><rect x="365.0" y="82" width="280.0" height="24" rx="4" fill="#8fae96" opacity=".76"/><text class="label" x="190" y="126">L0</text><text class="label" x="750" y="126" text-anchor="end">L31</text><text x="505.0" y="99" text-anchor="middle" font-size="11">L10–26</text><text class="muted" x="56" y="172">Gemma 4 E4B</text><rect x="190" y="154" width="560" height="24" rx="4" fill="#2a2a2a"/><rect x="350.0" y="154" width="240.0" height="24" rx="4" fill="#718ca8" opacity=".76"/><text class="label" x="190" y="198">L0</text><text class="label" x="750" y="198" text-anchor="end">L41</text><text x="470.0" y="171" text-anchor="middle" font-size="11">L12–30</text><text class="label" x="764" y="230" text-anchor="end">Session 33 zeigt tatsächliche Gemma-Vektoren bis L40 → separates Issue</text>
+</svg>

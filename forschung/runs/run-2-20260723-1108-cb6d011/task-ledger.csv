@@ -1,0 +1,19 @@
+task_id,task,resource_class,status,evidence_or_blocker
+T01,Repository und Hardware inventarisieren,INDEPENDENT,completed,run-2-manifest.md
+T02,Run-1-Artefakte indexieren,INDEPENDENT,completed,run-1-artifact-index.md
+T03,Harness und Config prüfen,INDEPENDENT,completed,logs/test_forschung_harness.log
+T04,Gemma-Bedingung fünf Seeds ausführen,DEPENDENT,completed,session_33 430/430 und processed/session-33-validation.json
+T05,GPU-Sperre kontrollieren,MONITORING,completed,Research- und Monitoring-Logs belegen serielle Modellarbeit; Web/Training nach finaler QA per SIGCONT freigegeben und gesund
+T06,48 bekannte Issues normalisieren,INDEPENDENT,completed,known-issues-comparison.csv
+T07,GPU-freie technische Retests,INDEPENDENT,completed,logs/test_*.log
+T08,Laufende Artefakte auf Regressionen prüfen,POST_PROCESSING,completed,70 Matrixeinträge mit 22 Run-2-Neufunden und 14/14 Validatorgates; 69 Follow-up-Turns vollständig manuell geprüft
+T09,Wissenschaftliche Quellenbasis,INDEPENDENT,completed,notes/scientific-sources.md
+T10,Report-Informationsarchitektur,INDEPENDENT,completed,report-content-outline.md
+T11,Markdown- und HTML-Plan,INDEPENDENT,completed,../../report/report-plan.md und report-plan.html
+T12,Session 33 final validieren,POST_PROCESSING,completed,processed/session-33-validation.json und systemd Exit 0
+T13,Qwen-Bedingung fünf Seeds ausführen,DEPENDENT,completed,Session 34 430/430; Exit 0; processed/session-34-validation.json 19/19 PASS
+T14,GPT-OSS/Groq mit Fallbackstrategie ausführen,DEPENDENT,completed,GPT-OSS 20B fünf Seeds 105/105 TEST_VALID; GPT-OSS 120B Session 35 plus disjunkte Session 41 als 21-Schlüssel-Union 17/17 TEST_VALID_SHARDED; beide Blindreviews bestanden
+T15,Interaktions- und Behavioral-Retests,DEPENDENT,completed,Sechs Module in Sessions 42–47; 69/69 formal valide; automatische und vollständige manuelle Auswertung abgeschlossen
+T16,Run-2-Daten aggregieren und Diagramme erzeugen,POST_PROCESSING,completed,finale SVG- und JSON-Figuren aus freigegebenen A/B/C- und Follow-up-Daten erzeugt
+T17,Finalen HTML-Report bauen,POST_PROCESSING,completed,CHAPPiE-Forschungsbericht-Run-2.html mit 70 Issues 16 Forschungsantworten getrennten Cloudklassen und COMPLETE-State gebaut
+T18,Responsive Accessibility Offline und Print QA,POST_PROCESSING,completed,finaler Build statisch 27/27 Reporttests 10/10 Chromium 10/10 No-JS 2/2 plus Print Fokus Touch und visuelle Hauptprüfung bestanden

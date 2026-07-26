@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "force_single_model": true,
+  "expected_provider": "groq",
+  "expected_model": "openai/gpt-oss-120b",
+  "components": {
+    "main": {
+      "uses_brain": true,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b"
+    },
+    "intent": {
+      "uses_brain": true,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "runtime_mode": "deterministic_local"
+    },
+    "query_extraction": {
+      "uses_brain": true,
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b"
+    },
+    "emotions": {
+      "uses_brain": false,
+      "mode": "simple_local_rules"
+    }
+  },
+  "requests": [
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "cache_hit": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "cache_hit": false
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "cache_hit": true
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-120b",
+      "cache_hit": true
+    }
+  ],
+  "request_count": 4,
+  "unexpected_requests": [],
+  "unexpected_components": {},
+  "passed": true
+}

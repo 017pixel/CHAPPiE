@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T21:24:24.293757+00:00",
+  "resource_class": "INDEPENDENT",
+  "manifest": "raw/cloud-configs/manifest.json",
+  "passed": true,
+  "checks": [
+    {
+      "name": "manifest_config_count",
+      "passed": true,
+      "detail": "10"
+    },
+    {
+      "name": "manifest_paths_exist",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "primary_five_configs",
+      "passed": true,
+      "detail": "5 configs for openai/gpt-oss-120b"
+    },
+    {
+      "name": "primary_seed_set",
+      "passed": true,
+      "detail": "[11, 23, 37, 53, 71]"
+    },
+    {
+      "name": "primary_model_contract",
+      "passed": true,
+      "detail": "openai/gpt-oss-120b"
+    },
+    {
+      "name": "fallback_five_configs",
+      "passed": true,
+      "detail": "5 configs for openai/gpt-oss-20b"
+    },
+    {
+      "name": "fallback_seed_set",
+      "passed": true,
+      "detail": "[11, 23, 37, 53, 71]"
+    },
+    {
+      "name": "fallback_model_contract",
+      "passed": true,
+      "detail": "openai/gpt-oss-20b"
+    },
+    {
+      "name": "same_stratified_selection",
+      "passed": true,
+      "detail": "identische 21 Fragen über 14 Kategorien"
+    },
+    {
+      "name": "no_duplicate_hashes_across_roles",
+      "passed": true,
+      "detail": "Model/Seed-Metadaten halten jede Config unterscheidbar"
+    }
+  ],
+  "configs": [
+    {
+      "path": "raw/cloud-configs/gpt-oss-120b-seed-11.config.json",
+      "sha256": "de45f74ecafcd8694b4c2f076d8f22280b480419a5f2c3b3ac0623e1c449b5a4",
+      "role": "primary",
+      "model": "openai/gpt-oss-120b",
+      "seed": 11,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-120b-seed-23.config.json",
+      "sha256": "aee8c00d1ff3982d8fccc0156299f67ceb37e91d8dbd35b00145981b38398858",
+      "role": "primary",
+      "model": "openai/gpt-oss-120b",
+      "seed": 23,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-120b-seed-37.config.json",
+      "sha256": "e1481a4473452c4f59b7f13ac4e384de6ab831d7f0c8b011775631ab6723a92f",
+      "role": "primary",
+      "model": "openai/gpt-oss-120b",
+      "seed": 37,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-120b-seed-53.config.json",
+      "sha256": "29267f837e599a240907370d019683197a00ffbf5d185caa5cb5ab730781f284",
+      "role": "primary",
+      "model": "openai/gpt-oss-120b",
+      "seed": 53,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-120b-seed-71.config.json",
+      "sha256": "5d0928bce8b7f8482da90a403cc05cc57848ce34f837b87b737d347ff19f3301",
+      "role": "primary",
+      "model": "openai/gpt-oss-120b",
+      "seed": 71,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-20b-seed-11.config.json",
+      "sha256": "443c02f5ee71938b3d5dc681fa942daf99cc5bfb22589b639cef7be3f378cb0b",
+      "role": "fallback",
+      "model": "openai/gpt-oss-20b",
+      "seed": 11,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-20b-seed-23.config.json",
+      "sha256": "e607f8dc6baae1db8a229f5d33b2a4606706c30303c47cdc628025d5d8624313",
+      "role": "fallback",
+      "model": "openai/gpt-oss-20b",
+      "seed": 23,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-20b-seed-37.config.json",
+      "sha256": "137e91a84a21e94464d5cebfc16d68ce522a819dbb0c9954971afc3aa3994c51",
+      "role": "fallback",
+      "model": "openai/gpt-oss-20b",
+      "seed": 37,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-20b-seed-53.config.json",
+      "sha256": "2a9929dd1863e5284db584862a97e3c8507964bd7df72fd63d1f10e60fd26b27",
+      "role": "fallback",
+      "model": "openai/gpt-oss-20b",
+      "seed": 53,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    },
+    {
+      "path": "raw/cloud-configs/gpt-oss-20b-seed-71.config.json",
+      "sha256": "d3b70cab83e94e7d5f96445cb8410f5c565ec3d4c5be580341d083cd8d5a9367",
+      "role": "fallback",
+      "model": "openai/gpt-oss-20b",
+      "seed": 71,
+      "selected_questions": 21,
+      "categories": 14,
+      "contract_ok": true
+    }
+  ],
+  "execution_authorized": false,
+  "execution_gate": "Konfigurationsaudit erlaubt keine Cloudinteraktion; Start erst nach validiertem Ende der lokalen automatisierten Bedingungen."
+}

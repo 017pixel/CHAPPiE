@@ -141,8 +141,10 @@ cython_debug/
 
 # Local data
 data/chroma_db/
+data/research_runs/
 data/chat_sessions/
 data/short_term_memory.json
+data/short_term_memory.json.lock
 data/status.json
 data/life_state.json
 data/sleep_state.json

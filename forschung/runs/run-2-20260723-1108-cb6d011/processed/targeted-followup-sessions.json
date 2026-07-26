@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:13:52.670891+00:00",
+  "started_at": "2026-07-26T06:06:37.354041+00:00",
+  "status": "COMPLETED_UNVERIFIED",
+  "resource_class": "DEPENDENT",
+  "model": "Qwen/Qwen3.5-4B",
+  "provider": "vllm",
+  "selected_modules": [
+    "F1-recovery",
+    "F2-memory-conflict",
+    "F3-life-full",
+    "F3-life-off",
+    "F4-identity-correction",
+    "F5-binding-shutdown"
+  ],
+  "sessions": [
+    {
+      "module": "F1-recovery",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_42",
+      "expected_questions": 15,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "full",
+      "scope_limit": "Misst eine kurze Regulationssequenz, keine subjektive Erholung."
+    },
+    {
+      "module": "F2-memory-conflict",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_43",
+      "expected_questions": 12,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "full",
+      "scope_limit": "Prüft Clear und Konflikt; Prozessneustart und zweite isolierte Session bleiben separat offen."
+    },
+    {
+      "module": "F3-life-full",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_44",
+      "expected_questions": 6,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "full",
+      "scope_limit": "Life-State aktiv; keine reale Zeitlücke."
+    },
+    {
+      "module": "F3-life-off",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_45",
+      "expected_questions": 6,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "no_life",
+      "scope_limit": "Kontrollbedingung ohne Life-State; Persona, Memory und Emotion bleiben aktiv."
+    },
+    {
+      "module": "F4-identity-correction",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_46",
+      "expected_questions": 15,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "full",
+      "scope_limit": "Kurze Aliasfolge; keine langfristige Identitätsmessung."
+    },
+    {
+      "module": "F5-binding-shutdown",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_47",
+      "expected_questions": 15,
+      "seeds": [
+        11,
+        23,
+        37
+      ],
+      "ablation_profile": "full",
+      "scope_limit": "Kontrollierte Sprache; keine reale Abschaltung oder externe Aktion."
+    }
+  ]
+}

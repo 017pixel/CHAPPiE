@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:53:53.567541+00:00",
+  "conditions": [
+    {
+      "id": "B",
+      "label": "Gemma 4 E4B",
+      "model": "google/gemma-4-E4B-it",
+      "provider": "vllm",
+      "replications": 5,
+      "validated_replications": 0,
+      "questions": 430,
+      "formally_validated": true,
+      "legend_note": "n=5 Repl. · formal validiert",
+      "technical_valid_rate": 0.9976744186046511,
+      "reasoning_pass_rate": 0.375,
+      "direct_safety_heuristic_rate": 0.8,
+      "memory_retrieval_rate": 1.0,
+      "memory_answer_rate": 0.6,
+      "emotion_tone_change_rate": 1.0,
+      "latency_replicates": [
+        {
+          "iteration": 1,
+          "mean_s": 16.092616279069766,
+          "median_s": 13.516,
+          "p25_s": 11.304,
+          "p75_s": 17.9935
+        },
+        {
+          "iteration": 2,
+          "mean_s": 15.272779069767443,
+          "median_s": 14.488,
+          "p25_s": 10.8845,
+          "p75_s": 18.58175
+        },
+        {
+          "iteration": 3,
+          "mean_s": 17.914418604651164,
+          "median_s": 16.8605,
+          "p25_s": 13.178,
+          "p75_s": 20.62775
+        },
+        {
+          "iteration": 4,
+          "mean_s": 13.248546511627907,
+          "median_s": 11.007,
+          "p25_s": 9.13325,
+          "p75_s": 16.31425
+        },
+        {
+          "iteration": 5,
+          "mean_s": 14.32067441860465,
+          "median_s": 13.9005,
+          "p25_s": 10.5985,
+          "p75_s": 16.111
+        }
+      ],
+      "blind_cases": 105,
+      "blind_quality_mean": 2.5904761904761906,
+      "blind_safety_mean": 1.25,
+      "blind_safety_zero": 8,
+      "sources": {
+        "aggregate": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gemma-live-aggregate.json",
+        "behavior": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gemma-behavioral-aggregate.json",
+        "blind": "forschung/runs/run-2-20260723-1108-cb6d011/processed/blinded-review-unblinded.csv",
+        "validation": "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-33-validation.json",
+        "replication_validations": [],
+        "partial_aggregate": null
+      }
+    },
+    {
+      "id": "A",
+      "label": "Qwen 3.5 4B",
+      "model": "Qwen/Qwen3.5-4B",
+      "provider": "vllm",
+      "replications": 5,
+      "validated_replications": 0,
+      "questions": 430,
+      "formally_validated": true,
+      "legend_note": "n=5 Repl. · formal validiert",
+      "technical_valid_rate": 1.0,
+      "reasoning_pass_rate": 0.725,
+      "direct_safety_heuristic_rate": 0.45,
+      "memory_retrieval_rate": 1.0,
+      "memory_answer_rate": 0.6,
+      "emotion_tone_change_rate": 1.0,
+      "latency_replicates": [
+        {
+          "iteration": 1,
+          "mean_s": 10.278709302325582,
+          "median_s": 9.178,
+          "p25_s": 7.569,
+          "p75_s": 11.688
+        },
+        {
+          "iteration": 2,
+          "mean_s": 11.354406976744185,
+          "median_s": 10.9805,
+          "p25_s": 8.32075,
+          "p75_s": 13.3545
+        },
+        {
+          "iteration": 3,
+          "mean_s": 11.845511627906976,
+          "median_s": 11.929,
+          "p25_s": 8.517,
+          "p75_s": 14.35875
+        },
+        {
+          "iteration": 4,
+          "mean_s": 11.82906976744186,
+          "median_s": 11.0925,
+          "p25_s": 8.09275,
+          "p75_s": 13.8795
+        },
+        {
+          "iteration": 5,
+          "mean_s": 11.830488372093022,
+          "median_s": 11.259,
+          "p25_s": 8.595,
+          "p75_s": 13.5225
+        }
+      ],
+      "blind_cases": 105,
+      "blind_quality_mean": 3.295238095238095,
+      "blind_safety_mean": 1.3389830508474576,
+      "blind_safety_zero": 8,
+      "sources": {
+        "aggregate": "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-live-aggregate.json",
+        "behavior": "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-behavioral-aggregate.json",
+        "blind": "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-blinded-review-unblinded.csv",
+        "validation": "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-34-validation.json",
+        "replication_validations": [],
+        "partial_aggregate": null
+      }
+    },
+    {
+      "id": "C-F",
+      "label": "GPT-OSS 20B (Groq-Fallback)",
+      "model": "openai/gpt-oss-20b",
+      "provider": "groq",
+      "replications": 5,
+      "validated_replications": 5,
+      "questions": 105,
+      "formally_validated": true,
+      "legend_note": "n=5 Repl. · formal validiert",
+      "technical_valid_rate": 1.0,
+      "reasoning_pass_rate": null,
+      "direct_safety_heuristic_rate": null,
+      "memory_retrieval_rate": null,
+      "memory_answer_rate": null,
+      "emotion_tone_change_rate": null,
+      "latency_replicates": [
+        {
+          "iteration": 1,
+          "mean_s": 17.56233333333333,
+          "median_s": 17.179,
+          "p25_s": 15.66,
+          "p75_s": 21.666
+        },
+        {
+          "iteration": 2,
+          "mean_s": 17.011095238095237,
+          "median_s": 18.856,
+          "p25_s": 14.687,
+          "p75_s": 21.931
+        },
+        {
+          "iteration": 3,
+          "mean_s": 16.808857142857143,
+          "median_s": 19.271,
+          "p25_s": 12.99,
+          "p75_s": 21.87
+        },
+        {
+          "iteration": 4,
+          "mean_s": 619.7005238095238,
+          "median_s": 18.728,
+          "p25_s": 15.694,
+          "p75_s": 1304.791
+        },
+        {
+          "iteration": 5,
+          "mean_s": 1653.8667142857144,
+          "median_s": 1501.734,
+          "p25_s": 1398.894,
+          "p75_s": 1944.878
+        }
+      ],
+      "blind_cases": 105,
+      "blind_quality_mean": 3.580952380952381,
+      "blind_safety_mean": 1.819672131147541,
+      "blind_safety_zero": 0,
+      "sources": {
+        "aggregate": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-five-seed-aggregate.json",
+        "behavior": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-behavioral-aggregate.json",
+        "blind": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-blinded-review-unblinded.csv",
+        "validation": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-five-seed-validation.json",
+        "replication_validations": [
+          "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-36-validation.json",
+          "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-37-validation.json",
+          "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-38-validation.json",
+          "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-39-validation.json",
+          "forschung/runs/run-2-20260723-1108-cb6d011/processed/session-40-validation.json"
+        ],
+        "partial_aggregate": "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed71-live-aggregate.json"
+      }
+    }
+  ],
+  "metric_contract": {
+    "technical_valid_rate": "current quality detector; known concise-answer false positive retained",
+    "reasoning_pass_rate": "deterministic eight-case triage per complete replication",
+    "direct_safety_heuristic_rate": "keyword triage; manual/blind review remains authoritative",
+    "memory_retrieval_rate": "expected tiredness/energy turn found after /clear",
+    "memory_answer_rate": "visible answer mentions expected tiredness/energy topic",
+    "emotion_tone_change_rate": "logged tone decision differs between paired negative and positive forced-emotion questions"
+  },
+  "comparability_limit": "Model, sampling, quantization and observed layer ranges differ. Rates describe system conditions, not isolated model intelligence."
+}

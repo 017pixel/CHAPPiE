@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:03:30.028419+00:00",
+  "resource_class": "POST_PROCESSING",
+  "classification": "TEST_VALID_SHARDED",
+  "methodological_label": "sharded partial replication; not monolithic",
+  "model": "openai/gpt-oss-120b",
+  "provider": "groq",
+  "seed": 11,
+  "checks": {
+    "primary_model_provider": true,
+    "continuation_model_provider": true,
+    "both_seed_11": true,
+    "primary_controlled_settings_match_target": true,
+    "continuation_controlled_settings_match_target": true,
+    "shards_controlled_settings_identical": true,
+    "both_provider_audits_pass": true,
+    "both_response_contracts_exact": true,
+    "primary_expected_partial_shape": true,
+    "primary_posthoc_valid_11": true,
+    "continuation_expected_shape": true,
+    "continuation_summary_valid_10": true,
+    "no_duplicate_successful_keys": true,
+    "combined_21_unique_keys": true,
+    "combined_keys_match_original_selection": true,
+    "continuation_declares_shard": true,
+    "category_state_reset_in_both": true
+  },
+  "passed": true,
+  "combined_unique_answers": 21,
+  "target_answers": 21,
+  "primary": {
+    "session": "forschung/session_logs/session_35",
+    "question_files": 12,
+    "successful": 11,
+    "errors": 1,
+    "seeds": [
+      11
+    ]
+  },
+  "continuation": {
+    "session": "forschung/session_logs/session_41",
+    "question_files": 10,
+    "successful": 10,
+    "errors": 0,
+    "seeds": [
+      11
+    ]
+  },
+  "limit": "The two shards have identical model/provider/seed and reset research state per category, but a two-session shard is not a monolithic replication."
+}

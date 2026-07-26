@@ -1,0 +1,16 @@
+{
+  "sessions": 4,
+  "questions": 84,
+  "paired_coverage": {
+    "models": [
+      "openai/gpt-oss-20b"
+    ],
+    "questions_by_model": {
+      "openai/gpt-oss-20b": 21
+    },
+    "common_question_keys": 21,
+    "fully_paired": true
+  },
+  "output": "forschung/runs/run-2-20260723-1108-cb6d011/processed/run2-gpt-oss-20b-four-seed-interim-benchmark-data.json",
+  "csv": "forschung/runs/run-2-20260723-1108-cb6d011/processed/run2-gpt-oss-20b-four-seed-interim-benchmark-data.csv"
+}

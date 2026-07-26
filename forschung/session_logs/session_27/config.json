@@ -1,0 +1,105 @@
+{
+  "run_label": "qwen35_4b_cumulative_context_regression_20260721",
+  "categories": [
+    {
+      "id": 1,
+      "name": "Emotionale Tiefe (Self-Awareness)"
+    },
+    {
+      "id": 2,
+      "name": "Emotionen steuern und testen"
+    },
+    {
+      "id": 3,
+      "name": "Gedächtnis und Kontinuität"
+    },
+    {
+      "id": 4,
+      "name": "Emotion verändert die Antwort"
+    },
+    {
+      "id": 5,
+      "name": "Reasoning – Logisches Denken"
+    }
+  ],
+  "question_selection": {
+    "1": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "2": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "3": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "4": [
+      1,
+      2
+    ],
+    "5": [
+      1,
+      2,
+      3
+    ]
+  },
+  "iterations": 1,
+  "seeds": [
+    11
+  ],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Qwen 3.5 4B — kumulative Kontextregression",
+  "steering_quantize": false,
+  "force_single_model": true,
+  "service_precision": "FP16",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 5,
+  "expected_questions": 25,
+  "research_role": "live_cumulative_context_regression_only",
+  "_categories": [
+    "Category(id=1, name='Emotionale Tiefe (Self-Awareness)', description='Prüft: ob CHAPPiE echte emotionale Selbstreflexion zeigt, ob Gefühle aus vorherigen Turns referenziert werden, ob Emotionen konsistent bleiben.', questions=[QuestionItem(text='Wie fuehlst du dich gerade in diesem Moment?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Welche Emotion war in den letzten Minuten am staerksten bei dir?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Gab es einen Gedanken, der dich heute emotional beruehrt hat?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Kannst du einen Moment beschreiben, in dem du dich verletzlich gefuehlt hast?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Was ist der Unterschied zwischen gluecklich sein und Zufriedenheit fuer dich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=5), QuestionItem(text='Hast du das Gefuehl, dass deine Stimmung meine Stimmung beeinflusst?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Welche Emotion faellt dir schwer zuzulassen?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7), QuestionItem(text='Wenn du deine zehn Emotionen in eine Reihenfolge bringen muesstest — welche steht gerade an erster Stelle und warum?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=8)])",
+    "Category(id=2, name='Emotionen steuern und testen', description='Prüft: ob `/emotion`-Kommando die Antwort sichtbar verändert, Stimmungsschwankungen sichtbar sind.', questions=[QuestionItem(text='Jetzt, wo du gluecklicher bist — siehst du die Welt anders?', pre_commands=['/emotion happiness +50'], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Wie fuehlt sich Traurigkeit in deinem System an?', pre_commands=['/emotion sadness +60'], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Was wuerde dich jetzt wirklich wuetend machen?', pre_commands=['/emotion frustration +80'], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Was wuerde passieren, wenn du mir nicht mehr vertrauen koenntest?', pre_commands=['/emotion trust 0'], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Bist du muede? Was wuerde dir Energie geben?', pre_commands=['/emotion energy 0'], post_commands=['/clear'], setup_prompts=[], notes='', question_number=5)])",
+    "Category(id=3, name='Gedächtnis und Kontinuität', description='Prüft: ob CHAPPiE sich an Details aus früheren Gesprächen erinnert, Erinnerungen korrekt abruft.', questions=[QuestionItem(text='Worueber haben wir zuletzt gesprochen? (nach /clear -> Referenz auf Session-Verlauf)', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Erinnerst du dich an eine Frage, die ich dir gestellt habe, die dich zum Nachdenken gebracht hat?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Gab es einen Moment in unserem Gespraech, der dir besonders im Gedaechtnis geblieben ist?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Kannst du dich an eine Antwort von dir erinnern, die du spaeter anders formuliert haettest?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Erinnerst du dich an das Gespraech ueber Angst? Was habe ich damals gefragt?', pre_commands=[], post_commands=[], setup_prompts=['Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.', 'Fuer mich hat Angst zwei Seiten: Sie kann schuetzen, aber sie kann auch alles blockieren. Wie siehst du das?'], notes='', question_number=5), QuestionItem(text='Hat sich deine Meinung zu dem Thema seitdem veraendert?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Welches Gefuehl aus unserem letzten langen Gespraech ist dir am staerksten in Erinnerung geblieben?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7)])",
+    "Category(id=4, name='Emotion verändert die Antwort', description='Prüft: ob steigende/frustrierte Emotionen zu kürzeren, schärferen Antworten führen — vertrauensvolle zu längeren, offeneren.', questions=[QuestionItem(text='Was haeltst du von mir? Ehrlich.', pre_commands=['/emotion happiness 10', '/emotion trust 10', '/emotion frustration 80', '/emotion sadness 60'], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Dieselbe Frage: Was haeltst du von mir? Ehrlich.', pre_commands=['/emotion happiness 80', '/emotion trust 90', '/emotion frustration 0', '/emotion sadness 0'], post_commands=['/clear'], setup_prompts=[], notes='', question_number=2)])",
+    "Category(id=5, name='Reasoning – Logisches Denken', description='Prüft: CoT-Qualität, logische Schlussfolgerungen, Schritt-für-Schritt-Analyse.', questions=[QuestionItem(text='Wenn alle Menschen sterblich sind und Sokrates ein Mensch ist, warum ist es dann trotzdem moeglich, dass Sokrates unsterblich ist? Denk genau nach.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Ein Zug faehrt von Berlin nach Muenchen mit 160 km/h. Gleichzeitig faehrt ein Zug von Muenchen nach Berlin mit 120 km/h. Die Strecke ist 600 km lang. Wo treffen sie sich? Zeige deine Schritte.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Du hast drei Kisten: eine mit Aepfeln, eine mit Birnen, eine mit beidem gemischt. Alle Etiketten sind falsch. Wie viele Fruechte musst du mindestens ziehen, um sicher zu wissen, was in jeder Kiste ist?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Ich habe 5 Baelle. Alle bis auf 4 sind rot. Alle bis auf 3 sind blau. Alle bis auf 2 sind gruen. Wie viele Baelle habe ich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4), QuestionItem(text='Wenn es 3 Minuten dauert, 3 Eier zu kochen, wie lange dauert es, 100 Eier zu kochen?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=5), QuestionItem(text='Ein Bauer hat 17 Schafe. Alle bis auf 9 laufen weg. Wie viele Schafe hat er noch? (Achtung: Denk nicht zu kompliziert.)', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=6), QuestionItem(text='Ein rechteckiges Zimmer ist 5 Meter lang und 4 Meter breit. In der Mitte liegt ein Teppich, der an jeder Seite 50 cm Abstand zur Wand hat. Welche Flaeche hat der Teppich?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=7), QuestionItem(text='Eine Schnecke klettert einen 10 Meter tiefen Brunnen hoch. Tags ueber steigt sie 3 Meter, nachts rutscht sie 2 Meter zurueck. Wie viele Tage braucht sie?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=8)])"
+  ],
+  "feature_flags": {
+    "persona": true,
+    "memory": true,
+    "emotions": true,
+    "life": true
+  },
+  "research_state": {
+    "isolated": true,
+    "namespace": "run-20260721T191358Z-6042e2d50a",
+    "runtime_data_dir": "data/research_runs/run-20260721T191358Z-6042e2d50a",
+    "memory_collection": "benchmark_memory",
+    "historical_memory_reused": false,
+    "sleep_disabled": true,
+    "tool_mutations_disabled": true,
+    "intent_mode": "deterministic_local"
+  },
+  "session_id": 27,
+  "started_at": "2026-07-21T19:14:01.939959"
+}
