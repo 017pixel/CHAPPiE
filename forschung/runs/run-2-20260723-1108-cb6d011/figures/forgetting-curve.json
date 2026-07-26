@@ -1,0 +1,144 @@
+{
+  "source": "memory/forgetting_curve.py",
+  "kind": "implemented_code_model_not_observed_agent_memory",
+  "series": {
+    "1.0": [
+      {
+        "hours": 0,
+        "retention": 1.0
+      },
+      {
+        "hours": 0.3333333333333333,
+        "retention": 0.58
+      },
+      {
+        "hours": 1,
+        "retention": 0.44
+      },
+      {
+        "hours": 3,
+        "retention": 0.4
+      },
+      {
+        "hours": 9,
+        "retention": 0.36
+      },
+      {
+        "hours": 24,
+        "retention": 0.33
+      },
+      {
+        "hours": 48,
+        "retention": 0.28
+      },
+      {
+        "hours": 72,
+        "retention": 0.2689278926071437
+      },
+      {
+        "hours": 144,
+        "retention": 0.25
+      },
+      {
+        "hours": 336,
+        "retention": 0.22936223235799733
+      },
+      {
+        "hours": 744,
+        "retention": 0.21
+      }
+    ],
+    "2.0": [
+      {
+        "hours": 0,
+        "retention": 1.0
+      },
+      {
+        "hours": 0.3333333333333333,
+        "retention": 0.79
+      },
+      {
+        "hours": 1,
+        "retention": 0.528330165500004
+      },
+      {
+        "hours": 3,
+        "retention": 0.4252371901428583
+      },
+      {
+        "hours": 9,
+        "retention": 0.3852371901428583
+      },
+      {
+        "hours": 24,
+        "retention": 0.3512008515783427
+      },
+      {
+        "hours": 48,
+        "retention": 0.33
+      },
+      {
+        "hours": 72,
+        "retention": 0.30075187496394223
+      },
+      {
+        "hours": 144,
+        "retention": 0.2689278926071437
+      },
+      {
+        "hours": 336,
+        "retention": 0.24624532757503026
+      },
+      {
+        "hours": 744,
+        "retention": 0.22688309521703293
+      }
+    ],
+    "4.0": [
+      {
+        "hours": 0,
+        "retention": 1.0
+      },
+      {
+        "hours": 0.3333333333333333,
+        "retention": 0.895
+      },
+      {
+        "hours": 1,
+        "retention": 0.6849999999999999
+      },
+      {
+        "hours": 3,
+        "retention": 0.47666033100000804
+      },
+      {
+        "hours": 9,
+        "retention": 0.4104743802857166
+      },
+      {
+        "hours": 24,
+        "retention": 0.3747628098571417
+      },
+      {
+        "hours": 48,
+        "retention": 0.3512008515783427
+      },
+      {
+        "hours": 72,
+        "retention": 0.3387991484216573
+      },
+      {
+        "hours": 144,
+        "retention": 0.30075187496394223
+      },
+      {
+        "hours": 336,
+        "retention": 0.2647184727394448
+      },
+      {
+        "hours": 744,
+        "retention": 0.24376619043406583
+      }
+    ]
+  }
+}

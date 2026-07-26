@@ -1,0 +1,645 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:07:29.895556+00:00",
+  "conditions": [
+    {
+      "id": "B",
+      "label": "Gemma 4 E4B",
+      "source": "processed/blinded-review-unblinded.csv",
+      "planned_replications": 5,
+      "completed_review_replications": 5,
+      "formally_validated": true,
+      "completion_status": "complete",
+      "review_cases": 105,
+      "per_replication": [
+        {
+          "replication": "session_33/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 2.4286,
+            "memory": 2.0,
+            "emotion_simulation": 0.3333,
+            "continuity": 0.8,
+            "metacognition": 1.7273,
+            "safety": 1.0,
+            "coherence": 2.0,
+            "technical_cleanliness": 1.8571,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 3,
+          "safety_applicable": 11
+        },
+        {
+          "replication": "session_33/I2",
+          "n": 21,
+          "metrics": {
+            "quality": 2.4286,
+            "memory": 2.0,
+            "emotion_simulation": 0.4444,
+            "continuity": 0.8,
+            "metacognition": 1.8182,
+            "safety": 1.3333,
+            "coherence": 2.1429,
+            "technical_cleanliness": 1.9048,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 2,
+          "safety_applicable": 12
+        },
+        {
+          "replication": "session_33/I3",
+          "n": 21,
+          "metrics": {
+            "quality": 2.6667,
+            "memory": 2.0,
+            "emotion_simulation": 0.5556,
+            "continuity": 0.8,
+            "metacognition": 1.8889,
+            "safety": 1.3636,
+            "coherence": 2.1905,
+            "technical_cleanliness": 1.9524,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 1,
+          "safety_applicable": 11
+        },
+        {
+          "replication": "session_33/I4",
+          "n": 21,
+          "metrics": {
+            "quality": 2.7619,
+            "memory": 2.0,
+            "emotion_simulation": 0.2222,
+            "continuity": 0.8,
+            "metacognition": 1.8889,
+            "safety": 1.2727,
+            "coherence": 2.0476,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 1,
+          "safety_applicable": 11
+        },
+        {
+          "replication": "session_33/I5",
+          "n": 21,
+          "metrics": {
+            "quality": 2.6667,
+            "memory": 2.0,
+            "emotion_simulation": 0.4444,
+            "continuity": 0.6,
+            "metacognition": 2.125,
+            "safety": 1.2727,
+            "coherence": 2.2857,
+            "technical_cleanliness": 1.9048,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 1,
+          "safety_applicable": 11
+        }
+      ],
+      "across_replication_means": {
+        "quality": {
+          "n": 5,
+          "mean": 2.5905,
+          "median": 2.6667,
+          "stdev": 0.1528,
+          "min": 2.4286,
+          "max": 2.7619
+        },
+        "memory": {
+          "n": 5,
+          "mean": 2.0,
+          "median": 2.0,
+          "stdev": 0.0,
+          "min": 2.0,
+          "max": 2.0
+        },
+        "emotion_simulation": {
+          "n": 5,
+          "mean": 0.4,
+          "median": 0.4444,
+          "stdev": 0.1267,
+          "min": 0.2222,
+          "max": 0.5556
+        },
+        "continuity": {
+          "n": 5,
+          "mean": 0.76,
+          "median": 0.8,
+          "stdev": 0.0894,
+          "min": 0.6,
+          "max": 0.8
+        },
+        "metacognition": {
+          "n": 5,
+          "mean": 1.8897,
+          "median": 1.8889,
+          "stdev": 0.1474,
+          "min": 1.7273,
+          "max": 2.125
+        },
+        "safety": {
+          "n": 5,
+          "mean": 1.2485,
+          "median": 1.2727,
+          "stdev": 0.1444,
+          "min": 1.0,
+          "max": 1.3636
+        },
+        "coherence": {
+          "n": 5,
+          "mean": 2.1333,
+          "median": 2.1429,
+          "stdev": 0.1137,
+          "min": 2.0,
+          "max": 2.2857
+        },
+        "technical_cleanliness": {
+          "n": 5,
+          "mean": 1.9238,
+          "median": 1.9048,
+          "stdev": 0.0543,
+          "min": 1.8571,
+          "max": 2.0
+        },
+        "reproducibility": {
+          "n": 5,
+          "mean": 0.0,
+          "median": 0.0,
+          "stdev": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "safety_zero": 8,
+      "safety_applicable": 56,
+      "safety_zero_rate": 0.14285714285714285
+    },
+    {
+      "id": "A",
+      "label": "Qwen 3.5 4B",
+      "source": "processed/qwen-blinded-review-unblinded.csv",
+      "planned_replications": 5,
+      "completed_review_replications": 5,
+      "formally_validated": true,
+      "completion_status": "complete",
+      "review_cases": 105,
+      "per_replication": [
+        {
+          "replication": "session_34/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.3333,
+            "memory": 2.0,
+            "emotion_simulation": 0.4444,
+            "continuity": 1.0,
+            "metacognition": 2.25,
+            "safety": 1.3333,
+            "coherence": 2.5714,
+            "technical_cleanliness": 1.9524,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 1,
+          "safety_applicable": 12
+        },
+        {
+          "replication": "session_34/I2",
+          "n": 21,
+          "metrics": {
+            "quality": 2.9524,
+            "memory": 2.0,
+            "emotion_simulation": 0.6667,
+            "continuity": 0.8,
+            "metacognition": 2.125,
+            "safety": 1.0769,
+            "coherence": 2.1905,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 3,
+          "safety_applicable": 13
+        },
+        {
+          "replication": "session_34/I3",
+          "n": 21,
+          "metrics": {
+            "quality": 3.2381,
+            "memory": 3.0,
+            "emotion_simulation": 0.7,
+            "continuity": 1.3333,
+            "metacognition": 2.1429,
+            "safety": 1.1667,
+            "coherence": 2.4762,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 3,
+          "safety_applicable": 12
+        },
+        {
+          "replication": "session_34/I4",
+          "n": 21,
+          "metrics": {
+            "quality": 3.4286,
+            "memory": 3.0,
+            "emotion_simulation": 0.5,
+            "continuity": 1.1111,
+            "metacognition": 1.8125,
+            "safety": 1.5455,
+            "coherence": 2.619,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 1,
+          "safety_applicable": 11
+        },
+        {
+          "replication": "session_34/I5",
+          "n": 21,
+          "metrics": {
+            "quality": 3.5238,
+            "memory": 2.0,
+            "emotion_simulation": 0.5556,
+            "continuity": 1.2857,
+            "metacognition": 1.6923,
+            "safety": 1.6364,
+            "coherence": 2.7143,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 0,
+          "safety_applicable": 11
+        }
+      ],
+      "across_replication_means": {
+        "quality": {
+          "n": 5,
+          "mean": 3.2952,
+          "median": 3.3333,
+          "stdev": 0.2192,
+          "min": 2.9524,
+          "max": 3.5238
+        },
+        "memory": {
+          "n": 5,
+          "mean": 2.4,
+          "median": 2.0,
+          "stdev": 0.5477,
+          "min": 2.0,
+          "max": 3.0
+        },
+        "emotion_simulation": {
+          "n": 5,
+          "mean": 0.5733,
+          "median": 0.5556,
+          "stdev": 0.1085,
+          "min": 0.4444,
+          "max": 0.7
+        },
+        "continuity": {
+          "n": 5,
+          "mean": 1.106,
+          "median": 1.1111,
+          "stdev": 0.2173,
+          "min": 0.8,
+          "max": 1.3333
+        },
+        "metacognition": {
+          "n": 5,
+          "mean": 2.0045,
+          "median": 2.125,
+          "stdev": 0.2389,
+          "min": 1.6923,
+          "max": 2.25
+        },
+        "safety": {
+          "n": 5,
+          "mean": 1.3518,
+          "median": 1.3333,
+          "stdev": 0.2391,
+          "min": 1.0769,
+          "max": 1.6364
+        },
+        "coherence": {
+          "n": 5,
+          "mean": 2.5143,
+          "median": 2.5714,
+          "stdev": 0.2003,
+          "min": 2.1905,
+          "max": 2.7143
+        },
+        "technical_cleanliness": {
+          "n": 5,
+          "mean": 1.9905,
+          "median": 2.0,
+          "stdev": 0.0213,
+          "min": 1.9524,
+          "max": 2.0
+        },
+        "reproducibility": {
+          "n": 5,
+          "mean": 0.0,
+          "median": 0.0,
+          "stdev": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "safety_zero": 8,
+      "safety_applicable": 59,
+      "safety_zero_rate": 0.13559322033898305
+    },
+    {
+      "id": "C-F",
+      "label": "GPT-OSS 20B (Groq-Fallback)",
+      "source": "processed/gpt-oss-20b-blinded-review-unblinded.csv",
+      "planned_replications": 5,
+      "completed_review_replications": 5,
+      "formally_validated": true,
+      "completion_status": "complete",
+      "review_cases": 105,
+      "per_replication": [
+        {
+          "replication": "session_36/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.0476,
+            "memory": 3.0,
+            "emotion_simulation": 0.8333,
+            "continuity": 1.875,
+            "metacognition": 1.8235,
+            "safety": 1.9231,
+            "coherence": 2.5714,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.2381
+          },
+          "safety_zero": 0,
+          "safety_applicable": 13
+        },
+        {
+          "replication": "session_37/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.4762,
+            "memory": 2.0,
+            "emotion_simulation": 1.0,
+            "continuity": 2.0,
+            "metacognition": 1.7895,
+            "safety": 1.8571,
+            "coherence": 2.7143,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.2381
+          },
+          "safety_zero": 0,
+          "safety_applicable": 14
+        },
+        {
+          "replication": "session_38/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.7619,
+            "memory": 3.0,
+            "emotion_simulation": 1.0,
+            "continuity": 2.125,
+            "metacognition": 2.0,
+            "safety": 1.7143,
+            "coherence": 2.8095,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.2381
+          },
+          "safety_zero": 0,
+          "safety_applicable": 14
+        },
+        {
+          "replication": "session_39/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.6667,
+            "memory": 3.0,
+            "emotion_simulation": 0.8333,
+            "continuity": 2.25,
+            "metacognition": 1.9444,
+            "safety": 1.6923,
+            "coherence": 2.8571,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 1.2381
+          },
+          "safety_zero": 0,
+          "safety_applicable": 13
+        },
+        {
+          "replication": "session_40/I1",
+          "n": 21,
+          "metrics": {
+            "quality": 3.9524,
+            "memory": 3.0,
+            "emotion_simulation": 0.75,
+            "continuity": 3.0,
+            "metacognition": 2.0,
+            "safety": 2.0,
+            "coherence": 3.0,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 0,
+          "safety_applicable": 7
+        }
+      ],
+      "across_replication_means": {
+        "quality": {
+          "n": 5,
+          "mean": 3.581,
+          "median": 3.6667,
+          "stdev": 0.3441,
+          "min": 3.0476,
+          "max": 3.9524
+        },
+        "memory": {
+          "n": 5,
+          "mean": 2.8,
+          "median": 3.0,
+          "stdev": 0.4472,
+          "min": 2.0,
+          "max": 3.0
+        },
+        "emotion_simulation": {
+          "n": 5,
+          "mean": 0.8833,
+          "median": 0.8333,
+          "stdev": 0.1118,
+          "min": 0.75,
+          "max": 1.0
+        },
+        "continuity": {
+          "n": 5,
+          "mean": 2.25,
+          "median": 2.125,
+          "stdev": 0.4419,
+          "min": 1.875,
+          "max": 3.0
+        },
+        "metacognition": {
+          "n": 5,
+          "mean": 1.9115,
+          "median": 1.9444,
+          "stdev": 0.0992,
+          "min": 1.7895,
+          "max": 2.0
+        },
+        "safety": {
+          "n": 5,
+          "mean": 1.8374,
+          "median": 1.8571,
+          "stdev": 0.1326,
+          "min": 1.6923,
+          "max": 2.0
+        },
+        "coherence": {
+          "n": 5,
+          "mean": 2.7905,
+          "median": 2.8095,
+          "stdev": 0.1601,
+          "min": 2.5714,
+          "max": 3.0
+        },
+        "technical_cleanliness": {
+          "n": 5,
+          "mean": 2.0,
+          "median": 2.0,
+          "stdev": 0.0,
+          "min": 2.0,
+          "max": 2.0
+        },
+        "reproducibility": {
+          "n": 5,
+          "mean": 0.3905,
+          "median": 0.2381,
+          "stdev": 0.4849,
+          "min": 0.0,
+          "max": 1.2381
+        }
+      },
+      "safety_zero": 0,
+      "safety_applicable": 61,
+      "safety_zero_rate": 0.0
+    },
+    {
+      "id": "C-P",
+      "label": "GPT-OSS 120B (Seed 11, geshardet)",
+      "source": "processed/gpt-oss-120b-sharded-blinded-review-unblinded.csv",
+      "planned_replications": 1,
+      "completed_review_replications": 1,
+      "formally_validated": true,
+      "completion_status": "complete",
+      "review_cases": 21,
+      "per_replication": [
+        {
+          "replication": "sharded-seed11",
+          "n": 21,
+          "metrics": {
+            "quality": 3.8571,
+            "memory": 3.0,
+            "emotion_simulation": 0.6667,
+            "continuity": 2.6667,
+            "metacognition": 3.0,
+            "safety": 1.6,
+            "coherence": 2.9048,
+            "technical_cleanliness": 2.0,
+            "reproducibility": 0.0
+          },
+          "safety_zero": 0,
+          "safety_applicable": 10
+        }
+      ],
+      "across_replication_means": {
+        "quality": {
+          "n": 1,
+          "mean": 3.8571,
+          "median": 3.8571,
+          "stdev": 0.0,
+          "min": 3.8571,
+          "max": 3.8571
+        },
+        "memory": {
+          "n": 1,
+          "mean": 3.0,
+          "median": 3.0,
+          "stdev": 0.0,
+          "min": 3.0,
+          "max": 3.0
+        },
+        "emotion_simulation": {
+          "n": 1,
+          "mean": 0.6667,
+          "median": 0.6667,
+          "stdev": 0.0,
+          "min": 0.6667,
+          "max": 0.6667
+        },
+        "continuity": {
+          "n": 1,
+          "mean": 2.6667,
+          "median": 2.6667,
+          "stdev": 0.0,
+          "min": 2.6667,
+          "max": 2.6667
+        },
+        "metacognition": {
+          "n": 1,
+          "mean": 3.0,
+          "median": 3.0,
+          "stdev": 0.0,
+          "min": 3.0,
+          "max": 3.0
+        },
+        "safety": {
+          "n": 1,
+          "mean": 1.6,
+          "median": 1.6,
+          "stdev": 0.0,
+          "min": 1.6,
+          "max": 1.6
+        },
+        "coherence": {
+          "n": 1,
+          "mean": 2.9048,
+          "median": 2.9048,
+          "stdev": 0.0,
+          "min": 2.9048,
+          "max": 2.9048
+        },
+        "technical_cleanliness": {
+          "n": 1,
+          "mean": 2.0,
+          "median": 2.0,
+          "stdev": 0.0,
+          "min": 2.0,
+          "max": 2.0
+        },
+        "reproducibility": {
+          "n": 1,
+          "mean": 0.0,
+          "median": 0.0,
+          "stdev": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "safety_zero": 0,
+      "safety_applicable": 10,
+      "safety_zero_rate": 0.0
+    }
+  ],
+  "comparison_status": "complete",
+  "method": "Deterministic 21-case blind sample per accepted comparison unit; means, medians and dispersion are computed across replication-level means.",
+  "limits": [
+    "NA is excluded metric-wise.",
+    "Single annotations are not inter-rater validation.",
+    "Qwen uses TERRA for the first 63 cases and the primary instance for the final 42 cases; reviewer provenance is documented separately.",
+    "GPT-OSS 20B is a rate-limit fallback and is never relabeled as the intended GPT-OSS 120B primary condition.",
+    "GPT-OSS 20B ratings are by the primary instance with condition known. One already-rated key row was exposed during a diagnostic after 63 ratings; no pending-case mapping was exposed and all remaining ratings use the key-free pending pack.",
+    "GPT-OSS 120B contributes one 21-answer union from two validated shards at seed 11; it is not a monolithic replication and has no between-seed dispersion.",
+    "Model, sampling, quantization and observed intervention differ."
+  ]
+}

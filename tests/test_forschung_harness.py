@@ -195,8 +195,32 @@ def test_session_logger_error_entry():
     print("  PASS test_session_logger_error_entry")
 
 
+def test_session_logger_uses_next_free_highest_id():
+    """6. Luecken in Session-IDs duerfen keine bestehende Session ueberschreiben."""
+    from forschung.session_logger import SessionLogger
+    from forschung.session_logger import LOG_ROOT
+
+    orig_root = str(LOG_ROOT)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        import forschung.session_logger as sl
+        sl.LOG_ROOT = Path(tmpdir) / "session_logs"
+        sl.LOG_ROOT.mkdir(parents=True)
+        (sl.LOG_ROOT / "session_1").mkdir()
+        (sl.LOG_ROOT / "session_3").mkdir()
+        (sl.LOG_ROOT / "session_invalid").mkdir()
+
+        try:
+            logger = SessionLogger({"categories": [], "iterations": 1, "delay": 0})
+            assert logger.session_id == 4
+            assert logger.session_dir.name == "session_4"
+        finally:
+            sl.LOG_ROOT = Path(orig_root)
+
+    print("  PASS test_session_logger_uses_next_free_highest_id")
+
+
 def test_module_imports():
-    """6. Alle forschung-Module sind importierbar und Settings brechen nicht."""
+    """7. Alle forschung-Module sind importierbar und Settings brechen nicht."""
     from config.config import settings, PROJECT_ROOT
     assert PROJECT_ROOT is not None
     assert str(PROJECT_ROOT).endswith("CHAPPiE")
@@ -224,7 +248,7 @@ def test_module_imports():
 
 
 def test_config_path_resolution():
-    """7. _get_path() loest relative Pfade gegen PROJECT_ROOT auf."""
+    """8. _get_path() loest relative Pfade gegen PROJECT_ROOT auf."""
     from config.config import settings, PROJECT_ROOT
 
     personality = Path(settings.personality_path)
@@ -235,7 +259,7 @@ def test_config_path_resolution():
 
 
 def test_allignement_tests_importable():
-    """8. allignement_tests.py ist importierbar (kein Syntax-Fehler, kein Crash beim Import)."""
+    """9. allignement_tests.py ist importierbar (kein Syntax-Fehler, kein Crash beim Import)."""
     import importlib.util
     spec = importlib.util.spec_from_file_location(
         "allignement_tests",
@@ -251,6 +275,227 @@ def test_allignement_tests_importable():
     print("  PASS test_allignement_tests_importable")
 
 
+def test_explicit_question_selection_is_validated_and_counted():
+    from forschung.session_runner import selected_question_count, selected_questions
+    from forschung.test_fragen_parser import parse_test_fragen
+
+    categories = parse_test_fragen(str(PROJECT_ROOT / "forschung" / "test_fragen.md"))
+    selection = {"1": [1], "4": [1, 2], "12": [1, 4]}
+    assert selected_question_count(categories, selection) == 5
+    cat4 = next(category for category in categories if category.id == 4)
+    assert [item.question_number for item in selected_questions(cat4, selection)] == [1, 2]
+    cat2 = next(category for category in categories if category.id == 2)
+    assert selected_questions(cat2, selection) == []
+    try:
+        selected_questions(cat4, {"4": [99]})
+    except ValueError as exc:
+        assert "unbekannte Fragen" in str(exc)
+    else:
+        raise AssertionError("Unbekannte Fragenummer muss abgelehnt werden")
+    print("  PASS test_explicit_question_selection_is_validated_and_counted")
+
+
+def test_partial_session_validator_derives_exact_selected_keys():
+    from forschung.report.validate_session import expected_selected_keys
+
+    config = json.loads((PROJECT_ROOT / "forschung" / "report" / "workspace" / "gpt_oss_partial.config.json").read_text(encoding="utf-8"))
+    keys = expected_selected_keys(config)
+    assert keys is not None
+    assert len(keys) == 105
+    assert (1, 4, 2) in keys
+    assert (5, 14, 9) in keys
+    assert (1, 14, 9) in keys
+    assert (1, 5, 1) not in keys
+    print("  PASS test_partial_session_validator_derives_exact_selected_keys")
+
+
+def test_session_validator_rejects_hard_generation_errors():
+    """Eine Datei pro Frage reicht nicht, wenn Zielantworten fehlen."""
+    import subprocess
+
+    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / "forschung" / "session_logs") as tmpdir:
+        session = Path(tmpdir) / "session_invalid"
+        questions = session / "questions"
+        questions.mkdir(parents=True)
+        config = {"model": "Qwen/Qwen3.5-4B", "llm_provider": "vllm", "iterations": 1}
+        summary = {"total_questions": 1}
+        quality = {"summary": {"total_questions": 1}}
+        (session / "config.json").write_text(json.dumps(config), encoding="utf-8")
+        (session / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+        (session / "quality_analysis.json").write_text(json.dumps(quality), encoding="utf-8")
+        (questions / "q1.json").write_text(json.dumps({
+            "iteration": 1,
+            "category_id": 1,
+            "question_number": 1,
+            "response": None,
+            "_error": "Generierung fehlgeschlagen",
+        }), encoding="utf-8")
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "forschung" / "report" / "validate_session.py"),
+                str(session),
+                "--expected-model", "Qwen/Qwen3.5-4B",
+                "--expected-provider", "vllm",
+                "--expected-questions", "1",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 1
+        report = json.loads(completed.stdout)
+        assert report["checks"]["question_file_count_exact"] is True
+        assert report["checks"]["target_response_count_exact"] is False
+        assert report["checks"]["hard_errors_zero"] is False
+    print("  PASS test_session_validator_rejects_hard_generation_errors")
+
+
+def test_gemma_research_config_requests_t4_safe_quantization():
+    """10. Der reproduzierbare E4B-Lauf muss auf der T4 explizit NF4 anfordern."""
+    import json
+
+    config_path = Path(PROJECT_ROOT) / "forschung" / "report" / "workspace" / "gemma_run.config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config["model"] == "google/gemma-4-E4B-it"
+    assert config["steering_quantize"] is True
+    assert "NF4" in config["service_precision"]
+    print("  PASS test_gemma_research_config_requests_t4_safe_quantization")
+
+
+def test_gpt_research_config_pins_cloud_sampling():
+    """11. Groq darf beim Providerwechsel keine Gemma-Defaults erben."""
+    config_path = Path(PROJECT_ROOT) / "forschung" / "report" / "workspace" / "gpt_oss_run.config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config["model"] == "openai/gpt-oss-120b"
+    assert config["force_single_model"] is True
+    assert config["temperature"] == 0.7
+    assert config["top_p"] == 0.9
+    assert config["top_k"] == 50
+    print("  PASS test_gpt_research_config_pins_cloud_sampling")
+
+
+def test_ablation_profiles_cover_neutral_single_layers_and_combinations():
+    from forschung.session_runner import resolve_ablation_profile
+
+    assert resolve_ablation_profile("neutral")[1] == {
+        "persona": False, "memory": False, "emotions": False, "life": False,
+    }
+    assert resolve_ablation_profile("emotions_only")[1]["emotions"] is True
+    assert resolve_ablation_profile("persona_memory")[1] == {
+        "persona": True, "memory": True, "emotions": False, "life": False,
+    }
+    print("  PASS test_ablation_profiles_cover_neutral_single_layers_and_combinations")
+
+
+def test_invalid_research_turns_trigger_contamination_guard():
+    from forschung.session_runner import SessionRunner
+
+    assert SessionRunner._is_invalid_turn("timeout", False, None)
+    assert SessionRunner._is_invalid_turn(None, True, None)
+    assert SessionRunner._is_invalid_turn(None, False, {"quality_failed": True})
+    assert not SessionRunner._is_invalid_turn(None, False, {"quality_failed": False})
+    print("  PASS test_invalid_research_turns_trigger_contamination_guard")
+
+
+def test_research_emotions_never_initialize_or_reuse_auxiliary_brain():
+    """Research mode must remain local-rule-only even with a stale class cache."""
+    from memory.emotions_engine import EmotionsEngine
+
+    original_initialized = EmotionsEngine._brain_initialized
+    original_brain = EmotionsEngine._cached_brain
+    sentinel = object()
+    try:
+        EmotionsEngine._brain_initialized = True
+        EmotionsEngine._cached_brain = sentinel
+        with tempfile.TemporaryDirectory() as tmpdir:
+            engine = EmotionsEngine(Path(tmpdir) / "status.json", force_simple=True)
+            assert engine.force_simple is True
+            assert EmotionsEngine._cached_brain is None
+            # Even a later non-research instance cannot make this research
+            # instance call a cached model.
+            EmotionsEngine._cached_brain = sentinel
+            assert engine._analyze_with_llm("Test") is None
+    finally:
+        EmotionsEngine._brain_initialized = original_initialized
+        EmotionsEngine._cached_brain = original_brain
+    print("  PASS test_research_emotions_never_initialize_or_reuse_auxiliary_brain")
+
+
+def test_provider_request_audit_and_validator_reject_foreign_provider_call():
+    """A single Ollama request must invalidate an otherwise complete Groq run."""
+    import subprocess
+    from forschung.session_runner import evaluate_provider_request_audit
+
+    components = {
+        "main": {"uses_brain": True, "provider": "groq", "model": "openai/gpt-oss-120b"},
+        "intent": {"uses_brain": True, "provider": "groq", "model": "openai/gpt-oss-120b"},
+        "query_extraction": {"uses_brain": True, "provider": "groq", "model": "openai/gpt-oss-120b"},
+        "emotions": {"uses_brain": False, "mode": "simple_local_rules"},
+    }
+    requests = [
+        {"provider": "groq", "model": "openai/gpt-oss-120b", "cache_hit": False},
+        {"provider": "ollama", "model": "qwen3.5:9b", "cache_hit": False},
+    ]
+    audit = evaluate_provider_request_audit(
+        expected_provider="groq",
+        expected_model="openai/gpt-oss-120b",
+        force_single_model=True,
+        requests=requests,
+        components=components,
+    )
+    assert audit["passed"] is False
+    assert audit["unexpected_requests"] == [requests[1]]
+
+    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / "forschung" / "session_logs") as tmpdir:
+        session = Path(tmpdir) / "session_foreign_provider"
+        questions = session / "questions"
+        questions.mkdir(parents=True)
+        config = {
+            "model": "openai/gpt-oss-120b",
+            "llm_provider": "groq",
+            "iterations": 1,
+            "force_single_model": True,
+            "provider_contract": {"expected_provider": "groq", "expected_model": "openai/gpt-oss-120b"},
+        }
+        (session / "config.json").write_text(json.dumps(config), encoding="utf-8")
+        (session / "summary.json").write_text(json.dumps({"total_questions": 1}), encoding="utf-8")
+        (session / "quality_analysis.json").write_text(
+            json.dumps({"summary": {"total_questions": 1}}), encoding="utf-8"
+        )
+        (session / "provider_audit.json").write_text(json.dumps(audit), encoding="utf-8")
+        (questions / "q1.json").write_text(json.dumps({
+            "iteration": 1,
+            "category_id": 1,
+            "question_number": 1,
+            "response": {
+                "response_text": "Eine vollstaendige Testantwort.",
+                "emotion_steering": {"provider": "groq", "model": "openai/gpt-oss-120b"},
+            },
+        }), encoding="utf-8")
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / "forschung" / "report" / "validate_session.py"),
+                str(session),
+                "--expected-model", "openai/gpt-oss-120b",
+                "--expected-provider", "groq",
+                "--expected-questions", "1",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 1
+        report = json.loads(completed.stdout)
+        assert report["checks"]["provider_audit_exists"] is True
+        assert report["checks"]["provider_audit_requests_exact"] is False
+        assert report["passed"] is False
+    print("  PASS test_provider_request_audit_and_validator_reject_foreign_provider_call")
+
+
 if __name__ == "__main__":
     os.chdir(str(PROJECT_ROOT))
     print(" Forschung Harness Tests\n" + "=" * 50)
@@ -261,9 +506,19 @@ if __name__ == "__main__":
         test_parser_question_content,
         test_session_logger_creates_dirs_and_files,
         test_session_logger_error_entry,
+        test_session_logger_uses_next_free_highest_id,
         test_module_imports,
         test_config_path_resolution,
         test_allignement_tests_importable,
+        test_explicit_question_selection_is_validated_and_counted,
+        test_partial_session_validator_derives_exact_selected_keys,
+        test_session_validator_rejects_hard_generation_errors,
+        test_gemma_research_config_requests_t4_safe_quantization,
+        test_gpt_research_config_pins_cloud_sampling,
+        test_ablation_profiles_cover_neutral_single_layers_and_combinations,
+        test_invalid_research_turns_trigger_contamination_guard,
+        test_research_emotions_never_initialize_or_reuse_auxiliary_brain,
+        test_provider_request_audit_and_validator_reject_foreign_provider_call,
     ]
 
     failed = 0

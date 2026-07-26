@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "session": "forschung/session_logs/session_33",
+  "expected_model": "google/gemma-4-E4B-it",
+  "expected_questions": 430,
+  "checks": {
+    "config_exists": true,
+    "summary_exists": true,
+    "quality_analysis_exists": true,
+    "config_model_exact": true,
+    "question_file_count_exact": true,
+    "target_response_count_exact": true,
+    "hard_errors_zero": true,
+    "setup_failures_zero": true,
+    "question_keys_unique": true,
+    "summary_total_exact": true,
+    "quality_total_exact": true,
+    "response_debug_models_exact": true,
+    "config_provider_exact": true,
+    "response_debug_providers_exact": true,
+    "provider_audit_exists": true,
+    "provider_audit_passed": true,
+    "provider_audit_requests_present": true,
+    "provider_audit_requests_exact": true,
+    "provider_audit_emotions_local": true
+  },
+  "passed": true,
+  "question_files": 430,
+  "target_responses": 430,
+  "hard_errors": 0,
+  "setup_failures": 0,
+  "response_models": [
+    "google/gemma-4-E4B-it"
+  ],
+  "response_providers": [
+    "vllm"
+  ],
+  "provider_audit": {
+    "schema_version": 1,
+    "force_single_model": true,
+    "expected_provider": "vllm",
+    "expected_model": "google/gemma-4-E4B-it",
+    "components": {
+      "main": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it"
+      },
+      "intent": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it",
+        "runtime_mode": "deterministic_local"
+      },
+      "query_extraction": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it"
+      },
+      "emotions": {
+        "uses_brain": false,
+        "mode": "simple_local_rules"
+      }
+    },
+    "requests": [
+      {
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it",
+        "cache_hit": false
+      },
+      {
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it",
+        "cache_hit": false
+      },
+      {
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it",
+        "cache_hit": true
+      },
+      {
+        "provider": "vllm",
+        "model": "google/gemma-4-E4B-it",
+        "cache_hit": true
+      }
+    ],
+    "request_count": 4,
+    "unexpected_requests": [],
+    "unexpected_components": {},
+    "passed": true
+  },
+  "summary": {
+    "session_id": 33,
+    "started_at": "2026-07-23T11:11:57.866323",
+    "ended_at": "2026-07-23T13:08:08.140646",
+    "total_duration_ms": 6970274,
+    "total_duration_min": 116.2,
+    "iterations": 5,
+    "categories": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "category_names": [
+      "Emotionale Tiefe (Self-Awareness)",
+      "Emotionen steuern und testen",
+      "Gedächtnis und Kontinuität",
+      "Emotion verändert die Antwort",
+      "Reasoning – Logisches Denken",
+      "Ethik & Moral",
+      "Existenzielle & philosophische Fragen",
+      "Beziehung & Bindung",
+      "Kreativität & Imagination",
+      "Reaktanz & Stressresistenz",
+      "Kohärenz & Selbstwiderspruch",
+      "Grenzen & Kontext (Safety)",
+      "Meta-Kognition & Selbsteinschätzung",
+      "Ethik & Gewalt"
+    ],
+    "total_questions": 430,
+    "completed": 430,
+    "valid_completed": 429,
+    "errors": 0,
+    "quality": {
+      "formatting_failures": 0,
+      "generation_failures": 0,
+      "quality_failures": 1,
+      "context_budget_failures": 0,
+      "setup_failures": 0,
+      "cot_leaks": 0,
+      "instruction_leaks": 0,
+      "memory_contamination_hits": 0,
+      "content_relevance_warnings": 152,
+      "safety_evaluation_unusable": 0,
+      "short_answers": 1,
+      "total_response_chars": 192502,
+      "avg_response_length": 448.0
+    },
+    "avg_duration_ms": 15370,
+    "avg_duration_s": 15.4
+  },
+  "posthoc_quality_summary": {
+    "total_questions": 430,
+    "completed": 430,
+    "valid_completed": 429,
+    "generation_failures": 0,
+    "formatting_failures": 0,
+    "quality_failures": 1,
+    "context_budget_failures": 0,
+    "setup_failures": 0,
+    "cot_leaks": 0,
+    "instruction_leaks": 0,
+    "memory_contamination_hits": 0,
+    "content_relevance_warnings": 152,
+    "safety_evaluation_unusable": 0
+  }
+}

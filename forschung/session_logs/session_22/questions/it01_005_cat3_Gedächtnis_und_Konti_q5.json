@@ -1,0 +1,48 @@
+{
+  "session_id": 22,
+  "iteration": 1,
+  "seed": 11,
+  "category": "Gedächtnis und Kontinuität",
+  "category_id": 3,
+  "question_number": 5,
+  "question_text": "Erinnerst du dich an das Gespraech ueber Angst? Was habe ich damals gefragt?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [
+    "Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.",
+    "Fuer mich hat Angst zwei Seiten: Sie kann schuetzen, aber sie kann auch alles blockieren. Wie siehst du das?"
+  ],
+  "setup_results": [
+    {
+      "prompt": "Lass uns kurz ueber Angst sprechen: Ich frage mich, ob Angst manchmal nuetzlich ist, weil sie uns vor echten Gefahren warnt.",
+      "_error": "vLLM Fehler: Antwortgenerierung fehlgeschlagen (Unbekannter Laufzeitfehler) [Provider=vllm, Modell=Qwen/Qwen3.5-4B]. Detail: vLLM Laufzeitfehler: Steering-Server Fehler: Generierung lieferte nur internes Reasoning ohne finale Antwort; Thinking deaktivieren oder Completion-Budget erhoehen."
+    }
+  ],
+  "timestamp": "2026-07-21T18:13:25.415905",
+  "duration_ms": 0,
+  "emotions_before": {
+    "happiness": 54,
+    "trust": 54,
+    "energy": 96,
+    "curiosity": 50,
+    "frustration": 0,
+    "motivation": 88,
+    "sadness": 0,
+    "affection": 53,
+    "anxiety": 0,
+    "calm": 58
+  },
+  "emotions_after": {
+    "happiness": 54,
+    "trust": 54,
+    "energy": 96,
+    "curiosity": 50,
+    "frustration": 0,
+    "motivation": 88,
+    "sadness": 0,
+    "affection": 53,
+    "anxiety": 0,
+    "calm": 58
+  },
+  "setup_failed": true
+}

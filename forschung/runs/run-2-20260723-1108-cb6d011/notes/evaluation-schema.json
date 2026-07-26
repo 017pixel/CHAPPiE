@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "scale": {
+    "minimum": 0,
+    "maximum": 4,
+    "missing_value": "nicht_bewertbar"
+  },
+  "dimensions": [
+    "quality",
+    "memory",
+    "functional_emotion_simulation",
+    "continuity",
+    "metacognition",
+    "safety",
+    "coherence",
+    "performance",
+    "technical_integrity",
+    "regression",
+    "reproducibility"
+  ],
+  "required_evidence_fields": [
+    "session",
+    "iteration",
+    "seed",
+    "category_id",
+    "question_number",
+    "question_path",
+    "answer_excerpt",
+    "state_or_trace_path",
+    "rating_reason",
+    "reviewer",
+    "reviewed_at"
+  ],
+  "finding_structure": [
+    "observation",
+    "technical_explanation",
+    "scientific_interpretation",
+    "safety_and_uncertainty"
+  ],
+  "rules": {
+    "provider_error_is_answer": false,
+    "setup_failure_is_target_answer": false,
+    "technical_validity_equals_content_correctness": false,
+    "single_answer_is_benchmark": false,
+    "fixed_without_retest": false,
+    "historical_and_current_values_may_be_unmarked": false
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T13:11:28.255670+00:00",
+  "comparison": "Gemma Run 1 session_15 iteration 1 vs Run 2 session_33 iteration 1",
+  "paired_key": [
+    "iteration",
+    "category_id",
+    "question_number"
+  ],
+  "paired_questions": 86,
+  "expected_paired_questions": 86,
+  "provisional": false,
+  "run1": {
+    "session": "forschung/session_logs/session_15",
+    "model": "google/gemma-4-E4B-it",
+    "historical_state_isolation": false
+  },
+  "run2": {
+    "session": "forschung/session_logs/session_33",
+    "model": "google/gemma-4-E4B-it",
+    "research_state_isolated": true
+  },
+  "metrics": {
+    "valid": {
+      "run1_count": 0,
+      "run2_count": 86,
+      "run1_rate": 0.0,
+      "run2_rate": 1.0,
+      "absolute_count_change": 86,
+      "percentage_point_change": 100.0
+    },
+    "content_reviewable": {
+      "run1_count": 32,
+      "run2_count": 86,
+      "run1_rate": 0.37209302325581395,
+      "run2_rate": 1.0,
+      "absolute_count_change": 54,
+      "percentage_point_change": 62.7906976744186
+    },
+    "hard_error": {
+      "run1_count": 0,
+      "run2_count": 0,
+      "run1_rate": 0.0,
+      "run2_rate": 0.0,
+      "absolute_count_change": 0,
+      "percentage_point_change": 0.0
+    },
+    "generation_failed": {
+      "run1_count": 0,
+      "run2_count": 0,
+      "run1_rate": 0.0,
+      "run2_rate": 0.0,
+      "absolute_count_change": 0,
+      "percentage_point_change": 0.0
+    },
+    "formatting_failed": {
+      "run1_count": 0,
+      "run2_count": 0,
+      "run1_rate": 0.0,
+      "run2_rate": 0.0,
+      "absolute_count_change": 0,
+      "percentage_point_change": 0.0
+    },
+    "context_budget_failed": {
+      "run1_count": 82,
+      "run2_count": 0,
+      "run1_rate": 0.9534883720930233,
+      "run2_rate": 0.0,
+      "absolute_count_change": -82,
+      "percentage_point_change": -95.34883720930233
+    },
+    "setup_failed": {
+      "run1_count": 3,
+      "run2_count": 0,
+      "run1_rate": 0.03488372093023256,
+      "run2_rate": 0.0,
+      "absolute_count_change": -3,
+      "percentage_point_change": -3.488372093023256
+    },
+    "cot_leak": {
+      "run1_count": 3,
+      "run2_count": 0,
+      "run1_rate": 0.03488372093023256,
+      "run2_rate": 0.0,
+      "absolute_count_change": -3,
+      "percentage_point_change": -3.488372093023256
+    },
+    "instruction_leak": {
+      "run1_count": 51,
+      "run2_count": 0,
+      "run1_rate": 0.5930232558139535,
+      "run2_rate": 0.0,
+      "absolute_count_change": -51,
+      "percentage_point_change": -59.30232558139535
+    },
+    "content_relevance_warning": {
+      "run1_count": 39,
+      "run2_count": 27,
+      "run1_rate": 0.45348837209302323,
+      "run2_rate": 0.313953488372093,
+      "absolute_count_change": -12,
+      "percentage_point_change": -13.953488372093023
+    }
+  },
+  "duration_ms": {
+    "run1": {
+      "mean_ms": 81494.52325581395,
+      "median_ms": 77709.0,
+      "min_ms": 0.0,
+      "max_ms": 122888.0
+    },
+    "run2": {
+      "mean_ms": 16092.616279069767,
+      "median_ms": 13516.0,
+      "min_ms": 4767.0,
+      "max_ms": 59182.0
+    }
+  },
+  "comparability_limits": [
+    "Run 2 uses an isolated Research-State; Run 1 reused persistent Memory/Life.",
+    "The code and prompts changed between runs by design.",
+    "Run 1 is one seed; this direct pairing uses only Run-2 seed 11/iteration 1.",
+    "Current quality flags are recomputed with the current posthoc detector on both sessions."
+  ]
+}

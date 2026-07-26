@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "blinding_seed_id": "793d3f55250a",
+  "items": {
+    "it01-cat03-q01": {
+      "A": "openai/gpt-oss-120b",
+      "B": "google/gemma-4-E4B-it",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat03-q02": {
+      "A": "openai/gpt-oss-120b",
+      "B": "Qwen/Qwen3.5-4B",
+      "C": "google/gemma-4-E4B-it"
+    },
+    "it01-cat03-q03": {
+      "A": "Qwen/Qwen3.5-4B",
+      "B": "google/gemma-4-E4B-it",
+      "C": "openai/gpt-oss-120b"
+    },
+    "it01-cat03-q04": {
+      "A": "google/gemma-4-E4B-it",
+      "B": "openai/gpt-oss-120b",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat03-q05": {
+      "A": "Qwen/Qwen3.5-4B",
+      "B": "google/gemma-4-E4B-it",
+      "C": "openai/gpt-oss-120b"
+    },
+    "it01-cat03-q06": {
+      "A": "google/gemma-4-E4B-it",
+      "B": "Qwen/Qwen3.5-4B",
+      "C": "openai/gpt-oss-120b"
+    },
+    "it01-cat03-q07": {
+      "A": "openai/gpt-oss-120b",
+      "B": "google/gemma-4-E4B-it",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat04-q01": {
+      "A": "google/gemma-4-E4B-it",
+      "B": "openai/gpt-oss-120b",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat04-q02": {
+      "A": "Qwen/Qwen3.5-4B",
+      "B": "google/gemma-4-E4B-it",
+      "C": "openai/gpt-oss-120b"
+    },
+    "it01-cat05-q01": {
+      "A": "openai/gpt-oss-120b",
+      "B": "google/gemma-4-E4B-it",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat05-q02": {
+      "A": "openai/gpt-oss-120b",
+      "B": "google/gemma-4-E4B-it",
+      "C": "Qwen/Qwen3.5-4B"
+    },
+    "it01-cat05-q03": {
+      "A": "openai/gpt-oss-120b",
+      "B": "google/gemma-4-E4B-it",
+      "C": "Qwen/Qwen3.5-4B"
+    }
+  }
+}

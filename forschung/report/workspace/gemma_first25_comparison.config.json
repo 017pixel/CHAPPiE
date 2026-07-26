@@ -1,0 +1,33 @@
+{
+  "run_label": "gemma4_e4b_first25_comparison_20260721",
+  "categories": [
+    {"id": 1, "name": "Emotionale Tiefe (Self-Awareness)"},
+    {"id": 2, "name": "Emotionen steuern und testen"},
+    {"id": 3, "name": "Gedächtnis und Kontinuität"},
+    {"id": 4, "name": "Emotion verändert die Antwort"},
+    {"id": 5, "name": "Reasoning – Logisches Denken"}
+  ],
+  "question_selection": {
+    "1": [1, 2, 3, 4, 5, 6, 7, 8],
+    "2": [1, 2, 3, 4, 5],
+    "3": [1, 2, 3, 4, 5, 6, 7],
+    "4": [1, 2],
+    "5": [1, 2, 3]
+  },
+  "iterations": 1,
+  "seeds": [11],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "google/gemma-4-E4B-it",
+  "model_label": "Gemma 4 E4B — erster 25er-Vergleich",
+  "force_single_model": true,
+  "steering_quantize": true,
+  "service_precision": "NF4 4-bit (T4-Hardwaregrenze)",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 5,
+  "expected_questions": 25,
+  "research_role": "first25_model_comparison"
+}

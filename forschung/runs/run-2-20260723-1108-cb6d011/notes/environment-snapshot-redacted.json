@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-23T16:19:00Z",
+  "resource_class": "INDEPENDENT",
+  "scope": "Non-secret process and runtime environment metadata for Run 2",
+  "host": {
+    "kernel": "Linux 6.8.0-134-generic",
+    "architecture": "x86_64",
+    "timezone": "Etc/UTC",
+    "lang": "de_DE.UTF-8",
+    "lc_all": "C.UTF-8",
+    "python": "3.12.3",
+    "python_executable": "venv/bin/python"
+  },
+  "research_units": {
+    "working_directory": "/home/bbecker/CHAPPiE",
+    "pythonunbuffered": "1",
+    "cuda_visible_devices": "unset; default device visibility",
+    "local_gpu": "NVIDIA Tesla T4, 16384 MiB",
+    "cloud_transport": "Groq HTTPS through project provider configuration"
+  },
+  "parent_shell_presence_only": {
+    "CUDA_VISIBLE_DEVICES": false,
+    "PYTHONUNBUFFERED": false,
+    "GROQ_API_KEY": false,
+    "GROQ_API_KEY_1": false,
+    "GROQ_API_KEY_2": false,
+    "HF_TOKEN": false,
+    "HUGGING_FACE_HUB_TOKEN": false,
+    "VLLM_USE_V1": false,
+    "TOKENIZERS_PARALLELISM": false
+  },
+  "credential_handling": {
+    "values_recorded": false,
+    "note": "Provider credentials are loaded from gitignored project configuration or API-key files. This artifact records neither values nor hashes."
+  },
+  "interpretation_limit": "Presence in the parent shell does not describe credentials loaded internally by project configuration. Per-request provider/model identity is instead validated from session config, provider_audit.json and response traces."
+}

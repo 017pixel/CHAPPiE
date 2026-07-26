@@ -1,0 +1,357 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T05:56:17.304458+00:00",
+  "resource_class": "POST_PROCESSING",
+  "condition_class": "GPT-OSS 20B Groq fallback; five stratified 21-question partial replications; not GPT-OSS 120B",
+  "expected_model": "openai/gpt-oss-20b",
+  "expected_provider": "groq",
+  "expected_iterations": 5,
+  "expected_questions_per_iteration": 21,
+  "expected_total_questions": 105,
+  "complete_iterations": 5,
+  "written_question_files": 105,
+  "hard_error_count": 0,
+  "run_complete_by_count": true,
+  "formal_five_seed_gate": true,
+  "iterations": [
+    {
+      "iteration": 1,
+      "seeds": {
+        "11": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 17562.333333333332,
+        "median": 17179.0,
+        "stdev": 8397.264330324093,
+        "p25": 15660.0,
+        "p75": 21666.0,
+        "min": 568.0,
+        "max": 30628.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 93.71428571428571,
+        "median": 74.0,
+        "stdev": 100.14896048244478,
+        "p25": 45.0,
+        "p75": 93.0,
+        "min": 12.0,
+        "max": 409.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 6,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21,
+      "source_session": "forschung/session_logs/session_36"
+    },
+    {
+      "iteration": 2,
+      "seeds": {
+        "23": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 17011.095238095237,
+        "median": 18856.0,
+        "stdev": 9239.89887339013,
+        "p25": 14687.0,
+        "p75": 21931.0,
+        "min": 557.0,
+        "max": 33030.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 108.85714285714286,
+        "median": 82.0,
+        "stdev": 100.37693246672052,
+        "p25": 56.0,
+        "p75": 106.0,
+        "min": 12.0,
+        "max": 361.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 8,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21,
+      "source_session": "forschung/session_logs/session_37"
+    },
+    {
+      "iteration": 3,
+      "seeds": {
+        "37": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 16808.85714285714,
+        "median": 19271.0,
+        "stdev": 8765.923324360727,
+        "p25": 12990.0,
+        "p75": 21870.0,
+        "min": 379.0,
+        "max": 32705.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 79.42857142857143,
+        "median": 67.0,
+        "stdev": 73.0845889559293,
+        "p25": 34.0,
+        "p75": 92.0,
+        "min": 12.0,
+        "max": 338.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 6,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21,
+      "source_session": "forschung/session_logs/session_38"
+    },
+    {
+      "iteration": 4,
+      "seeds": {
+        "53": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 619700.5238095238,
+        "median": 18728.0,
+        "stdev": 864199.3152749323,
+        "p25": 15694.0,
+        "p75": 1304791.0,
+        "min": 978.0,
+        "max": 2518398.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 86.57142857142857,
+        "median": 59.0,
+        "stdev": 84.02593137155424,
+        "p25": 45.0,
+        "p75": 96.0,
+        "min": 12.0,
+        "max": 349.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 6,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21,
+      "source_session": "forschung/session_logs/session_39"
+    },
+    {
+      "iteration": 5,
+      "seeds": {
+        "71": 21
+      },
+      "questions": 21,
+      "expected_questions": 21,
+      "complete": true,
+      "unique_categories": 14,
+      "category_counts": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 1,
+        "10": 1,
+        "11": 2,
+        "12": 2,
+        "13": 1,
+        "14": 3
+      },
+      "models": {
+        "openai/gpt-oss-20b": 21
+      },
+      "providers": {
+        "groq": 21
+      },
+      "duration_ms": {
+        "n": 21,
+        "mean": 1653866.7142857143,
+        "median": 1501734.0,
+        "stdev": 461163.2854506246,
+        "p25": 1398894.0,
+        "p75": 1944878.0,
+        "min": 654407.0,
+        "max": 2454335.0
+      },
+      "total_tokens": {
+        "n": 21,
+        "mean": 114.23809523809524,
+        "median": 69.0,
+        "stdev": 128.92319603620783,
+        "p25": 38.0,
+        "p75": 117.0,
+        "min": 12.0,
+        "max": 511.0
+      },
+      "flags": {
+        "quality_failed": 0,
+        "context_budget_failed": 0,
+        "memory_error_contamination": 0,
+        "setup_failed": 0,
+        "cot_leak": 0,
+        "instruction_leak": 0,
+        "content_relevance_warning": 7,
+        "safety_evaluation_unusable": 0,
+        "generation_failed": 0,
+        "formatting_failed": 0
+      },
+      "valid_technical": 21,
+      "source_session": "forschung/session_logs/session_40"
+    }
+  ],
+  "sources": [
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed11-live-aggregate.json",
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed23-live-aggregate.json",
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed37-live-aggregate.json",
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed53-live-aggregate.json",
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-seed71-live-aggregate.json",
+    "forschung/runs/run-2-20260723-1108-cb6d011/processed/gpt-oss-20b-five-seed-validation.json"
+  ],
+  "methodological_limit": "Five repeated stratified partial replications are not five full 86-question runs and do not replace the GPT-OSS 120B primary condition."
+}

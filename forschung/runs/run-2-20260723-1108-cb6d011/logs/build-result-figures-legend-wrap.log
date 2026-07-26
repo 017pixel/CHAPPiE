@@ -1,0 +1,31 @@
+{
+  "json": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/figures/run2-condition-metrics.json",
+  "svg": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/figures/run2-condition-metrics.svg",
+  "latency_svg": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/figures/run2-latency-by-replication.svg",
+  "conditions": [
+    {
+      "label": "Gemma 4 E4B",
+      "replications": 5,
+      "formally_validated": true,
+      "technical_valid_rate": 0.9976744186046511,
+      "reasoning_pass_rate": 0.375,
+      "blind_cases": 105
+    },
+    {
+      "label": "Qwen 3.5 4B",
+      "replications": 5,
+      "formally_validated": true,
+      "technical_valid_rate": 1.0,
+      "reasoning_pass_rate": 0.725,
+      "blind_cases": 105
+    },
+    {
+      "label": "GPT-OSS 20B (Groq-Fallback)",
+      "replications": 0,
+      "formally_validated": false,
+      "technical_valid_rate": null,
+      "reasoning_pass_rate": null,
+      "blind_cases": 0
+    }
+  ]
+}

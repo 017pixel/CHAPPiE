@@ -1,0 +1,2833 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:54:22.487Z",
+  "renderer": "Playwright Chromium, headless, --disable-gpu",
+  "viewports": [
+    {
+      "key": "1920x1080",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "key": "1440x900",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "key": "1280x720",
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "key": "tablet-1024x768",
+      "width": 1024,
+      "height": 768
+    },
+    {
+      "key": "mobile-390x844",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "passed": true,
+  "passed_checks": 10,
+  "total_checks": 10,
+  "checks": [
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": {
+        "key": "1920x1080",
+        "width": 1920,
+        "height": 1080
+      },
+      "initial": {
+        "title": "CHAPPiE · Report-Plan · Forschungs-Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "visible",
+        "bodyOverflowX": "visible",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 642,
+            "right": 1542,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 642,
+            "right": 1542,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 642,
+            "right": 1542,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          }
+        ],
+        "detailsCount": 3,
+        "tableCount": 3,
+        "buttonCount": 3
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": "not-applicable",
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 1920,
+            "width": 1920,
+            "clientWidth": 1920,
+            "scrollWidth": 1920,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1920,
+            "width": 1920,
+            "clientWidth": 1920,
+            "scrollWidth": 1920,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1920,
+            "width": 1920,
+            "clientWidth": 1920,
+            "scrollWidth": 1920,
+            "overflowX": "visible"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/plan-1920x1080.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": {
+        "key": "1920x1080",
+        "width": 1920,
+        "height": 1080
+      },
+      "initial": {
+        "title": "CHAPPiE · Forschungsbericht · Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "hidden",
+        "bodyOverflowX": "hidden",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 602,
+            "right": 1582,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 109,
+        "tableCount": 16,
+        "buttonCount": 5
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": true,
+        "issueFilter": true,
+        "sidebarToggle": true
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 470,
+            "right": 1450,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/report-1920x1080.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": {
+        "key": "1440x900",
+        "width": 1440,
+        "height": 900
+      },
+      "initial": {
+        "title": "CHAPPiE · Report-Plan · Forschungs-Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "visible",
+        "bodyOverflowX": "visible",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 402,
+            "right": 1302,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 402,
+            "right": 1302,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 402,
+            "right": 1302,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          }
+        ],
+        "detailsCount": 3,
+        "tableCount": 3,
+        "buttonCount": 3
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": "not-applicable",
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 1440,
+            "width": 1440,
+            "clientWidth": 1440,
+            "scrollWidth": 1440,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1440,
+            "width": 1440,
+            "clientWidth": 1440,
+            "scrollWidth": 1440,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1440,
+            "width": 1440,
+            "clientWidth": 1440,
+            "scrollWidth": 1440,
+            "overflowX": "visible"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/plan-1440x900.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": {
+        "key": "1440x900",
+        "width": 1440,
+        "height": 900
+      },
+      "initial": {
+        "title": "CHAPPiE · Forschungsbericht · Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "hidden",
+        "bodyOverflowX": "hidden",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 362,
+            "right": 1342,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 109,
+        "tableCount": 16,
+        "buttonCount": 5
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": true,
+        "issueFilter": true,
+        "sidebarToggle": true
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 230,
+            "right": 1210,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/report-1440x900.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": {
+        "key": "1280x720",
+        "width": 1280,
+        "height": 720
+      },
+      "initial": {
+        "title": "CHAPPiE · Report-Plan · Forschungs-Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "visible",
+        "bodyOverflowX": "visible",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 322,
+            "right": 1222,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 322,
+            "right": 1222,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          },
+          {
+            "left": 322,
+            "right": 1222,
+            "width": 900,
+            "clientWidth": 900,
+            "scrollWidth": 900,
+            "overflowX": "visible"
+          }
+        ],
+        "detailsCount": 3,
+        "tableCount": 3,
+        "buttonCount": 3
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": "not-applicable",
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 1280,
+            "width": 1280,
+            "clientWidth": 1280,
+            "scrollWidth": 1280,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1280,
+            "width": 1280,
+            "clientWidth": 1280,
+            "scrollWidth": 1280,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1280,
+            "width": 1280,
+            "clientWidth": 1280,
+            "scrollWidth": 1280,
+            "overflowX": "visible"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/plan-1280x720.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": {
+        "key": "1280x720",
+        "width": 1280,
+        "height": 720
+      },
+      "initial": {
+        "title": "CHAPPiE · Forschungsbericht · Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "hidden",
+        "bodyOverflowX": "hidden",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 1248,
+            "width": 952,
+            "clientWidth": 950,
+            "scrollWidth": 950,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 109,
+        "tableCount": 16,
+        "buttonCount": 5
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": true,
+        "issueFilter": true,
+        "sidebarToggle": true
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 150,
+            "right": 1130,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/report-1280x720.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": {
+        "key": "tablet-1024x768",
+        "width": 1024,
+        "height": 768
+      },
+      "initial": {
+        "title": "CHAPPiE · Report-Plan · Forschungs-Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "visible",
+        "bodyOverflowX": "visible",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 696,
+            "scrollWidth": 696,
+            "overflowX": "visible"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 696,
+            "scrollWidth": 696,
+            "overflowX": "visible"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 696,
+            "scrollWidth": 696,
+            "overflowX": "visible"
+          }
+        ],
+        "detailsCount": 3,
+        "tableCount": 3,
+        "buttonCount": 3
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": "not-applicable",
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 1024,
+            "width": 1024,
+            "clientWidth": 1024,
+            "scrollWidth": 1024,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1024,
+            "width": 1024,
+            "clientWidth": 1024,
+            "scrollWidth": 1024,
+            "overflowX": "visible"
+          },
+          {
+            "left": 0,
+            "right": 1024,
+            "width": 1024,
+            "clientWidth": 1024,
+            "scrollWidth": 1024,
+            "overflowX": "visible"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/plan-tablet-1024x768.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": {
+        "key": "tablet-1024x768",
+        "width": 1024,
+        "height": 768
+      },
+      "initial": {
+        "title": "CHAPPiE · Forschungsbericht · Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "hidden",
+        "bodyOverflowX": "hidden",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 296,
+            "right": 992,
+            "width": 696,
+            "clientWidth": 694,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 109,
+        "tableCount": 16,
+        "buttonCount": 5
+      },
+      "interactions": {
+        "menu": "not-applicable",
+        "jury": true,
+        "pitch": true,
+        "details": true,
+        "issueFilter": true,
+        "sidebarToggle": true
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 22,
+            "right": 1002,
+            "width": 980,
+            "clientWidth": 978,
+            "scrollWidth": 978,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/report-tablet-1024x768.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": {
+        "key": "mobile-390x844",
+        "width": 390,
+        "height": 844
+      },
+      "initial": {
+        "title": "CHAPPiE · Report-Plan · Forschungs-Run 2",
+        "language": "de",
+        "pageOverflowPx": 0,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "visible",
+        "bodyOverflowX": "visible",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [
+          {
+            "tag": "aside",
+            "id": "sidebar",
+            "className": "sidebar",
+            "left": -264,
+            "right": 0,
+            "width": 264,
+            "overflowX": "auto",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "brand",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "nav-label",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "nav",
+            "id": "nav",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "active",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "nav",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "p",
+            "id": "",
+            "className": "side-note",
+            "left": -242,
+            "right": -23,
+            "width": 219,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -57,
+            "width": 155,
+            "overflowX": "visible",
+            "parent": "brand",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "strong",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -57,
+            "width": 155,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "small",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -57,
+            "width": 155,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          }
+        ],
+        "tableWrappers": [
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 354,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 354,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 354,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 3,
+        "tableCount": 3,
+        "buttonCount": 3
+      },
+      "interactions": {
+        "menu": true,
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": "not-applicable",
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 390,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 390,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 390,
+            "scrollWidth": 700,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/plan-mobile-390x844.png",
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": {
+        "key": "mobile-390x844",
+        "width": 390,
+        "height": 844
+      },
+      "initial": {
+        "title": "CHAPPiE · Forschungsbericht · Run 2",
+        "language": "de",
+        "pageOverflowPx": 243,
+        "horizontalScrollReachPx": 0,
+        "rootOverflowX": "hidden",
+        "bodyOverflowX": "hidden",
+        "missingAnchors": [],
+        "brokenImages": [],
+        "headingSkips": [],
+        "unlabeledButtons": 0,
+        "imagesWithoutAlt": 0,
+        "horizontalOffenders": [
+          {
+            "tag": "aside",
+            "id": "sidebar",
+            "className": "sidebar",
+            "left": -264,
+            "right": 0,
+            "width": 264,
+            "overflowX": "auto",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "brand",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "nav-label",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "nav",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "active",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "a",
+            "id": "",
+            "className": "",
+            "left": -252,
+            "right": -13,
+            "width": 239,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "p",
+            "id": "",
+            "className": "side-note",
+            "left": -242,
+            "right": -23,
+            "width": 219,
+            "overflowX": "visible",
+            "parent": "sidebar",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "br",
+            "id": "",
+            "className": "",
+            "left": -29,
+            "right": -29,
+            "width": 0,
+            "overflowX": "visible",
+            "parent": "side-note",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -57,
+            "width": 155,
+            "overflowX": "visible",
+            "parent": "brand",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "strong",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -57,
+            "width": 155,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "small",
+            "id": "",
+            "className": "",
+            "left": -212,
+            "right": -69,
+            "width": 143,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "status",
+            "left": -242,
+            "right": -178,
+            "width": 64,
+            "overflowX": "visible",
+            "parent": "side-note",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "mark",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "brand",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "active",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          },
+          {
+            "tag": "span",
+            "id": "",
+            "className": "nav-num",
+            "left": -242,
+            "right": -222,
+            "width": 20,
+            "overflowX": "visible",
+            "parent": "",
+            "insideTableWrapper": false,
+            "insideSvg": false
+          }
+        ],
+        "tableWrappers": [
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 18,
+            "right": 372,
+            "width": 354,
+            "clientWidth": 352,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          }
+        ],
+        "detailsCount": 109,
+        "tableCount": 16,
+        "buttonCount": 5
+      },
+      "interactions": {
+        "menu": true,
+        "jury": true,
+        "pitch": true,
+        "details": "not-applicable",
+        "issueFilter": true,
+        "sidebarToggle": "not-applicable"
+      },
+      "focusVisible": true,
+      "printCheck": {
+        "overflowPx": 0,
+        "visibleMain": true,
+        "sidebarHidden": true,
+        "topbarHidden": true,
+        "bodyBackground": "rgb(255, 255, 255)",
+        "bodyColor": "rgb(24, 24, 24)",
+        "horizontalOffenders": [],
+        "tableWrappers": [
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 1304,
+            "overflowX": "auto"
+          },
+          {
+            "left": 0,
+            "right": 390,
+            "width": 390,
+            "clientWidth": 388,
+            "scrollWidth": 740,
+            "overflowX": "auto"
+          }
+        ]
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "forschung/runs/run-2-20260723-1108-cb6d011/report-assets/qa/report-mobile-390x844.png",
+      "passed": true,
+      "failures": []
+    }
+  ],
+  "no_javascript_passed": 2,
+  "no_javascript_total": 2,
+  "no_javascript_checks": [
+    {
+      "document": "forschung/report/report-plan.html",
+      "viewport": "1440x900",
+      "javascriptEnabled": false,
+      "state": {
+        "mainPresent": true,
+        "mainVisible": true,
+        "visibleTextCharacters": 10888,
+        "headings": 24,
+        "navigationLinks": 22,
+        "details": 3
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "document": "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html",
+      "viewport": "1440x900",
+      "javascriptEnabled": false,
+      "state": {
+        "mainPresent": true,
+        "mainVisible": true,
+        "visibleTextCharacters": 69736,
+        "headings": 48,
+        "navigationLinks": 12,
+        "details": 109
+      },
+      "passed": true,
+      "failures": []
+    }
+  ]
+}

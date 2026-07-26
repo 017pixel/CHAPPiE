@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "force_single_model": true,
+  "expected_provider": "vllm",
+  "expected_model": "Qwen/Qwen3.5-4B",
+  "components": {
+    "main": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B"
+    },
+    "intent": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "runtime_mode": "deterministic_local"
+    },
+    "query_extraction": {
+      "uses_brain": true,
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B"
+    },
+    "emotions": {
+      "uses_brain": false,
+      "mode": "simple_local_rules"
+    }
+  },
+  "requests": [
+    {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "cache_hit": false
+    },
+    {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "cache_hit": false
+    },
+    {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "cache_hit": true
+    },
+    {
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "cache_hit": true
+    }
+  ],
+  "request_count": 4,
+  "unexpected_requests": [],
+  "unexpected_components": {},
+  "passed": true
+}

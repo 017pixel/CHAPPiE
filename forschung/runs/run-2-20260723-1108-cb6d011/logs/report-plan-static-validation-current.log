@@ -1,0 +1,20 @@
+{
+  "report": "forschung/report/report-plan.html",
+  "bytes": 33108,
+  "checks": 27,
+  "passed": 17,
+  "failed": [
+    "alle Pflichtabschnitte besitzen IDs",
+    "technische Details sind einklappbar",
+    "mindestens drei Inline-SVG-Diagramme",
+    "Benchmark- und Techniktabellen vorhanden",
+    "eingebettete Benchmarkdaten sind gueltiges JSON",
+    "historische und aktuelle Evidenz getrennt",
+    "keine unbelegte Gefuehls-/Bewusstseinsbehauptung",
+    "Pitch-Sektion mit Sprecherzeiten",
+    "Sidebar-, Filter- und Details-Interaktion enthalten",
+    "Report enthaelt eingebettete Evidenz und Assets"
+  ],
+  "browser_preview": "nicht verfuegbar; statische Pruefung dokumentiert",
+  "embedded_sessions": []
+}

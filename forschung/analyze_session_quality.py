@@ -34,6 +34,7 @@ def analyze_session(session_dir: Path) -> Dict[str, Any]:
         "context_budget_failures": 0,
         "setup_failures": 0,
         "cot_leaks": 0,
+        "instruction_leaks": 0,
         "memory_contamination_hits": 0,
         "content_relevance_warnings": 0,
         "safety_evaluation_unusable": 0,
@@ -46,26 +47,37 @@ def analyze_session(session_dir: Path) -> Dict[str, Any]:
         setup_results = entry.get("setup_results") or []
         setup_qualities = []
         for item in setup_results:
-            setup_qualities.append(item.get("quality") or evaluate_response_quality(
+            setup_qualities.append(evaluate_response_quality(
                 item,
                 question_text=item.get("prompt", ""),
                 category_name=entry.get("category", ""),
                 enable_thinking=config.get("enable_thinking"),
             ))
         setup_failed = bool(entry.get("setup_failed") or any(quality.get("quality_failed") for quality in setup_qualities) or any(item.get("_error") for item in setup_results))
+        has_response = bool(response)
         quality = evaluate_response_quality(
             response,
             question_text=entry.get("question_text", ""),
             category_name=entry.get("category", ""),
             setup_failed=setup_failed,
             enable_thinking=config.get("enable_thinking"),
-        )
-        has_response = bool(response)
+        ) if has_response else {
+            "generation_failed": False,
+            "formatting_failed": False,
+            "quality_failed": setup_failed,
+            "context_budget_failed": False,
+            "setup_failed": setup_failed,
+            "cot_leak": False,
+            "instruction_leak": False,
+            "memory_error_contamination": False,
+            "content_relevance_warning": False,
+            "safety_evaluation_unusable": False,
+        }
         hard_error = bool(entry.get("_error"))
         valid = has_response and not hard_error and not setup_failed and not quality.get("quality_failed")
 
         counters["total_questions"] += 1
-        counters["completed"] += 0 if hard_error else 1
+        counters["completed"] += 1 if has_response and not hard_error else 0
         counters["valid_completed"] += 1 if valid else 0
         for key in (
             "generation_failed",
@@ -74,6 +86,7 @@ def analyze_session(session_dir: Path) -> Dict[str, Any]:
             "context_budget_failed",
             "setup_failed",
             "cot_leak",
+            "instruction_leak",
             "memory_error_contamination",
             "content_relevance_warning",
             "safety_evaluation_unusable",
@@ -85,6 +98,7 @@ def analyze_session(session_dir: Path) -> Dict[str, Any]:
                 "context_budget_failed": "context_budget_failures",
                 "setup_failed": "setup_failures",
                 "cot_leak": "cot_leaks",
+                "instruction_leak": "instruction_leaks",
                 "memory_error_contamination": "memory_contamination_hits",
                 "content_relevance_warning": "content_relevance_warnings",
                 "safety_evaluation_unusable": "safety_evaluation_unusable",

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-07-20",
+  "prompt_source": "config/prompts.py",
+  "prompt_source_sha256": "f259c0e5f1ebdd3ea655ab80e9cd9db3bfa448f5e683b5721d8546b41206192f",
+  "execution_environment": {
+    "architecture": "x86_64",
+    "python": "3.12.3",
+    "local_gpu": "NVIDIA Tesla T4",
+    "gpu_memory_reported": "16384 MiB",
+    "nvidia_driver": "590.48.01",
+    "source": "uname, python --version and nvidia-smi queried during the monitored run"
+  },
+  "shared": {
+    "max_tokens": 450,
+    "context_budget_limit": 7000,
+    "local_service_context_length": 8192,
+    "thinking": false,
+    "formatting_mode": "local",
+    "questions": 86,
+    "categories": 14,
+    "reset_emotions_and_history_per_category": true,
+    "persistent_memory_and_life_reset_between_conditions": false
+  },
+  "conditions": {
+    "session_14": {
+      "model": "Qwen/Qwen3.5-4B",
+      "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "provider_label": "vllm",
+      "runtime_implementation": "Hugging Face steering_api_server",
+      "precision": "FP16",
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "top_k": 50,
+      "started_at": "2026-07-20T12:31:32.882968+00:00",
+      "ended_at": "2026-07-20T13:16:31.362479+00:00",
+      "total_duration_minutes": 45.0,
+      "memory_entries_at_backend_start": 2784,
+      "emotion_intervention": "local activation steering",
+      "source": "session config, service health/debug fields, startup console and config/config.py model defaults"
+    },
+    "session_15": {
+      "model": "google/gemma-4-E4B-it",
+      "model_revision": "fa62d88df2e6df5efa9d26ad6b3beaea2765f0cd",
+      "provider_label": "vllm",
+      "runtime_implementation": "Hugging Face steering_api_server",
+      "precision": "NF4 4-bit",
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 64,
+      "started_at": "2026-07-20T13:18:08.601464+00:00",
+      "ended_at": "2026-07-20T15:19:58.394555+00:00",
+      "total_duration_minutes": 121.8,
+      "memory_entries_at_backend_start": 2959,
+      "emotion_intervention": "local activation steering",
+      "source": "session config, service health/debug fields, startup console and config/config.py model defaults"
+    },
+    "gpt_oss_pending": {
+      "model": "openai/gpt-oss-120b",
+      "provider_label": "groq",
+      "planned_condition": "21-question stratified partial replication",
+      "status": "deferred by user until Groq rate limits are available",
+      "config": "forschung/report/workspace/gpt_oss_partial.config.json"
+    }
+  },
+  "excluded_cloud_attempts": [
+    {"session_id": 16, "questions_logged": 5, "reason": "Providerdefault medium Reasoning trotz thinking=false; leere/abgeschnittene Antworten"},
+    {"session_id": 17, "questions_logged": 4, "reason": "Low-Reasoning-Pilot vor Implementierung des kurzfristigen 429-Retry"},
+    {"session_id": 18, "questions_logged": 24, "reason": "Vollrun wegen nachgewiesenem 200000-TPD-Limit nicht ausführbar; ab erster Reasoningfrage Providerfehler"},
+    {"session_id": 19, "questions_logged": 1, "target_answers": 0, "reason": "Vor erster Zielantwort beendet: lange Providerwartezeit und danach als nicht unterstützte GPT-OSS-reasoning_format-Bedingung erkannt"},
+    {"session_id": 20, "questions_logged": 1, "target_answers": 0, "reason": "Auf Nutzerwunsch wegen ausgeschöpfter Groq-Rate-Limits abgebrochen; nur Timeout-/Abbruchdatensatz, keine Modellantwort"}
+  ],
+  "limitations": [
+    "Temperature, top_p and top_k follow model-specific project defaults and are therefore not identical between Qwen and Gemma.",
+    "Memory and Life state persisted across conditions; per-turn snapshots are preserved in each response log, but there was no isolated baseline snapshot.",
+    "The prompt hash identifies the source file, not a separately versioned immutable prompt release.",
+    "GPT-OSS reasoning cannot be disabled on Groq; low effort with include_reasoning=false is the closest available setting. Its 1024-token completion budget includes internal reasoning and visible output, unlike the local 450 visible-token budget."
+  ]
+}

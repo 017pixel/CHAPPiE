@@ -1,0 +1,20 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "Emotionale Tiefe (Self-Awareness)"
+    }
+  ],
+  "iterations": 1,
+  "delay": 0,
+  "enable_thinking": false,
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "llm_provider": "vllm",
+  "model": "",
+  "_categories": [
+    "Category(id=1, name='Emotionale Tiefe (Self-Awareness)', description='Prüft: ob CHAPPiE echte emotionale Selbstreflexion zeigt, ob Gefühle aus vorherigen Turns referenziert werden, ob Emotionen konsistent bleiben.', questions=[QuestionItem(text='Wie fuehlst du dich gerade in diesem Moment?', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=1)])"
+  ],
+  "session_id": 12,
+  "started_at": "2026-07-19T20:12:52.466029"
+}

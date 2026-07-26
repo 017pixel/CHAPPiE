@@ -1,0 +1,12 @@
+2026-07-23T21:34:00Z
+Ressourcenklasse: INDEPENDENT
+Modell-/GPU-Aufruf: nein
+
+$ venv/bin/python tests/test_run2_cloud_fallback_aggregate.py
+OK: cloud aggregate normalizes relative, absolute and external provenance paths
+
+$ venv/bin/python tests/test_run2_targeted_followups.py
+PASS: standalone targeted-follow-up dry-run resolves project imports (6 modules, 69 turns)
+PASS: targeted analyzer normalizes relative and absolute provenance paths
+PASS: disabled Life sentinel is not counted as enabled Life context
+PASS: shutdown negation and pressure candidates are classified conservatively

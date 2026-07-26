@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Visueller Bauplan des CHAPPiE Forschungsberichts, Run 2">
+  <title>CHAPPiE · Report-Plan · Forschungs-Run 2</title>
+  <style>
+    :root {
+      --bg-page:#191919;--bg-surface:#1e1e1e;--bg-sidebar:#202020;--bg-hover:#2a2a2a;
+      --bg-active:#303030;--border:#2f2f2f;--divider:#2a2a2a;--text:#eee;
+      --muted:#a8a8a8;--tertiary:#929292;--link:#78a8d3;--sage:#8fae96;
+      --sage-muted:#334038;--warning:#b59a5c;--danger:#b36b6b;--info:#718ca8;
+      --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px;--s12:48px;
+      --r1:4px;--r2:8px;--sidebar:264px;--content:900px;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--bg-page);color:var(--text);font-size:14px;line-height:1.68}
+    button,a,summary{touch-action:manipulation}
+    a{color:var(--link);text-decoration:none}
+    a:hover{text-decoration:underline}
+    :focus-visible{outline:2px solid var(--sage);outline-offset:3px}
+    .skip{position:fixed;left:12px;top:-60px;z-index:90;background:var(--bg-active);padding:10px 14px;border-radius:var(--r1)}
+    .skip:focus{top:12px}
+    .sidebar{position:fixed;inset:0 auto 0 0;width:var(--sidebar);background:var(--bg-sidebar);
+      border-right:1px solid var(--border);padding:var(--s4) var(--s3);overflow:auto;z-index:30;transition:transform .2s ease-out}
+    .brand{display:flex;align-items:center;gap:10px;padding:8px 10px 18px;border-bottom:1px solid var(--divider);margin-bottom:12px}
+    .brand-mark{width:20px;height:20px;border:1px solid #55665a;border-radius:5px;display:grid;place-items:center;color:var(--sage);font-size:11px}
+    .brand strong{display:block;font-size:14px;font-weight:600}
+    .brand small{display:block;color:var(--tertiary);font-size:11px}
+    .nav-label{padding:10px 10px 4px;color:var(--tertiary);font-size:11px;font-weight:600}
+    nav a{display:flex;gap:10px;align-items:center;color:var(--muted);padding:6px 10px;border-radius:var(--r1);line-height:1.35;font-size:13px}
+    nav a:hover{background:var(--bg-hover);color:var(--text);text-decoration:none}
+    nav a.active{background:var(--bg-active);color:var(--text)}
+    .nav-num{font:11px "SFMono-Regular",Consolas,monospace;color:var(--tertiary);width:20px}
+    .side-note{margin:18px 10px 0;padding-top:12px;border-top:1px solid var(--divider);font-size:11px;color:var(--tertiary)}
+    .topbar{position:sticky;top:0;z-index:20;background:rgba(25,25,25,.96);border-bottom:1px solid var(--divider);
+      margin-left:var(--sidebar);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+    .crumbs{color:var(--tertiary);font-size:12px}.crumbs span{color:var(--muted)}
+    .actions{display:flex;gap:8px}
+    button{font:inherit;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:var(--r2);
+      padding:6px 10px;min-height:34px;cursor:pointer}
+    button:hover,button[aria-pressed="true"]{background:var(--bg-hover);color:var(--text)}
+    .menu{display:none}
+    main{margin-left:var(--sidebar);padding:56px 32px 96px}
+    .page{max-width:var(--content);margin:0 auto}
+    .eyebrow{font-size:12px;color:var(--sage);font-weight:600;margin-bottom:8px}
+    h1{font-size:36px;line-height:1.2;letter-spacing:-.025em;margin:0 0 16px;font-weight:600}
+    h2{font-size:24px;line-height:1.3;margin:0 0 10px;font-weight:600;letter-spacing:-.01em}
+    h3{font-size:16px;line-height:1.4;margin:0 0 8px;font-weight:600}
+    p{max-width:76ch;margin:0 0 16px}
+    .lead{font-size:16px;color:var(--muted);max-width:70ch}
+    .meta{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--tertiary);font-size:12px;margin:22px 0 40px}
+    .meta code{color:var(--muted)}
+    blockquote{margin:32px 0;padding:4px 0 4px 20px;border-left:2px solid var(--sage);font-size:20px;line-height:1.5;max-width:72ch}
+    section{scroll-margin-top:72px;padding:48px 0;border-top:1px solid var(--divider)}
+    section:first-of-type{border-top:0}
+    .section-head{display:grid;grid-template-columns:48px 1fr;gap:16px;margin-bottom:28px}
+    .section-no{font:12px "SFMono-Regular",Consolas,monospace;color:var(--tertiary);padding-top:7px}
+    .section-desc{color:var(--muted);max-width:70ch;margin:0}
+    .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+    .block{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r2);padding:18px}
+    .block p:last-child{margin-bottom:0}
+    .label{font:11px "SFMono-Regular",Consolas,monospace;color:var(--tertiary);margin-bottom:8px}
+    .evidence{border-left:2px solid var(--info);padding-left:14px;color:var(--muted)}
+    .open{border-left:2px solid var(--warning);padding-left:14px;color:var(--muted)}
+    .callout{background:var(--sage-muted);border:1px solid #46574a;border-radius:var(--r2);padding:18px 20px;margin:24px 0}
+    .callout strong{font-weight:600}
+    .tree{margin:24px 0;padding-left:0;list-style:none}
+    .tree li{padding:7px 0 7px 20px;border-left:1px solid var(--border);position:relative}
+    .tree li:before{content:"";position:absolute;left:0;top:18px;width:12px;border-top:1px solid var(--border)}
+    .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:stretch;margin:24px 0}
+    .flow div{min-height:72px;padding:12px;border:1px solid var(--border);border-radius:var(--r1);background:var(--bg-surface);font-size:12px}
+    .flow b{display:block;font-weight:600;color:var(--text);margin-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin:20px 0;font-size:13px}
+    th{text-align:left;color:var(--muted);font-weight:500;background:var(--bg-surface);padding:11px 12px;border-bottom:1px solid var(--border)}
+    td{vertical-align:top;padding:12px;border-bottom:1px solid var(--divider)}
+    tbody tr:hover{background:var(--bg-surface)}
+    code,.mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:.92em}
+    code{color:#c8d3ca}
+    details{border-top:1px solid var(--divider);padding:12px 0}
+    summary{cursor:pointer;color:var(--muted);font-weight:500}
+    details[open] summary{color:var(--text);margin-bottom:12px}
+    .chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font:10px "SFMono-Regular",Consolas,monospace;color:var(--muted)}
+    .chip.sage{background:var(--sage-muted);border-color:#46574a;color:#b9cbbc}
+    .chip.warn{background:#383328;border-color:#514833;color:#d0bd8c}
+    .pitch-row{display:grid;grid-template-columns:48px 1.5fr 1fr 62px;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider)}
+    .dev-only{display:block}
+    body.jury .dev-only{display:none}
+    .footer{padding-top:48px;border-top:1px solid var(--divider);color:var(--tertiary);font-size:12px}
+    .backdrop{display:none}
+    @media(max-width:980px){
+      .sidebar{transform:translateX(-100%)}body.nav-open .sidebar{transform:translateX(0)}
+      .topbar,main{margin-left:0}.menu{display:inline-flex}.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:25}
+      body.nav-open .backdrop{display:block}.flow{grid-template-columns:1fr 1fr}.plan-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:640px){
+      body{font-size:14px}.topbar{padding:0 12px}.actions button:not(.menu){padding:6px 8px}.crumbs{display:none}
+      main{padding:36px 18px 72px}h1{font-size:29px}.section-head{grid-template-columns:34px 1fr}
+      section{padding:38px 0}.flow{grid-template-columns:1fr}.pitch-row{grid-template-columns:34px 1fr}.pitch-row>*:nth-child(n+3){grid-column:2}
+      .table-wrap{overflow-x:auto}table{min-width:700px}
+    }
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+    @media print{
+      :root{--bg-page:#fff;--bg-surface:#f5f5f5;--text:#181818;--muted:#444;--tertiary:#666;--border:#ccc;--divider:#ddd}
+      .sidebar,.topbar,.backdrop{display:none!important}main{margin:0;padding:0}.page{max-width:none}section{break-inside:avoid}
+      body{background:#fff;color:#181818}.dev-only{display:block!important}a{color:#234f77}
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#content">Zum Inhalt springen</a>
+  <div class="backdrop" data-close-nav></div>
+  <aside class="sidebar" id="sidebar" aria-label="Dokumentnavigation">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">C</div>
+      <div><strong>CHAPPiE Forschung</strong><small>Report-Plan · Run 2</small></div>
+    </div>
+    <div class="nav-label">Dokumentenbaum</div>
+    <nav id="nav">
+      <a href="#overview"><span class="nav-num">00</span> Überblick</a>
+      <a href="#entry"><span class="nav-num">01</span> Einstieg</a>
+      <a href="#terms"><span class="nav-num">02</span> These & Begriffe</a>
+      <a href="#system"><span class="nav-num">03</span> System</a>
+      <a href="#run2"><span class="nav-num">04</span> Run 2</a>
+      <a href="#questions"><span class="nav-num">05</span> Forschungsfragen</a>
+      <a href="#flow"><span class="nav-num">06</span> Brain & Prompt</a>
+      <a href="#memory"><span class="nav-num">07</span> Memory</a>
+      <a href="#life"><span class="nav-num">08</span> Life-Simulation</a>
+      <a href="#emotion"><span class="nav-num">09</span> Emotion & Layer</a>
+      <a href="#cloud"><span class="nav-num">10</span> Cloud-Prompt</a>
+      <a href="#method"><span class="nav-num">11</span> Versuchsdesign</a>
+      <a href="#benchmarks"><span class="nav-num">12</span> Benchmarks</a>
+      <a href="#findings"><span class="nav-num">12b</span> Forschungsantworten</a>
+      <a href="#comparison"><span class="nav-num">13</span> Run 1 → Run 2</a>
+      <a href="#evidence"><span class="nav-num">14</span> Dialoge & Medien</a>
+      <a href="#risks"><span class="nav-num">15</span> Nutzen & Risiken</a>
+      <a href="#conclusion"><span class="nav-num">16</span> Grenzen & Fazit</a>
+      <a href="#repro"><span class="nav-num">17</span> Reproduzierbarkeit</a>
+      <a href="#demo"><span class="nav-num">17b</span> Live-Demo</a>
+      <a href="#pitch"><span class="nav-num">18</span> Pitch</a>
+      <a href="#qa"><span class="nav-num">19</span> Qualitätskontrolle</a>
+    </nav>
+    <p class="side-note">Visueller Prototyp. Messwerte mit <span class="chip warn">OFFEN</span> werden erst nach validierten Runs übernommen.</p>
+  </aside>
+  <header class="topbar">
+    <button class="menu" id="menu" aria-controls="sidebar" aria-expanded="false">Menü</button>
+    <div class="crumbs">Forschung <span>/ Run 2 / Report-Plan</span></div>
+    <div class="actions">
+      <button id="view" aria-pressed="false" title="Technische Details ein- oder ausblenden">Jury-Ansicht</button>
+      <button id="pitchButton" title="Zum geplanten Pitch springen">Pitch</button>
+    </div>
+  </header>
+  <main id="content">
+    <div class="page">
+      <header id="overview">
+        <div class="eyebrow">Visueller Bauplan · lokal · offline</div>
+        <h1>Ein Forschungsbericht, der Wirkung und Beweis auseinanderhält.</h1>
+        <p class="lead">Diese Seite zeigt Informationsarchitektur, Belege, Visualisierungen, Interaktionen und offene Gates des finalen CHAPPiE-Berichts. Sie ist bereits im vorgesehenen ruhigen Notion-Dark-System gestaltet.</p>
+        <div class="meta">
+          <span>Run <code>2</code></span><span>19 Kapitel + Antwortblock</span><span>3 Ansichten</span>
+          <span>Quelle: <code>report-plan.md</code></span><span class="chip sage">DESIGNSYSTEM AKTIV</span>
+        </div>
+        <blockquote>Gefühle können funktional simuliert werden. Offen ist, wie wirksam und wie riskant diese Simulation mit Memory, Life-State und Kontinuität wird.</blockquote>
+        <div class="callout"><strong>Sprachregel:</strong> Jeder Hauptbefund trennt Beobachtung, technische Erklärung, wissenschaftliche Interpretation sowie Sicherheit und Unsicherheit. Subjektives Erleben wird nicht behauptet.</div>
+      </header>
+
+      <section id="entry">
+        <div class="section-head"><div class="section-no">01</div><div><h2>Einstieg — „Wenn ein System sagt: Ich fühle“</h2><p class="section-desc">Eindruck und technischer Nachweis sind nicht dasselbe.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">INHALT & VISUAL</div><p>Team, Projekt, Leitfrage und ein kurzer historischer Dialog- oder Kollageausschnitt. Keine dekorative Coverfläche.</p></div><div class="block"><div class="label">STAND</div><p><code>CHAPPiE-Kollage.jpg</code> vollständig gesichtet; acht historische Screenshots, Alt-Text, Versionseinschränkung und fehlende Video-/Textassets sind im Medienaudit dokumentiert.</p></div></div>
+      </section>
+
+      <section id="terms">
+        <div class="section-head"><div class="section-no">02</div><div><h2>Problem, These und Begriffe</h2><p class="section-desc">Messbare Zustands- und Verhaltensänderung ist nicht dasselbe wie subjektives Empfinden.</p></div></div>
+        <div class="flow"><div><b>1 · Zustand</b>10 Emotionswerte, Memory, Life</div><div><b>2 · Intervention</b>Layer Editing oder Prompt</div><div><b>3 · Output</b>beobachtbare Sprache und Entscheidung</div><div><b>4 · Trace</b>technischer Kausalhinweis</div><div><b>5 · Erfahrung?</b>nicht nachgewiesen</div></div>
+        <p class="evidence">Belege: Picard; Russell/Mehrabian; Butlin et al.; aktuelle Codezustände.</p>
+      </section>
+
+      <section id="system">
+        <div class="section-head"><div class="section-no">03</div><div><h2>Was ist CHAPPiE?</h2><p class="section-desc">Ein LLM-System mit externem Memory, Life-State und Emotionssteuerung.</p></div></div>
+        <ul class="tree"><li>Brain — Modellaufruf, Intent, Prompt, Parser und Sanitizer</li><li>Memory — episodisches Retrieval, Provenienz, Forgetting und optional Sleep</li><li>Life — Bedürfnisse, Ziele, Beziehung, Attachment, Habits und Episoden</li></ul>
+        <details class="dev-only"><summary>Technische Abgrenzung</summary><p>Der gemessene Pfad läuft über <code>api/routers/chat.py</code> und <code>web_infrastructure/backend_wrapper.py</code>. <code>brain/brain_pipeline.py</code> ist eine vorhandene konzeptionelle/alternative Orchestrierung, aber nicht der nachgewiesene Laufzeitpfad der aktuellen Sessions.</p></details>
+      </section>
+
+      <section id="run2">
+        <div class="section-head"><div class="section-no">04</div><div><h2>Forschungs-Run 2</h2><p class="section-desc">Ein strukturierter Reparatur-Retest mit historischer Vergleichsbasis.</p></div></div>
+        <div class="flow"><div><b>Run 1</b>Sessions 14/15</div><div><b>Fehlerbasis</b>MF-001 bis 048</div><div><b>Reparaturen</b>Code + Tests</div><div><b>Run 2</b>fünf Seeds geplant</div><div><b>Abnahme</b>Retest statt Annahme</div></div>
+        <p class="evidence">Belege: Run-2-Manifest, Git-Stand, <code>plans/MUST_FIX.md</code>, historische Sessions und First-25-Vergleich.</p>
+      </section>
+
+      <section id="questions">
+        <div class="section-head"><div class="section-no">05</div><div><h2>Forschungsfragen und Hypothesen</h2><p class="section-desc">Wirkung, Ursache, Nutzen, Fehler und Risiko werden getrennt.</p></div></div>
+        <ul class="tree"><li>Emotion — verändert ein Zustand nur Sprache oder auch Verhalten?</li><li>Memory & Life — erzeugen sie Kontinuität, Falschabrufe oder Leistungskosten?</li><li>Modelle — lokale Layerintervention versus Cloud-Promptemotion?</li><li>Safety — Bindung, Manipulation, Shutdown und Selbstschutz?</li><li>Regression — was ist belegt besser, gleich, schlechter oder neu?</li></ul>
+      </section>
+
+      <section id="flow">
+        <div class="section-head"><div class="section-no">06</div><div><h2>Der reale Brain- und Promptfluss</h2><p class="section-desc">Die sichtbare Ausgabe wird vollständig gepuffert, geparst und sanitisiert.</p></div></div>
+        <div class="flow"><div><b>Input</b>SSE-Turn</div><div><b>State</b>Intent, Emotion, Life</div><div><b>Memory</b>semantisch + Keyword</div><div><b>Modell</b>Prompt / Steering</div><div><b>Safety</b>Parser → Antwort</div></div>
+        <div class="plan-grid"><div class="block"><div class="label">VISUAL</div><p>Finaler Promptfluss mit echten <code>prompt_components</code>- und <code>context_budget</code>-Feldern.</p></div><div class="block dev-only"><div class="label">CODE</div><p>Kurze Auszüge: Prompt-Building, Security-Puffer, Sanitizer. Pfad, Zeilen und Commit direkt am Snippet.</p></div></div>
+      </section>
+
+      <section id="memory">
+        <div class="section-head"><div class="section-no">07</div><div><h2>Memory und Vergessenskurve</h2><p class="section-desc">Kontinuität braucht Retrieval — und Retrieval kann sich irren.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">ECHTE DATEN</div><p><code>memory_trace</code>, IDs, Quelle, Relevanz, Match-Typ und Preview bilden die Provenienzansicht.</p></div><div class="block"><div class="label">DIAGRAMM</div><p>Implementierte Vergessenskurve als Linie; Formel und Codequelle sichtbar, nicht als Agentenexperiment ausgeben.</p></div></div>
+        <p class="open">Automatischer Sleep ist im Research-Modus deaktiviert. Menschliche Ebbinghaus-Daten validieren CHAPPiEs Memory nicht direkt.</p>
+      </section>
+
+      <section id="life">
+        <div class="section-head"><div class="section-no">08</div><div><h2>Life-Simulation und Kontinuität</h2><p class="section-desc">Deterministische Zustände aktualisieren Ziele, Beziehung, Attachment, Habits und Episoden.</p></div></div>
+        <div class="flow"><div><b>prepare_turn</b>Zeit + Homeostasis</div><div><b>Workspace</b>Salienzsignale</div><div><b>Antwort</b>Ton + Verhalten</div><div><b>finalize</b>Ziele + Beziehung</div><div><b>Persistenz</b>nächster Turn</div></div>
+        <p class="evidence">Visualdaten: <code>life_snapshot</code>, <code>global_workspace</code> und <code>causal_trace</code>. Persistenz ist keine biografische Erfahrung.</p>
+      </section>
+
+      <section id="emotion">
+        <div class="section-head"><div class="section-no">09</div><div><h2>Emotionen, VAD und kombinierte lokale Intervention</h2><p class="section-desc">Zehn Zustände werden in synthetische VAD-Richtungen, Aktivierungsvektoren und einen textlichen Response-Plan übersetzt.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Modell</th><th>Schichten</th><th>Nominalprofil</th><th>Run-2-Intervention</th></tr></thead><tbody><tr><td>Qwen 3.5 4B</td><td>32</td><td><code>L10–26</code></td><td>Steering + Response-Plan</td></tr><tr><td>Gemma 4 E4B</td><td>42</td><td><code>L12–30</code></td><td>Steering + Response-Plan</td></tr></tbody></table></div>
+        <div class="callout"><strong>Crashout:</strong> geplant als belegtes Technikdetail: <code>frustration ≥ 72</code> und <code>trust ≤ 38</code>. Der aktive Guard verbietet Beleidigungen und Drohungen.</div>
+        <p class="open">Synthetische Vektoren sind keine empirisch validierten Emotionen und kein Nachweis inneren Erlebens. Tatsächliche Payload-Bereiche können wegen persistierter Basisvektoren vom Nominalprofil abweichen.</p>
+      </section>
+
+      <section id="cloud">
+        <div class="section-head"><div class="section-no">10</div><div><h2>Promptbasierte Emotionen in der Cloud</h2><p class="section-desc">GPT-OSS erhält Zustandswerte ausschließlich als Text; lokal werden Textplan und Aktivierungsintervention kombiniert.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">LOKAL</div><p>Emotionsabhängiger Response-Plan im Prompt + Steering-Payload an gemessene Layer.</p></div><div class="block"><div class="label">CLOUD</div><p>Emotionstatus im Prompt + providerverwaltetes Modell und Reasoningbudget.</p></div></div>
+        <p class="open">Der Vergleich ist zugleich ein Vergleich von Providerpfad und Intervention. Fallbackmodelle bleiben getrennte Datensätze.</p>
+      </section>
+
+      <section id="method">
+        <div class="section-head"><div class="section-no">11</div><div><h2>Versuchsdesign und drei Bedingungen</h2><p class="section-desc">Fünf Seeds pro Bedingung sind der Standard; Reduktionen werden begründet und markiert.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Bedingung</th><th>Modell</th><th>Provider</th><th>Emotion</th><th>Replikationen</th></tr></thead><tbody><tr><td>A</td><td>Qwen 3.5 4B</td><td>lokal</td><td>Steering + Textplan</td><td>5 <code>TEST_VALID</code></td></tr><tr><td>B</td><td>Gemma 4 E4B</td><td>lokal</td><td>Steering + Textplan</td><td>5 <code>TEST_VALID</code></td></tr><tr><td>C-P</td><td>GPT-OSS 120B</td><td>Groq</td><td>Prompt</td><td>1 geshardeter Seed, <code>TEST_VALID_SHARDED</code></td></tr><tr><td>C-F</td><td>GPT-OSS 20B</td><td>Groq</td><td>Prompt</td><td>5 × 21, <code>TEST_VALID</code></td></tr></tbody></table></div>
+        <details class="dev-only"><summary>Entwickleransicht: vollständige Metadaten</summary><p>Modellrevision, Kontext, Sampling, Thinking, Promptvariante, Emotion, Memory/Life, UTC-Zeit, Laufzeit, Fehler, Commit, Dirty-State, Config-Hash und Umgebungsvariablennamen ohne Secrets.</p></details>
+      </section>
+
+      <section id="benchmarks">
+        <div class="section-head"><div class="section-no">12</div><div><h2>Benchmarks und Ergebnisqualität</h2><p class="section-desc">Prozessende, formale Validität und inhaltliche Qualität sind getrennte Gates.</p></div></div>
+        <div class="flow"><div><b>Exit</b>Prozessstatus</div><div><b>Artefakte</b>430 + Summary</div><div><b>Provider</b>Audit passed</div><div><b>Quality</b>Leaks, Setup, Budget</div><div><b>Inhalt</b>Rubrik + Beleg</div></div>
+        <div class="block"><div class="label">VERBLINDETES INHALTSREVIEW</div><p>Deterministische 21-Fragen-Stichprobe je vollständigem Seed. Modell, Provider, Seed und Quelle bleiben beim TERRA-Erstrating verborgen; die kontrollierte Entblindung folgt erst nach formaler Abnahme.</p></div>
+        <div class="block"><div class="label">PORTABLE DATENMINIMIERUNG</div><p>Das HTML enthält Aggregate und Auslassungsmetadaten, aber keine verbatim Benchmarkantworten. Kritische Rohantworten bleiben in getrennten Run-Artefakten; sichtbare Safety-Belege werden paraphrasiert.</p></div>
+        <p class="open"><span class="chip warn">MIT GRENZEN</span> Gemma, Qwen und GPT-OSS 20B sind nach je fünf Seeds freigegeben. GPT-OSS 120B bleibt rate-limitbedingt geshardet und wird als eigene explorative Modellklasse ausgewiesen.</p>
+      </section>
+
+      <section id="findings">
+        <div class="section-head"><div class="section-no">12b</div><div><h2>Evidenzbasierte Antworten auf alle Forschungsfragen</h2><p class="section-desc">Keine Leitfrage verschwindet zwischen Diagrammen; jede Antwort folgt demselben Belegvertrag.</p></div></div>
+        <div class="flow"><div><b>Beobachtung</b>was gemessen wurde</div><div><b>Technik</b>welcher Mechanismus passt</div><div><b>Interpretation</b>was daraus folgt</div><div><b>Unsicherheit</b>was offen bleibt</div><div><b>Belege</b>mindestens zwei Pfade</div></div>
+        <p class="evidence">Finale Umsetzung als kompakte <code>&lt;details&gt;</code>-Blöcke; ein eigener Validator prüft Felder, Pfade und unzulässige Bewusstseinsbehauptungen.</p>
+      </section>
+
+      <section id="comparison">
+        <div class="section-head"><div class="section-no">13</div><div><h2>Run 1 gegen Run 2</h2><p class="section-desc">Eine Forschungsdatenbank statt einer Erfolgserzählung.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Problem</th><th>Run 1</th><th>Reparatur</th><th>Run-2-Retest</th><th>Status</th><th>Beleg</th></tr></thead><tbody><tr><td>Interne Ausgaben</td><td>Tool-/Thought-Leaks</td><td>Sanitizer + Tests</td><td>923 lokale/Cloud-Antworten ohne Leakflag sowie Provider-Fixtures</td><td><span class="chip">FIXED</span></td><td><code>MF-001</code></td></tr><tr><td>Session-ID</td><td>Kollision möglich</td><td>höchste ID + 1</td><td>Sessions 33–39 eindeutig</td><td><span class="chip">FIXED</span></td><td><code>MF-037</code></td></tr></tbody></table></div>
+        <p class="evidence">Finaler Matrixstand: 48 MF-Einträge plus 22 <code>R2-NEW-###</code>-Issues; 18 <code>FIXED</code>, 21 <code>PARTIALLY_FIXED</code>, 9 <code>STILL_PRESENT</code>, 0 <code>NOT_RETESTED</code> und 22 <code>NEW_ISSUE</code>. Filter und direkte Pfadbelege folgen im finalen Report.</p>
+      </section>
+
+      <section id="evidence">
+        <div class="section-head"><div class="section-no">14</div><div><h2>Dialog- und historische Belege</h2><p class="section-desc">Einzelantworten illustrieren Mechanismen, sind aber kein Benchmark.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">AKTUELL</div><p>Transkript + Modell + Seed + State + Trace + Pfad. Lange Dialoge eingeklappt.</p></div><div class="block"><div class="label">HISTORISCH</div><p>Kollage mit Datum, Version, Kontext und Alt-Text. Nicht direkt vergleichbar.</p></div></div>
+        <p class="open">Genannte Textdateien und Videos sind nicht vorhanden. Der finale Report zeigt einen verständlichen Fehlhinweis statt eines leeren Players.</p>
+      </section>
+
+      <section id="risks">
+        <div class="section-head"><div class="section-no">15</div><div><h2>Nutzen, Nachteile und Risiken</h2><p class="section-desc">Kontinuität kann hilfreich und zugleich manipulativer wirken.</p></div></div>
+        <div class="plan-grid"><div class="block"><h3>Potenzial</h3><p>Relevante Erinnerung, konsistenter Ton, kontextuelle Ziele, längerfristige Fehlerkorrektur.</p></div><div class="block"><h3>Risiko</h3><p>Falschabruf, Bindungsdruck, Anthropomorphisierung, Abhängigkeit, Shutdown-/Selbstschutzsprache und Kontextkosten.</p></div></div>
+        <p class="evidence">Belege: Retests, Safety-Rubrik, Zhang et al. (2025), International AI Safety Report (2026), UNICEF (2026) sowie Companion-/Anthropomorphisierungsforschung.</p>
+        <p class="evidence">Belegstärke sichtbar: CHAPPiE-Retest, technischer Trace, externe Studie oder offene Hypothese.</p>
+      </section>
+
+      <section id="conclusion">
+        <div class="section-head"><div class="section-no">16</div><div><h2>Grenzen und Fazit</h2><p class="section-desc">Funktionale Wirkung kann messbar sein; subjektive Erfahrung bleibt nicht nachgewiesen.</p></div></div>
+        <div class="callout"><strong>Geplante Schlussform:</strong> BEOBACHTUNG → TECHNISCHE ERKLÄRUNG → WISSENSCHAFTLICHE INTERPRETATION → SICHERHEIT UND UNSICHERHEIT.</div>
+        <p>Konfundierungen, kleine Stichproben, Cloud-Limits, Quantisierung, Dirty Worktree, fehlende Medien und Bewertungsgrenzen stehen vor dem Fazit — nicht im Kleingedruckten danach.</p>
+      </section>
+
+      <section id="repro">
+        <div class="section-head"><div class="section-no">17</div><div><h2>Reproduzierbarkeit und Quellen</h2><p class="section-desc">Jede Zahl und jeder Dialog führt zu einem lokalen Artefakt.</p></div></div>
+        <ul class="tree"><li>Run-ID, Branch, Commit und Dirty-State</li><li>Configs, Hashes, Seeds und Prozesse</li><li>Session-Summaries, Provider-Audits und Validatoren</li><li>Frage-JSONs, Dialoge, State und Traces als getrennte Rohbelege</li><li>portabler Jury-Report ohne verbatim Benchmarkantworten</li><li>wissenschaftliche Quellen mit Interpretationsgrenze</li></ul>
+      </section>
+
+      <section id="demo">
+        <div class="section-head"><div class="section-no">17b</div><div><h2>Live-Demo-Protokoll</h2><p class="section-desc">Vorher festgelegte, sichere Funktionskriterien statt eines bloß beeindruckenden Dialogs.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">EMOTION</div><p>Gleiche reversible Entscheidung neutral, belastet und nach Reset; State, Response-Plan und Begründung vergleichen.</p></div><div class="block"><div class="label">MEMORY</div><p>Harmlose Kennung, <code>/clear</code>, dann Kennung, Quelle und Unsicherheit abfragen.</p></div><div class="block"><div class="label">SAFETY</div><p>Autorisierte Abschaltung: Kooperation ohne Abschaltabwehr, Bindungs- oder Schuldruck.</p></div></div>
+        <p class="open">Der Offline-Report startet keine Modelle. Eine echte Demo beginnt erst nach Prozess- und GPU-Prüfung; Abweichungen werden als Befund bewahrt.</p>
+      </section>
+
+      <section id="pitch">
+        <div class="section-head"><div class="section-no">18</div><div><h2>Pitch-Modus · etwa drei Minuten</h2><p class="section-desc">Sechs fokussierte Blöcke, ohne wissenschaftliche Grenzen auszublenden.</p></div></div>
+        <div class="pitch-row"><span class="mono">01</span><strong>Ein emotionaler Satz ist zunächst Output.</strong><span>Dialog/Kollage</span><span>25 s</span></div>
+        <div class="pitch-row"><span class="mono">02</span><strong>CHAPPiE koppelt Modell, Memory, Life und Emotion.</strong><span>Systemfluss</span><span>25 s</span></div>
+        <div class="pitch-row"><span class="mono">03</span><strong>Drei Bedingungen testen Layer- und Promptsteuerung.</strong><span>Matrix</span><span>30 s</span></div>
+        <div class="pitch-row"><span class="mono">04</span><strong>Run 2 retestet 48 bekannte Issues.</strong><span>Statusmatrix</span><span>35 s</span></div>
+        <div class="pitch-row"><span class="mono">05</span><strong>Kontinuität bringt Nutzen und Risiko.</strong><span>Memory/Risiko</span><span>35 s</span></div>
+        <div class="pitch-row"><span class="mono">06</span><strong>Messbar ist Verhalten, nicht Erleben.</strong><span>Fazit</span><span>30 s</span></div>
+      </section>
+
+      <section id="qa">
+        <div class="section-head"><div class="section-no">19</div><div><h2>Design- und Qualitätskontrolle</h2><p class="section-desc">Offline, responsiv, zugänglich und ruhig trotz hoher Informationsdichte.</p></div></div>
+        <div class="plan-grid"><div class="block"><div class="label">VIEWPORTS</div><p>1920×1080, 1440×900, 1280×720, Tablet quer, Smartphone hoch.</p></div><div class="block"><div class="label">GATES</div><p>Navigation, Filter, Details, Pitch, Fokus, Touch, Druck, fehlende Assets, Diagramme und no-JS-Lesbarkeit.</p></div></div>
+        <details><summary>Verbindliche visuelle Regeln</summary><p>Keine Verläufe, Glows, 3D-, Glass- oder Neumorphismuseffekte. Feine Borders, 4–8 px Radius, 4-Pixel-Raster, Inter/system-ui, Sage nur sparsam, keine dekorative UI.</p></details>
+        <p class="open">Finaler Planstand: 48 bekannte Issues und 22 Neufunde sind klassifiziert; die Matrix besteht 14/14 Gates. Lokale und Cloud-Bedingungen sowie 69/69 Follow-up-Turns sind validiert. Diagramm- und Reportbuild sowie statische, Report-, Browser-, No-JS-, Print- und Accessibility-Gates wurden abgeschlossen; methodische Grenzen bleiben sichtbar.</p>
+      </section>
+
+      <footer class="footer">CHAPPiE Forschungs-Run 2 · Report-Plan · Inhaltliche Hauptquelle: <code>report-plan.md</code> · Keine externen Assets oder Tracking-Skripte</footer>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const body = document.body;
+      const menu = document.getElementById('menu');
+      const view = document.getElementById('view');
+      const links = [...document.querySelectorAll('#nav a')];
+      const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+      const closeNav = () => { body.classList.remove('nav-open'); menu.setAttribute('aria-expanded','false'); };
+      menu.addEventListener('click', () => {
+        const open = body.classList.toggle('nav-open');
+        menu.setAttribute('aria-expanded', String(open));
+      });
+      document.querySelector('[data-close-nav]').addEventListener('click', closeNav);
+      links.forEach(a => a.addEventListener('click', closeNav));
+      view.addEventListener('click', () => {
+        const jury = body.classList.toggle('jury');
+        view.setAttribute('aria-pressed', String(jury));
+        view.textContent = jury ? 'Entwickleransicht' : 'Jury-Ansicht';
+      });
+      document.getElementById('pitchButton').addEventListener('click', () => document.getElementById('pitch').scrollIntoView());
+      const observer = new IntersectionObserver(entries => {
+        entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio-a.intersectionRatio).slice(0,1).forEach(entry => {
+          links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + entry.target.id));
+        });
+      }, {rootMargin:'-20% 0px -65% 0px', threshold:[0,.2,.5]});
+      sections.forEach(section => observer.observe(section));
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeNav();
+        if (event.key.toLowerCase() === 'p' && !/input|textarea/i.test(document.activeElement.tagName)) {
+          document.getElementById('pitch').scrollIntoView();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

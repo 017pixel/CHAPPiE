@@ -1,0 +1,24 @@
+Forschung Report Tests
+==================================================
+  PASS test_template_design_contract
+  PASS test_run2_tertiary_text_meets_wcag_aa
+  PASS test_run2_result_svgs_use_current_status_and_contrast
+  PASS test_report_builds_offline_html
+  PASS test_benchmark_helpers_handle_missing_data
+  PASS test_report_validator_detects_missing_local_link
+  PASS test_prompt_tool_contract_tracks_measured_streaming_path
+  PASS test_runtime_reload_logging_does_not_render_secret_signatures
+  PASS test_stratified_partial_condition_is_never_labeled_full
+  FAIL test_run2_report_separates_120b_primary_and_20b_fallback: Traceback (most recent call last):
+  File "/home/bbecker/CHAPPiE/forschung/report/build_run2_report.py", line 1158, in <module>
+    main()
+  File "/home/bbecker/CHAPPiE/forschung/report/build_run2_report.py", line 1152, in main
+    document = enrich_report(build(run_dir, benchmark, args.output), run_dir)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bbecker/CHAPPiE/forschung/report/build_run2_report.py", line 499, in enrich_report
+    active_fallback = (conditions.get("C") or {}).get("active_fallback") or {}
+                       ^^^^^^^^^^
+NameError: name 'conditions' is not defined. Did you mean: 'condition'?
+
+==================================================
+  1 TEST(S) FEHLGESCHLAGEN

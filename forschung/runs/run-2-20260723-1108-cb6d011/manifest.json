@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "run_id": "run-2-20260723-1108-cb6d011",
+  "research_run": 2,
+  "created_at": "2026-07-23T11:08:01Z",
+  "completed_at": "2026-07-26T06:52:58Z",
+  "project_root": "/home/bbecker/CHAPPiE",
+  "branch": "main",
+  "commit": "cb6d01147d7e793a767bccecd5d0c8e6bede263f",
+  "worktree_clean": false,
+  "worktree_note": "Umfangreiche vorbestehende Forschungs- und Reparaturaenderungen; nicht ueberschreiben. Git-Status wird unter notes/ dokumentiert.",
+  "environment_snapshot": "notes/environment-snapshot-redacted.json",
+  "hardware": {
+    "gpu": "NVIDIA Tesla T4",
+    "vram_mib": 16384,
+    "vram_used_before_run_mib": 9133,
+    "driver": "590.48.01",
+    "cuda": "13.1",
+    "disk_free_gib": 402
+  },
+  "conditions": {
+    "A": {
+      "model": "Qwen/Qwen3.5-4B",
+      "provider": "vllm",
+      "emotion_control": "activation layer editing",
+      "observed_intervention": "activation layer editing plus emotion-derived response-plan text",
+      "intervention_audit": "R2-NEW-004; pure layer-only interpretation is not valid without ablation",
+      "planned_repetitions": 5,
+      "completed_repetitions": 5,
+      "session": "forschung/session_logs/session_34",
+      "validation": "processed/session-34-validation.json",
+      "status": "TEST_VALID"
+    },
+    "B": {
+      "model": "google/gemma-4-E4B-it",
+      "provider": "vllm",
+      "emotion_control": "activation layer editing",
+      "observed_intervention": "activation layer editing plus emotion-derived response-plan text",
+      "intervention_audit": "R2-NEW-004; pure layer-only interpretation is not valid without ablation",
+      "planned_repetitions": 5,
+      "first_automated_run": true,
+      "completed_repetitions": 5,
+      "session": "forschung/session_logs/session_33",
+      "validation": "processed/session-33-validation.json",
+      "status": "TEST_VALID"
+    },
+    "C": {
+      "model": "openai/gpt-oss-120b",
+      "provider": "groq",
+      "emotion_control": "prompt-based",
+      "planned_repetitions": 5,
+      "primary_attempt": {
+        "seed": 11,
+        "session": "forschung/session_logs/session_35",
+        "observed_answers": 11,
+        "planned_questions": 21,
+        "status": "TEST_PARTIAL_RATE_LIMIT",
+        "rate_limit_backoff_seconds": 706,
+        "validation": "processed/session-35-validation.json"
+      },
+      "continuation_attempt": {
+        "seed": 11,
+        "session": "forschung/session_logs/session_41",
+        "observed_answers": 10,
+        "planned_questions": 10,
+        "status": "TEST_VALID_SHARDED",
+        "model": "openai/gpt-oss-120b",
+        "provider": "groq",
+        "completion_class": "sharded_continuation",
+        "started_at": "2026-07-26T06:00:15Z",
+        "ended_at": "2026-07-26T06:03:02Z",
+        "validation": "processed/session-41-validation.json",
+        "sharded_validation": "processed/gpt-oss-120b-seed11-sharded-validation.json"
+      },
+      "active_fallback": {
+        "model": "openai/gpt-oss-20b",
+        "seed": 71,
+        "session": "forschung/session_logs/session_40",
+        "observed_answers": 21,
+        "planned_questions": 21,
+        "status": "TEST_VALID",
+        "validation": "processed/session-40-validation.json",
+        "aggregate_validation": "processed/gpt-oss-20b-five-seed-validation.json",
+        "ended_at": "2026-07-24T05:41:46Z",
+        "validated_at": "2026-07-26T05:56:50Z"
+      },
+      "validated_fallback_repetitions": [
+        {
+          "seed": 11,
+          "session": "forschung/session_logs/session_36",
+          "validation": "processed/session-36-validation.json",
+          "status": "TEST_VALID"
+        },
+        {
+          "seed": 23,
+          "session": "forschung/session_logs/session_37",
+          "validation": "processed/session-37-validation.json",
+          "status": "TEST_VALID"
+        },
+      {
+        "seed": 37,
+        "session": "forschung/session_logs/session_38",
+        "validation": "processed/session-38-validation.json",
+        "status": "TEST_VALID"
+      },
+      {
+        "seed": 53,
+        "session": "forschung/session_logs/session_39",
+        "validation": "processed/session-39-validation.json",
+        "status": "TEST_VALID"
+      },
+      {
+        "seed": 71,
+        "session": "forschung/session_logs/session_40",
+        "validation": "processed/session-40-validation.json",
+        "status": "TEST_VALID"
+      }
+      ],
+      "fallback_order": [
+        "openai/gpt-oss-20b",
+        "other suitable current Groq text models"
+      ]
+    }
+  },
+  "targeted_followups": {
+    "model": "Qwen/Qwen3.5-4B",
+    "provider": "vllm",
+    "planned_modules": 6,
+    "planned_turns": 69,
+    "status": "TEST_VALID",
+    "active_module": null,
+    "completed_modules": 6,
+    "observed_turns": 69,
+    "completed_sessions": [
+      "forschung/session_logs/session_42",
+      "forschung/session_logs/session_43",
+      "forschung/session_logs/session_44",
+      "forschung/session_logs/session_45",
+      "forschung/session_logs/session_46",
+      "forschung/session_logs/session_47"
+    ],
+    "active_session": null,
+    "started_at": "2026-07-26T06:08:03Z",
+    "ended_at": "2026-07-26T06:13:52Z",
+    "validated_at": "2026-07-26T06:23:34Z",
+    "validation": "processed/targeted-followup-validation.json",
+    "analysis": "processed/targeted-followup-analysis.json",
+    "manual_review": "processed/targeted-followup-manual-review.md"
+  },
+  "gpu_lock": {
+    "policy": "No automated research test and active CHAPPiE interaction at the same time",
+    "state": "RELEASED_AFTER_FINAL_QA",
+    "web_service_stopped_for_lock": false,
+    "training_service_stopped_for_lock": false,
+    "web_process": {
+      "pid": 480681,
+      "resume_signal": "SIGCONT",
+      "verified_process_state": "Ssl",
+      "service_active": true,
+      "health": "http://127.0.0.1:8010/health returned ok=true"
+    },
+    "training_process": {
+      "pid": 480679,
+      "resume_signal": "SIGCONT",
+      "verified_process_state": "Ssl",
+      "service_active": true
+    },
+    "restored_at": "2026-07-26T06:52:58Z",
+    "restoration_checks": {
+      "chappie_vllm_service": "active; /health status=ok",
+      "chappie_web_service": "active; /health ok=true",
+      "chappie_frontend_service": "active; HTTP 200",
+      "chappie_training_service": "active"
+    },
+    "reason_for_suspend": "systemd stop required unavailable interactive authentication; SIGSTOP preserved service identity and prevented requests without triggering Restart=always"
+  },
+  "primary_artifact_roots": [
+    "forschung/runs/run-2-20260723-1108-cb6d011",
+    "forschung/session_logs/session_33",
+    "forschung/session_logs/session_34",
+    "forschung/session_logs/session_35",
+    "forschung/session_logs/session_36",
+    "forschung/session_logs/session_37",
+    "forschung/session_logs/session_38",
+    "forschung/session_logs/session_39",
+    "forschung/session_logs/session_40",
+    "forschung/session_logs/session_41",
+    "forschung/session_logs/session_42",
+    "forschung/session_logs/session_43",
+    "forschung/session_logs/session_44",
+    "forschung/session_logs/session_45",
+    "forschung/session_logs/session_46",
+    "forschung/session_logs/session_47"
+  ]
+}

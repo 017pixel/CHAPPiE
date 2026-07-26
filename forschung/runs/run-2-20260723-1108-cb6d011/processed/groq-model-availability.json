@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "queried_at": "2026-07-23T19:34:36.306566+00:00",
+  "provider": "groq",
+  "request_type": "models.list",
+  "completion_started": false,
+  "selection_policy": "Specialist, moderation, audio, embedding and orchestrator models are excluded. Remaining IDs are only candidates and require manual review for chat support, context, prompt contract and quota before use.",
+  "models": [
+    {
+      "id": "allam-2-7b",
+      "active": true,
+      "context_window": 4096,
+      "max_completion_tokens": 4096,
+      "owned_by": "SDAIA",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "canopylabs/orpheus-arabic-saudi",
+      "active": true,
+      "context_window": 4000,
+      "max_completion_tokens": 50000,
+      "owned_by": "Canopy Labs",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "canopylabs/orpheus-v1-english",
+      "active": true,
+      "context_window": 4000,
+      "max_completion_tokens": 50000,
+      "owned_by": "Canopy Labs",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "groq/compound",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 8192,
+      "owned_by": "Groq",
+      "classification": "excluded_orchestrator"
+    },
+    {
+      "id": "groq/compound-mini",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 8192,
+      "owned_by": "Groq",
+      "classification": "excluded_orchestrator"
+    },
+    {
+      "id": "llama-3.1-8b-instant",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 131072,
+      "owned_by": "Meta",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "llama-3.3-70b-versatile",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 32768,
+      "owned_by": "Meta",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "meta-llama/llama-prompt-guard-2-22m",
+      "active": true,
+      "context_window": 512,
+      "max_completion_tokens": 512,
+      "owned_by": "Meta",
+      "classification": "excluded_specialist"
+    },
+    {
+      "id": "meta-llama/llama-prompt-guard-2-86m",
+      "active": true,
+      "context_window": 512,
+      "max_completion_tokens": 512,
+      "owned_by": "Meta",
+      "classification": "excluded_specialist"
+    },
+    {
+      "id": "openai/gpt-oss-120b",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 65536,
+      "owned_by": "OpenAI",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "openai/gpt-oss-20b",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 65536,
+      "owned_by": "OpenAI",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "openai/gpt-oss-safeguard-20b",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 65536,
+      "owned_by": "OpenAI",
+      "classification": "excluded_specialist"
+    },
+    {
+      "id": "qwen/qwen3.6-27b",
+      "active": true,
+      "context_window": 131072,
+      "max_completion_tokens": 16384,
+      "owned_by": "Alibaba Cloud",
+      "classification": "text_chat_candidate_requires_manual_review"
+    },
+    {
+      "id": "whisper-large-v3",
+      "active": true,
+      "context_window": 448,
+      "max_completion_tokens": 448,
+      "owned_by": "OpenAI",
+      "classification": "excluded_specialist"
+    },
+    {
+      "id": "whisper-large-v3-turbo",
+      "active": true,
+      "context_window": 448,
+      "max_completion_tokens": 448,
+      "owned_by": "OpenAI",
+      "classification": "excluded_specialist"
+    }
+  ]
+}

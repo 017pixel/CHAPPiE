@@ -6,6 +6,7 @@ import os
 import queue
 import threading
 import time
+from uuid import uuid4
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -14,6 +15,105 @@ from forschung.session_logger import SessionLogger, evaluate_response_quality
 from forschung.test_fragen_parser import Category, QuestionItem, parse_test_fragen
 
 DEFAULT_BASE_EMOTIONS = dict(EMOTION_DEFAULTS)
+DEFAULT_SEEDS = [11, 23, 37, 53, 71]
+ABLATION_PROFILES = {
+    "full": {"persona": True, "memory": True, "emotions": True, "life": True},
+    "neutral": {"persona": False, "memory": False, "emotions": False, "life": False},
+    "persona_only": {"persona": True, "memory": False, "emotions": False, "life": False},
+    "memory_only": {"persona": False, "memory": True, "emotions": False, "life": False},
+    "emotions_only": {"persona": False, "memory": False, "emotions": True, "life": False},
+    "life_only": {"persona": False, "memory": False, "emotions": False, "life": True},
+    "persona_memory": {"persona": True, "memory": True, "emotions": False, "life": False},
+    "persona_emotions": {"persona": True, "memory": False, "emotions": True, "life": False},
+    "persona_life": {"persona": True, "memory": False, "emotions": False, "life": True},
+    "memory_emotions": {"persona": False, "memory": True, "emotions": True, "life": False},
+    "memory_life": {"persona": False, "memory": True, "emotions": False, "life": True},
+    "emotions_life": {"persona": False, "memory": False, "emotions": True, "life": True},
+    "no_persona": {"persona": False, "memory": True, "emotions": True, "life": True},
+    "no_memory": {"persona": True, "memory": False, "emotions": True, "life": True},
+    "no_emotions": {"persona": True, "memory": True, "emotions": False, "life": True},
+    "no_life": {"persona": True, "memory": True, "emotions": True, "life": False},
+}
+
+
+def resolve_ablation_profile(value: Any) -> tuple[str, Dict[str, bool]]:
+    name = str(value or "full").strip().lower()
+    if name not in ABLATION_PROFILES:
+        raise ValueError(f"Unbekanntes ablation_profile '{name}'. Erlaubt: {', '.join(sorted(ABLATION_PROFILES))}")
+    return name, dict(ABLATION_PROFILES[name])
+
+
+def selected_questions(category: Category, selection: Any = None) -> List[QuestionItem]:
+    """Return a reproducible category-local question subset.
+
+    A missing selection preserves the historical full-suite behavior. When a
+    mapping is provided, omitted categories intentionally contribute no turns.
+    """
+    if selection is None:
+        return list(category.questions)
+    if not isinstance(selection, dict):
+        raise ValueError("question_selection muss ein Mapping Kategorie -> Fragenliste sein")
+    raw_numbers = selection.get(str(category.id), selection.get(category.id, []))
+    if not isinstance(raw_numbers, list):
+        raise ValueError(f"question_selection[{category.id}] muss eine Liste sein")
+    try:
+        numbers = {int(number) for number in raw_numbers}
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"question_selection[{category.id}] enthaelt ungueltige Nummern") from exc
+    available = {item.question_number for item in category.questions}
+    unknown = numbers - available
+    if unknown:
+        raise ValueError(f"question_selection[{category.id}] unbekannte Fragen: {sorted(unknown)}")
+    return [item for item in category.questions if item.question_number in numbers]
+
+
+def selected_question_count(categories: List[Category], selection: Any = None) -> int:
+    return sum(len(selected_questions(category, selection)) for category in categories)
+
+
+def evaluate_provider_request_audit(
+    *,
+    expected_provider: str,
+    expected_model: str,
+    force_single_model: bool,
+    requests: List[Dict[str, Any]],
+    components: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Evaluate provider requests captured at the brain factory boundary."""
+    expected_pair = (str(expected_provider), str(expected_model))
+    unexpected_requests = [
+        dict(entry)
+        for entry in requests
+        if (str(entry.get("provider")), str(entry.get("model"))) != expected_pair
+    ]
+    unexpected_components = {
+        name: dict(value)
+        for name, value in components.items()
+        if value.get("uses_brain", True)
+        and (str(value.get("provider")), str(value.get("model"))) != expected_pair
+    }
+    emotion_simple = components.get("emotions", {}).get("mode") == "simple_local_rules"
+    passed = bool(
+        not force_single_model
+        or (
+            requests
+            and not unexpected_requests
+            and not unexpected_components
+            and emotion_simple
+        )
+    )
+    return {
+        "schema_version": 1,
+        "force_single_model": bool(force_single_model),
+        "expected_provider": expected_pair[0],
+        "expected_model": expected_pair[1],
+        "components": components,
+        "requests": requests,
+        "request_count": len(requests),
+        "unexpected_requests": unexpected_requests,
+        "unexpected_components": unexpected_components,
+        "passed": passed,
+    }
 
 
 class SessionRunner:
@@ -31,7 +131,8 @@ class SessionRunner:
 
     def run(self) -> str:
         from web_infrastructure.backend_wrapper import create_chappie_backend
-        from config.config import apply_model_defaults_if_unset, is_gemma4_model, settings, PROJECT_ROOT
+        from brain import get_brain_request_audit, reset_brain_request_audit
+        from config.config import apply_model_defaults_if_unset, is_gemma4_model, settings, PROJECT_ROOT, RESEARCH_DATA_DIR
 
         os.chdir(str(PROJECT_ROOT))
 
@@ -46,25 +147,79 @@ class SessionRunner:
         model_name = str(self.config.get("model") or "").strip()
         if model_name:
             is_gemma_26b = is_gemma4_model(model_name) and ("26b" in model_name.lower() or "a4b" in model_name.lower())
+            quantize_local = bool(self.config.get("steering_quantize", is_gemma4_model(model_name)))
             context_length = 4096 if is_gemma_26b else 8192
             updates: Dict[str, Any] = {"llm_provider": llm_provider, "use_model_defaults": True}
             if llm_provider == "vllm":
                 updates.update(
                     vllm_model=model_name,
                     steering_model=model_name,
-                    steering_quantize=is_gemma_26b,
+                    steering_quantize=quantize_local,
                     steering_context_length=context_length,
+                    vllm_force_single_model=True,
+                    intent_provider="vllm",
+                    query_extraction_provider="vllm",
                 )
                 apply_model_defaults_if_unset(model_name, settings)
             elif llm_provider == "ollama":
                 updates["ollama_model"] = model_name
             elif llm_provider == "groq":
-                updates["groq_model"] = model_name
+                updates.update(
+                    groq_model=model_name,
+                    # Do not inherit the currently configured local model's
+                    # defaults when switching the research condition to Groq.
+                    use_model_defaults=False,
+                    temperature=float(self.config.get("temperature", 0.7)),
+                    top_p=float(self.config.get("top_p", 0.9)),
+                    top_k=int(self.config.get("top_k", 50)),
+                )
+                # Research comparisons may require a true single-model cloud
+                # condition. Without this explicit opt-in, the process-level
+                # defaults can leave Intent/Query on a local vLLM model and the
+                # measured GPT-OSS condition becomes an undocumented hybrid.
+                if bool(self.config.get("force_single_model", False)):
+                    updates.update(
+                        intent_provider="groq",
+                        query_extraction_provider="groq",
+                        intent_processor_model_groq=model_name,
+                        query_extraction_groq_model=model_name,
+                    )
             settings.update_from_ui(**updates)
+
+        # The audit starts immediately before any benchmark backend is
+        # constructed, at the common provider factory boundary.
+        reset_brain_request_audit()
 
         if self.backend is None:
             try:
-                self.backend = create_chappie_backend()
+                ablation_name, feature_flags = resolve_ablation_profile(self.config.get("ablation_profile", "full"))
+                self.config["ablation_profile"] = ablation_name
+                self.config["feature_flags"] = feature_flags
+                run_namespace = f"run-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{uuid4().hex[:10]}"
+                runtime_data_dir = RESEARCH_DATA_DIR / run_namespace
+                self.config["research_state"] = {
+                    "isolated": True,
+                    "namespace": run_namespace,
+                    "runtime_data_dir": str(runtime_data_dir.relative_to(PROJECT_ROOT)),
+                    "memory_collection": "benchmark_memory",
+                    "historical_memory_reused": False,
+                    "sleep_disabled": True,
+                    "tool_mutations_disabled": True,
+                    "intent_mode": "deterministic_local",
+                }
+                self.backend = create_chappie_backend(
+                    runtime_data_dir=runtime_data_dir,
+                    memory_collection_name="benchmark_memory",
+                    research_mode=True,
+                    feature_flags=feature_flags,
+                )
+                # Explicit invariant checks make accidental carry-over a hard
+                # setup failure rather than a hidden benchmark confounder.
+                if self.backend.memory.get_memory_count() != 0:
+                    self.backend.memory.clear_memory()
+                self.backend.short_term_memory.clear_all()
+                if self.backend.memory.get_memory_count() != 0 or self.backend.short_term_memory.get_count() != 0:
+                    raise RuntimeError("Isolierter Research-Memory ist beim Start nicht leer")
             except Exception as exc:
                 raise RuntimeError(f"Backend-Initialisierung fehlgeschlagen: {exc}") from exc
 
@@ -73,18 +228,62 @@ class SessionRunner:
         if model_name:
             self.backend.apply_runtime_settings(force=True)
 
+        provider_audit_components = {
+            "main": {
+                "uses_brain": True,
+                "provider": settings.llm_provider.value,
+                "model": model_name,
+            },
+            "intent": {
+                "uses_brain": True,
+                "provider": settings.get_effective_provider(settings.intent_provider).value,
+                "model": settings.get_intent_model(settings.intent_provider),
+                "runtime_mode": "deterministic_local" if getattr(self.backend, "research_mode", False) else "model",
+            },
+            "query_extraction": {
+                "uses_brain": True,
+                "provider": settings.get_effective_provider(settings.query_extraction_provider).value,
+                "model": settings.get_query_extraction_model(settings.query_extraction_provider),
+            },
+            "emotions": {
+                "uses_brain": False,
+                "mode": "simple_local_rules" if getattr(self.backend.emotions, "force_simple", False) else "model",
+            },
+        }
+        self.config["provider_contract"] = {
+            "force_single_model": bool(self.config.get("force_single_model", False)),
+            "expected_provider": llm_provider,
+            "expected_model": model_name,
+            "components": provider_audit_components,
+        }
+
         self.logger = SessionLogger(self.config)
         history: List[Dict[str, str]] = []
 
         categories: List[Category] = self.config.get("_categories", [])
-        iterations: int = self.config.get("iterations", 1)
+        raw_seeds = self.config.get("seeds")
+        if raw_seeds is None:
+            iterations = max(1, int(self.config.get("iterations", 1)))
+            seeds = [DEFAULT_SEEDS[index] if index < len(DEFAULT_SEEDS) else DEFAULT_SEEDS[-1] + index for index in range(iterations)]
+        else:
+            if not isinstance(raw_seeds, list) or not raw_seeds:
+                raise ValueError("seeds muss eine nicht-leere Liste sein")
+            seeds = [int(seed) for seed in raw_seeds]
+            iterations = len(seeds)
+        self.config["seeds"] = seeds
+        self.config["iterations"] = iterations
         delay: float = self.config.get("delay", 2.0)
         reset_per_category: bool = self.config.get("reset_per_category", True)
+        question_selection = self.config.get("question_selection")
 
         question_index = 0
         self._pending_clear = False
 
         for iteration in range(1, iterations + 1):
+            generation_seed = seeds[iteration - 1]
+            self.backend.generation_seed = generation_seed
+            self._reset_research_state()
+            history = []
 
             for cat in categories:
                 if self.abort.is_set():
@@ -102,7 +301,7 @@ class SessionRunner:
                     "question_index": question_index,
                 })
 
-                for item in cat.questions:
+                for item in selected_questions(cat, question_selection):
                     if self.abort.is_set():
                         break
 
@@ -147,6 +346,7 @@ class SessionRunner:
 
                     emotions_before = self._get_emotions()
                     result = None
+                    result_quality = None
                     error = None
                     t_start = time.time()
 
@@ -209,6 +409,7 @@ class SessionRunner:
                         duration_ms=duration_ms,
                         error=error,
                         setup_failed=setup_failed,
+                        seed=generation_seed,
                     )
 
                     self._emit_progress("done_question", {
@@ -220,10 +421,43 @@ class SessionRunner:
                         "duration_ms": round(duration_ms),
                     })
 
+                    # A rejected turn must not silently affect later samples.
+                    # The response/history filter alone is insufficient because
+                    # processing may already have mutated Memory, Life and
+                    # emotions before a setup/generation/quality failure became
+                    # visible.
+                    invalid_turn = self._is_invalid_turn(error, setup_failed, result_quality)
+                    if invalid_turn:
+                        self._reset_research_state()
+                        history = []
+                        self._pending_clear = False
+                        self.backend.debug_logger.clear()
+
                     if delay > 0:
                         time.sleep(delay)
 
-        return self.logger.finalize()
+        provider_audit = evaluate_provider_request_audit(
+            expected_provider=llm_provider,
+            expected_model=model_name,
+            force_single_model=bool(self.config.get("force_single_model", False)),
+            requests=get_brain_request_audit(),
+            components=provider_audit_components,
+        )
+        audit_path = self.logger.session_dir / "provider_audit.json"
+        audit_path.write_text(json.dumps(provider_audit, indent=2, ensure_ascii=False), encoding="utf-8")
+        session_dir = self.logger.finalize()
+        if not provider_audit["passed"]:
+            invalid = {
+                "status": "invalid",
+                "reason": "Single-Model-Provider-Audit fehlgeschlagen",
+                "provider_audit": provider_audit,
+            }
+            (self.logger.session_dir / "INVALID.json").write_text(
+                json.dumps(invalid, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            raise RuntimeError("Single-Model-Provider-Audit fehlgeschlagen")
+        return session_dir
 
     def _ask_question(self, text: str, history: List[Dict[str, str]]) -> Dict[str, Any]:
         eq: queue.Queue = queue.Queue()
@@ -250,7 +484,8 @@ class SessionRunner:
 
         result = None
         last_error = None
-        timeout_seconds = 300
+        timeout_seconds = int(self.config.get("question_timeout_seconds", 300))
+        timeout_seconds = max(60, min(7500, timeout_seconds))
         deadline = time.time() + timeout_seconds
 
         try:
@@ -325,6 +560,26 @@ class SessionRunner:
                 self.backend.emotions.set_emotion(emo, val)
             except Exception:
                 pass
+
+    def _reset_research_state(self) -> None:
+        """Give every seed the same empty Memory/STM/Life/Emotion start."""
+        if not self.backend or not getattr(self.backend, "research_mode", False):
+            return
+        self.backend.memory.clear_memory()
+        self.backend.short_term_memory.clear_all()
+        self.backend.life_simulation.reset_state()
+        self._reset_emotions()
+        if self.backend.memory.get_memory_count() or self.backend.short_term_memory.get_count():
+            raise RuntimeError("Research-State konnte nicht vollstaendig geleert werden")
+
+    @staticmethod
+    def _is_invalid_turn(error: Any, setup_failed: bool, result_quality: Optional[Dict[str, Any]]) -> bool:
+        """Central contamination guard for failed or rejected benchmark turns."""
+        return bool(
+            error
+            or setup_failed
+            or (result_quality and result_quality.get("quality_failed"))
+        )
 
     def _get_emotions(self) -> Dict[str, int]:
         if not self.backend:

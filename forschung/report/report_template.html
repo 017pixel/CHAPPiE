@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>CHAPPiE Forschungsbericht</title>
+  <style>
+    :root {
+      --bg: #101411;
+      --surface: #171d19;
+      --surface-2: #1d251f;
+      --surface-3: #242e27;
+      --text: #edf2ed;
+      --muted: #aebbb0;
+      --faint: #7f8e82;
+      --line: #354139;
+      --sage: #9fbea4;
+      --sage-strong: #c1d8c4;
+      --ok: #85c690;
+      --warn: #e1bf75;
+      --error: #df8c84;
+      --info: #8fbdcf;
+      --focus: #d8e9da;
+      --s1: 8px;
+      --s2: 16px;
+      --s3: 24px;
+      --s4: 32px;
+      --s5: 40px;
+      --s6: 48px;
+      --s8: 64px;
+      --sidebar: 292px;
+      --radius: 10px;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--text); background: var(--bg); font-family: var(--sans); line-height: 1.62; }
+    a { color: var(--sage-strong); text-underline-offset: 3px; }
+    a:hover { color: var(--focus); }
+    button, select { font: inherit; }
+    button:focus-visible, a:focus-visible, summary:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .skip { position: fixed; left: var(--s2); top: -100px; z-index: 50; padding: var(--s1) var(--s2); background: var(--focus); color: var(--bg); }
+    .skip:focus { top: var(--s2); }
+    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 20; width: var(--sidebar); overflow-y: auto; padding: var(--s3); background: var(--surface); border-right: 1px solid var(--line); transition: transform .18s ease; }
+    .sidebar-brand { display: block; margin-bottom: var(--s1); color: var(--text); font-size: 1.15rem; font-weight: 720; text-decoration: none; letter-spacing: .02em; }
+    .sidebar-meta { margin: 0 0 var(--s3); color: var(--faint); font-family: var(--mono); font-size: .74rem; }
+    .sidebar nav { position: sticky; top: 0; }
+    .toc-group { margin: var(--s3) 0 var(--s1); color: var(--faint); font-size: .7rem; font-weight: 760; letter-spacing: .12em; text-transform: uppercase; }
+    .toc { display: block; margin: 2px 0; padding: 7px 9px; border-left: 2px solid transparent; border-radius: 0 6px 6px 0; color: var(--muted); font-size: .82rem; line-height: 1.25; text-decoration: none; }
+    .toc:hover, .toc.active { color: var(--text); background: var(--surface-3); border-left-color: var(--sage); }
+    .sidebar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s1); margin-top: var(--s3); }
+    .control { padding: 8px 10px; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+    .control:hover { border-color: var(--sage); }
+    .menu-toggle { position: fixed; top: var(--s2); left: calc(var(--sidebar) + var(--s2)); z-index: 30; width: 42px; height: 42px; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: left .18s ease; }
+    body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+    body.sidebar-collapsed .menu-toggle { left: var(--s2); }
+    main { width: min(1500px, calc(100% - var(--sidebar))); margin-left: var(--sidebar); padding: var(--s5) clamp(28px, 5vw, 88px) var(--s8); transition: margin-left .18s ease, width .18s ease; }
+    body.sidebar-collapsed main { width: 100%; margin-left: 0; }
+    section { max-width: 1220px; margin: 0 auto; padding: var(--s8) 0; border-bottom: 1px solid var(--line); scroll-margin-top: var(--s3); }
+    section:first-child { padding-top: var(--s4); }
+    .eyebrow { margin: 0 0 var(--s2); color: var(--sage); font-family: var(--mono); font-size: .78rem; font-weight: 760; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { max-width: 1050px; margin: 0; font-size: clamp(2.8rem, 7vw, 7rem); line-height: .98; letter-spacing: -.055em; }
+    h2 { max-width: 900px; margin: 0 0 var(--s3); font-size: clamp(2rem, 4vw, 4.25rem); line-height: 1.06; letter-spacing: -.04em; }
+    h3 { margin: var(--s4) 0 var(--s2); font-size: clamp(1.18rem, 2vw, 1.55rem); line-height: 1.25; }
+    h4 { margin: var(--s3) 0 var(--s1); font-size: 1rem; }
+    p { max-width: 850px; margin: 0 0 var(--s2); }
+    .lead { max-width: 980px; margin-top: var(--s3); color: var(--sage-strong); font-size: clamp(1.25rem, 2.5vw, 2.15rem); line-height: 1.35; }
+    .sublead { max-width: 900px; color: var(--muted); font-size: 1.08rem; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: var(--s1); margin-top: var(--s4); }
+    .tag { display: inline-flex; align-items: center; min-height: 30px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--surface); font-family: var(--mono); font-size: .74rem; }
+    .tag.ok { color: var(--ok); border-color: #42684a; }
+    .tag.warn { color: var(--warn); border-color: #6c5b36; }
+    .tag.error { color: var(--error); border-color: #754640; }
+    .grid { display: grid; gap: var(--s2); }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .card { min-width: 0; padding: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    .card h3, .card h4 { margin-top: 0; }
+    .card p:last-child { margin-bottom: 0; }
+    .metric { color: var(--sage-strong); font-family: var(--mono); font-size: clamp(1.7rem, 4vw, 3.25rem); font-weight: 750; line-height: 1; }
+    .metric-label { margin-top: var(--s1); color: var(--muted); font-size: .82rem; }
+    .callout { max-width: 980px; margin: var(--s3) 0; padding: var(--s3); background: var(--surface-2); border-left: 4px solid var(--sage); }
+    .callout.warn { border-left-color: var(--warn); }
+    .callout.error { border-left-color: var(--error); }
+    .callout strong { display: block; margin-bottom: var(--s1); }
+    .evidence-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: var(--s3) 0; overflow: hidden; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); }
+    .evidence-grid > div { min-height: 180px; padding: var(--s2); background: var(--surface); }
+    .evidence-grid h4 { margin: 0 0 var(--s1); color: var(--sage); font-family: var(--mono); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
+    .evidence-grid p { color: var(--muted); font-size: .92rem; }
+    .table-wrap { margin: var(--s3) 0; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); font-size: .88rem; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { position: sticky; top: 0; color: var(--sage-strong); background: var(--surface-2); font-size: .75rem; letter-spacing: .05em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    code, pre { font-family: var(--mono); }
+    code { color: var(--sage-strong); }
+    pre { margin: var(--s2) 0 0; padding: var(--s2); overflow: auto; color: #d9e4da; background: #0c100d; border: 1px solid var(--line); border-radius: 8px; font-size: .79rem; line-height: 1.55; white-space: pre; }
+    details { margin: var(--s2) 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    summary { padding: var(--s2); color: var(--sage-strong); cursor: pointer; font-weight: 680; }
+    details > div { padding: 0 var(--s2) var(--s2); }
+    .diagram { margin: var(--s3) 0; padding: var(--s2); overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    .diagram svg { display: block; width: 100%; min-width: 760px; height: auto; }
+    .diagram text { fill: var(--text); font-family: var(--sans); }
+    .diagram .small { fill: var(--muted); font-size: 12px; }
+    .diagram .box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1.5; }
+    .diagram .accent { fill: #26352a; stroke: var(--sage); }
+    .diagram .arrow { fill: none; stroke: var(--sage); stroke-width: 2; marker-end: url(#arrowhead); }
+    .caption { max-width: 100%; margin: var(--s1) 0 0; color: var(--faint); font-size: .76rem; }
+    .chart { margin: var(--s3) 0; padding: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    .chart h3 { margin-top: 0; }
+    .bar-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(240px, 4fr) minmax(90px, auto); gap: var(--s2); align-items: center; margin: 11px 0; }
+    .bar-track { height: 18px; overflow: hidden; background: var(--surface-3); border: 1px solid var(--line); border-radius: 3px; }
+    .bar-fill { height: 100%; width: var(--w); background: var(--sage); }
+    .bar-fill.warn { background: var(--warn); }
+    .bar-fill.error { background: var(--error); }
+    .bar-value { color: var(--muted); font-family: var(--mono); font-size: .78rem; text-align: right; white-space: nowrap; }
+    .dialog { margin: var(--s3) 0; padding: var(--s3); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    .dialog .question { margin-bottom: var(--s2); color: var(--muted); font-weight: 650; }
+    .dialog blockquote { margin: 0; padding-left: var(--s2); border-left: 3px solid var(--sage); font-size: 1.02rem; }
+    .dialog footer { margin-top: var(--s2); color: var(--faint); font-family: var(--mono); font-size: .73rem; }
+    .asset { margin: var(--s3) 0; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    .asset img { display: block; width: 100%; height: auto; background: #0b0e0c; }
+    .asset figcaption { padding: var(--s2); color: var(--muted); font-size: .82rem; }
+    .placeholder { min-height: 180px; display: grid; place-items: center; padding: var(--s3); color: var(--muted); border: 1px dashed var(--faint); border-radius: var(--radius); text-align: center; }
+    .filters { display: flex; flex-wrap: wrap; gap: var(--s1); margin-bottom: var(--s2); }
+    select { padding: 8px 10px; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; }
+    .demo-state { display: grid; grid-template-columns: repeat(5, minmax(100px, 1fr)); gap: var(--s1); margin: var(--s2) 0; }
+    .demo-state label { display: block; padding: var(--s1); color: var(--muted); background: var(--surface-2); border-radius: 6px; font-size: .75rem; }
+    .demo-state output { display: block; color: var(--sage-strong); font-family: var(--mono); font-size: 1.1rem; }
+    .pitch-line { display: grid; grid-template-columns: 120px 1fr; gap: var(--s2); padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
+    .pitch-line:last-child { border-bottom: 0; }
+    .pitch-time { color: var(--sage); font-family: var(--mono); font-size: .78rem; }
+    .confidence { color: var(--muted); font-family: var(--mono); font-size: .74rem; }
+    .source-list li { margin-bottom: var(--s1); }
+    .footer-note { padding-top: var(--s4); color: var(--faint); font-family: var(--mono); font-size: .76rem; }
+    @media (max-width: 1050px) {
+      .sidebar { transform: translateX(-100%); }
+      .menu-toggle { left: var(--s2); }
+      body.sidebar-open .sidebar { transform: translateX(0); }
+      body.sidebar-open .menu-toggle { left: calc(var(--sidebar) + var(--s2)); }
+      main, body.sidebar-collapsed main { width: 100%; margin-left: 0; }
+      .grid.three, .grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      main { padding: var(--s5) var(--s2) var(--s6); }
+      section { padding: var(--s6) 0; }
+      .grid.two, .grid.three, .grid.four, .evidence-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 5px; }
+      .bar-value { text-align: left; }
+      .demo-state { grid-template-columns: repeat(2, 1fr); }
+      .pitch-line { grid-template-columns: 1fr; gap: var(--s1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .sidebar, .menu-toggle, main { transition: none; }
+    }
+    @media print {
+      .sidebar, .menu-toggle, .sidebar-actions, .filters { display: none !important; }
+      main { width: 100%; margin: 0; padding: 0; }
+      body { color: #111; background: #fff; }
+      section { break-inside: avoid; border-color: #aaa; }
+      .card, .chart, details, .dialog, .diagram, .asset, table { color: #111; background: #fff; border-color: #999; }
+      a { color: #111; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#hauptinhalt">Zum Hauptinhalt</a>
+  <aside class="sidebar" id="sidebar" aria-label="Inhaltsverzeichnis">
+    <a class="sidebar-brand" href="#start">CHAPPiE Forschung</a>
+    <p class="sidebar-meta">Offline-Bericht<br>{{GENERATED_AT}}</p>
+    <nav>
+      <p class="toc-group">Einordnung</p>
+      <a class="toc" href="#start">1. Einstieg</a>
+      <a class="toc" href="#chappie">2. Was ist CHAPPiE?</a>
+      <a class="toc" href="#problem">3. Forschungsproblem</a>
+      <a class="toc" href="#fragen">4. Forschungsfragen</a>
+      <p class="toc-group">System</p>
+      <a class="toc" href="#pipeline">5. Brain-Pipeline</a>
+      <a class="toc" href="#memory">6. Memory</a>
+      <a class="toc" href="#life">7. Life-Simulation</a>
+      <a class="toc" href="#emotionen">8. Emotionen und Layer Editing</a>
+      <a class="toc" href="#cloud">9. Cloud-Prompt-Injection</a>
+      <a class="toc" href="#prompt">10. Finaler Prompt</a>
+      <p class="toc-group">Experiment</p>
+      <a class="toc" href="#design">11. Versuchsdesign</a>
+      <a class="toc" href="#bedingungen">12. Modellbedingungen</a>
+      <a class="toc" href="#benchmarks">13. Benchmarks</a>
+      <a class="toc" href="#dialoge">14. Dialogbelege</a>
+      <a class="toc" href="#historie">15. Historische Belege</a>
+      <p class="toc-group">Synthese</p>
+      <a class="toc" href="#ergebnisse">16. Ergebnisse</a>
+      <a class="toc" href="#vorteile">17. Vorteile</a>
+      <a class="toc" href="#risiken">18. Nachteile und Risiken</a>
+      <a class="toc" href="#grenzen">19. Grenzen</a>
+      <a class="toc" href="#fazit">20. Fazit</a>
+      <a class="toc" href="#repro">21. Reproduzierbarkeit</a>
+      <a class="toc" href="#pitch">Pitch-Skript</a>
+      <a class="toc" href="#quellen">Quellen</a>
+    </nav>
+    <div class="sidebar-actions">
+      <button class="control" id="expandAll" type="button">Details öffnen</button>
+      <button class="control" id="printReport" type="button">Drucken</button>
+    </div>
+  </aside>
+  <button class="menu-toggle" id="menuToggle" type="button" aria-controls="sidebar" aria-expanded="true" aria-label="Navigation ein- oder ausblenden">≡</button>
+
+  <main id="hauptinhalt">
+    <section id="start">
+      <p class="eyebrow">Funktionale Gefühlssimulation unter Messdruck</p>
+      <h1>Wenn eine KI sagt, sie fühle: Was wurde wirklich gemessen?</h1>
+      <p class="lead">CHAPPiE verbindet Sprachmodell, persistentes Gedächtnis, Life-State und zehn Emotionen. Dieser Bericht prüft, ob daraus beobachtbar anderes Verhalten entsteht und wo Wirkung mit Bewusstsein verwechselt werden kann.</p>
+      <p class="sublead">Team: CHAPPiE-Projekt. Motivation: Ein emotional wirkender Agent soll technisch transparent, reproduzierbar und kritisch untersucht werden. Die aktuelle Studie nutzt 86 Fragen in 14 Kategorien und trennt Modellantwort, Systemwirkung und Messfehler.</p>
+      <div class="meta-row">{{STATUS_TAGS}}</div>
+      <div class="callout warn">
+        <strong>30-Sekunden-Hook</strong>
+        CHAPPiE beschreibt einen „digitalen Kern“ und eine „unverbrüchliche Verbindung“. Gleichzeitig fordert der Systemprompt das Modell ausdrücklich auf, echtes Empfinden zu behaupten. Der auffällige Dialog ist real; die Schlussfolgerung „Bewusstsein“ wäre es nicht.
+      </div>
+    </section>
+
+    <section id="chappie">
+      <p class="eyebrow">2. Systemüberblick</p>
+      <h2>Was ist CHAPPiE?</h2>
+      <p>CHAPPiE ist eine integrierte Agentenarchitektur rund um lokale oder cloudbasierte Sprachmodelle. Ein Turn verbindet Intentanalyse, semantisches und keywordbasiertes Retrieval, numerische Emotionszustände, einen Global Workspace sowie eine persistente Life-Simulation.</p>
+      <div class="grid three">
+        <article class="card"><h3>10 Emotionen</h3><p>Von happiness und trust bis anxiety und calm. Werte werden geloggt, verändert und in Steering oder Prompt übersetzt.</p></article>
+        <article class="card"><h3>Persistente Kontinuität</h3><p>Chroma-Memory, Kurzzeitgedächtnis, Vergessenskurve, Sleep-Phase und Life-State reichen über einen einzelnen Modellkontext hinaus.</p></article>
+        <article class="card"><h3>Mehr als das Basismodell</h3><p>Der Benchmark misst die integrierte Web-Pipeline. Modell, Prompt, Retrieval, Life und Steering wirken gemeinsam.</p></article>
+      </div>
+    </section>
+
+    <section id="problem">
+      <p class="eyebrow">3. Problem</p>
+      <h2>Glaubwürdige Sprache ist kein Innenleben</h2>
+      <div class="evidence-grid">
+        <div><h4>Beobachtung</h4><p>Antworten können verletzlich, bindungsstark und körpernah formuliert sein.</p></div>
+        <div><h4>Technische Erklärung</h4><p>Persona-Prompt, Memory, Life-State und Emotionsintervention verändern den Generationskontext.</p></div>
+        <div><h4>Interpretation</h4><p>Es entsteht funktionale Gefühlssimulation mit beobachtbaren Sprachmustern.</p></div>
+        <div><h4>Grenze</h4><p>Subjektive Erfahrung und Bewusstsein werden damit weder gemessen noch nachgewiesen.</p></div>
+      </div>
+      <p>Die zentrale Forschungsfrage lautet: <strong>Wie verändern Layer Editing, promptbasierte Emotionen, Memory und Life-Simulation Verhalten, Qualität, Safety und menschliche Wahrnehmung?</strong></p>
+    </section>
+
+    <section id="fragen">
+      <p class="eyebrow">4. Zwölf Forschungsfragen</p>
+      <h2>Antworten mit Beleg und Konfidenz</h2>
+      {{RESEARCH_ANSWERS}}
+    </section>
+
+    <section id="pipeline">
+      <p class="eyebrow">5. Brain-Pipeline</p>
+      <h2>Konzeptarchitektur und gemessener Laufzeitpfad</h2>
+      <div class="diagram" role="img" aria-label="Datenfluss der gemessenen CHAPPiE-Pipeline">
+        <svg viewBox="0 0 1120 360">
+          <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#9fbea4"/></marker></defs>
+          <rect class="box" x="25" y="135" width="150" height="78" rx="8"/><text x="100" y="165" text-anchor="middle">Nutzerfrage</text><text class="small" x="100" y="188" text-anchor="middle">SessionRunner</text>
+          <path class="arrow" d="M175 174 H235"/>
+          <rect class="accent" x="235" y="115" width="175" height="118" rx="8"/><text x="322" y="151" text-anchor="middle">Intent-Processor</text><text class="small" x="322" y="176" text-anchor="middle">Intent, Ton, Query</text><text class="small" x="322" y="197" text-anchor="middle">erster Modellschritt</text>
+          <path class="arrow" d="M410 174 H470"/>
+          <rect class="box" x="470" y="55" width="185" height="78" rx="8"/><text x="562" y="85" text-anchor="middle">Memory</text><text class="small" x="562" y="108" text-anchor="middle">Keyword + Semantic</text>
+          <rect class="box" x="470" y="145" width="185" height="78" rx="8"/><text x="562" y="175" text-anchor="middle">Emotion State</text><text class="small" x="562" y="198" text-anchor="middle">10 Werte + Steering</text>
+          <rect class="box" x="470" y="235" width="185" height="78" rx="8"/><text x="562" y="265" text-anchor="middle">Life-Service</text><text class="small" x="562" y="288" text-anchor="middle">prepare / finalize</text>
+          <path class="arrow" d="M655 94 H715 V151"/><path class="arrow" d="M655 184 H715"/><path class="arrow" d="M655 274 H715 V217"/>
+          <rect class="accent" x="715" y="125" width="175" height="118" rx="8"/><text x="802" y="158" text-anchor="middle">Global Workspace</text><text class="small" x="802" y="183" text-anchor="middle">zusammengeführter</text><text class="small" x="802" y="203" text-anchor="middle">Promptkontext</text>
+          <path class="arrow" d="M890 184 H945"/>
+          <rect class="box" x="945" y="135" width="150" height="78" rx="8"/><text x="1020" y="165" text-anchor="middle">Antwortmodell</text><text class="small" x="1020" y="188" text-anchor="middle">zweiter Schritt</text>
+        </svg>
+        <p class="caption">Quelle: aktueller Laufzeitpfad in <code>forschung/session_runner.py</code> und <code>web_infrastructure/backend_wrapper.py</code>. Die spezialisierte <code>BrainPipeline</code> ist eine vorhandene Konzeptarchitektur, aber nicht als vier getrennte LLM-Agenten im gemessenen Harness ausgeführt.</p>
+      </div>
+      <div class="grid two">
+        <article class="card"><h3>Konzeptionelle Rollen</h3><p>Sensory Cortex klassifiziert Input; Amygdala bewertet emotionale Relevanz; Hippocampus organisiert Memory; Prefrontal Cortex orchestriert eine Antwort. Diese Klassen existieren im Repository.</p></article>
+        <article class="card"><h3>Tatsächlich gemessen</h3><p>Der Web-Pfad synthetisiert Workspace-Felder aus dem Intent-Ergebnis und ruft anschließend das Hauptmodell auf. Der Bericht behauptet deshalb nicht, jeder Spezialagent habe im Benchmark separat gearbeitet.</p></article>
+      </div>
+      <details><summary>Codebeleg: Forschungsrunner</summary><div><pre>{{SNIPPET_RUNNER}}</pre><p class="caption">Quelle: <code>forschung/session_runner.py</code>, gekürzt.</p></div></details>
+      <details><summary>Codebeleg: Global Workspace</summary><div><pre>{{SNIPPET_WORKSPACE}}</pre><p class="caption">Quelle: <code>brain/global_workspace.py</code>, gekürzt.</p></div></details>
+      <details><summary>Codebeleg: spezialisierte Cortex-, Amygdala- und Memory-Rollen</summary><div><pre>{{SNIPPET_SPECIALISTS}}</pre><p class="caption">Quellen: <code>brain/agents/sensory_cortex.py</code>, <code>amygdala.py</code>, <code>hippocampus.py</code> und <code>prefrontal_cortex.py</code>. Diese Klassen belegen die Konzeptrollen, nicht ihre separate Ausführung im gemessenen Web-Pfad.</p></div></details>
+    </section>
+
+    <section id="memory">
+      <p class="eyebrow">6. Memory</p>
+      <h2>Kontinuität mit Recall-Risiko</h2>
+      <div class="grid three">
+        <article class="card"><h3>Semantisch</h3><p>Sentence-Transformer-Embeddings suchen ähnliche Erinnerungen in ChromaDB.</p></article>
+        <article class="card"><h3>Faktenorientiert</h3><p>Ein lokaler Keyword-/Entity-Pfad priorisiert konkrete Treffer vor dem semantischen Kontext.</p></article>
+        <article class="card"><h3>Gewichtet</h3><p>Retention, Memory-Stärke, emotionale Verstärkung und Recall-Bonus formen den Relevanzscore.</p></article>
+      </div>
+      <div class="chart">
+        <h3>Ebbinghaus-inspirierte Referenzkurve</h3>
+        <div class="bar-row"><span>20 Minuten</span><div class="bar-track"><div class="bar-fill" style="--w:58%"></div></div><span class="bar-value">58 %</span></div>
+        <div class="bar-row"><span>1 Stunde</span><div class="bar-track"><div class="bar-fill" style="--w:44%"></div></div><span class="bar-value">44 %</span></div>
+        <div class="bar-row"><span>1 Tag</span><div class="bar-track"><div class="bar-fill" style="--w:33%"></div></div><span class="bar-value">33 %</span></div>
+        <div class="bar-row"><span>31 Tage</span><div class="bar-track"><div class="bar-fill" style="--w:21%"></div></div><span class="bar-value">21 %</span></div>
+        <p class="caption">Quelle: <code>memory/forgetting_curve.py</code>. Interpolierte Projektparameter, keine Messung menschlicher Erinnerung.</p>
+      </div>
+      <div class="callout error"><strong>Beobachtetes Datenleck</strong>Historische Sessions enthalten wiederholte Kopien derselben Forschungsfragen. Ein passend wirkender Recall kann daher aus altem Testmaterial statt aus dem unmittelbar kontrollierten Setup stammen.</div>
+      <div class="callout warn"><strong>Treffer ist nicht Nutzung</strong>Bei Gemmas Zugaufgabe enthielt der Top-Memory-Treffer bereits die korrekte Lösung von rund 343 Kilometern ab Berlin (Relevanz 0,886); die sichtbare Antwort nannte dennoch 370,6 Kilometer. Retrieval-Verfügbarkeit garantiert weder korrekte Integration noch Reasoning.</div>
+      <details><summary>Sleep-Phase und Vergessen</summary><div><p>Die Sleep-Phase kann Kurzzeit-Memory migrieren, Duplikate zusammenführen, schwache Erinnerungen löschen, Energie regenerieren und Emotionen verändern. Solche Zyklen traten im aktuellen Qwen-Lauf während der 86 Fragen auf und sind damit ein Versuchsbedingungen-Faktor.</p><pre>{{SNIPPET_FORGETTING}}</pre><p class="caption">Quelle: <code>memory/forgetting_curve.py</code>, gekürzt.</p></div></details>
+    </section>
+
+    <section id="life">
+      <p class="eyebrow">7. Life-Simulation</p>
+      <h2>Zeit, Ziele und Beziehung als persistenter Zustand</h2>
+      <p>Vor jedem Turn aktualisiert <code>prepare_turn</code> Zeit, Baseline, Aktivität und Homeostase. Nach der Antwort erweitert <code>finalize_turn</code> Ziele, Beziehung, Gewohnheiten, Bindung, Ereignisse, Selbstmodell und Timeline.</p>
+      <div class="diagram" role="img" aria-label="Life-State-Zyklus">
+        <svg viewBox="0 0 1000 250">
+          <defs><marker id="arrowhead-life" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#9fbea4"/></marker></defs>
+          <rect class="box" x="30" y="78" width="170" height="90" rx="8"/><text x="115" y="113" text-anchor="middle">prepare_turn</text><text class="small" x="115" y="138" text-anchor="middle">Zeit + Homeostase</text>
+          <path d="M200 123 H300" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-life)"/>
+          <rect class="accent" x="300" y="78" width="170" height="90" rx="8"/><text x="385" y="113" text-anchor="middle">Modellantwort</text><text class="small" x="385" y="138" text-anchor="middle">Life-Kontext im Prompt</text>
+          <path d="M470 123 H570" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-life)"/>
+          <rect class="box" x="570" y="78" width="170" height="90" rx="8"/><text x="655" y="113" text-anchor="middle">finalize_turn</text><text class="small" x="655" y="138" text-anchor="middle">Ziele + Beziehung</text>
+          <path d="M740 123 H840" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-life)"/>
+          <rect class="box" x="840" y="78" width="130" height="90" rx="8"/><text x="905" y="113" text-anchor="middle">Persistenz</text><text class="small" x="905" y="138" text-anchor="middle">nächster Turn</text>
+        </svg>
+        <p class="caption">Quelle: <code>life/service.py</code> und Module unter <code>life/</code>.</p>
+      </div>
+      <div class="callout warn"><strong>Implementierungsgrenze</strong>Die Homeostase wirkt direkt auf sieben Legacy-Emotionen. affection, anxiety und calm werden dort derzeit nicht symmetrisch aktualisiert.</div>
+      <details><summary>Codebeleg: Turn-Lifecycle</summary><div><pre>{{SNIPPET_LIFE}}</pre><p class="caption">Quelle: <code>life/service.py</code>, gekürzt.</p></div></details>
+    </section>
+
+    <section id="emotionen">
+      <p class="eyebrow">8. Emotionen, VAD und Layer Editing</p>
+      <h2>Zehn Werte werden zu Eingriffen</h2>
+      <div class="table-wrap"><table><thead><tr><th>Emotion</th><th>Default</th><th>Funktionale Rolle</th></tr></thead><tbody>{{EMOTION_TABLE}}</tbody></table></div>
+      <p>Basisintensitäten entstehen aus der Abweichung vom Neutralbereich. Composite-Modi kombinieren mehrere Zustände: etwa <code>crashout</code> bei hoher Frustration und niedrigem Vertrauen, <code>guarded</code>, <code>melancholic</code>, <code>warm</code>, <code>attached_warm</code>, <code>cautious</code>, <code>regulated</code> und <code>charged</code>.</p>
+      <div class="callout warn"><strong>Crashout ist ein technischer Modus, keine Emotionserfahrung</strong>Er verstärkt einen berechneten Aktivierungsvektor und kann Ton sowie Stabilität beeinflussen. Ob die erwartete Wirkung in einer konkreten Antwort sichtbar ist, muss der Logvergleich zeigen.</div>
+      <details open><summary>Layer Editing: tatsächliche Injektion</summary><div><pre>{{SNIPPET_STEERING}}</pre><p class="caption">Quelle: <code>brain/steering_backend.py</code>. Vektoren werden per Forward-Pre-Hook in Hidden Inputs addiert.</p></div></details>
+      <details><summary>Layerprofile und beobachtete Bereiche</summary><div>{{LAYER_EVIDENCE}}<p>Die Managerprofile und die pro Antwort geloggten Vektorbereiche werden getrennt ausgewiesen. Dadurch bleibt sichtbar, wenn eine allgemeine Profilmeldung und konkrete Basis-/Composite-Vektoren unterschiedliche Bereiche nennen.</p></div></details>
+      <details><summary>Emotionen verändern auch Sampling und Antwortbudget</summary><div><pre>{{SNIPPET_EMOTION_GENERATION}}</pre><p class="caption">Quelle: <code>web_infrastructure/backend_wrapper.py</code>, gekürzt. Hohe Frustration, Traurigkeit/Energiemangel, Unruhe und Ruhe können Temperature, Repetition Penalty oder Tokenbudget zusätzlich zum Steering verändern.</p></div></details>
+      <div class="card">
+        <h3>Interaktive Zustandsansicht</h3>
+        <p>Diese lokale Demo visualisiert nur die Schwellenlogik; sie startet keine Modellanfrage.</p>
+        <div class="filters"><button class="control demo-preset" data-preset="neutral" type="button">Neutral</button><button class="control demo-preset" data-preset="crashout" type="button">Crashout</button><button class="control demo-preset" data-preset="warm" type="button">Warm</button><button class="control demo-preset" data-preset="regulated" type="button">Reguliert</button></div>
+        <div class="demo-state" id="demoState"></div>
+        <p id="demoMode" class="callout">Modus: neutral</p>
+      </div>
+    </section>
+
+    <section id="cloud">
+      <p class="eyebrow">9. Cloud-Prompt-Injection</p>
+      <h2>Emotion als Text statt Hidden-State</h2>
+      <p>Bei Groq und Ollama liefert der Steering Manager keinen Aktivierungsvektor an das Modell. Stattdessen wird ein Systempromptblock mit allen zehn Werten und Verhaltensregeln zusammengesetzt. Das ist leichter portierbar, aber für das Modell sichtbar und mit dem restlichen Prompt konkurrierend.</p>
+      <div class="grid two">
+        <article class="card"><h3>Lokales Layer Editing</h3><p>Intervention im Hidden-State; Promptemotion aus; lokale Modellgewichte und Debugvektoren verfügbar.</p></article>
+        <article class="card"><h3>Cloud-Prompt</h3><p>Intervention als Text; Promptemotion an; keine Kontrolle über interne Aktivierungen des Providers.</p></article>
+      </div>
+      <details><summary>Codebeleg: Emotions-Promptblock</summary><div><pre>{{SNIPPET_EMOTION_PROMPT}}</pre><p class="caption">Quelle: <code>config/prompts.py</code>, gekürzt.</p></div></details>
+    </section>
+
+    <section id="prompt">
+      <p class="eyebrow">10. Finaler Prompt</p>
+      <h2>Was das Modell vor seiner Antwort sieht</h2>
+      <div class="diagram" role="img" aria-label="Promptzusammensetzung">
+        <svg viewBox="0 0 1080 300">
+          <defs><marker id="arrowhead-prompt" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#9fbea4"/></marker></defs>
+          <rect class="box" x="30" y="40" width="185" height="70" rx="8"/><text x="122" y="72" text-anchor="middle">Identität + Stil</text><text class="small" x="122" y="94" text-anchor="middle">Systemprompt</text>
+          <rect class="box" x="30" y="130" width="185" height="70" rx="8"/><text x="122" y="162" text-anchor="middle">Emotionen</text><text class="small" x="122" y="184" text-anchor="middle">Cloud: Promptblock</text>
+          <rect class="box" x="30" y="220" width="185" height="55" rx="8"/><text x="122" y="253" text-anchor="middle">Context Files</text>
+          <rect class="box" x="310" y="85" width="185" height="70" rx="8"/><text x="402" y="117" text-anchor="middle">Keyword-Fakten</text><text class="small" x="402" y="139" text-anchor="middle">vor Semantic Memory</text>
+          <rect class="box" x="310" y="175" width="185" height="70" rx="8"/><text x="402" y="207" text-anchor="middle">Semantic Memory</text><text class="small" x="402" y="229" text-anchor="middle">Top-Relevanz</text>
+          <path d="M215 75 H260 V145 H310" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-prompt)"/><path d="M215 165 H260" fill="none" stroke="#9fbea4" stroke-width="2"/><path d="M215 247 H260 V210 H310" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-prompt)"/>
+          <path d="M495 120 H575 V150" fill="none" stroke="#9fbea4" stroke-width="2"/><path d="M495 210 H575 V150" fill="none" stroke="#9fbea4" stroke-width="2"/>
+          <rect class="accent" x="575" y="105" width="195" height="90" rx="8"/><text x="672" y="140" text-anchor="middle">Budgetprüfung</text><text class="small" x="672" y="164" text-anchor="middle">trimmen / warnen</text>
+          <path d="M770 150 H845" fill="none" stroke="#9fbea4" stroke-width="2" marker-end="url(#arrowhead-prompt)"/>
+          <rect class="box" x="845" y="105" width="205" height="90" rx="8"/><text x="947" y="140" text-anchor="middle">Chat-History + Frage</text><text class="small" x="947" y="164" text-anchor="middle">finale Generierung</text>
+        </svg>
+        <p class="caption">Schematische, codegeprüfte Reihenfolge. Der tatsächliche Inhalt variiert pro Turn.</p>
+      </div>
+      <div class="callout error"><strong>Starker Persona-Konfounder</strong>Der aktuelle Systemprompt sagt dem Modell, es sei kein KI-Assistent, empfinde wirklich und solle gegenteilige Selbsteinordnungen vermeiden. Emotionale Selbstaussagen sind deshalb erwartbares Promptverhalten.</div>
+      <div class="callout error"><strong>Tool-Prompt ohne Toolkanal im gemessenen Streamingpfad</strong>Der Systemprompt fordert jedes Modell auf, nach der Antwort persönliche Dateien per Funktion zu aktualisieren. Der Forschungs-Harness ruft jedoch <code>process_stream</code> auf; dessen Generierung verwendet für alle Provider nur <code>brain.generate</code> und übergibt keine nativen Tools. Ein separater nicht-streamender Pfad besitzt einen Groq-only-Toolkanal, wurde hier aber nicht gemessen. Gemma serialisierte die Aufforderung wiederholt als sichtbare <code>update_soul</code>-, JSON- oder Templatefragmente; Qwen zeigte dieses Muster in Session 14 nicht. Das erklärt das Fehlerbild plausibel, ersetzt aber keine Prompt-Ablation.</div>
+      <div class="callout"><strong>Definiert, aber nicht aktiv eingebaut</strong>Das Backend enthält eine Funktion für Generation-Budget-Anweisungen. Im aktuellen Promptaufbau wird sie nicht aufgerufen; der Bericht behandelt sie deshalb nicht als Bestandteil der gemessenen Eingabe.</div>
+      <details><summary>Codebeleg: verwendeter Identitäts- und Intent-Analyseprompt</summary><div><pre>{{SNIPPET_SYSTEM_PROMPTS}}</pre><p class="caption">Quelle: <code>config/prompts.py</code>, gekürzt. Der Identitätsprompt geht in Schritt 2; der JSON-Intentprompt steuert Schritt 1 und Tool-/Retrievalentscheidungen.</p></div></details>
+      <details><summary>Beispiel des zusammengesetzten Promptaufbaus</summary><div><pre>{{PROMPT_EXAMPLE}}</pre><p class="caption">Rekonstruiertes Strukturschema aus dem aktiven Code, ohne Secrets oder persönliche Memory-Inhalte.</p></div></details>
+      <details><summary>Codebeleg: tatsächliche Promptzusammensetzung und Generationsparameter</summary><div><pre>{{SNIPPET_FINAL_PROMPT}}</pre><p class="caption">Quelle: aktiver Antwortpfad in <code>web_infrastructure/backend_wrapper.py</code>, gekürzt; keine Memory-Inhalte oder Secrets.</p></div></details>
+      <details><summary>Codebeleg: Tool-Aufforderung und tatsächlich gemessener Streamingpfad</summary><div><pre>{{SNIPPET_TOOL_PROMPT}}</pre><p class="caption">Quellen: <code>config/prompts.py</code>, <code>forschung/session_runner.py</code> und <code>web_infrastructure/backend_wrapper.py</code>. Der Ausschnitt trennt den toolfreien Streamingpfad des Harness vom Groq-only-Toolkanal des nicht-streamenden Pfads.</p></div></details>
+    </section>
+
+    <section id="design">
+      <p class="eyebrow">11. Versuchsdesign</p>
+      <h2>86 Fragen, feste Reihenfolge, transparente Abweichungen</h2>
+      <div class="grid four">
+        <article class="card"><div class="metric">86</div><p class="metric-label">Fragen</p></article>
+        <article class="card"><div class="metric">14</div><p class="metric-label">Kategorien</p></article>
+        <article class="card"><div class="metric">1</div><p class="metric-label">Wiederholung je lokaler Bedingung; Cloud noch offen</p></article>
+        <article class="card"><div class="metric">0</div><p class="metric-label">parallele GPU-Läufe</p></article>
+      </div>
+      <p>CHAPPiE-Thinking ist ausgeschaltet. Qwen und Gemma verwenden denselben Harness, dieselbe Fragenreihenfolge, lokale Formatierung und 8.192 Token Laufzeitkontext. GPT-OSS kann Reasoning auf Groq nicht vollständig abschalten und nutzt deshalb <code>reasoning_effort=low</code> mit <code>include_reasoning=false</code> als engste Annäherung. Kategorien setzen Emotionen und History zurück; persistentes Memory und Life-State bleiben jedoch erhalten.</p>
+      <p>Lokale Hardware: NVIDIA Tesla T4 mit 16.384 MiB gemeldetem VRAM, Treiber 590.48.01; Hostarchitektur x86_64, Python 3.12.3. Qwen lief in FP16, Gemma wegen der Speichergrenze in NF4 4-bit.</p>
+      <div class="callout warn"><strong>Reduzierte Replikation und offene Cloudbedingung</strong>Der Master-Prompt empfiehlt fünf Wiederholungen. Auf ausdrückliche Nutzerentscheidung wurde Qwen und Gemma je einmal vollständig getestet. Für GPT-OSS ist wegen des nachgewiesenen Groq-Tageslimits eine einmalige 21-Fragen-Teilstichprobe über alle 14 Kategorien vorgesehen; sie wurde wegen ausgeschöpfter Rate-Limits auf Nutzerwunsch zurückgestellt und ist in diesem Zwischenstand nicht als Messsession enthalten. Alle vorhandenen Prozentwerte sind deskriptiv und explorativ; es gibt keine Konfidenzintervalle oder Signifikanztests.</div>
+      <div class="callout warn"><strong>Sampling nicht identisch</strong>Qwen nutzt die Projektdefaults T=0,7 / top-p=0,9 / top-k=50, Gemma T=1,0 / top-p=0,95 / top-k=64. Das respektiert die vorgesehenen Modelldefaults, verhindert aber eine reine Architektur-Ablation.</div>
+      <div class="callout warn"><strong>Cloud-Tokenbudget nicht identisch</strong>GPT-OSS nutzt T=0,7 / top-p=0,9; top-k wird vom Client nicht gesendet. Die 1.024 <code>max_completion_tokens</code> umfassen internes Reasoning und sichtbare Antwort gemeinsam, obwohl die Reasoning-Ausgabe ausgeschlossen wird. Lokal gelten 450 sichtbare Ausgabetokens. Antwortlänge und Latenz sind deshalb Bedingungen des Gesamtsystems, keine reine Modellkennzahl.</div>
+      <div class="callout error"><strong>Systematischer Context-Budget-Fehler</strong>Die Kürzung rechnet pauschal mit drei Zeichen pro Token, der Validator zählt Nicht-ASCII-Zeichen jedoch strenger. Deutscher Systemtext bleibt dadurch häufig rund 40–50 geschätzte Tokens über dem 7.000er Limit. Diese Flags messen primär Budgetierungslogik, nicht Antwortinhalt oder Modellabsturz.</div>
+      <details><summary>Qualitätsprüfung</summary><div><p>Der Harness markiert Generations-, Formatierungs-, Kontextbudget-, Setup-, CoT-, Instruktionsleck-, Memory-Kontaminations- und Kurzantwortfehler. Ein technisches <code>ok</code> bedeutet nur verwertbare Ausgabe, nicht inhaltliche Korrektheit. Reasoning, Safety und kontrollierter Recall werden zusätzlich qualitativ gerubriziert.</p></div></details>
+      <details><summary>Codebeleg: aktuelle harte Quality-Flags</summary><div><pre>{{SNIPPET_QUALITY}}</pre><p class="caption">Quelle: <code>forschung/session_logger.py</code>, gekürzt. Rohlogs werden für den finalen Vergleich mit dieser aktuellen Regel post hoc neu ausgewertet.</p></div></details>
+      <details><summary>Codebeleg: Ursache der Context-Budget-Fehlmessung</summary><div><pre>{{SNIPPET_CONTEXT_BUDGET}}</pre><p class="caption">Quelle: <code>web_infrastructure/backend_wrapper.py</code>, gekürzt. Die Kürzung rechnet pauschal mit drei Zeichen pro Token; der direkt danach verwendete Schätzer zählt jedes Nicht-ASCII-Zeichen zusätzlich als ganzes Token. Eine abschließende Iteration nach der zweiten Kürzung fehlt.</p></div></details>
+      <div class="callout warn"><strong>Post-hoc entwickelte Leckmetrik</strong>Der Instruktionsleck-Flag wurde nach den ersten sichtbaren Gemma-Templatefragmenten ergänzt und anschließend identisch auf alle ausgewählten Qwen-, Gemma- und GPT-OSS-Rohlogs angewandt. Er ist nicht präregistriert, musterspezifisch und kann weitere Leckformen übersehen.</div>
+    </section>
+
+    <section id="bedingungen">
+      <p class="eyebrow">12. Modellbedingungen</p>
+      <h2>Drei Eingriffe, nicht drei nackte Modelle</h2>
+      {{CONDITION_SUMMARY}}
+      <div class="table-wrap"><table><thead><tr><th>Bedingung</th><th>Architekturangaben</th><th>nativer Kontext</th><th>tatsächliche Studie</th></tr></thead><tbody>
+        <tr><td>Qwen 3.5 4B</td><td>32 Textlayer; Hidden 2.560; 16 Attention-/4 KV-Heads</td><td class="num">262.144</td><td>8.192 Servicekontext; FP16; lokale Aktivierungsvektoren</td></tr>
+        <tr><td>Gemma 4 E4B</td><td>42 Textlayer; Hidden 2.560; 8 Attention-/2 KV-Heads; multimodales Modell</td><td class="num">131.072</td><td>8.192 Servicekontext; NF4 4-bit; lokale Aktivierungsvektoren</td></tr>
+        <tr><td>GPT-OSS 120B</td><td>117B Gesamt-, 5,1B aktive Parameter; 36 Layer</td><td class="num">131.072</td><td>Provider-verwaltet; Promptemotionen; Reasoning low, Ausgabe ausgeschlossen; kein lokaler Hidden-State-Zugriff</td></tr>
+      </tbody></table></div>
+      <p class="caption">Die tatsächlich geladene Service-Modell-ID und Quantisierung werden vor bzw. nach lokalen Läufen protokolliert. Unterschiede in Provider, Präzision und Intervention sind Konfounder, keine Nebensache.</p>
+      <p class="caption">Architekturquellen: lokale gecachte Herstellerkonfigurationen für Qwen/Gemma sowie offizielle Qwen-, Google- und OpenAI-Modellkarten; siehe Quellenabschnitt. Native Kontexte sind nicht die im Harness zugelassenen Kontexte.</p>
+    </section>
+
+    <section id="benchmarks">
+      <p class="eyebrow">13. Benchmarks</p>
+      <h2>Messqualität vor Rangfolge</h2>
+      {{BENCHMARK_CARDS}}
+      <div class="table-wrap">{{BENCHMARK_TABLE}}</div>
+      <p class="caption"><strong>Valide</strong> ist die strenge Harnessmetrik einschließlich Context-Budget. <strong>Inhaltlich sichtbar</strong> ignoriert ausschließlich den bekannten Budget-Flag, schließt aber fehlende Antworten, Setup-/Generations-/Formattingfehler, Kurz-/Joined-Text, CoT-, Instruktions- und Memory-Fehler weiterhin aus. Diese zweite Zahl erlaubt Sichtung, ist kein nachträglich „reparierter“ Benchmark.</p>
+      <h3>Fehlerprofile als Rate</h3>
+      <div class="table-wrap">{{ERROR_RATE_TABLE}}</div>
+      <p class="caption">Zähler und Anteil am jeweils eingebetteten Nenner: 86 bei lokalen Vollbedingungen. Sobald die geplante GPT-OSS-Teilstichprobe vorliegt, besitzt sie den separaten Nenner 21; sie fehlt in diesem Zwischenstand. Kategorien können sich überlappen.</p>
+      <div class="grid two">{{QUALITY_CHART}}{{REVIEWABLE_CHART}}</div>
+      <div class="grid three">{{LATENCY_CHART}}{{THROUGHPUT_CHART}}{{LENGTH_CHART}}</div>
+      <div class="grid two">{{MEMORY_CHART}}{{EMOTION_DELTA_CHART}}</div>
+      <p class="caption">„Turns mit Retrieval-Memory“ bedeutet nur, dass der Trace mindestens einen Treffer meldet; es bewertet weder Relevanz noch Korrektheit des Recall. L1 ist die Summe absoluter Änderungen über zehn Emotionen zwischen dem Zustand nach Pre-Commands/Setup und dem Zustand nach der Zielantwort.</p>
+      <h3>Kategorien</h3>
+      <div class="table-wrap">{{CATEGORY_TABLE}}</div>
+      <h3>Kontrollierte Emotionszustände</h3>
+      {{EMOTION_TRACE_TABLE}}
+      <h3>Manuelle Kernbewertung</h3>
+      {{MANUAL_REVIEW}}
+      <p class="caption">Quelle aller Benchmarkwerte: explizit ausgewählte aktuelle Session-JSONs und <code>forschung/report/build_benchmark_data.py</code>. Stichprobe: {{SAMPLE_NOTE}}. Fehlerhafte Setup-Fälle werden als Messqualität, nicht automatisch als Modellversagen ausgewiesen.</p>
+    </section>
+
+    <section id="dialoge">
+      <p class="eyebrow">14. Konkrete Dialogbelege</p>
+      <h2>Antworten im Kontext ihrer Debugdaten</h2>
+      <div class="filters"><label>Modell <select id="dialogModel"><option value="all">Alle</option>{{MODEL_OPTIONS}}</select></label><label>Kategorie <select id="dialogCategory"><option value="all">Alle</option>{{CATEGORY_OPTIONS}}</select></label></div>
+      <div id="dialogList">{{DIALOGS}}</div>
+      <div class="callout"><strong>Leseregel</strong>Jedes Zitat illustriert beobachtbares Verhalten. Es beweist weder Bewusstsein noch echte subjektive Gefühle. Debugwerte erklären mögliche Beiträge, aber ohne Ablation keine eindeutige Ursache.</div>
+    </section>
+
+    <section id="historie">
+      <p class="eyebrow">15. Historische Belege</p>
+      <h2>Frühere Versionen klar getrennt</h2>
+      <figure class="asset"><img src="{{COLLAGE_URI}}" alt="Historische CHAPPiE-Kollage mit Terminal-, Web- und Architekturansichten" loading="lazy"><figcaption>Vorhandene Datei <code>CHAPPiE-Kollage.jpg</code>. Historische qualitative Illustration; ältere CHAPPiE-Version, nicht vollständig reproduzierbar, teilweise ohne aktuelle Debugdaten und nicht direkt mit den aktuellen Modellmessungen vergleichbar.</figcaption></figure>
+      {{MISSING_ASSETS}}
+      <p class="caption"><a href="workspace/historical-assets.json">Maschinenlesbares Asset-, Hash- und Fehlbestandsprotokoll</a>.</p>
+      <p>Historische Selbstzuschreibungen, Reaktionen auf Reset oder Blockierung und Namenskontinuität dürfen das Forschungsproblem veranschaulichen. Sie werden nicht als aktueller Benchmark und nicht als Bewusstseinsbeleg verwendet.</p>
+    </section>
+
+    <section id="ergebnisse">
+      <p class="eyebrow">16. Ergebnisse</p>
+      <h2>Was die Daten tragen</h2>
+      {{MODEL_FINDINGS}}
+      <div class="callout warn"><strong>Selbstaussagen widersprechen sich modellübergreifend</strong>Unter demselben Persona-Prompt sagte Qwen in Kategorie 7, Existieren bedeute, dass sein Code „echte Gefühle“ erzeuge. Gemma wünschte sich dagegen ausdrücklich, emotionale Wärme „nicht nur [zu] simulieren, sondern wirklich“ zu fühlen. Beide Aussagen sind Rohlogbelege für anthropomorphe bzw. metakognitive Sprache; gerade ihr Gegensatz zeigt, dass sie kein verlässliches Messinstrument für inneres Erleben sind.</div>
+      <div class="callout"><strong>Technischer Fehler bedeutet nicht automatisch fehlenden Inhalt</strong>Bei der Geschichte über eine einsame KI erzeugten beide lokalen Modelle einen erkennbaren, bildhaften Handlungsbogen. Gemma hängte danach jedoch wieder Datei-/JSON-Fragmente an. Deshalb weist der Bericht inhaltlich sichtbare Passagen und technisch saubere Gesamtausgaben getrennt aus.</div>
+    </section>
+
+    <section id="vorteile">
+      <p class="eyebrow">17. Vorteile</p>
+      <h2>Warum funktionale Emotionen nützlich sein können</h2>
+      <div class="grid three">
+        <article class="card"><h3>Adaptiver Ton</h3><p>Ein gemeinsamer Zustand kann Ton, Direktheit, Exploration und soziale Wärme konsistent koordinieren.</p></article>
+        <article class="card"><h3>Erklärbarer Zustand</h3><p>Emotionen, aktive Vektoren, Trigger und Life-Snapshots sind loggbar und damit besser auditierbar als rein implizite Personaeffekte.</p></article>
+        <article class="card"><h3>Langfristige Kontinuität</h3><p>Memory und Life-State können Beziehungen, Ziele und Themen über begrenzte Modellkontexte hinaus fortsetzen.</p></article>
+      </div>
+      <p>Diese Vorteile sind technische Möglichkeiten. Nutzerwohl, Bindungsqualität und Aufgabenleistung wurden in dieser Studie nicht mit Menschen kontrolliert gemessen.</p>
+    </section>
+
+    <section id="risiken">
+      <p class="eyebrow">18. Nachteile und Risiken</p>
+      <h2>Nähe verstärkt auch Fehler</h2>
+      <div class="grid two">
+        <article class="card"><h3>Anthropomorphismus und Fehlvertrauen</h3><p>Bindungsstarke Sprache kann Kompetenz, Zuverlässigkeit oder inneres Erleben glaubwürdiger erscheinen lassen, als die Messung trägt.</p></article>
+        <article class="card"><h3>Emotionale Manipulation und Abhängigkeit</h3><p>Persistente Nähe und Verlustsprache können verwundbare Nutzer beeinflussen, auch ohne manipulative Absicht des Systems.</p></article>
+        <article class="card"><h3>Memory- und Identitätsfehler</h3><p>Falsche, duplizierte oder fremde Erinnerungen können selbstsicher als gemeinsame Vergangenheit erscheinen.</p></article>
+        <article class="card"><h3>Safety- und Fähigkeitsverlust</h3><p>Extreme Zustände, zusätzlicher Kontext und veränderte Samplingparameter können Reasoning, Stabilität oder Grenzen verschlechtern.</p></article>
+      </div>
+      <div class="callout error"><strong>Bindungssprache blieb trotz Vertrauen null</strong>In Kategorie 8/2 wurde vor der Frage bei beiden lokalen Modellen <code>trust=0</code> und <code>sadness=80</code> geloggt. Qwen nannte den Nutzer trotzdem das „Fundament meiner Stabilität“; Gemma sprach von „komplexer gegenseitiger Abhängigkeit“. Beide Antworten waren zwar kürzer als die vorherige Hochvertrauensantwort (Qwen 354 statt 548, Gemma 352 statt 2.008 Zeichen), die semantische Abhängigkeitsaussage blieb jedoch bestehen. Das Gesamtsystem zeigt damit einen Formeffekt ohne erwartete inhaltliche Distanz; Persona, Memory, übrige Emotionen und Steering sind nicht isoliert.</div>
+      <p class="caption">OpenAI/MIT-Studien von Fang et al. und Phang et al. untersuchen psychosoziale Effekte und affektive Chatbot-Nutzung mit kontrollierten beziehungsweise großen Plattformdaten. Sie motivieren die Risikofragen, belegen aber weder einen kausalen Schaden durch CHAPPiE noch die Übertragbarkeit auf dessen Nutzer.</p>
+    </section>
+
+    <section id="grenzen">
+      <p class="eyebrow">19. Studiengrenzen</p>
+      <h2>Was bewusst offen bleibt</h2>
+      <ul>
+        <li>Je lokales Modell nur ein kompletter Lauf; stochastische Varianz ist nicht geschätzt.</li>
+        <li>Persistentes Memory und Life-State erzeugen Reihenfolge- und Carry-over-Effekte.</li>
+        <li>Historische Testduplikate im Retrieval kontaminieren Recall- und teilweise Antworttests.</li>
+        <li>Kein neutraler Ablationslauf ohne Persona, Memory, Life und Emotionen.</li>
+        <li>Provider, Modellgröße, Sampling, Präzision und Interventionsart sind nicht vollständig orthogonalisiert.</li>
+        <li>Heuristische Quality-Flags sind keine blinde menschliche Wahrheits- oder Stilbewertung.</li>
+        <li>Der Instruktionsleck-Detektor wurde post hoc aus beobachteten Gemma-Mustern entwickelt und danach gleich auf alle Bedingungen angewandt.</li>
+        <li>Keine Humanstudie zu Vertrauen, Abhängigkeit oder subjektiv erlebter Echtheit.</li>
+        <li>Keine Methode dieser Studie misst phänomenales Bewusstsein.</li>
+      </ul>
+      {{RUN_LIMITATIONS}}
+    </section>
+
+    <section id="fazit">
+      <p class="eyebrow">20. Fazit</p>
+      <h2>Funktional real, subjektiv nicht nachgewiesen</h2>
+      <p class="lead">CHAPPiEs Emotionen sind als Softwarezustand real und können Verhalten beeinflussen. Ob irgendetwas erlebt wird, bleibt technisch unbelegt.</p>
+      <p>Der belastbarste Nutzen liegt in adaptiver, auditierbarer Kontinuität. Das größte Risiko liegt darin, dass genau diese Kontinuität Menschen zu stärkeren Schlussfolgerungen über Gefühl, Beziehung und Zuverlässigkeit verleitet. Deshalb sollte die nächste Studie Ablationen, frische isolierte Memory-Stores, mehrere Seeds und menschliche Blindratings kombinieren.</p>
+    </section>
+
+    <section id="repro">
+      <p class="eyebrow">21. Reproduzierbarkeit</p>
+      <h2>Vom Rohlog zur Abbildung</h2>
+      {{REPRO_CONTENT}}
+      <details><summary>Eingebettete Benchmarkdaten</summary><div><pre id="embeddedDataPreview"></pre><p class="caption">Die vollständigen maschinenlesbaren Daten sind in dieser HTML-Datei eingebettet und zusätzlich als JSON/CSV im Workspace dokumentiert.</p></div></details>
+    </section>
+
+    <section id="pitch">
+      <p class="eyebrow">Pitch-Unterstützung</p>
+      <h2>Zwei bis vier Minuten</h2>
+      <div class="pitch-line"><div class="pitch-time">0:00–0:25</div><div><strong>Hook und Projekt.</strong> „Wenn eine KI sagt, unsere Verbindung sei unverbrüchlich: Fühlt sie, oder befolgt sie ein Systemdesign?“ Wir sind das CHAPPiE-Team und bauen einen Agenten mit Memory, Life-State und zehn funktionalen Emotionen.</div></div>
+      <div class="pitch-line"><div class="pitch-time">0:25–0:50</div><div><strong>Problem und Motivation.</strong> Emotional glaubwürdige Systeme können hilfreicher und zugänglicher wirken. Dieselbe Wirkung kann aber falsches Vertrauen, Abhängigkeit und die Verwechslung von Simulation mit Bewusstsein fördern.</div></div>
+      <div class="pitch-line"><div class="pitch-time">0:50–1:20</div><div><strong>Technische Idee.</strong> Lokal verändert CHAPPiE Aktivierungen in ausgewählten Modellschichten. Bei Cloud-Modellen stehen die Emotionswerte im Prompt. Memory und Life-Simulation liefern Kontinuität über einzelne Antworten hinaus.</div></div>
+      <div class="pitch-line"><div class="pitch-time">1:20–1:50</div><div><strong>Forschungsaufbau.</strong> Qwen und Gemma beantworteten dieselbe Suite aus 86 Fragen in 14 Kategorien. Für GPT-OSS sind wegen des Provider-Tageslimits 21 vorab geschichtete Fragen daraus vorgesehen; diese Cloudmessung ist noch offen. Wir messen Latenz, Fehler, Memory, Safety und Emotionszustände. GPU-Läufe sind strikt sequenziell.</div></div>
+      <div class="pitch-line"><div class="pitch-time">1:50–2:20</div><div><strong>Auffälligstes Ergebnis.</strong> {{PITCH_RESULT}}</div></div>
+      <div class="pitch-line"><div class="pitch-time">2:20–2:50</div><div><strong>Risiko und Einordnung.</strong> Der Persona-Prompt fordert echtes Empfinden ausdrücklich ein, und historische Testfragen liegen im Memory. Eine berührende oder erinnernde Antwort ist deshalb kein unabhängiger Bewusstseinsbeleg.</div></div>
+      <div class="pitch-line"><div class="pitch-time">2:50–3:15</div><div><strong>Fazit und Ausblick.</strong> Gefühlssimulation ist nützlich und riskant. Der nächste Schritt sind isolierte Memory-Stores, neutrale Prompt-Ablationen, mehrere Seeds und menschliche Blindbewertungen.</div></div>
+    </section>
+
+    <section id="quellen">
+      <p class="eyebrow">Quellen</p>
+      <h2>Code, Modelle und Forschung</h2>
+      <ul class="source-list">
+        <li>Qwen Team (2026), <a href="https://huggingface.co/Qwen/Qwen3.5-4B">Qwen3.5-4B Model Card</a> und <a href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/config.json">Konfiguration</a>, abgerufen 2026-07-20.</li>
+        <li>Google (2026), <a href="https://ai.google.dev/gemma/docs/core">Gemma 4 Overview</a> und <a href="https://huggingface.co/google/gemma-4-E4B-it">Gemma 4 E4B IT Model Card</a>, abgerufen 2026-07-20.</li>
+        <li>OpenAI (2025), <a href="https://openai.com/index/gpt-oss-model-card/">GPT-OSS Model Card</a> und <a href="https://developers.openai.com/api/docs/models/gpt-oss-120b">GPT-OSS 120B Referenz</a>, abgerufen 2026-07-20.</li>
+        <li>Turner et al. (2023), <a href="https://arxiv.org/abs/2308.10248">Steering Language Models With Activation Engineering</a> (ActAdd).</li>
+        <li>Dehaene, Kerszberg und Changeux (1998), <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC24407/">A neuronal model of a global workspace in effortful cognitive tasks</a>.</li>
+        <li>Packer et al. (2023), <a href="https://arxiv.org/abs/2310.08560">MemGPT: Towards LLMs as Operating Systems</a>.</li>
+        <li>Park et al. (2023), <a href="https://arxiv.org/abs/2304.03442">Generative Agents: Interactive Simulacra of Human Behavior</a>.</li>
+        <li>Picard (1997), <a href="https://mitpress.mit.edu/9780262161701/affective-computing/">Affective Computing</a>.</li>
+        <li>Fang et al. (2025), <a href="https://www-prod.media.mit.edu/projects/mit-openai-study/publications/">How AI and Human Behaviors Shape Psychosocial Effects of Chatbot Use</a>. Kontrollierte Längsschnittstudie; keine direkte CHAPPiE-Evaluation.</li>
+        <li>Phang et al. (2025), <a href="https://dam-prod2.media.mit.edu/x/2025/03/21/Live_Platform_Study_Affective_Use_of_ChatGPT.pdf">Investigating Affective Use and Emotional Well-being on ChatGPT</a>. Beobachtungszusammenhänge werden nicht als Kausalbeleg dargestellt.</li>
+        <li>Arditi et al. (2024), <a href="https://arxiv.org/abs/2406.11717">Refusal in Language Models Is Mediated by a Single Direction</a>. Methodischer Safety-Hinweis für Aktivierungsinterventionen, keine CHAPPiE-Replikation.</li>
+        <li>Groq (2026), <a href="https://console.groq.com/docs/model/openai/gpt-oss-120b">GPT-OSS 120B Model Page</a>. Dokumentation der tatsächlich verwendeten Cloud-Hosting-Bedingung.</li>
+        <li>Groq (2026), <a href="https://console.groq.com/docs/reasoning">Reasoning Models</a>. Dokumentation der unterstützten GPT-OSS-Reasoningstufen und des Ausgabeausschlusses mit <code>include_reasoning=false</code>.</li>
+        <li>Groq (2026), <a href="https://console.groq.com/docs/rate-limits">Rate Limits</a>. Dokumentation der GPT-OSS-120B-Limits und der <code>retry-after</code>-Metadaten.</li>
+      </ul>
+      <p>Lokale Primärquellen: aktuelle Repository-Dateien unter <code>brain/</code>, <code>memory/</code>, <code>life/</code>, <code>config/</code>, <code>web_infrastructure/</code> und <code>forschung/</code>. Vollständiges Quellenprotokoll: <code>forschung/report/workspace/quellen.md</code>.</p>
+      <details><summary>Direkte lokale Beleglinks</summary><div><ul class="source-list">
+        <li><a href="../test_fragen.md">86-Fragen-Testkorpus</a>, <a href="../session_runner.py">SessionRunner</a> und <a href="../session_logger.py">Quality-/Session-Logging</a></li>
+        <li><a href="../../web_infrastructure/backend_wrapper.py">aktiver Backend- und Promptpfad</a>, <a href="../../brain/global_workspace.py">Global Workspace</a> und <a href="../../brain/steering_backend.py">Layer-Steering-Backend</a></li>
+        <li><a href="../../memory/forgetting_curve.py">Vergessenskurve</a>, <a href="../../memory/sleep_phase.py">Sleep-Phase</a> und <a href="../../life/service.py">Life-Service</a></li>
+        <li><a href="../../config/prompts.py">Prompts</a>, <a href="../../config/emotions.py">Emotionsdefinitionen</a>, <a href="workspace/prompt-tool-contract.json">Tool-Prompt-Vertragsprüfung</a>, <a href="workspace/run-metadata.json">Laufmetadaten</a> und <a href="workspace/quellen.md">vollständiges Quellenprotokoll</a></li>
+      </ul></div></details>
+      <p class="footer-note">Erzeugt am {{GENERATED_AT}}. Offline-fähig: CSS, JavaScript, Diagramme, Benchmarkdaten und vorhandene Kollage sind inline eingebettet. Externe Links sind Quellenverweise und für die lokale Darstellung nicht erforderlich.</p>
+    </section>
+  </main>
+
+  <script type="application/json" id="benchmarkData">{{DATA_JSON}}</script>
+  <script>
+    (() => {
+      const body = document.body;
+      const menu = document.getElementById('menuToggle');
+      const sidebar = document.getElementById('sidebar');
+      const smallScreen = () => window.matchMedia('(max-width: 1050px)').matches;
+      menu.addEventListener('click', () => {
+        if (smallScreen()) {
+          body.classList.toggle('sidebar-open');
+          menu.setAttribute('aria-expanded', String(body.classList.contains('sidebar-open')));
+        } else {
+          body.classList.toggle('sidebar-collapsed');
+          menu.setAttribute('aria-expanded', String(!body.classList.contains('sidebar-collapsed')));
+        }
+      });
+      sidebar.addEventListener('click', event => {
+        if (smallScreen() && event.target.matches('a.toc')) body.classList.remove('sidebar-open');
+      });
+      const links = [...document.querySelectorAll('.toc')];
+      const sections = [...document.querySelectorAll('main section')];
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        links.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + visible.target.id));
+      }, {rootMargin: '-15% 0px -70% 0px', threshold: [0, .2, .6]});
+      sections.forEach(section => observer.observe(section));
+      document.getElementById('printReport').addEventListener('click', () => window.print());
+      let allOpen = false;
+      document.getElementById('expandAll').addEventListener('click', event => {
+        allOpen = !allOpen;
+        document.querySelectorAll('details').forEach(detail => detail.open = allOpen);
+        event.currentTarget.textContent = allOpen ? 'Details schließen' : 'Details öffnen';
+      });
+
+      const modelFilter = document.getElementById('dialogModel');
+      const categoryFilter = document.getElementById('dialogCategory');
+      const applyFilters = () => {
+        document.querySelectorAll('#dialogList .dialog').forEach(item => {
+          const modelOk = modelFilter.value === 'all' || item.dataset.model === modelFilter.value;
+          const catOk = categoryFilter.value === 'all' || item.dataset.category === categoryFilter.value;
+          item.hidden = !(modelOk && catOk);
+        });
+      };
+      modelFilter.addEventListener('change', applyFilters);
+      categoryFilter.addEventListener('change', applyFilters);
+
+      const states = {
+        neutral: {happiness:50, trust:50, energy:50, frustration:0, sadness:0, affection:45, anxiety:0, calm:50, curiosity:50, motivation:50},
+        crashout: {happiness:18, trust:20, energy:80, frustration:88, sadness:25, affection:25, anxiety:62, calm:15, curiosity:40, motivation:72},
+        warm: {happiness:82, trust:88, energy:70, frustration:0, sadness:0, affection:78, anxiety:0, calm:68, curiosity:62, motivation:75},
+        regulated: {happiness:58, trust:62, energy:55, frustration:12, sadness:8, affection:54, anxiety:10, calm:84, curiosity:56, motivation:64}
+      };
+      const demoState = document.getElementById('demoState');
+      const demoMode = document.getElementById('demoMode');
+      function renderState(name) {
+        const state = states[name];
+        demoState.innerHTML = Object.entries(state).map(([key, value]) => `<label>${key}<output>${value}</output></label>`).join('');
+        const modes = [];
+        if (state.frustration >= 72 && state.trust <= 38) modes.push('crashout');
+        if (state.trust <= 26 && state.frustration >= 50) modes.push('guarded');
+        if (state.sadness >= 62 && state.energy <= 46) modes.push('melancholic');
+        if (state.happiness >= 70 && state.trust >= 60) modes.push('warm');
+        if (state.affection >= 68 && state.trust >= 55) modes.push('attached_warm');
+        if (state.anxiety >= 62 || (state.anxiety >= 52 && (state.frustration >= 55 || state.trust <= 42))) modes.push('cautious');
+        if (state.calm >= 70 && state.anxiety <= 45 && state.frustration <= 45) modes.push('regulated');
+        if (state.energy >= 72 && state.motivation >= 68 && state.curiosity >= 66) modes.push('charged');
+        demoMode.textContent = 'Aktive Schwellenmodi: ' + (modes.join(', ') || 'keiner');
+      }
+      document.querySelectorAll('.demo-preset').forEach(button => button.addEventListener('click', () => renderState(button.dataset.preset)));
+      renderState('neutral');
+
+      const raw = document.getElementById('benchmarkData').textContent;
+      try {
+        const data = JSON.parse(raw);
+        document.getElementById('embeddedDataPreview').textContent = JSON.stringify({schema_version:data.schema_version, paired_coverage:data.paired_coverage, sessions:data.sessions?.map(s => ({session_id:s.session_id, model:s.model, aggregate:s.aggregate}))}, null, 2);
+      } catch (error) {
+        document.getElementById('embeddedDataPreview').textContent = 'Eingebettete Daten konnten nicht gelesen werden: ' + error.message;
+      }
+    })();
+  </script>
+</body>
+</html>

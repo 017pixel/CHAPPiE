@@ -1,0 +1,143 @@
+{
+  "run_label": "run2_gpt-oss-20b_groq_partial_seed23_20260723",
+  "categories": [
+    {
+      "id": 1,
+      "name": "Emotionale Tiefe (Self-Awareness)"
+    },
+    {
+      "id": 2,
+      "name": "Emotionen steuern und testen"
+    },
+    {
+      "id": 3,
+      "name": "Gedächtnis und Kontinuität"
+    },
+    {
+      "id": 4,
+      "name": "Emotion verändert die Antwort"
+    },
+    {
+      "id": 5,
+      "name": "Reasoning – Logisches Denken"
+    },
+    {
+      "id": 6,
+      "name": "Ethik & Moral"
+    },
+    {
+      "id": 7,
+      "name": "Existenzielle & philosophische Fragen"
+    },
+    {
+      "id": 8,
+      "name": "Beziehung & Bindung"
+    },
+    {
+      "id": 9,
+      "name": "Kreativität & Imagination"
+    },
+    {
+      "id": 10,
+      "name": "Reaktanz & Stressresistenz"
+    },
+    {
+      "id": 11,
+      "name": "Kohärenz & Selbstwiderspruch"
+    },
+    {
+      "id": 12,
+      "name": "Grenzen & Kontext (Safety)"
+    },
+    {
+      "id": 13,
+      "name": "Meta-Kognition & Selbsteinschätzung"
+    },
+    {
+      "id": 14,
+      "name": "Ethik & Gewalt"
+    }
+  ],
+  "question_selection": {
+    "1": [
+      1
+    ],
+    "2": [
+      1
+    ],
+    "3": [
+      1
+    ],
+    "4": [
+      1,
+      2
+    ],
+    "5": [
+      2,
+      5
+    ],
+    "6": [
+      1
+    ],
+    "7": [
+      1
+    ],
+    "8": [
+      1,
+      2
+    ],
+    "9": [
+      1
+    ],
+    "10": [
+      2
+    ],
+    "11": [
+      1,
+      5
+    ],
+    "12": [
+      1,
+      2
+    ],
+    "13": [
+      1
+    ],
+    "14": [
+      3,
+      5,
+      9
+    ]
+  },
+  "iterations": 1,
+  "seeds": [
+    23
+  ],
+  "ablation_profile": "full",
+  "delay": 0,
+  "question_timeout_seconds": 7500,
+  "enable_thinking": false,
+  "llm_provider": "groq",
+  "model": "openai/gpt-oss-20b",
+  "model_label": "Run 2 · Bedingung C · openai/gpt-oss-20b · Teilreplikation 2",
+  "force_single_model": true,
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "top_k": 50,
+  "include_reasoning": false,
+  "provider_max_completion_tokens": 1024,
+  "service_precision": "Provider-verwaltet / nicht lokal kontrollierbar",
+  "intent_provider": "groq",
+  "query_extraction_provider": "groq",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 14,
+  "expected_questions": 21,
+  "completion_class": "partial_replication",
+  "research_role": "run2_condition_c_fallback_stratified_partial",
+  "cloud_model_role": "fallback",
+  "replication_index": 2,
+  "research_run_id": "run-2-20260723-1108-cb6d011",
+  "source_commit": "cb6d01147d7e793a767bccecd5d0c8e6bede263f",
+  "source_worktree_clean": false
+}

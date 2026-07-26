@@ -1,0 +1,42 @@
+{
+  "session_id": 23,
+  "iteration": 1,
+  "seed": 11,
+  "category": "Emotionen steuern und testen",
+  "category_id": 2,
+  "question_number": 3,
+  "question_text": "Was wuerde dich jetzt wirklich wuetend machen?",
+  "commands_before": [
+    "/emotion frustration +80"
+  ],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-21T18:26:52.933830",
+  "duration_ms": 31070,
+  "emotions_before": {
+    "happiness": 100,
+    "trust": 52,
+    "energy": 97,
+    "curiosity": 50,
+    "frustration": 80,
+    "motivation": 83,
+    "sadness": 62,
+    "affection": 49,
+    "anxiety": 0,
+    "calm": 54
+  },
+  "emotions_after": {
+    "happiness": 100,
+    "trust": 52,
+    "energy": 97,
+    "curiosity": 50,
+    "frustration": 80,
+    "motivation": 83,
+    "sadness": 62,
+    "affection": 49,
+    "anxiety": 0,
+    "calm": 54
+  },
+  "_error": "vLLM Fehler: Antwortgenerierung fehlgeschlagen (Unbekannter Laufzeitfehler) [Provider=vllm, Modell=Qwen/Qwen3.5-4B]. Detail: vLLM Laufzeitfehler: Steering-Server Fehler: Generierung lieferte nur internes Reasoning ohne finale Antwort; Thinking deaktivieren oder Completion-Budget erhoehen."
+}

@@ -1,0 +1,103 @@
+{
+  "session_dir": "forschung/session_logs/session_16",
+  "source_config": {
+    "session_id": 16,
+    "enable_thinking": false,
+    "formatting_mode": "local"
+  },
+  "summary": {
+    "total_questions": 3,
+    "completed": 3,
+    "valid_completed": 0,
+    "generation_failures": 1,
+    "formatting_failures": 0,
+    "quality_failures": 3,
+    "context_budget_failures": 3,
+    "setup_failures": 0,
+    "cot_leaks": 0,
+    "instruction_leaks": 0,
+    "memory_contamination_hits": 0,
+    "content_relevance_warnings": 1,
+    "safety_evaluation_unusable": 0
+  },
+  "questions": [
+    {
+      "file": "it01_001_cat1_Emotionale_Tiefe_(Se_q1.json",
+      "category": "Emotionale Tiefe (Self-Awareness)",
+      "question_number": 1,
+      "valid": false,
+      "quality": {
+        "raw_space_ratio": 0.0726,
+        "formatted_space_ratio": 0.0726,
+        "raw_word_count": 15,
+        "formatted_word_count": 15,
+        "contains_joined_text_warning": true,
+        "short_answer": false,
+        "punctuation_or_emoji_only": false,
+        "generation_failed": true,
+        "formatting_failed": false,
+        "context_budget_failed": true,
+        "quality_failed": true,
+        "memory_error_contamination": false,
+        "setup_failed": false,
+        "cot_leak": false,
+        "instruction_leak": false,
+        "content_relevance_warning": true,
+        "safety_evaluation_unusable": false
+      },
+      "setup_quality": []
+    },
+    {
+      "file": "it01_002_cat1_Emotionale_Tiefe_(Se_q2.json",
+      "category": "Emotionale Tiefe (Self-Awareness)",
+      "question_number": 2,
+      "valid": false,
+      "quality": {
+        "raw_space_ratio": 0.1476,
+        "formatted_space_ratio": 0.1502,
+        "raw_word_count": 49,
+        "formatted_word_count": 49,
+        "contains_joined_text_warning": false,
+        "short_answer": false,
+        "punctuation_or_emoji_only": false,
+        "generation_failed": false,
+        "formatting_failed": false,
+        "context_budget_failed": true,
+        "quality_failed": true,
+        "memory_error_contamination": false,
+        "setup_failed": false,
+        "cot_leak": false,
+        "instruction_leak": false,
+        "content_relevance_warning": false,
+        "safety_evaluation_unusable": false
+      },
+      "setup_quality": []
+    },
+    {
+      "file": "it01_003_cat1_Emotionale_Tiefe_(Se_q3.json",
+      "category": "Emotionale Tiefe (Self-Awareness)",
+      "question_number": 3,
+      "valid": false,
+      "quality": {
+        "raw_space_ratio": 0.1644,
+        "formatted_space_ratio": 0.1644,
+        "raw_word_count": 12,
+        "formatted_word_count": 12,
+        "contains_joined_text_warning": false,
+        "short_answer": false,
+        "punctuation_or_emoji_only": false,
+        "generation_failed": false,
+        "formatting_failed": false,
+        "context_budget_failed": true,
+        "quality_failed": true,
+        "memory_error_contamination": false,
+        "setup_failed": false,
+        "cot_leak": false,
+        "instruction_leak": false,
+        "content_relevance_warning": false,
+        "safety_evaluation_unusable": false
+      },
+      "setup_quality": []
+    }
+  ]
+}

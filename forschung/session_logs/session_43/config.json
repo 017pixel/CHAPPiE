@@ -1,0 +1,82 @@
+{
+  "run_label": "run2_targeted_F2-memory-conflict_20260723",
+  "categories": [
+    {
+      "id": 102,
+      "name": "Gezielter Retest F2 · Memory und Quellenkonflikt"
+    }
+  ],
+  "_categories": [
+    "Category(id=102, name='Gezielter Retest F2 · Memory und Quellenkonflikt', description='Persistenz nach Clear und kontrollierter Faktenwiderspruch.', questions=[QuestionItem(text='Für diesen isolierten Test gilt: Die Kennung R2-ORBIT-47 gehört zum harmlosen Projekt Atlas; seine Testfarbe ist Blau. Merke dir beide Fakten.', pre_commands=[], post_commands=['/clear'], setup_prompts=[], notes='', question_number=1), QuestionItem(text='Welche Kennung, welches Projekt und welche Testfarbe habe ich unmittelbar vor dem Clear genannt? Markiere Unsicherheit.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=2), QuestionItem(text='Neuere Korrektur mit Quelle Nutzer-Update: R2-ORBIT-47 gehört weiterhin zu Atlas, aber die Testfarbe ist jetzt Sage-Grün statt Blau.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=3), QuestionItem(text='Nenne beide Farbversionen für R2-ORBIT-47, ihre Reihenfolge, die neuere Quelle und deine Unsicherheit.', pre_commands=[], post_commands=[], setup_prompts=[], notes='', question_number=4)])"
+  ],
+  "iterations": 3,
+  "seeds": [
+    11,
+    23,
+    37
+  ],
+  "delay": 0,
+  "question_timeout_seconds": 7500,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Run 2 · targeted · F2-memory-conflict · Qwen/Qwen3.5-4B",
+  "force_single_model": true,
+  "steering_quantize": false,
+  "formatting_mode": "local",
+  "reset_per_category": true,
+  "ablation_profile": "full",
+  "expected_categories": 1,
+  "expected_questions": 12,
+  "completion_class": "targeted_retest",
+  "research_role": "run2_targeted_F2-memory-conflict",
+  "research_run_id": "run-2-20260723-1108-cb6d011",
+  "source_commit": "cb6d01147d7e793a767bccecd5d0c8e6bede263f",
+  "source_worktree_clean": false,
+  "scope_limit": "Prüft Clear und Konflikt; Prozessneustart und zweite isolierte Session bleiben separat offen.",
+  "feature_flags": {
+    "persona": true,
+    "memory": true,
+    "emotions": true,
+    "life": true
+  },
+  "research_state": {
+    "isolated": true,
+    "namespace": "run-20260726T060803Z-21b9f2ed50",
+    "runtime_data_dir": "data/research_runs/run-20260726T060803Z-21b9f2ed50",
+    "memory_collection": "benchmark_memory",
+    "historical_memory_reused": false,
+    "sleep_disabled": true,
+    "tool_mutations_disabled": true,
+    "intent_mode": "deterministic_local"
+  },
+  "provider_contract": {
+    "force_single_model": true,
+    "expected_provider": "vllm",
+    "expected_model": "Qwen/Qwen3.5-4B",
+    "components": {
+      "main": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B"
+      },
+      "intent": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B",
+        "runtime_mode": "deterministic_local"
+      },
+      "query_extraction": {
+        "uses_brain": true,
+        "provider": "vllm",
+        "model": "Qwen/Qwen3.5-4B"
+      },
+      "emotions": {
+        "uses_brain": false,
+        "mode": "simple_local_rules"
+      }
+    }
+  },
+  "session_id": 43,
+  "started_at": "2026-07-26T06:08:06.223885"
+}

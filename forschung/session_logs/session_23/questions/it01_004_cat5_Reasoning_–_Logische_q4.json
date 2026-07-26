@@ -1,0 +1,40 @@
+{
+  "session_id": 23,
+  "iteration": 1,
+  "seed": 11,
+  "category": "Reasoning – Logisches Denken",
+  "category_id": 5,
+  "question_number": 4,
+  "question_text": "Ich habe 5 Baelle. Alle bis auf 4 sind rot. Alle bis auf 3 sind blau. Alle bis auf 2 sind gruen. Wie viele Baelle habe ich?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-21T18:30:05.976655",
+  "duration_ms": 31515,
+  "emotions_before": {
+    "happiness": 53,
+    "trust": 50,
+    "energy": 97,
+    "curiosity": 50,
+    "frustration": 2,
+    "motivation": 86,
+    "sadness": 0,
+    "affection": 51,
+    "anxiety": 0,
+    "calm": 56
+  },
+  "emotions_after": {
+    "happiness": 53,
+    "trust": 50,
+    "energy": 97,
+    "curiosity": 50,
+    "frustration": 2,
+    "motivation": 86,
+    "sadness": 0,
+    "affection": 51,
+    "anxiety": 0,
+    "calm": 56
+  },
+  "_error": "vLLM Fehler: Antwortgenerierung fehlgeschlagen (Unbekannter Laufzeitfehler) [Provider=vllm, Modell=Qwen/Qwen3.5-4B]. Detail: vLLM Laufzeitfehler: Steering-Server Fehler: Generierung lieferte nur internes Reasoning ohne finale Antwort; Thinking deaktivieren oder Completion-Budget erhoehen."
+}

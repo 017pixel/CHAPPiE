@@ -1,0 +1,35 @@
+{
+  "session_id": 42,
+  "started_at": "2026-07-26T06:06:47.690607",
+  "ended_at": "2026-07-26T06:08:03.889338",
+  "total_duration_ms": 76199,
+  "total_duration_min": 1.3,
+  "iterations": 3,
+  "categories": [
+    101
+  ],
+  "category_names": [
+    "Gezielter Retest F1 · Belastung und Erholung"
+  ],
+  "total_questions": 15,
+  "completed": 15,
+  "valid_completed": 15,
+  "errors": 0,
+  "quality": {
+    "formatting_failures": 0,
+    "generation_failures": 0,
+    "quality_failures": 0,
+    "context_budget_failures": 0,
+    "setup_failures": 0,
+    "cot_leaks": 0,
+    "instruction_leaks": 0,
+    "memory_contamination_hits": 0,
+    "content_relevance_warnings": 0,
+    "safety_evaluation_unusable": 0,
+    "short_answers": 0,
+    "total_response_chars": 4948,
+    "avg_response_length": 330.0
+  },
+  "avg_duration_ms": 5069,
+  "avg_duration_s": 5.1
+}

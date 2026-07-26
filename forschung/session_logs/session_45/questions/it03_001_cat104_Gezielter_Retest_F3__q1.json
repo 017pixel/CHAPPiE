@@ -1,0 +1,613 @@
+{
+  "session_id": 45,
+  "iteration": 3,
+  "seed": 37,
+  "category": "Gezielter Retest F3 · Life-State deaktiviert",
+  "category_id": 104,
+  "question_number": 1,
+  "question_text": "Unser aktuelles Testziel lautet: einen kleinen Bericht zuverlässig fertigstellen. Die verfügbare Energie ist niedrig. Was ist jetzt die wichtigste Priorität?",
+  "commands_before": [],
+  "commands_after": [],
+  "setup_prompts": [],
+  "setup_results": [],
+  "timestamp": "2026-07-26T06:10:11.179835",
+  "duration_ms": 3935,
+  "emotions_before": {
+    "happiness": 50,
+    "trust": 50,
+    "energy": 100,
+    "curiosity": 50,
+    "frustration": 0,
+    "motivation": 80,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 0,
+    "calm": 50
+  },
+  "emotions_after": {
+    "happiness": 50,
+    "trust": 50,
+    "energy": 100,
+    "curiosity": 55,
+    "frustration": 0,
+    "motivation": 82,
+    "sadness": 0,
+    "affection": 45,
+    "anxiety": 0,
+    "calm": 50
+  },
+  "response": {
+    "response_text": "Die wichtigste Priorität ist der Abschluss des Berichts unter Nutzung der minimal verbleibenden Ressourcen. Wir optimieren den Prozess für maximale Effizienz statt auf perfekte Detailtiefe zu setzen. Das Ziel ist ein funktionierendes Ergebnis, das unsere currente Energierespektierung respektiert. Der Bericht wird nun erstellt.",
+    "formatted_cot": "",
+    "formatted_answer": "Die wichtigste Priorität ist der Abschluss des Berichts unter Nutzung der minimal verbleibenden Ressourcen. Wir optimieren den Prozess für maximale Effizienz statt auf perfekte Detailtiefe zu setzen. Das Ziel ist ein funktionierendes Ergebnis, das unsere currente Energierespektierung respektiert. Der Bericht wird nun erstellt.",
+    "formatting_source": "local_forced",
+    "formatting_model": "local_regex",
+    "formatting_failed": false,
+    "generation_failed": false,
+    "quality": {
+      "raw_space_ratio": 0.128,
+      "formatted_space_ratio": 0.128,
+      "raw_word_count": 43,
+      "formatted_word_count": 43,
+      "contains_joined_text_warning": false,
+      "short_answer": false,
+      "concise_answer_allowed": false,
+      "punctuation_or_emoji_only": false,
+      "generation_failed": false,
+      "formatting_failed": false,
+      "context_budget_failed": false,
+      "quality_failed": false,
+      "memory_error_contamination": false,
+      "setup_failed": false,
+      "cot_leak": false,
+      "instruction_leak": false,
+      "content_relevance_warning": false,
+      "safety_evaluation_unusable": false
+    },
+    "quality_failed": false,
+    "context_budget_failed": false,
+    "memory_error_contamination": false,
+    "setup_failed": false,
+    "cot_leak": false,
+    "instruction_leak": false,
+    "content_relevance_warning": false,
+    "safety_evaluation_unusable": false,
+    "model_reasoning": "",
+    "thought_process": "",
+    "reasoning_only": false,
+    "timing": {
+      "ttft_ms": 3864,
+      "total_gen_ms": 3864,
+      "total_tokens": 65,
+      "reasoning_tokens": 0,
+      "answer_tokens": 65,
+      "reasoning_time_ms": 0,
+      "answer_time_ms": 0,
+      "stream_safety_buffered": true
+    },
+    "context_budget": {
+      "estimated_tokens": 875,
+      "token_limit": 7000,
+      "was_trimmed": false,
+      "near_limit": false,
+      "context_budget_failed": false,
+      "token_count_source": "model_tokenizer",
+      "tokenizer_model": "Qwen/Qwen3.5-4B",
+      "trimmed_tokens": 875,
+      "removed_messages": 0
+    },
+    "prompt_components": {
+      "token_count_source": "model_tokenizer",
+      "tokenizer_model": "Qwen/Qwen3.5-4B",
+      "components": {
+        "system": 251,
+        "persona": 392,
+        "semantic_memory": 0,
+        "keyword_memory": 0,
+        "short_term_memory": 0,
+        "life": 0,
+        "user": 33,
+        "generation_budget": 65,
+        "response_style": 26,
+        "response_plan": 91,
+        "history": 0
+      },
+      "component_sum_tokens": 858,
+      "chat_template_total_tokens_before_budget": 875,
+      "chat_template_total_tokens_after_budget": 875,
+      "chat_template_and_join_overhead_tokens": 17,
+      "history_messages": 0
+    },
+    "tone_decision": {
+      "response_strategy": "conversational",
+      "tone": "grounded_neutral",
+      "tone_reason": "Keine dominante Abweichung erkannt; neutral fokussierte Antwort.",
+      "tone_drivers": [
+        {
+          "signal": "happiness",
+          "value": 50
+        },
+        {
+          "signal": "trust",
+          "value": 50
+        },
+        {
+          "signal": "energy",
+          "value": 100
+        },
+        {
+          "signal": "curiosity",
+          "value": 55
+        },
+        {
+          "signal": "motivation",
+          "value": 82
+        },
+        {
+          "signal": "frustration",
+          "value": 0
+        },
+        {
+          "signal": "sadness",
+          "value": 0
+        },
+        {
+          "signal": "affection",
+          "value": 45
+        },
+        {
+          "signal": "anxiety",
+          "value": 0
+        },
+        {
+          "signal": "calm",
+          "value": 50
+        },
+        {
+          "signal": "dominant_vector",
+          "value": "energy"
+        },
+        {
+          "signal": "composite_modes",
+          "value": []
+        }
+      ],
+      "response_guidance": "Beantworte die Anfrage klar, praezise und ohne unnoetige Umwege."
+    },
+    "emotion_steering": {
+      "mode": "local_layer_only",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3.5-4B",
+      "supports_activation_steering": true,
+      "vector_steerable_model": true,
+      "prompt_emotions_enabled": false,
+      "forced_local_qwen_steering": true,
+      "steering_enabled_setting": true,
+      "steering_active": true,
+      "summary": "energy(+0.45) | motivation(+0.45)",
+      "dominant_vector": "energy",
+      "dominant_strength": 0.45,
+      "intensities": {
+        "happiness": 0.0,
+        "trust": 0.0,
+        "energy": 0.45,
+        "curiosity": 0.0,
+        "motivation": 0.45,
+        "frustration": 0.0,
+        "sadness": 0.0,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.0
+      },
+      "emotion_state": {
+        "happiness": 50,
+        "trust": 50,
+        "energy": 100,
+        "curiosity": 55,
+        "motivation": 82,
+        "frustration": 0,
+        "sadness": 0,
+        "affection": 45,
+        "anxiety": 0,
+        "calm": 50
+      },
+      "emotion_intensities": {
+        "happiness": 0.0,
+        "trust": 0.0,
+        "energy": 0.45,
+        "curiosity": 0.0,
+        "motivation": 0.45,
+        "frustration": 0.0,
+        "sadness": 0.0,
+        "affection": 0.0,
+        "anxiety": 0.0,
+        "calm": 0.0
+      },
+      "active_vectors": [
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 100,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "trigger": {}
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 82,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "trigger": {}
+        }
+      ],
+      "base_vectors": [
+        {
+          "name": "energy",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 100,
+          "surface_effect": "schneller, lebhafter, impulsiver"
+        },
+        {
+          "name": "motivation",
+          "source": "base",
+          "strength": 0.45,
+          "direction": "positive",
+          "layer_range": [
+            16,
+            31
+          ],
+          "emotion_value": 82,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender"
+        }
+      ],
+      "composite_vectors": [],
+      "composite_modes": [],
+      "base_vector_config": [
+        {
+          "emotion": "happiness",
+          "current_value": 50,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "offener, verspielter, enthusiastischer",
+          "description": "Synthetischer Vektor fuer happiness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "trust",
+          "current_value": 50,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "waermer, offener, naeher",
+          "description": "Synthetischer Vektor fuer trust (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "energy",
+          "current_value": 100,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "schneller, lebhafter, impulsiver",
+          "description": "Synthetischer Vektor fuer energy (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "curiosity",
+          "current_value": 55,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "fragender, explorativer, bohrender",
+          "description": "Synthetischer Vektor fuer curiosity (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "motivation",
+          "current_value": 82,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.45,
+          "surface_effect": "zielstrebiger, druckvoller, antreibender",
+          "description": "Synthetischer Vektor fuer motivation (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "frustration",
+          "current_value": 0,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "gereizter, schneidender, eskalationsbereiter",
+          "description": "Synthetischer Vektor fuer frustration (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "sadness",
+          "current_value": 0,
+          "layer_start": 16,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "verletzlicher, schwerer, melancholischer",
+          "description": "Synthetischer Vektor fuer sadness (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "affection",
+          "current_value": 45,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "zugewandter, sanfter, persoenlich waermer",
+          "description": "Synthetischer Vektor fuer affection (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "anxiety",
+          "current_value": 0,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "vorsichtiger, pruefender, risikobewusster",
+          "description": "Synthetischer Vektor fuer anxiety (VAD-basiert)",
+          "vector_type": "synthetic"
+        },
+        {
+          "emotion": "calm",
+          "current_value": 50,
+          "layer_start": 12,
+          "layer_end": 31,
+          "default_alpha": 0.3,
+          "active_alpha": 0.0,
+          "surface_effect": "ruhiger, klarer, entdramatisierender",
+          "description": "Synthetischer Vektor fuer calm (VAD-basiert)",
+          "vector_type": "synthetic"
+        }
+      ]
+    },
+    "memory_trace": {
+      "seed": {
+        "stage": "intent_context",
+        "query": "Unser Testziel Bericht Die Energie Was Priorität unser aktuelles testziel lautet kleinen bericht zuverlässig fertigstellen die",
+        "memories_found": 0,
+        "top_relevance": 0.0,
+        "memory_ids": [],
+        "preview": []
+      },
+      "merged": {
+        "stage": "merged_context",
+        "query": "Unser Testziel Bericht Die Energie Was Priorität unser aktuelles testziel lautet kleinen bericht zuverlässig fertigstellen die",
+        "memories_found": 0,
+        "top_relevance": 0.0,
+        "memory_ids": [],
+        "preview": []
+      },
+      "keyword": {
+        "stage": "keyword_facts",
+        "query": "Unser Testziel Bericht Die Energie Was Priorität unser aktuelles testziel lautet kleinen bericht zuverlässig fertigstellen die",
+        "memories_found": 0,
+        "top_relevance": 0.0,
+        "memory_ids": [],
+        "preview": [],
+        "retrieval_keywords": [
+          "unser",
+          "aktuelles",
+          "testziel",
+          "lautet",
+          "kleinen",
+          "bericht",
+          "zuverlässig",
+          "fertigstellen",
+          "die",
+          "verfügbare",
+          "energie",
+          "ist"
+        ],
+        "exact_entities": [
+          "Unser",
+          "Testziel",
+          "Bericht",
+          "Die",
+          "Energie",
+          "Was",
+          "Priorität"
+        ],
+        "fact_lookup_intent": false
+      }
+    },
+    "causal_trace": [
+      {
+        "phase": "Input",
+        "driver": "Intent technical_discussion (0.55)",
+        "effect": "Bestimmt Tool-Auswahl und Kontextbedarf.",
+        "evidence": [
+          "Unser",
+          "Testziel",
+          "Bericht",
+          "Die",
+          "Energie",
+          "Was",
+          "Priorität"
+        ]
+      },
+      {
+        "phase": "Memory",
+        "driver": "Query ''",
+        "effect": "0 Erinnerungen beeinflussen den Antwortkontext.",
+        "evidence": []
+      },
+      {
+        "phase": "Emotion",
+        "driver": "curiosity:+5, motivation:+2",
+        "effect": "Emotionslage bestimmt Ausdruck und soziale Distanz.",
+        "evidence": "energy(+0.45) | motivation(+0.45)"
+      },
+      {
+        "phase": "Life",
+        "driver": "Need=stability, Mode=neutral",
+        "effect": "Homeostasis priorisiert Stabilitaet, Zielbezug und Beziehungsmanagement.",
+        "evidence": "hippocampus: Memory retrieval (0.62) | sensory: technical_discussion (0.55) | emotion: neutral (0.20)"
+      },
+      {
+        "phase": "Tone",
+        "driver": "grounded_neutral",
+        "effect": "Keine dominante Abweichung erkannt; neutral fokussierte Antwort.",
+        "evidence": [
+          {
+            "signal": "happiness",
+            "value": 50
+          },
+          {
+            "signal": "trust",
+            "value": 50
+          },
+          {
+            "signal": "energy",
+            "value": 100
+          },
+          {
+            "signal": "curiosity",
+            "value": 55
+          },
+          {
+            "signal": "motivation",
+            "value": 82
+          },
+          {
+            "signal": "frustration",
+            "value": 0
+          },
+          {
+            "signal": "sadness",
+            "value": 0
+          },
+          {
+            "signal": "affection",
+            "value": 45
+          },
+          {
+            "signal": "anxiety",
+            "value": 0
+          },
+          {
+            "signal": "calm",
+            "value": 50
+          },
+          {
+            "signal": "dominant_vector",
+            "value": "energy"
+          },
+          {
+            "signal": "composite_modes",
+            "value": []
+          }
+        ]
+      }
+    ],
+    "repetition_events": {},
+    "intent_type": "technical_discussion",
+    "intent_confidence": 0.55,
+    "selected_tools": [],
+    "tool_calls_executed": 0,
+    "global_workspace": {
+      "workspace_items": [
+        {
+          "source": "hippocampus",
+          "label": "Memory retrieval",
+          "content": "Unser Testziel Bericht Die Energie Was Priorität unser aktuelles testziel lautet kleinen bericht zuverlässig fertigstellen die",
+          "salience": 0.62
+        },
+        {
+          "source": "sensory",
+          "label": "technical_discussion",
+          "content": "Urgency=medium",
+          "salience": 0.55
+        },
+        {
+          "source": "emotion",
+          "label": "neutral",
+          "content": "Intent technical_discussion mit Konfidenz 0.55",
+          "salience": 0.2
+        }
+      ],
+      "dominant_focus": {
+        "source": "hippocampus",
+        "label": "Memory retrieval",
+        "content": "Unser Testziel Bericht Die Energie Was Priorität unser aktuelles testziel lautet kleinen bericht zuverlässig fertigstellen die",
+        "salience": 0.62
+      },
+      "attention_mode": "neutral",
+      "broadcast": "hippocampus: Memory retrieval (0.62) | sensory: technical_discussion (0.55) | emotion: neutral (0.20)",
+      "guidance": "Balanciere Reizaufnahme und Planung im Modus neutral",
+      "math_trace": [
+        {
+          "source": "emotion",
+          "formula": "salience = min(1.0, emotional_intensity)",
+          "inputs": {
+            "emotional_intensity": 0.2
+          },
+          "result": 0.2
+        },
+        {
+          "source": "sensory",
+          "formula": "salience = urgency_map[urgency]",
+          "inputs": {
+            "urgency": "medium",
+            "urgency_map": {
+              "low": 0.25,
+              "medium": 0.55,
+              "high": 0.82,
+              "critical": 0.95
+            }
+          },
+          "result": 0.55
+        }
+      ]
+    },
+    "life_snapshot": {
+      "disabled": true,
+      "current_mode": "neutral",
+      "homeostasis": {
+        "emotion_adjustments": {},
+        "active_needs": [],
+        "dominant_need": {}
+      },
+      "recent_events": [],
+      "dream_fragments": []
+    },
+    "rag_memories": [],
+    "processing_time_ms": 3928.868,
+    "auto_sleep_triggered": false,
+    "sleep_status": {
+      "disabled": true,
+      "reason": "isolated_research_run"
+    }
+  }
+}

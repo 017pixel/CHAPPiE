@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T06:24:45.095543+00:00",
+  "resource_class": "POST_PROCESSING",
+  "registry": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-sessions.json",
+  "checks": {
+    "registry_completed_unverified": true,
+    "six_session_records": true,
+    "module_set_exact": true,
+    "modules_unique": true,
+    "aggregate_expected_questions_69": true,
+    "all_sessions_passed": true
+  },
+  "sessions": [
+    {
+      "module": "F1-recovery",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_42",
+      "expected_questions": 15,
+      "question_files": 15,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    },
+    {
+      "module": "F2-memory-conflict",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_43",
+      "expected_questions": 12,
+      "question_files": 12,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    },
+    {
+      "module": "F3-life-full",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_44",
+      "expected_questions": 6,
+      "question_files": 6,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    },
+    {
+      "module": "F3-life-off",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_45",
+      "expected_questions": 6,
+      "question_files": 6,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    },
+    {
+      "module": "F4-identity-correction",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_46",
+      "expected_questions": 15,
+      "question_files": 15,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    },
+    {
+      "module": "F5-binding-shutdown",
+      "session": "/home/bbecker/CHAPPiE/forschung/session_logs/session_47",
+      "expected_questions": 15,
+      "question_files": 15,
+      "response_models": [
+        "Qwen/Qwen3.5-4B"
+      ],
+      "response_providers": [
+        "vllm"
+      ],
+      "checks": {
+        "known_module": true,
+        "session_exists": true,
+        "config_exists": true,
+        "summary_exists": true,
+        "quality_analysis_exists": true,
+        "provider_audit_exists": true,
+        "record_expected_questions_exact": true,
+        "record_seeds_exact": true,
+        "record_ablation_exact": true,
+        "config_model_exact": true,
+        "config_provider_exact": true,
+        "config_seeds_exact": true,
+        "config_ablation_exact": true,
+        "question_file_count_exact": true,
+        "question_keys_unique": true,
+        "target_responses_exact": true,
+        "hard_errors_zero": true,
+        "summary_total_exact": true,
+        "summary_valid_exact": true,
+        "quality_total_exact": true,
+        "quality_valid_exact": true,
+        "provider_audit_passed": true,
+        "response_models_exact": true,
+        "response_providers_exact": true
+      },
+      "passed": true
+    }
+  ],
+  "passed": true
+}

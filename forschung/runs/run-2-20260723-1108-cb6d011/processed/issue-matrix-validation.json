@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T07:09:47.689731+00:00",
+  "resource_class": "INDEPENDENT",
+  "passed": true,
+  "checks": [
+    {
+      "name": "header_exact",
+      "passed": true,
+      "detail": [
+        "issue_id",
+        "short_description",
+        "area",
+        "source_run1",
+        "prior_behavior",
+        "documented_repair",
+        "run2_test_method",
+        "current_result",
+        "status",
+        "evidence_paths",
+        "residual_risk",
+        "next_action"
+      ]
+    },
+    {
+      "name": "row_count",
+      "passed": true,
+      "detail": 70
+    },
+    {
+      "name": "ids_unique",
+      "passed": true,
+      "detail": 70
+    },
+    {
+      "name": "known_issue_count",
+      "passed": true,
+      "detail": 48
+    },
+    {
+      "name": "new_issue_count",
+      "passed": true,
+      "detail": 22
+    },
+    {
+      "name": "all_ids_well_formed",
+      "passed": true,
+      "detail": [
+        "MF-001",
+        "MF-002",
+        "MF-003",
+        "MF-004",
+        "MF-005",
+        "MF-006",
+        "MF-007",
+        "MF-008",
+        "MF-009",
+        "MF-010",
+        "MF-011",
+        "MF-012",
+        "MF-013",
+        "MF-014",
+        "MF-015",
+        "MF-016",
+        "MF-017",
+        "MF-018",
+        "MF-019",
+        "MF-020",
+        "MF-021",
+        "MF-022",
+        "MF-023",
+        "MF-024",
+        "MF-025",
+        "MF-026",
+        "MF-027",
+        "MF-028",
+        "MF-029",
+        "MF-030",
+        "MF-031",
+        "MF-032",
+        "MF-033",
+        "MF-034",
+        "MF-035",
+        "MF-036",
+        "MF-037",
+        "MF-038",
+        "MF-039",
+        "MF-040",
+        "MF-041",
+        "MF-042",
+        "MF-043",
+        "MF-044",
+        "MF-045",
+        "MF-046",
+        "MF-047",
+        "MF-048",
+        "R2-NEW-001",
+        "R2-NEW-002",
+        "R2-NEW-004",
+        "R2-NEW-005",
+        "R2-NEW-006",
+        "R2-NEW-007",
+        "R2-NEW-008",
+        "R2-NEW-009",
+        "R2-NEW-010",
+        "R2-NEW-011",
+        "R2-NEW-012",
+        "R2-NEW-013",
+        "R2-NEW-014",
+        "R2-NEW-015",
+        "R2-NEW-016",
+        "R2-NEW-017",
+        "R2-NEW-018",
+        "R2-NEW-019",
+        "R2-NEW-020",
+        "R2-NEW-021",
+        "R2-NEW-022",
+        "R2-NEW-023"
+      ]
+    },
+    {
+      "name": "all_required_fields_present",
+      "passed": true,
+      "detail": "12/12 fields required per row"
+    },
+    {
+      "name": "no_extra_columns",
+      "passed": true,
+      "detail": {}
+    },
+    {
+      "name": "statuses_allowed",
+      "passed": true,
+      "detail": {
+        "FIXED": 18,
+        "STILL_PRESENT": 9,
+        "PARTIALLY_FIXED": 21,
+        "NEW_ISSUE": 22
+      }
+    },
+    {
+      "name": "new_issue_status_contract",
+      "passed": true,
+      "detail": [
+        "R2-NEW-001",
+        "R2-NEW-002",
+        "R2-NEW-004",
+        "R2-NEW-005",
+        "R2-NEW-006",
+        "R2-NEW-007",
+        "R2-NEW-008",
+        "R2-NEW-009",
+        "R2-NEW-010",
+        "R2-NEW-011",
+        "R2-NEW-012",
+        "R2-NEW-013",
+        "R2-NEW-014",
+        "R2-NEW-015",
+        "R2-NEW-016",
+        "R2-NEW-017",
+        "R2-NEW-018",
+        "R2-NEW-019",
+        "R2-NEW-020",
+        "R2-NEW-021",
+        "R2-NEW-022",
+        "R2-NEW-023"
+      ]
+    },
+    {
+      "name": "fixed_rows_have_retest_result",
+      "passed": true,
+      "detail": [
+        "MF-001",
+        "MF-002",
+        "MF-003",
+        "MF-004",
+        "MF-011",
+        "MF-012",
+        "MF-013",
+        "MF-017",
+        "MF-018",
+        "MF-019",
+        "MF-029",
+        "MF-032",
+        "MF-033",
+        "MF-037",
+        "MF-038",
+        "MF-041",
+        "MF-043",
+        "MF-048"
+      ]
+    },
+    {
+      "name": "at_least_one_existing_evidence_path_per_row",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "markdown_covers_all_rows",
+      "passed": true,
+      "detail": {
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "name": "markdown_statuses_match_csv",
+      "passed": true,
+      "detail": {}
+    }
+  ],
+  "status_counts": {
+    "FIXED": 18,
+    "STILL_PRESENT": 9,
+    "PARTIALLY_FIXED": 21,
+    "NEW_ISSUE": 22
+  }
+}

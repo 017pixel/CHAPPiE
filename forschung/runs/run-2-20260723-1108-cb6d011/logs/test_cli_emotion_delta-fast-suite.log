@@ -1,0 +1,17 @@
+  OK: no-args shows status + syntax
+  OK: delta increase
+  OK: delta decrease
+  OK: delta negative number
+  OK: absolute set
+  OK: absolute set zero
+  OK: absolute set hundred
+  OK: clamp maximum
+  OK: clamp minimum
+  OK: absolute clamp above
+  OK: minus prefix is delta
+  OK: unknown name error
+  OK: invalid value error
+  OK: missing value usage
+  OK: no args no crash
+  OK: help contains delta syntax
+OK: CLI /emotion delta syntax (16 tests)

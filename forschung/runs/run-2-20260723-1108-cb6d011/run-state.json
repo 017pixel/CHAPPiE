@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "run_id": "run-2-20260723-1108-cb6d011",
+  "state": "COMPLETE",
+  "updated_at": "2026-07-26T06:52:58Z",
+  "gpu_lock_active": false,
+  "active_condition": null,
+  "active_session": null,
+  "provider_backoff_seconds": null,
+  "next_retry_not_before": null,
+  "last_verified_event": "Run 2 completed with documented limitations. All model-interaction work is complete and validated at its declared scope; the final issue matrix contains 70 classified points with no NOT_RETESTED known issue; findings, report, static checks and browser checks passed. Training and web PIDs 480679 and 480681 were resumed with SIGCONT, all four system services are active, steering and web health checks pass, and the frontend returns HTTP 200.",
+  "allowed_resource_classes": [
+    "INDEPENDENT",
+    "POST_PROCESSING",
+    "MONITORING",
+    "DEPENDENT"
+  ],
+  "post_processing_scope": "complete; all validated local, Cloud and targeted-follow-up artifacts were synthesized and no further model interaction is planned",
+  "dependent_work_released": true
+}

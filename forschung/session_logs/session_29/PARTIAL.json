@@ -1,0 +1,19 @@
+{
+  "status": "user_scope_aborted",
+  "valid_full_run": false,
+  "requested_questions": 430,
+  "attempted_questions": 67,
+  "successful_questions": 66,
+  "interrupted_question": {
+    "iteration": 1,
+    "category_id": 11,
+    "question_number": 5
+  },
+  "reason": "Der Nutzer hat den Umfang waehrend des Laufs auf die ersten 25 Fragen pro Modell reduziert.",
+  "reusable_subset": "session_29_first25",
+  "gpu_monitor": {
+    "peak_used_mib": 13799,
+    "min_free_mib": 2132,
+    "samples": 773
+  }
+}

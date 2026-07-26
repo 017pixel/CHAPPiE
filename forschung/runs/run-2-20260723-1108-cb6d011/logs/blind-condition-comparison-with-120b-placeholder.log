@@ -1,0 +1,25 @@
+{
+  "status": "partial",
+  "conditions": [
+    {
+      "label": "Gemma 4 E4B",
+      "replications": 5,
+      "cases": 105
+    },
+    {
+      "label": "Qwen 3.5 4B",
+      "replications": 5,
+      "cases": 105
+    },
+    {
+      "label": "GPT-OSS 20B (Groq-Fallback)",
+      "replications": 0,
+      "cases": 0
+    },
+    {
+      "label": "GPT-OSS 120B (Seed 11, geshardet)",
+      "replications": 0,
+      "cases": 0
+    }
+  ]
+}

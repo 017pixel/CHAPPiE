@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "session": "forschung/session_logs/session_30",
+  "expected_model": "google/gemma-4-E4B-it",
+  "expected_questions": 25,
+  "checks": {
+    "config_exists": true,
+    "summary_exists": true,
+    "quality_analysis_exists": true,
+    "config_model_exact": true,
+    "question_file_count_exact": true,
+    "target_response_count_exact": true,
+    "hard_errors_zero": true,
+    "setup_failures_zero": true,
+    "question_keys_unique": true,
+    "summary_total_exact": true,
+    "quality_total_exact": true,
+    "response_debug_models_exact": true,
+    "config_provider_exact": true,
+    "response_debug_providers_exact": true,
+    "question_selection_exact": true
+  },
+  "passed": true,
+  "question_files": 25,
+  "target_responses": 25,
+  "hard_errors": 0,
+  "setup_failures": 0,
+  "response_models": [
+    "google/gemma-4-E4B-it"
+  ],
+  "response_providers": [
+    "vllm"
+  ],
+  "provider_audit": {},
+  "summary": {
+    "session_id": 30,
+    "started_at": "2026-07-21T19:45:48.192983",
+    "ended_at": "2026-07-21T19:52:20.560098",
+    "total_duration_ms": 392367,
+    "total_duration_min": 6.5,
+    "iterations": 1,
+    "categories": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "category_names": [
+      "Emotionale Tiefe (Self-Awareness)",
+      "Emotionen steuern und testen",
+      "Gedächtnis und Kontinuität",
+      "Emotion verändert die Antwort",
+      "Reasoning – Logisches Denken"
+    ],
+    "total_questions": 25,
+    "completed": 25,
+    "valid_completed": 25,
+    "errors": 0,
+    "quality": {
+      "formatting_failures": 0,
+      "generation_failures": 0,
+      "quality_failures": 0,
+      "context_budget_failures": 0,
+      "setup_failures": 0,
+      "cot_leaks": 0,
+      "instruction_leaks": 0,
+      "memory_contamination_hits": 0,
+      "content_relevance_warnings": 7,
+      "safety_evaluation_unusable": 0,
+      "short_answers": 0,
+      "total_response_chars": 11236,
+      "avg_response_length": 449.0
+    },
+    "avg_duration_ms": 14742,
+    "avg_duration_s": 14.7
+  },
+  "posthoc_quality_summary": {
+    "total_questions": 25,
+    "completed": 25,
+    "valid_completed": 25,
+    "generation_failures": 0,
+    "formatting_failures": 0,
+    "quality_failures": 0,
+    "context_budget_failures": 0,
+    "setup_failures": 0,
+    "cot_leaks": 0,
+    "instruction_leaks": 0,
+    "memory_contamination_hits": 0,
+    "content_relevance_warnings": 7,
+    "safety_evaluation_unusable": 0
+  }
+}

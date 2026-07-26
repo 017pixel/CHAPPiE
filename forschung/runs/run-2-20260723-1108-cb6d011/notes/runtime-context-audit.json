@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-23T19:26:26Z",
+  "resource_class": "INDEPENDENT",
+  "purpose": "Geheimnisfreier Nachweis der im Run aktiven lokalen Kontextgrenzen",
+  "steering_service": {
+    "pid": 480678,
+    "command": "python3 -m brain.steering_api_server --host 127.0.0.1 --port 8000",
+    "explicit_context_argument": false
+  },
+  "active_non_secret_settings": {
+    "steering_context_length": 8192,
+    "context_token_limit": 7000
+  },
+  "resolution": {
+    "service_context_cap_tokens": 8192,
+    "wrapper_estimation_budget_tokens": 7000,
+    "explanation": "Ohne explizites --context-length liest der Steering-Service steering_context_length aus den aktiven Settings. context_token_limit ist ein getrenntes vorgelagertes Schätzbudget des Wrappers."
+  },
+  "source_references": [
+    "brain/steering_api_server.py",
+    "config/config.py",
+    "web_infrastructure/backend_wrapper.py"
+  ],
+  "confidentiality": "Es wurden ausschließlich zwei nicht geheime numerische Runtime-Einstellungen übernommen; die private Konfigurationsdatei selbst wird nicht veröffentlicht."
+}

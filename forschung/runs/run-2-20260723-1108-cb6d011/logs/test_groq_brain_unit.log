@@ -1,0 +1,47 @@
+  [OK] test_groqbrain_is_basebrain_subclass
+  [OK] test_is_missing_key_empty
+  [OK] test_is_missing_key_invalid
+  [OK] test_is_missing_key_valid
+WARNUNG: Groq Brain - Kein API-Key konfiguriert!
+   Trage deinen Key in CHAPPIE_CONFIG.json ein
+  [OK] test_get_model_info_without_key
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+  [OK] test_get_model_info_with_key
+WARNUNG: Groq Brain - Kein API-Key konfiguriert!
+   Trage deinen Key in CHAPPIE_CONFIG.json ein
+  [OK] test_is_available_false_without_key
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-20b
+  [OK] test_is_available_true_with_valid_key
+WARNUNG: Groq Brain - Kein API-Key konfiguriert!
+   Trage deinen Key in CHAPPIE_CONFIG.json ein
+  [OK] test_generate_returns_error_when_not_initialized
+WARNUNG: Groq Brain - Kein API-Key konfiguriert!
+   Trage deinen Key in CHAPPIE_CONFIG.json ein
+  [OK] test_list_models_returns_empty_when_not_initialized
+  [OK] test_groq_models_dict_not_empty
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-120b
+  [OK] test_model_defaults_from_settings
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: qwen/qwen3-32b
+  [OK] test_model_explicit_overrides_settings
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-20b
+  [OK] test_api_key_explicit_overrides_settings
+  [OK] test_sync_generation_passes_configured_top_p
+  [OK] test_non_reasoning_groq_model_keeps_requested_max_tokens
+  [OK] test_gpt_oss_thinking_enabled_does_not_exclude_reasoning_output
+Groq Rate-Limit: Retry 1/4 in 0.25s
+  [OK] test_sync_generation_retries_short_rate_limit_without_exposing_error
+Groq Rate-Limit: Retry 1/4 in 0.25s
+  [OK] test_stream_generation_retries_rate_limit_before_first_token
+  [OK] test_daily_rate_limit_duration_is_parsed_without_busy_retrying
+
+20/20 tests passed

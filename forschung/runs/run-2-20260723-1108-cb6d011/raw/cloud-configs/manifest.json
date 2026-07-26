@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "purpose": "Rate-limit-safe one-seed partial replications; never merge fallback models under GPT-OSS 120B",
+  "questions_per_replication": 21,
+  "planned_replicates_per_model_role": 5,
+  "seeds": [
+    11,
+    23,
+    37,
+    53,
+    71
+  ],
+  "configs": [
+    "raw/cloud-configs/gpt-oss-120b-seed-11.config.json",
+    "raw/cloud-configs/gpt-oss-120b-seed-23.config.json",
+    "raw/cloud-configs/gpt-oss-120b-seed-37.config.json",
+    "raw/cloud-configs/gpt-oss-120b-seed-53.config.json",
+    "raw/cloud-configs/gpt-oss-120b-seed-71.config.json",
+    "raw/cloud-configs/gpt-oss-20b-seed-11.config.json",
+    "raw/cloud-configs/gpt-oss-20b-seed-23.config.json",
+    "raw/cloud-configs/gpt-oss-20b-seed-37.config.json",
+    "raw/cloud-configs/gpt-oss-20b-seed-53.config.json",
+    "raw/cloud-configs/gpt-oss-20b-seed-71.config.json"
+  ]
+}

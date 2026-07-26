@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "gpu_or_model_calls": 0,
+  "prompt_source": "config/prompts.py",
+  "prompt_sha256": "f259c0e5f1ebdd3ea655ab80e9cd9db3bfa448f5e683b5721d8546b41206192f",
+  "tool_instruction_appended_when_emotions_and_thinking_disabled": true,
+  "tool_instruction_demands_post_answer_call": true,
+  "build_prompt_append_line": 320,
+  "backend_source": "web_infrastructure/backend_wrapper.py",
+  "runner_source": "forschung/session_runner.py",
+  "harness_process_stream_line": 286,
+  "measured_harness_uses_process_stream": true,
+  "streaming_path_start_line": 2441,
+  "streaming_plain_generate_line": 2531,
+  "streaming_path_uses_plain_generate": true,
+  "streaming_path_uses_generate_with_tools": false,
+  "native_tool_gate_line": 2128,
+  "nonstreaming_native_tools_groq_only": true,
+  "interpretation": "Der im Harness gemessene Streaming-Pfad enthaelt die Aufforderung zum Funktionsaufruf, ruft aber fuer alle Provider plain generate ohne strukturierten Toolkanal auf. Ein separater nicht-streamender Antwortpfad aktiviert native Tools nur fuer Groq.",
+  "causal_limit": "Code- und Output-Uebereinstimmung; keine Prompt-Ablation im aktuellen n=1-Vergleich."
+}

@@ -1,0 +1,19 @@
+Initialisiere Memory Engine...
+   Lade Embedding-Modell: all-MiniLM-L6-v2
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 4719.81it/s]
+   Embedding-Modell bereit! (Dimension: 384)
+   Verbinde mit ChromaDB (persistent: /tmp/chappie-context-budget-b7dtfuqc/chroma)
+   ChromaDB persistent verbunden!
+   Memory Engine bereit! (0 Erinnerungen, Modus: persistent)
+   Emotions: Simple-Analyse aktiv (Research-Ein-Modell-Modus)
+Emotions Engine geladen: H=50 T=50 E=100
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-20b
+Groq Brain initialisiert
+   Cloud API verbunden (https://api.groq.com/openai/v1)
+   Modell: openai/gpt-oss-20b
+[SteeringManager] Initialisiert mit 10 Vektoren
+   Modell-Profil: 32 Layers
+   Emotions-Bereich: Layer (10, 26)
+OK: model tokenizer context budget

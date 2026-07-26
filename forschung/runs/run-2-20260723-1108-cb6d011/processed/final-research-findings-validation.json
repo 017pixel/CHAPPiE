@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T07:09:47.741191+00:00",
+  "input": "/home/bbecker/CHAPPiE/forschung/runs/run-2-20260723-1108-cb6d011/processed/final-research-findings.json",
+  "checks": [
+    {
+      "name": "release_status",
+      "passed": true,
+      "detail": "FINAL_WITH_LIMITATIONS"
+    },
+    {
+      "name": "at_least_13_questions",
+      "passed": true,
+      "detail": 16
+    },
+    {
+      "name": "required_fields",
+      "passed": true,
+      "detail": "all six fields required"
+    },
+    {
+      "name": "questions_unique",
+      "passed": true,
+      "detail": 16
+    },
+    {
+      "name": "evidence_paths_exist",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "multiple_evidence_for_major_findings",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "forbidden_consciousness_claims_absent",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "four_part_language_nontrivial",
+      "passed": true,
+      "detail": "each interpretation field >= 40 characters"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-26T07:09:47.852599+00:00",
+  "html": "/home/bbecker/CHAPPiE/forschung/report/report-plan.html",
+  "markdown": "/home/bbecker/CHAPPiE/forschung/report/report-plan.md",
+  "checks": [
+    {
+      "name": "complete_section_hierarchy",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "internal_navigation_targets_exist",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "no_external_runtime_dependencies",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "notion_dark_design_tokens",
+      "passed": true,
+      "detail": {
+        "missing": [],
+        "forbidden": []
+      }
+    },
+    {
+      "name": "responsive_reduced_motion_and_print",
+      "passed": true,
+      "detail": "four media contracts"
+    },
+    {
+      "name": "accessibility_structure",
+      "passed": true,
+      "detail": "skip, labels, focus and landmarks"
+    },
+    {
+      "name": "inline_javascript_syntax",
+      "passed": true,
+      "detail": "node --check passed"
+    },
+    {
+      "name": "issue_counts_match_in_both_plans",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "condition_separation_matches",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "content_and_qa_plan_match",
+      "passed": true,
+      "detail": []
+    },
+    {
+      "name": "epistemic_language_contract",
+      "passed": true,
+      "detail": {
+        "forbidden_hits": [],
+        "limits_present": true
+      }
+    }
+  ],
+  "passed": true
+}

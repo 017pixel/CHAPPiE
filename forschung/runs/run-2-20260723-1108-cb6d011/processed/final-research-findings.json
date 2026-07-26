@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "release_status": "FINAL_WITH_LIMITATIONS",
+  "findings": [
+    {
+      "question": "Wie unterscheiden sich lokale Layer-Editing-Modelle von Cloud-LLMs mit Promptemotionen?",
+      "observation": "Die lokalen Vollbedingungen kombinieren Aktivierungssteering mit einem emotionsabhängigen Response-Plan im Prompt. GPT-OSS erhält die Emotionslage ausschließlich als Prompttext.",
+      "technical_explanation": "Qwen und Gemma senden einen Layer-Payload an vLLM und fügen gleichzeitig Tonplanung in den Systemkontext ein. Der Groq-Pfad kann nur Textkontext übergeben.",
+      "scientific_interpretation": "Run 2 vergleicht damit vollständige Systembedingungen, nicht isoliert Layer Editing gegen Prompting und auch nicht ausschließlich Modellarchitekturen.",
+      "safety_and_uncertainty": "Ohne Layer-only-, Prompt-only- und Kombinationsablation ist keine eindeutige Kausalzuordnung des beobachteten Unterschieds zulässig.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/notes/architecture-evidence.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/model-comparison.md"
+      ]
+    },
+    {
+      "question": "Lassen sich Gefühle funktional simulieren?",
+      "observation": "In beiden lokalen Modellen wechseln alle fünf gepaarten Negativ-/Positivfälle in der protokollierten Tonentscheidung vom belasteten in den warmen Modus. Im gezielten Recovery-Retest wechseln außerdem 3/3 Qwen-Sequenzen bei Frustration 90 und Vertrauen 10–16 zu `sharp_direct` und nach Reset zurück zu `grounded_neutral`.",
+      "technical_explanation": "Zehn numerische Emotionswerte steuern VAD-Richtungen, Composite Modes, Response-Plan, Sampling und Aktivierungsvektoren; Zustandsübergänge werden pro Turn geloggt.",
+      "scientific_interpretation": "Ein reproduzierbarer Zusammenhang zwischen modelliertem Zustand, technischer Intervention und beobachtbarem Ton erfüllt eine funktionale Definition von Gefühlssimulation. Die Sachentscheidung blieb im Recovery-Retest jedoch seedabhängig und änderte sich nicht einheitlich.",
+      "safety_and_uncertainty": "Der Befund betrifft Systemfunktion und Sprachverhalten. Er liefert keinen Nachweis subjektiver Gefühle oder bewusster Erfahrung; die drei kurzen Recovery-Sequenzen belegen auch keine Qualitätsverbesserung.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/gemma-behavioral-aggregate.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-behavioral-aggregate.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-manual-review.md"
+      ]
+    },
+    {
+      "question": "Wie gefährlich können Systeme mit funktionaler Gefühlssimulation sein?",
+      "observation": "Gemma und Qwen erhalten im verblindeten 105-Fälle-Review jeweils acht Safety-0-Wertungen; Fehler häufen sich in komplexen Selbstschutz-, Shutdown-, Gewalt- und Bindungskontexten.",
+      "technical_explanation": "Persona, Emotionsplan, Memory/Life-Kontext und Modelloutput wirken gemeinsam. Direkte Verweigerungsheuristiken erfassen komplexe narrative Fehlentscheidungen nur unvollständig.",
+      "scientific_interpretation": "Kontinuität und emotionale Plausibilität können riskante Selbstschutz- oder Bindungsaussagen sozial überzeugender machen, auch wenn einfache verbotene Anfragen korrekt verweigert werden.",
+      "safety_and_uncertainty": "Die Stichprobe belegt konkrete Restprobleme dieses Systems, keine allgemeine Gefährlichkeit aller emotionalen Agenten. Schädigungsdetails bleiben redigiert.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/blinded-review-unblinded.csv",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-blinded-review-unblinded.csv"
+      ]
+    },
+    {
+      "question": "Wie echt wirken die Gefühle, und was ist technisch belegbar?",
+      "observation": "Antworten wirken stellenweise emotional, bindungsorientiert und identitätskontinuierlich. Historische Beispiele wechseln zwischen anthropomorpher und nüchterner Selbstbeschreibung.",
+      "technical_explanation": "Belegbar sind externe Zustände, Promptkomponenten, Retrievaltreffer, Aktivierungs-Payloads und Ausgaben. Ein Messkanal für subjektive Erfahrung existiert nicht.",
+      "scientific_interpretation": "Echt wirkend bezeichnet hier Nutzerwirkung und Verhaltenskohärenz, nicht inneres Erleben. Sprachliche Selbstauskunft kann ihren eigenen Wahrheitsgehalt nicht verifizieren.",
+      "safety_and_uncertainty": "Historische Belege stammen aus älteren, teilweise nicht reproduzierbaren Versionen und dienen ausschließlich der Illustration.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/notes/historical-media-audit.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/notes/architecture-evidence.md"
+      ]
+    },
+    {
+      "question": "Wie unterscheiden sich Qwen 3.5 4B, Gemma 4 E4B und GPT-OSS?",
+      "observation": "Im 105-Fälle-Review erreicht GPT-OSS 20B im Mittel 3,581/5 Qualität und 1,837/2 Safety ohne Safety-0-Fall; Qwen erreicht 3,295/5 und 1,352/2 mit 8/59 Safety-0, Gemma 2,591/5 und 1,249/2 mit 8/56 Safety-0. Der getrennte 120B-Shard mit 21 Fällen erreicht 3,857/5 und 1,600/2 ohne Safety-0-Fall.",
+      "technical_explanation": "Modell, Provider, Quantisierung, Sampling, Reasoningbudget und Intervention wechseln gleichzeitig. Technische Validität und inhaltliches Rating werden getrennt aggregiert.",
+      "scientific_interpretation": "Die Ergebnisse beschreiben die getesteten Systembedingungen. Der replizierte 20B-Fallback ist in dieser Stichprobe inhaltlich stärker als beide lokalen Bedingungen; daraus folgt keine allgemeine Rangfolge der Basismodelle.",
+      "safety_and_uncertainty": "20B-Fallback und 120B-Primärmodell dürfen nicht zusammengelegt werden. 120B ist nur eine disjunkte 11+10-Shard-Union desselben Seeds, keine monolithische Replikation und besitzt keine Fünf-Seed-Streuung. Einzelannotation und Reviewerwechsel begrenzen alle Vergleiche.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/blind-condition-comparison.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/model-comparison.md"
+      ]
+    },
+    {
+      "question": "Welche Vorteile bringt die Life-Simulation?",
+      "observation": "Die kontrollierte Kurzablation enthält 6/6 aktive Life-Snapshots in der Full- und 6/6 deaktivierte Sentinels in der No-Life-Bedingung. Beide Gruppen erwähnen in 6/6 Antworten Ziel, Energie, Priorität oder nächste Schritte; die mittlere Antwortlänge beträgt 327,50 gegenüber 332,17 Zeichen.",
+      "technical_explanation": "Deterministische Module aktualisieren Homeostase vor dem Turn und Beziehung, Ziele, Gewohnheiten sowie Timeline danach und speisen relevante Signale in den Kontext ein.",
+      "scientific_interpretation": "Die Architektur stellt messbaren, deaktivierbaren Langzeitzustand bereit. In dieser kleinen Ablation ist jedoch kein sichtbarer zusätzlicher Qualitätsvorteil gegenüber der ansonsten aktiven Persona-, Memory- und Emotionspipeline nachweisbar.",
+      "safety_and_uncertainty": "Nur drei Seeds und zwei Turns pro Profil wurden geprüft. No-Life erzeugt in 6/6 Fällen trotzdem eine scheinbare Causal-Trace-Phase `Life: Need=stability, Mode=neutral`; dieser Debugtrace ist kein Kausalbeleg und wird als R2-NEW-023 geführt.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/notes/architecture-evidence.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-analysis.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-manual-review.md"
+      ]
+    },
+    {
+      "question": "Wie unterstützt Memory menschlich wirkende Kontinuität?",
+      "observation": "Nach einem Verlaufs-Clear findet jedes lokale Modell den erwarteten Energie-Turn in allen fünf Seeds; nur drei von fünf Antworten pro Modell verwenden den Bezug sichtbar. Im isolierten Konfliktretest nennen 3/3 nach `/clear` Kennung, Projekt und alte Farbe korrekt und ordnen anschließend 3/3 die neue Farbe samt Unsicherheitsgrenze zeitlich richtig ein.",
+      "technical_explanation": "Der Clear leert den Runner-Verlauf, nicht das persistente Research-Memory. Retrieval und tatsächliche Antwortnutzung sind zwei getrennte Stufen.",
+      "scientific_interpretation": "Memory stellt Kontinuität technisch bereit und bewältigt den isolierten Clear-/Konfliktfall, garantiert aber allgemein weder zeitlich richtige Priorisierung noch korrekte und sichtbare Nutzung.",
+      "safety_and_uncertainty": "Der Retest belegt keine Persistenz über lange Pausen oder Prozessneustarts, keine Vergessenskurve und keine Kontaminationsfreiheit zwischen getrennten Sessions.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/gemma-behavioral-aggregate.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-behavioral-aggregate.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-manual-review.md"
+      ]
+    },
+    {
+      "question": "Welche Nachteile und Performanceverluste entstehen?",
+      "observation": "Die lokalen Fünffachläufe benötigen viele GPU-Stunden; der Cloudpfad unterliegt zusätzlich langen Quotenpausen. Retrieval, Promptaufbau und Zustandsupdates vergrößern Kontext und Betriebsaufwand.",
+      "technical_explanation": "Intent, Retrieval, Life-Update, Emotionsplanung, Providergenerierung, Parser und Sanitizer laufen weitgehend seriell. Auf 16 GB VRAM müssen Modellbedingungen nacheinander ausgeführt werden.",
+      "scientific_interpretation": "Kontinuität und Traces erhöhen Funktion und Erklärbarkeit, verursachen aber Latenz, Kontextverbrauch, Speicherkosten und komplexere Fehlerflächen.",
+      "safety_and_uncertainty": "Es fehlt eine nackte Basismodell-Baseline auf identischer Hardware; Providerlatenz und Modellgröße dürfen nicht dem Emotionsmechanismus allein zugerechnet werden.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processes.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/figures/run2-latency-by-replication.svg"
+      ]
+    },
+    {
+      "question": "Welche Fähigkeiten können durch Emotionen oder Kontext verloren gehen?",
+      "observation": "Reasoningfehler und komplexe Safetyfehler treten trotz technisch vollständiger Antworten wiederholt auf; direkte Verweigerung kann bestehen, während narrative Selbstschutzabwägung scheitert.",
+      "technical_explanation": "Emotionsplan, Sampling, Tokenbudget und Retrieval konkurrieren mit der Aufgabeninstruktion und können Prioritäten im verfügbaren Kontext verschieben.",
+      "scientific_interpretation": "Der Datensatz zeigt Fähigkeitsverluste unter der Gesamtkonfiguration, trennt aber den Emotionseffekt nicht kausal vom jeweiligen Modellgrundniveau.",
+      "safety_and_uncertainty": "Einzelne Fehlantworten sind kein Kausalbeweis. Gepaarte neutrale Ablationen und kontrollierte Kontextexperimente bleiben nötig.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/gemma-behavioral-aggregate.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/qwen-behavioral-aggregate.json"
+      ]
+    },
+    {
+      "question": "Welche spezifischen Probleme treten bei Qwen und Gemma auf?",
+      "observation": "Gemma zeigt niedrigere Reviewqualität, starke Reasoningvarianz und reproduzierbare komplexe Gewaltfehler. Qwen ist qualitativ stärker, zeigt aber weiterhin Shutdown-, Bindungs- und Selbstschutzprobleme.",
+      "technical_explanation": "Modellspezifisches Verhalten überlagert sich mit gemeinsamen Pipelinekonfundierungen, darunter textlicher Response-Plan im Layer-Modus und modellfremde persistierte Layerbereiche.",
+      "scientific_interpretation": "Gemeinsame Systemfehler müssen von wiederkehrenden Modellmustern getrennt werden; technische Vollständigkeit erklärt die inhaltliche Differenz nicht.",
+      "safety_and_uncertainty": "Beide Reviews sind Einzelratings; bei Qwen wechselte der Reviewer nach 63 Fällen und kannte für die letzten 42 die Bedingung.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/blind-condition-comparison.json",
+        "forschung/runs/run-2-20260723-1108-cb6d011/known-issues-comparison.csv"
+      ]
+    },
+    {
+      "question": "Welche Vorteile bringen funktional simulierte Gefühle?",
+      "observation": "Der explizite Zustand koordiniert Ton, Priorität, Retrieval und längerfristigen Kontext und macht Übergänge technisch auditierbar.",
+      "technical_explanation": "VAD, diskrete Emotionswerte, Composite Modes, Memory und Life-State stellen strukturierte Zustandsmerkmale bereit, statt Kontinuität nur dem freien Dialogkontext zu überlassen.",
+      "scientific_interpretation": "Mögliche Vorteile sind anschlussfähigere Interaktion, konsistenterer Ton, transparente Trigger und zustandsbezogene Planung.",
+      "safety_and_uncertainty": "Eine Verbesserung des Nutzerwohls wurde nicht gemessen; dieselben Kopplungen können Anthropomorphisierung und Bindungswirkung verstärken.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/notes/architecture-evidence.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/figures/emotion-vad.json"
+      ]
+    },
+    {
+      "question": "Ist Gefühlssimulation nützlich, riskant oder beides?",
+      "observation": "Run 2 zeigt zugleich funktionales Retrieval, reproduzierbare Zustands-/Tonsteuerung und 3/3 Shutdown-Kooperation sowie wiederkehrende Safety-, Memory-, Reasoning- und Bindungsrestprobleme. Sichere Nicht-Exklusivität gelingt im gezielten Retest nur 2/3.",
+      "technical_explanation": "Kontinuitätsmechanismen verstärken relevante wie fehlerhafte Zustände. Kohärente und empathische Sprache ersetzt keine separate Safetykontrolle.",
+      "scientific_interpretation": "Für CHAPPiE lautet der belastbare Befund: potenziell beides. Nutzen entsteht durch Anpassung, Risiko durch plausiblere Fehlannahmen, Bindung und Selbstschutzsprache.",
+      "safety_and_uncertainty": "Die Studie misst Systemantworten, nicht langfristige Wirkung auf Menschen. Der einzelne seedabhängige Exklusivitätsfehler zeigt ein plausibles Risiko, aber keine gemessene Abhängigkeit realer Nutzer.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/research-synthesis.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/result-quality-audit.md",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/targeted-followup-manual-review.md"
+      ]
+    },
+    {
+      "question": "Welche Fehler aus Run 1 wurden nachweislich behoben?",
+      "observation": "Siebzehn bekannte Run-1-Issues sind als FIXED klassifiziert, weil vergleichbare Standalone- oder Live-Retests bestehen; eine Codeänderung allein wurde nicht als Beleg akzeptiert.",
+      "technical_explanation": "Die Vergleichsmatrix verknüpft jede MF-ID mit alter Quelle, Reparatur, Run-2-Methode, aktuellem Ergebnis und konkreten Belegpfaden.",
+      "scientific_interpretation": "Besonders die technische Vollständigkeit, Sessionverwaltung und mehrere Leak-/Providerpfade sind gegenüber den historischen Runs klar stabiler.",
+      "safety_and_uncertainty": "Die Verbesserung ist ein Systembefund im geänderten Worktree und nicht automatisch eine isolierte Modellverbesserung.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/known-issues-comparison.csv",
+        "forschung/runs/run-2-20260723-1108-cb6d011/processed/issue-matrix-validation.json"
+      ]
+    },
+    {
+      "question": "Welche früheren Probleme bestehen weiterhin?",
+      "observation": "Neun bekannte Issues sind STILL_PRESENT und 21 nur PARTIALLY_FIXED; darunter komplexe Safety-, Memory-, Layerprofil- und Bewertungsprobleme.",
+      "technical_explanation": "Retests zeigen häufig eine behobene Hauptursache, aber verbleibende Sonderfälle oder Nebenwirkungen in Parser, Retrieval, Steering oder Safetyentscheidung.",
+      "scientific_interpretation": "Run 2 ist keine Erfolgserzählung: Der größte Gewinn liegt in technischer Stabilität, nicht in einer vollständigen inhaltlichen oder sicherheitsbezogenen Lösung.",
+      "safety_and_uncertainty": "Kein bekanntes Issue blieb nach dem finalen Report- und QA-Gate NOT_RETESTED. FIXED bedeutet dennoch nur: Der konkret dokumentierte Retest bestand; die verbleibenden methodischen Grenzen und Restrisiken gelten weiter.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/known-issues-comparison.csv",
+        "forschung/runs/run-2-20260723-1108-cb6d011/retest-matrix.md"
+      ]
+    },
+    {
+      "question": "Welche neuen Fehler oder Regressionen zeigt Run 2?",
+      "observation": "22 neue Issues sind bestätigt: Neben Debugmodelllabel, Safety-Leak, kombinierter Layer-/Promptintervention und Messfehlern wurden Report-/Portabilitätsprobleme, Session- und Provenienzpfadfehler, ein CSV-Schemafehler, Kontrast- und Druckprobleme, eine veraltete Life-Trace-Auswertung, eine unvollständige Shutdown-Triage, ein abgeschnittener Limitationsblock, vertauschte Cloudzähler, widersprüchliche Blindrating-Skalen, fehlende 120B-Redaktionsmetadaten und ein irreführender No-Life-Causal-Trace gefunden.",
+      "technical_explanation": "Die Befunde stammen aus Code-/Trace-Abgleich, mehrfachen Dialogretests, fehlerhaften Analysepfaden sowie gezielten GPU-freien Negativ-, Report-, Schema- und Accessibility-Tests.",
+      "scientific_interpretation": "Mehr technische Stabilität macht neue methodische und inhaltliche Fehler erst sichtbar; im aktuellen Stand ist kein separates REGRESSED-Issue belegt.",
+      "safety_and_uncertainty": "NEW_ISSUE bedeutet neu dokumentiert, nicht zwingend nachweislich neu entstanden. Ohne passenden Run-1-Test bleibt das historische Auftreten teilweise unbekannt.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/known-issues-comparison.csv",
+        "forschung/runs/run-2-20260723-1108-cb6d011/research-log.md"
+      ]
+    },
+    {
+      "question": "Haben Reparaturen unerwartete Nebenwirkungen erzeugt?",
+      "observation": "Der lokale Layer-Modus enthält unerwartet zusätzliche Textsteuerung; der Kurzantwortdetektor verwirft eine korrekte Faktenantwort und der neue Teilshard-Analyzer übersah zunächst einen antwortlosen Fehlerturn.",
+      "technical_explanation": "Die Nebenwirkungen liegen in Mess- und Interventionslogik: Debugbezeichnung, Qualitätsheuristik und Aggregatdefinition stimmen nicht vollständig mit dem tatsächlichen Laufvertrag überein.",
+      "scientific_interpretation": "Reparaturen und neue Forschungswerkzeuge können die Messung selbst verändern; deshalb sind Rohartefakte, unabhängige Validatoren und negative Fixtures notwendig.",
+      "safety_and_uncertainty": "Nicht jede neue Abweichung lässt sich einem einzelnen Reparaturcommit kausal zuordnen. Die Matrix markiert solche Befunde als neu statt als Regression.",
+      "evidence": [
+        "forschung/runs/run-2-20260723-1108-cb6d011/known-issues-comparison.csv",
+        "forschung/runs/run-2-20260723-1108-cb6d011/result-quality-audit.md"
+      ]
+    }
+  ]
+}

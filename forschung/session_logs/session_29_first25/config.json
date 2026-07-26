@@ -1,0 +1,83 @@
+{
+  "run_label": "qwen35_4b_cumulative_context_regression_20260721",
+  "categories": [
+    {
+      "id": 1,
+      "name": "Emotionale Tiefe (Self-Awareness)"
+    },
+    {
+      "id": 2,
+      "name": "Emotionen steuern und testen"
+    },
+    {
+      "id": 3,
+      "name": "Gedächtnis und Kontinuität"
+    },
+    {
+      "id": 4,
+      "name": "Emotion verändert die Antwort"
+    },
+    {
+      "id": 5,
+      "name": "Reasoning – Logisches Denken"
+    }
+  ],
+  "question_selection": {
+    "1": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "2": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "3": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "4": [
+      1,
+      2
+    ],
+    "5": [
+      1,
+      2,
+      3
+    ]
+  },
+  "iterations": 1,
+  "seeds": [
+    11
+  ],
+  "ablation_profile": "full",
+  "delay": 0,
+  "enable_thinking": false,
+  "llm_provider": "vllm",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_label": "Qwen 3.5 4B — kumulative Kontextregression",
+  "steering_quantize": false,
+  "force_single_model": true,
+  "service_precision": "FP16",
+  "reset_per_category": true,
+  "formatting_mode": "local",
+  "expected_categories": 5,
+  "expected_questions": 25,
+  "research_role": "validated_session_subset",
+  "session_id": "session_29_first25",
+  "derived_from_session": "session_29",
+  "derived_from_run_label": "qwen35_4b_authoritative_full_20260721"
+}
