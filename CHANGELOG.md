@@ -2,6 +2,13 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.1] - 2026-08-16
+
+### Verändert
+- Berichtstitel auf den inhaltlichen Schwerpunkt Layer Editing umgestellt
+
+---
+
 ## [16.0] - 2026-08-16
 
 ### Erstellt
