@@ -2,6 +2,28 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.0] - 2026-08-16
+
+### Erstellt
+- Forschungsbericht v5 mit OLED-Design und roter/gruener Befundfarbung erstellt
+- GitHub Pages Deployment fuer den Forschungsbericht eingerichtet
+- Sechs externe Forschungsquellen von Anthropic und OpenAI als Quellenkarten eingebunden
+- Zahlenkonsistenz-Pruefung im Validator-Skript ergaenzt
+- Legacy-Kennzeichnung fuer die nicht angebundene Brain-Pipeline gesetzt
+
+### Verändert
+- Quellenkarten auf 16:9-Format mit offiziellen Seiten-Screenshots umgestellt
+- Färbung nach dokumentiertem Regelwerk vereinheitlicht (nur messbare Befunde)
+- D1-Pipeline und D2-Emotionsdiagramm luftiger gestaltet
+- Sidebar-Status als Stichpunkte ohne Pillen dargestellt
+- Em- und En-Dashes im Berichtstext entfernt
+
+### Gelöscht
+- Ueberfluessige Hinweisboxen und Meta-Informationen aus dem Bericht entfernt
+- Nicht angebundenen Agentenpfad aus dem Bericht entfernt
+
+---
+
 ## [15.0] - 2026-07-04
 
 ### Erstellt
