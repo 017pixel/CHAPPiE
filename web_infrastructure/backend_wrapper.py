@@ -468,18 +468,18 @@ def create_chappie_backend():
             repetition_penalty = settings.repetition_penalty
             max_tokens = settings.max_tokens
 
-            # Hohe Frustration (>70): Output wird instabil, runterregeln
+            # >70: Temperatur senken und Wiederholungsstrafe erhöhen, um Drift zu bremsen.
             if frustration > 70:
                 t_scale = 1.0 - min(0.30, (frustration - 70) / 100.0)
                 temperature = min(temperature, max(0.45, settings.temperature * t_scale))
                 repetition_penalty = max(repetition_penalty, 1.25)
 
-            # Extreme Frustration (>85): stark runterregeln
+            # >85: harte Ober-/Untergrenzen verhindern eine weitere Eskalation des Samplings.
             if frustration > 85:
                 temperature = min(temperature, 0.52)
                 repetition_penalty = max(repetition_penalty, 1.32)
 
-            # Hohe Traurigkeit + niedrige Energie: Output wird schwer, leicht daempfen
+            # Traurigkeit + niedrige Energie: Varianz dämpfen, ohne die Antwort abzuschneiden.
             if sadness > 70 and energy < 35:
                 temperature = min(temperature, max(0.50, settings.temperature * 0.82))
 
@@ -492,7 +492,7 @@ def create_chappie_backend():
             if calm > 72 and frustration < 45 and anxiety < 45:
                 temperature = min(temperature, max(0.50, settings.temperature * 0.92))
 
-            # Kurze Antworten bei hoher Frustration: max_tokens etwas reduzieren
+            # >75: Nur das Antwortbudget kürzen; das Denkbudget bleibt vollständig erhalten.
             if frustration > 75:
                 thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 800))
                 answer_limit = int(getattr(settings, "chappie_answer_token_limit", 1200))

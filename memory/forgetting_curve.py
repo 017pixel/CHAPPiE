@@ -30,12 +30,12 @@ class MemoryStrength:
 
 class EbbinghausForgettingCurve:
     """
-    Implements the Ebbinghaus forgetting curve.
+    Implementiert die Ebbinghaus-Vergessenskurve.
     
-    Formula: R = e^(-t/S)
-    - R = Retention (0-1)
-    - t = Time since learning (hours)
-    - S = Strength of memory (reinforced by repetition)
+    Formel: R = e^(-t/S)
+    - R = Behaltensanteil (0–1)
+    - t = Zeit seit dem Lernen (Stunden)
+    - S = Gedächtnisstärke (verstärkt durch Wiederholung)
     """
     
     EBBINGHAUS_DATA = {
