@@ -806,10 +806,10 @@ table.issues .body{padding:2px 13px 16px;border-top:1px dashed var(--border)}
 
   <!-- D12 · Vergessenskurve. Quelle: figures/forgetting-curve.json (aus memory/forgetting_curve.py) -->
   <figure>
-    <figcaption><b>D12 · Implementierte Vergessenskurve.</b> Behaltensanteil einer Erinnerung über die Zeit, für drei Wichtigkeitsstufen. Die Zeitachse ist logarithmisch, weil die Kurve in der ersten Stunde am stärksten fällt.</figcaption>
+    <figcaption><b>D12 · Implementierte Vergessenskurve.</b> Behaltensanteil einer Erinnerung über die Zeit, für drei beispielhafte Wichtigkeitsstufen (1, 2 und 4 – Stufe 3 liegt zwischen 2 und 4). Die Zeitachse ist logarithmisch, weil die Kurve in der ersten Stunde am stärksten fällt.</figcaption>
     <div class="svg-wrap"><svg viewBox="0 0 920 380" role="img" aria-labelledby="d12t d12d">
-      <title id="d12t">Vergessenskurve für drei Wichtigkeitsstufen</title>
-      <desc id="d12d">Der Behaltensanteil fällt bei Wichtigkeit 1 innerhalb von zwanzig Minuten auf 58 Prozent und nach 31 Tagen auf 21 Prozent. Bei Wichtigkeit 4 liegt er nach zwanzig Minuten bei 89,5 Prozent und nach 31 Tagen bei 24,4 Prozent. Alle drei Kurven laufen auf einen Bodenwert zu.</desc>
+      <title id="d12t">Vergessenskurve für drei beispielhafte Wichtigkeitsstufen (1, 2 und 4)</title>
+      <desc id="d12d">Der Behaltensanteil fällt bei Wichtigkeit 1 innerhalb von zwanzig Minuten auf 58 Prozent und nach 31 Tagen auf 21 Prozent. Bei Wichtigkeit 4 liegt er nach zwanzig Minuten bei 89,5 Prozent und nach 31 Tagen bei 24,4 Prozent. Stufe 3 existiert im Code und verläuft zwischen den Kurven 2 und 4. Alle drei gezeigten Kurven laufen auf einen Bodenwert zu.</desc>
       <style>
         .ax{stroke:#2f2f2f;fill:none}
         .gl{stroke:#2a2a2a;fill:none}
@@ -842,8 +842,8 @@ table.issues .body{padding:2px 13px 16px;border-top:1px dashed var(--border)}
       <span class="scroll-hint">Auf schmalen Bildschirmen ist die Abbildung seitlich scrollbar.</span>
       <span class="li"><i style="background:#8fae96"></i>Wichtigkeit 1 · nach 31 Tagen 21,0 %</span>
       <span class="li"><i style="background:#718ca8"></i>Wichtigkeit 2 · nach 31 Tagen 22,7 %</span>
-      <span class="li"><i style="background:#b59a5c"></i>Wichtigkeit 4 · nach 31 Tagen 24,4 %</span>
-      <span class="src">Quelle: <code>figures/forgetting-curve.json</code>, erzeugt aus <code>memory/forgetting_curve.py</code>. Zeigt konfigurierten Code, kein gemessenes Agentenverhalten. In den Forschungsläufen war die automatische Schlafphase abgeschaltet, die Kurve wirkte also nicht auf die Daten.</span>
+      <span class="li"><i style="background:#b59a5c"></i>Wichtigkeit 4 · nach 31 Tagen 24,4 % (Stufe 3 liegt zwischen 2 und 4 und wurde für die Lesbarkeit nicht separat gezeichnet)</span>
+      <span class="src">Quelle: <code>figures/forgetting-curve.json</code>, erzeugt aus <code>memory/forgetting_curve.py</code>. Zeigt konfigurierten Code, kein gemessenes Agentenverhalten. In den Forschungsläufen war die automatische Schlafphase abgeschaltet, die Kurve wirkte also nicht auf die Daten. Stärke 3 ist im Code vorhanden.</span>
     </div>
   </figure>
 
