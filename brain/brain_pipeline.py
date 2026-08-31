@@ -1,6 +1,12 @@
 """
 CHAPPiE - Brain Processing Integration
 ======================================
+LEGACY CODE - NICHT MEHR AM LIVE-PFAD ANGEBUNDEN
+=================================================
+Diese Orchestrierung (BrainPipeline mit sieben Hirn-Agenten) wird im laufenden
+System nicht verwendet. Der Webpfad läuft ueber web_infrastructure/backend_wrapper.py.
+BrainPipeline wird nur noch aus Testdateien instanziiert (Befund MF-048).
+
 Integration layer between the new brain agent system and the existing backend.
 
 This module provides:

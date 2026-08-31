@@ -498,15 +498,15 @@ class SteeringManager:
                 intensities[emotion] = 0.0
                 continue
 
-            # Berechne Abweichung vom Neutralpunkt (50)
+            # Abstand zum Neutralpunkt: Er bestimmt Richtungslosigkeit und Eingriffsstärke.
             deviation = abs(value - 50)
 
             if deviation < 6:
-                # Innerhalb des toten Bereichs: kein Steering
+                # Totzone 44–56: kleine Schwankungen lösen bewusst keinen Eingriff aus.
                 intensities[emotion] = 0.0
                 continue
 
-            normalized = max(0.0, min(1.0, (deviation - 6.0) / 44.0))
+            normalized = max(0.0, min(1.0, (deviation - 6.0) / 44.0))  # Kurve läuft sanft an; Schwellen verstärken Extreme.
             curved = math.pow(normalized, 1.2)
             max_alpha = profile["max_alpha"] * vector_scale
             alpha = max_alpha * (0.22 + 0.78 * curved)
@@ -552,9 +552,9 @@ class SteeringManager:
         calm = emotions.get("calm", 50)
 
         # --- crashout ---
-        # Erfordert: frustration >= 72 UND trust <= 38
+        # Schwellenregel: Nur hohe Frustration UND geringes Vertrauen aktivieren crashout.
         # Wirkung: aggressiv, konfrontativ, kurz angebunden
-        # Basisstärke 0.62, steigt mit frustration und sinkendem trust (max 1.25)
+        # Stärke = Basis + Frustrationsanteil + Vertrauensdefizit, gedeckelt bei 1.25.
         if frustration >= 72 and trust <= 38:
             strength = round(min(1.25, 0.62 + ((frustration - 72) / 28) * 0.4 + ((38 - trust) / 38) * 0.28), 4)
             modes.append({

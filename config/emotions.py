@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, Mapping
 
 
+# VAD: Valenz = angenehm/unangenehm, Erregung = aktiv/ruhig, Dominanz = kontrollierend/ausgeliefert.
 EMOTION_DEFINITIONS: tuple[dict[str, Any], ...] = (
     {
         "key": "happiness",
