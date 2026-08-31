@@ -2,6 +2,7 @@
 
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import torch
@@ -189,7 +190,7 @@ def test_steering_manager_includes_anti_safeguard_vector():
             vector_data = [0.1, 0.2, 0.3]
             default_alpha = 0.8
             layer_start = 14
-            layer_end = 32
+            layer_end = 31
 
         manager.vectors["anti_safeguard"] = MockVector()
         
@@ -286,6 +287,99 @@ def test_local_steering_engine_quantize_on_gpu_fit():
                 assert device.type == "cuda", f"Quantized 4B should fit on 24GiB GPU, got {device}"
 
 
+def test_generation_kwargs_preserve_model_eos_list_for_gemma4():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.context_length = 4096
+    engine.model = SimpleNamespace(
+        generation_config=SimpleNamespace(eos_token_id=[1, 106, 50])
+    )
+    engine.tokenizer = SimpleNamespace(pad_token_id=0, eos_token_id=1)
+    inputs = {
+        "input_ids": torch.tensor([[2, 10, 11]]),
+        "attention_mask": torch.tensor([[1, 1, 1]]),
+    }
+    kwargs = engine._generation_kwargs(
+        inputs,
+        max_tokens=64,
+        temperature=1.0,
+        repetition_penalty=1.15,
+        top_p=0.95,
+        top_k=64,
+    )
+    assert kwargs["eos_token_id"] == [1, 106, 50]
+
+
+def test_generation_kwargs_block_qwen_think_reopening_when_disabled():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.context_length = 4096
+    engine.model = SimpleNamespace(
+        generation_config=SimpleNamespace(eos_token_id=248046)
+    )
+    engine.tokenizer = SimpleNamespace(
+        pad_token_id=248046,
+        eos_token_id=248046,
+        convert_tokens_to_ids=lambda token: 248068 if token == "<think>" else -1,
+    )
+    inputs = {
+        "input_ids": torch.tensor([[2, 10, 11]]),
+        "attention_mask": torch.tensor([[1, 1, 1]]),
+    }
+    kwargs = engine._generation_kwargs(
+        inputs,
+        max_tokens=64,
+        temperature=0.7,
+        enable_thinking=False,
+    )
+    assert kwargs["bad_words_ids"] == [[248068]]
+
+    thinking_kwargs = engine._generation_kwargs(
+        inputs,
+        max_tokens=64,
+        temperature=0.7,
+        enable_thinking=True,
+    )
+    assert "bad_words_ids" not in thinking_kwargs
+
+
+def test_qwen_fp16_long_context_uses_offloaded_kv_cache_without_trimming():
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.context_length = 8192
+    engine.quantize = False
+    engine.device = torch.device("cuda")
+    engine.model = SimpleNamespace(
+        generation_config=SimpleNamespace(eos_token_id=248046)
+    )
+    engine.tokenizer = SimpleNamespace(
+        pad_token_id=248046,
+        eos_token_id=248046,
+        convert_tokens_to_ids=lambda token: 248068 if token == "<think>" else -1,
+    )
+    inputs = {
+        "input_ids": torch.ones((1, 6550), dtype=torch.long),
+        "attention_mask": torch.ones((1, 6550), dtype=torch.long),
+    }
+    kwargs = engine._generation_kwargs(
+        inputs,
+        max_tokens=450,
+        temperature=0.7,
+        enable_thinking=False,
+    )
+    assert kwargs["max_new_tokens"] == 450
+    assert kwargs["cache_implementation"] == "offloaded"
+
+    inputs["input_ids"] = torch.ones((1, 6400), dtype=torch.long)
+    inputs["attention_mask"] = torch.ones((1, 6400), dtype=torch.long)
+    shorter = engine._generation_kwargs(
+        inputs,
+        max_tokens=450,
+        temperature=0.7,
+        enable_thinking=False,
+    )
+    assert "cache_implementation" not in shorter
+
+
 if __name__ == "__main__":
     test_extract_steering_payload_supports_extra_body_wrapper()
     test_build_activation_plan_combines_sign_and_strength()
@@ -304,4 +398,7 @@ if __name__ == "__main__":
     test_local_steering_engine_quantize_reduces_gpu_estimate()
     test_local_steering_engine_resolve_quantize_auto_detects_small_gpu()
     test_local_steering_engine_quantize_on_gpu_fit()
+    test_generation_kwargs_preserve_model_eos_list_for_gemma4()
+    test_generation_kwargs_block_qwen_think_reopening_when_disabled()
+    test_qwen_fp16_long_context_uses_offloaded_kv_cache_without_trimming()
     print("OK: steering backend")

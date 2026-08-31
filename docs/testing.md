@@ -107,10 +107,13 @@ Vor automatisierten Aenderungen immer pruefen:
 ## Research-Hygiene
 
 - Direkte vLLM-/Steering-Smoke-Checks immer vor einem vollen 86-Fragen-Run ausfuehren.
+- Standard-Vergleiche verwenden die Seeds `11, 23, 37, 53, 71`; jeder Seed beginnt mit leerem, laufisoliertem Chroma-/STM-/Life-/Emotionszustand.
 - Setup-Antworten werden wie Hauptantworten validiert; fehlerhafte Setups machen die Zielfrage ungueltig.
-- Defekte Antworten duerfen nicht in die Kategorie-History uebernommen werden.
+- Defekte Antworten duerfen nicht in die Kategorie-History uebernommen werden; nach einem ungueltigen Turn wird der isolierte Zustand komplett zurueckgesetzt.
 - Bestehende Memory-Fehlerstrings lassen sich sicher per Dry-Run finden: `python scripts/cleanup_memory_errors.py`.
 - Geloescht wird nur explizit mit `python scripts/cleanup_memory_errors.py --apply`.
+- Der Offline-Forschungsbericht wird mit `python tests/test_forschung_report.py` und anschließend `python forschung/report/validate_report.py forschung/report/CHAPPiE-Forschungsbericht.html` auf Struktur, eingebettete Assets, JavaScript, Secrets, Runtime-Logging-Vertrag und lokale Beleglinks geprüft. `tests/test_groq_brain_unit.py` deckt zusätzlich GPT-OSS-Reasoning mit kleinster Stufe und ausgeschlossener Reasoning-Ausgabe, Completionbudget und begrenzte 429-Retries ohne Live-API ab.
+- Run-2-Teilshards werden zusaetzlich mit `python tests/test_run2_session_analyzer.py` gegen antwortlose False-Valid-Turns abgesichert. `python tests/test_run2_targeted_followups.py` prueft den verschachtelten Follow-up-Entrypoint ausschliesslich per Dry-Run; der Test erzeugt keine Modellantworten.
 
 ## Weiterfuehrend
 
@@ -118,3 +121,4 @@ Vor automatisierten Aenderungen immer pruefen:
 - [Forschung / Alignment-Tests](../forschung)
 - [Lokale Modelle](local-models.md)
 - [Deployment](deployment.md)
+- [Forschungsmethodik, Ablationen und Humanratings](research-methodology.md)

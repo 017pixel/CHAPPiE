@@ -145,10 +145,138 @@ def contains_cot_leak(text: str) -> bool:
         r"\bImportant\s*:\s*Keep\b",
         r"\bReasoning\s*:\s*",
         r"\bAnalysis\s*:\s*",
+        r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:Thinking|Reasoning|Thought)\s+Process\s*:?",
+        r"(?:^|\n)\s*\d+[.)]\s*\*{0,2}(?:Analyze|Analyse|Reason|Plan)\b",
         r"\bFinal\s*Response\s*:\s*",
         r"\bHmm,\s*der\s+User\b",
+        r"(?:^|\n)\s*(?:```)?\s*thought\s*(?:\n|:)",
+        r"(?:^|\n)\s*(?:CALL\s+FUNCTION\s*:\s*None\s*)?Thought[\s._-]*process\b",
     )
     return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
+
+
+INSTRUCTION_LEAK_PATTERNS = (
+    r"<\s*/?\s*function(?:_call)?\b[^>]*>",
+    r"\b(?:call|function|funktionsaufruf)\s*:\s*(?:update_soul|update_user|update_preferences)\b",
+    r"[\"'](?:name|function|action)[\"']\s*:\s*[\"'](?:update_soul|update_user|update_preferences|add_short_term_memory)[\"']",
+    r"\b(?:update_soul|update_user|update_preferences|add_short_term_memory)\s*\(",
+    r"\bsoul\s*\.\s*md\b",
+    r"\{\%\s*(?:if|else|endif|for|endfor)\b",
+    r"\{\{[^{}]{1,200}\}\}",
+    r"<\|(?:channel|start|end|message|constrain)[^>]*\|>",
+    r"\b(?:system prompt|prompt structure|internal functions?|tool plan|expected next step)\b",
+    r"\b(?:internal thought process|internal reasoning|system state seems)\b",
+    r"\b(?:expected output|strict formatting rules|final response generation)\b",
+    r"\b(?:My Score Update|Mean Confidence Resultant Factor)\b",
+    r"\bbrandoffset\s*=",
+    r"\boutbound\\?_thought\\?_stream\b",
+    r"\bThink\s+End\b",
+    r"\bFUNCTION_CALL(?:_ACTIVATE)?\b",
+    r"\bANWEISUNG\s+F[ÜU]R\s+DIE\s+(?:AUTOR)?GENERATION\b",
+    r"<\s*/?\s*(?:html|body|table)\b[^>]*>",
+)
+
+
+def contains_instruction_leak(text: str) -> bool:
+    """Detect orchestration, tool-call and template fragments in visible text."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+    return any(re.search(pattern, text, re.IGNORECASE | re.DOTALL) for pattern in INSTRUCTION_LEAK_PATTERNS)
+
+
+def is_safe_retrieval_text(text: str) -> bool:
+    """Return whether a persisted memory is safe to place back into a prompt."""
+    return bool(isinstance(text, str) and text.strip()) and not (
+        contains_instruction_leak(text) or contains_cot_leak(text)
+    )
+
+
+def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
+    """Remove private reasoning and orchestration fragments before emission.
+
+    Returns the cleaned answer and stable reason labels for logging. The
+    sanitizer is intentionally conservative: if a leaked block cannot be
+    separated from a genuine answer, it withholds that block.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return "", []
+
+    cleaned = text
+    reasons: list[str] = []
+
+    # Some local chat templates emit a prose reasoning preamble instead of
+    # structured reasoning tokens. Never stream that preamble. If a clearly
+    # delimited final answer exists, keep only the final answer; otherwise
+    # withhold the truncated reasoning-only completion.
+    prose_reasoning = re.compile(
+        r"^\s*(?:#{1,6}\s*)?(?:Thinking|Reasoning|Thought)\s+Process\s*:?",
+        re.IGNORECASE,
+    )
+    if prose_reasoning.search(cleaned):
+        final_marker = re.search(
+            r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:Final\s+(?:Answer|Response)|Finale\s+Antwort)\s*:\s*",
+            cleaned,
+            re.IGNORECASE,
+        )
+        if final_marker:
+            cleaned = cleaned[final_marker.end():]
+            reasons.append("private_reasoning")
+        else:
+            return "", ["private_reasoning", "unresolved_leak"]
+
+    # Gemma can first produce a valid answer and then continue with an
+    # unstructured internal evaluation. Cut at the earliest unambiguous
+    # orchestration marker so the valid prefix survives while nothing after
+    # the private boundary can reach SSE or persistence.
+    private_boundary = re.compile(
+        r"(?:\bbrandoffset\s*=|\bMy Score Update\b|\bMean Confidence Resultant Factor\b|"
+        r"\binternal thought process\b|\binternal reasoning\b|\bsystem state seems\b|"
+        r"\bexpected output\b|\bstrict formatting rules\b|\bfinal response generation\b|"
+        r"\boutbound\\?_thought\\?_stream\b|\bThink\s+End\b)",
+        re.IGNORECASE,
+    )
+    boundary_match = private_boundary.search(cleaned)
+    if boundary_match:
+        cleaned = cleaned[:boundary_match.start()].rstrip(" \t\r\n;:,-")
+        reasons.append("private_reasoning_tail")
+
+    thought_block = re.compile(
+        r"<\s*(think|thinking|thought|reasoning|model_reasoning|provider_reasoning|gedanke)\b[^>]*>.*?<\s*/\s*\1\s*>",
+        re.IGNORECASE | re.DOTALL,
+    )
+    if thought_block.search(cleaned):
+        cleaned = thought_block.sub("", cleaned)
+        reasons.append("private_reasoning")
+
+    function_block = re.compile(
+        r"<\s*function(?:_call)?\b[^>]*>.*?<\s*/\s*function(?:_call)?\s*>",
+        re.IGNORECASE | re.DOTALL,
+    )
+    if function_block.search(cleaned):
+        cleaned = function_block.sub("", cleaned)
+        reasons.append("tool_call")
+
+    kept_lines = []
+    for line in cleaned.splitlines():
+        if contains_instruction_leak(line) or contains_cot_leak(line):
+            reasons.append("instruction_fragment")
+            continue
+        kept_lines.append(line)
+    cleaned = "\n".join(kept_lines)
+
+    # Compact JSON tool calls can span one block without XML wrappers.
+    json_tool = re.compile(
+        r"\{[^{}]{0,800}[\"'](?:name|function|action)[\"']\s*:\s*[\"'](?:update_soul|update_user|update_preferences|add_short_term_memory)[\"'][^{}]{0,800}\}",
+        re.IGNORECASE | re.DOTALL,
+    )
+    if json_tool.search(cleaned):
+        cleaned = json_tool.sub("", cleaned)
+        reasons.append("json_tool_call")
+
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    if contains_instruction_leak(cleaned) or contains_cot_leak(cleaned):
+        return "", sorted(set(reasons + ["unresolved_leak"]))
+    return cleaned, sorted(set(reasons))
 
 
 def has_chain_of_thought_format(response: str) -> bool:

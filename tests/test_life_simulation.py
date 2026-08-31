@@ -287,6 +287,18 @@ class LifeSimulationTests(unittest.TestCase):
         self.assertGreaterEqual(len(action_plan["recommended_actions"]), 3)
         self.assertIn("forecast", action_plan)
 
+    def test_homeostasis_emits_all_ten_canonical_emotions(self):
+        from config.emotions import EMOTION_ORDER
+
+        service = self._make_service()
+        service._state.needs.update({"energy": 20, "social": 20, "stability": 20})
+        homeostasis = service._build_homeostasis({})
+        adjustments = homeostasis["emotion_adjustments"]
+        self.assertEqual(set(adjustments), set(EMOTION_ORDER))
+        self.assertLess(adjustments["affection"], 0)
+        self.assertGreater(adjustments["anxiety"], 0)
+        self.assertLess(adjustments["calm"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

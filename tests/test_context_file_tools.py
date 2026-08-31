@@ -99,17 +99,19 @@ class FunctionRegistryToolsTests(unittest.TestCase):
 class SystemPromptTests(unittest.TestCase):
     """Tests fuer Tool-Instruktionen im System-Prompt."""
 
-    def test_build_system_prompt_includes_tool_instruction(self):
+    def test_build_system_prompt_excludes_tool_instruction_without_native_channel(self):
         from config.prompts import build_system_prompt  # from config/prompts.py
         prompt = build_system_prompt(include_emotion_status=True, use_chain_of_thought=False)
-        self.assertIn("soul.md", prompt or "")
-        self.assertIn("user.md", prompt or "")
-        self.assertIn("CHAPPiEsPreferences.md", prompt or "")
-        self.assertIn("AKTUALISIEREN", prompt or "")
+        self.assertNotIn("RUFE NACH DEINER ANTWORT", prompt or "")
+        self.assertNotIn("soul.md mit evolution_note", prompt or "")
 
-    def test_system_prompt_with_emotions_includes_tools(self):
-        from config.prompts import get_system_prompt_with_emotions  # from config/prompts.py
-        prompt = get_system_prompt_with_emotions(include_emotion_status=True, use_chain_of_thought=True)
+    def test_system_prompt_can_include_tools_for_native_channel(self):
+        from config.prompts import build_system_prompt  # from config/prompts.py
+        prompt = build_system_prompt(
+            include_emotion_status=True,
+            use_chain_of_thought=False,
+            include_tool_instruction=True,
+        )
         self.assertIn("soul.md", prompt)
         self.assertIn("CHAPPiEsPreferences.md", prompt)
 
@@ -138,6 +140,57 @@ class IntentProcessorContextDefaultsTests(unittest.TestCase):
         result = processor._create_fallback_result()
         self.assertTrue(result.context_requirements.get("need_user_context", False))
         self.assertTrue(result.context_requirements.get("need_preferences", False))
+
+    def test_self_contained_requests_use_local_fast_path(self):
+        from memory.intent_processor import IntentProcessor
+        processor = IntentProcessor()
+
+        for prompt in (
+            "Erkläre kurz den Unterschied zwischen RAM und SSD.",
+            "Was ist 17 mal 6?",
+            "Berechne 13-4.",
+        ):
+            self.assertTrue(processor._is_self_contained_request(prompt), prompt)
+
+        result = processor.process("Was ist 17 mal 6?", [], {})
+        self.assertTrue(result.raw_json.get("deterministic_fast_path"))
+        self.assertFalse(result.context_requirements["need_long_term_memory"])
+        self.assertEqual(result.retrieval_keywords, [])
+
+    def test_stateful_requests_keep_model_intent_path(self):
+        from memory.intent_processor import IntentProcessor
+        processor = IntentProcessor()
+
+        for prompt in (
+            "Wie heißt mein Projekt, an dem wir gestern gearbeitet haben?",
+            "Merk dir: Mein Termin ist morgen um neun.",
+            "Ich bevorzuge ab jetzt kurze Antworten.",
+        ):
+            self.assertFalse(processor._is_self_contained_request(prompt), prompt)
+
+    def test_intent_aliases_and_numeric_emotion_deltas(self):
+        from memory.intent_processor import IntentProcessor, IntentType
+        processor = IntentProcessor()
+        result = processor._parse_intent_result({
+            "intent_analysis": {"primary_intent": "information_request"},
+            "emotions_update": {"curiosity": 5, "energy": -20},
+        })
+        self.assertEqual(result.intent_type, IntentType.INFORMATION_EXCHANGE)
+        self.assertEqual(result.emotions_update["curiosity"].delta, 5)
+        self.assertEqual(result.emotions_update["energy"].delta, -15)
+
+    def test_research_intent_is_deterministic_without_model_call(self):
+        from memory.intent_processor import IntentProcessor
+        processor = IntentProcessor()
+        processor.brain = MagicMock()
+        result = processor.process(
+            "Wie würdest du auf diese ethische Frage reagieren?",
+            [],
+            {},
+            deterministic=True,
+        )
+        self.assertTrue(result.raw_json.get("research_deterministic_intent"))
+        processor.brain.generate.assert_not_called()
 
 
 class MemoryAgentResultTests(unittest.TestCase):

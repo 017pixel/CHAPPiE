@@ -1,4 +1,4 @@
-"""Tests for CLI v6.0 command handling: /help, /compact, /full, toggles, emotion names."""
+"""Tests for CLI v16.0 command handling: /help, /compact, /full, toggles, emotion names."""
 
 import os
 import sys
@@ -104,7 +104,7 @@ def _build_local_cli():
 
 # ── /help output content ────────────────────────────────────────
 
-def test_help_contains_v6_commands():
+def test_help_contains_current_version_commands():
     m = _get_module()
     cli = _build_local_cli()
     import io
@@ -117,7 +117,7 @@ def test_help_contains_v6_commands():
     finally:
         sys.stdout = sys.__stdout__
 
-    assert "CHAPPiE Terminal Interface v6.0" in output
+    assert "CHAPPiE Terminal Interface v16.0" in output
     assert "/help" in output
     assert "/status" in output
     assert "/exit" in output
@@ -329,7 +329,7 @@ def test_steering_remote_warns():
 
 
 if __name__ == "__main__":
-    test_help_contains_v6_commands()
+    test_help_contains_current_version_commands()
     test_help_contains_post_output_section()
     test_compact_toggle()
     test_full_toggle()
@@ -353,4 +353,4 @@ if __name__ == "__main__":
     test_memory_command()
     test_runtime_remote_warns()
     test_steering_remote_warns()
-    print("OK: CLI v6.0 command handling")
+    print("OK: CLI v16.0 command handling")

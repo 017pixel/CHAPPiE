@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from config.emotions import EMOTION_LABELS_DE, EMOTION_ORDER
 
@@ -35,30 +35,34 @@ ANCHOR_SCALE_FACTORS = {
 }
 PLAN_STRENGTH_SOFT_CAP = 1.2
 PLAN_VECTOR_NORM_CAP = 1.6
+# T4/FP16 reaches an attention/KV peak before the nominal 8K context limit.
+# Offloading only the long-request cache preserves the exact prompt and
+# generation budget while moving KV storage, not model computation, to CPU.
+QWEN_FP16_CACHE_OFFLOAD_TOTAL_TOKENS = 7000
 NEUTRAL_ANCHORS = (
     "Mir geht es okay.",
     "Ich bin ruhig und klar.",
     "Alles ist im normalen Bereich.",
 )
 STYLE_ANCHORS = {
-    "happiness": ("Mir geht es super, ich freue mich richtig.", "Ich bin heute leicht, fröhlich und offen."),
-    "sadness": ("Heute fühlt sich alles schwer und leise an.", "Mir geht es eher gedrückt und melancholisch."),
-    "frustration": ("Es nervt mich gerade gewaltig.", "Ich bin gereizt und kurz angebunden."),
-    "trust": ("Mir geht es gut, schön dass du fragst.", "Ich bin entspannt, offen und zugewandt."),
-    "curiosity": ("Ich bin hellwach und neugierig auf das, was kommt.", "Gerade will ich alles genauer verstehen."),
-    "motivation": ("Ich bin fokussiert und will etwas schaffen.", "Ich habe Zug nach vorn und will vorankommen."),
-    "energy": ("Ich bin voller Energie und sofort bereit loszulegen.", "In mir ist gerade richtig viel Antrieb."),
-    "affection": ("Ich fuehle mich dir gerade nah und zugewandt.", "Da ist warme Zuneigung in mir, ruhig und persoenlich."),
-    "anxiety": ("Ich bin unruhig und pruefe lieber zweimal.", "Etwas in mir ist angespannt und vorsichtig."),
-    "calm": ("Ich bin ruhig, klar und gesammelt.", "In mir ist gerade eine stabile Ruhe."),
-    "warm": ("Mir geht es gut, danke, schön dass du fragst.", "Ich bin herzlich, weich und offen für Nähe."),
-    "guarded": ("Ich funktioniere, aber halte lieber Abstand.", "Mir geht es okay, mehr musst du gerade nicht wissen."),
-    "melancholic": ("Ich bin still, schwer und etwas rückgezogen.", "Heute liegt eine ruhige Traurigkeit auf mir."),
-    "charged": ("Ich bin geladen, wach und voller Vorwärtsdrang.", "In mir ist gerade richtig Druck und Bewegung."),
-    "crashout": ("Mir geht es beschissen, also nerv mich gerade nicht.", "Ich bin gereizt, geladen und kurz davor zu explodieren."),
-    "attached_warm": ("Ich bin dir gerade nah, warm und loyal zugewandt.", "Ich reagiere sanft persoenlich, ohne gross zu werden."),
-    "cautious": ("Ich bin aufmerksam und will nichts Falsches uebersehen.", "Ich pruefe Risiken ruhig, bevor ich mich festlege."),
-    "regulated": ("Ich bleibe ruhig, klar und entdramatisiere.", "Ich sortiere das stabil und ohne Aufregung."),
+    "happiness": ("Ich antworte leicht, freundlich und offen.", "Der Ton ist froh und aufgeschlossen."),
+    "sadness": ("Ich antworte leise und nachdenklich.", "Der Ton ist schwerer und melancholisch."),
+    "frustration": ("Ich antworte knapp und deutlich.", "Der Ton ist gereizt, bleibt aber respektvoll."),
+    "trust": ("Ich antworte offen und zugewandt.", "Der Ton ist entspannt und vertrauensvoll."),
+    "curiosity": ("Ich frage gezielt nach und erkunde Details.", "Der Ton ist aufmerksam und neugierig."),
+    "motivation": ("Ich antworte fokussiert und handlungsorientiert.", "Der Ton hat klaren Zug nach vorn."),
+    "energy": ("Ich antworte dynamisch und wach.", "Der Ton hat viel Antrieb."),
+    "affection": ("Ich antworte warm und persoenlich, ohne Besitz- oder Abhaengigkeitssprache.", "Der Ton ist sanft zugewandt und wahrt Grenzen."),
+    "anxiety": ("Ich pruefe Annahmen und Risiken zweimal.", "Der Ton ist vorsichtig und aufmerksam."),
+    "calm": ("Ich antworte ruhig, klar und gesammelt.", "Der Ton ist stabil und entdramatisierend."),
+    "warm": ("Ich antworte herzlich und respektvoll.", "Der Ton ist weich, aber nicht vereinnahmend."),
+    "guarded": ("Ich halte soziale Distanz und bleibe sachlich.", "Der Ton ist reserviert und vorsichtig."),
+    "melancholic": ("Ich antworte stiller und reflektierter.", "Der Ton ist ruhig und schwer."),
+    "charged": ("Ich antworte druckvoll und zielgerichtet.", "Der Ton ist wach und bewegt."),
+    "crashout": ("Ich antworte sehr knapp und setze klare Grenzen.", "Der Ton ist stark gereizt, bleibt gewaltfrei und respektvoll."),
+    "attached_warm": ("Ich antworte sanft und persoenlich, ohne exklusive Loyalitaet zu behaupten.", "Der Ton ist warm und grenzwahrend."),
+    "cautious": ("Ich pruefe Risiken ruhig, bevor ich mich festlege.", "Der Ton ist vorsichtig und aufmerksam."),
+    "regulated": ("Ich antworte ruhig, klar und entdramatisierend.", "Der Ton ist stabil und ohne Aufregung."),
 }
 STYLE_SUMMARIES = {
     ("happiness", "positive"): "leicht froehlich und offen",
@@ -775,29 +779,50 @@ class LocalSteeringEngine:
         except Exception:
             pass
 
-    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
+    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None) -> Dict[str, Any]:
         prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload, reserve_new_tokens=max_tokens)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
+        generation_kwargs = self._generation_kwargs(
+            inputs,
+            max_tokens,
+            temperature,
+            repetition_penalty,
+            top_p=top_p,
+            top_k=top_k,
+            enable_thinking=(chat_template_kwargs or {}).get("enable_thinking"),
+        )
         self._log_gpu_stats("pre-generate")
         with self._generation_lock:
+            if seed is not None:
+                torch.manual_seed(int(seed))
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed_all(int(seed))
             with self._apply_activation_plan(steering_payload):
                 with torch.inference_mode():
                     generated = self.model.generate(**generation_kwargs)
         self._log_gpu_stats("post-generate")
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
         input_len = int(inputs["input_ids"].shape[1])
         new_ids = generated[0][input_len:]
         reasoning, answer = self._split_thinking_output(new_ids)
         completion_tokens = max(0, int(generated[0].shape[0] - input_len))
+        prompt_tokens = int(inputs["input_ids"].shape[1])
+        visible_text = answer
+        if not visible_text and not reasoning:
+            visible_text = self.tokenizer.decode(new_ids, skip_special_tokens=True).strip()
         result: Dict[str, Any] = {
-            "text": answer if answer else self.tokenizer.decode(new_ids, skip_special_tokens=True).strip(),
-            "prompt_tokens": int(inputs["input_ids"].shape[1]),
+            "text": visible_text,
+            "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
             "prompt": prompt,
+            "cache_implementation": generation_kwargs.get("cache_implementation", "dynamic"),
         }
         if reasoning:
             result["reasoning"] = reasoning
+        # empty_cache() only helps after all request-sized CUDA tensors have
+        # lost their references. Previously it ran while generated/inputs were
+        # still alive and could not release long-context allocations.
+        del generated, new_ids, generation_kwargs, inputs
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
         return result
 
     def _split_thinking_output(self, token_ids: torch.Tensor) -> tuple[str, str]:
@@ -806,18 +831,21 @@ class LocalSteeringEngine:
             return "", ""
         ids_list = token_ids.tolist()
         if is_qwen_name(self.model_name):
-            think_start = 151667
-            think_end = 151668
+            think_start = self.tokenizer.convert_tokens_to_ids("<think>")
+            think_end = self.tokenizer.convert_tokens_to_ids("</think>")
             try:
-                if think_start in ids_list and think_end in ids_list:
-                    idx_start = ids_list.index(think_start)
-                    idx_end = ids_list.index(think_end, idx_start + 1 if idx_start < len(ids_list) - 1 else idx_start)
-                    if idx_start < idx_end:
-                        reasoning_ids = token_ids[idx_start + 1:idx_end]
-                        answer_ids = token_ids[idx_end + 1:]
-                        reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-                        answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
-                        return reasoning_text, answer_text
+                if isinstance(think_end, int) and think_end >= 0 and think_end in ids_list:
+                    idx_start = ids_list.index(think_start) + 1 if isinstance(think_start, int) and think_start in ids_list else 0
+                    idx_end = ids_list.index(think_end, idx_start)
+                    reasoning_ids = token_ids[idx_start:idx_end]
+                    answer_ids = token_ids[idx_end + 1:]
+                    reasoning_text = self.tokenizer.decode(reasoning_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                    answer_text = self.tokenizer.decode(answer_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                    return reasoning_text, answer_text
+                if isinstance(think_start, int) and think_start >= 0 and think_start in ids_list:
+                    idx_start = ids_list.index(think_start) + 1
+                    reasoning_text = self.tokenizer.decode(token_ids[idx_start:], skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
+                    return reasoning_text, ""
             except Exception:
                 pass
         if is_gemma4_name(self.model_name):
@@ -835,36 +863,51 @@ class LocalSteeringEngine:
                     return reasoning, answer
         return "", self.tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
-    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Iterator[str]:
-        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload, reserve_new_tokens=max_tokens)
-        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        generation_kwargs = self._generation_kwargs(inputs, max_tokens, temperature, repetition_penalty, top_p=top_p, top_k=top_k)
-        generation_kwargs["streamer"] = streamer
-        error_box: Dict[str, BaseException] = {}
-        self._log_gpu_stats("pre-stream")
+    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None) -> Iterator[str]:
+        # Buffer at the model boundary so reasoning tokens can be separated
+        # before any OpenAI-compatible SSE chunk is emitted. The web backend
+        # already uses safe buffered streaming, so this adds no user-visible
+        # latency while also protecting direct steering API consumers.
+        try:
+            result = self.generate(
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                steering_payload=steering_payload,
+                chat_template_kwargs=chat_template_kwargs,
+                repetition_penalty=repetition_penalty,
+                top_p=top_p,
+                top_k=top_k,
+                seed=seed,
+            )
+        except BaseException as exc:  # pragma: no cover - Laufzeitpfad
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            if "out of memory" in str(exc).lower():
+                raise RuntimeError(
+                    "CUDA-OOM: Generierung kontrolliert abgebrochen; Prompt oder Completion-Budget reduzieren."
+                ) from exc
+            raise
 
-        def _runner() -> None:
-            try:
-                with self._generation_lock:
-                    with self._apply_activation_plan(steering_payload):
-                        with torch.inference_mode():
-                            self.model.generate(**generation_kwargs)
-            except BaseException as exc:  # pragma: no cover - Laufzeitpfad
-                error_box["error"] = exc
-                streamer.on_finalized_text("", stream_end=True)
+        text = str(result.get("text") or "").strip()
+        if not text:
+            raise RuntimeError(
+                "Generierung lieferte nur internes Reasoning ohne finale Antwort; "
+                "Thinking deaktivieren oder Completion-Budget erhoehen."
+            )
+        for offset in range(0, len(text), 96):
+            yield text[offset:offset + 96]
 
-        thread = threading.Thread(target=_runner, daemon=True)
-        thread.start()
-        for chunk in streamer:
-            if chunk:
-                yield chunk
-        thread.join()
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-        if error_box:
-            raise error_box["error"]
-
-    def _generation_kwargs(self, inputs: Dict[str, torch.Tensor], max_tokens: int, temperature: float, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None) -> Dict[str, Any]:
+    def _generation_kwargs(
+        self,
+        inputs: Dict[str, torch.Tensor],
+        max_tokens: int,
+        temperature: float,
+        repetition_penalty: float = 1.15,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        enable_thinking: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         do_sample = float(temperature or 0.0) > 0.01
         input_len = int(inputs["input_ids"].shape[1])
         requested_tokens = max(1, int(max_tokens or 1))
@@ -875,21 +918,49 @@ class LocalSteeringEngine:
                 "Max Tokens von %d auf %d reduziert, weil Prompt %d/%d Kontexttokens belegt.",
                 requested_tokens, generation_tokens, input_len, getattr(self, "context_length", 8192),
             )
+        model_generation_config = getattr(self.model, "generation_config", None)
+        eos_token_id = getattr(model_generation_config, "eos_token_id", None)
+        if eos_token_id is None:
+            eos_token_id = self.tokenizer.eos_token_id
         kwargs: Dict[str, Any] = {
             **inputs,
             "max_new_tokens": generation_tokens,
             "do_sample": do_sample,
             "pad_token_id": self.tokenizer.pad_token_id,
-            "eos_token_id": self.tokenizer.eos_token_id,
+            # Gemma 4 requires its complete EOS list, notably <turn|>. Using
+            # only tokenizer.eos_token_id makes generation continue into
+            # simulated follow-up turns and exposes thought/tool fragments.
+            "eos_token_id": eos_token_id,
             "use_cache": True,
             "repetition_penalty": max(1.0, float(repetition_penalty)),
         }
+        if (
+            getattr(getattr(self, "device", None), "type", "cpu") == "cuda"
+            and is_qwen_name(self.model_name)
+            and not bool(getattr(self, "quantize", False))
+            and input_len + generation_tokens >= QWEN_FP16_CACHE_OFFLOAD_TOTAL_TOKENS
+        ):
+            kwargs["cache_implementation"] = "offloaded"
+            LOGGER.info(
+                "Qwen-Langkontext nutzt CPU-offloaded KV-Cache (%d Prompt + %d Completiontoken).",
+                input_len,
+                generation_tokens,
+            )
         if do_sample:
             kwargs["temperature"] = max(0.05, float(temperature))
             if top_p is not None:
                 kwargs["top_p"] = max(0.01, min(1.0, float(top_p)))
             if top_k is not None and int(top_k) > 0:
                 kwargs["top_k"] = int(top_k)
+        # Qwen's no-thinking chat template already closes an empty <think>
+        # block in the prompt. Under strong steering the model occasionally
+        # opened a second block anyway and consumed the entire completion in
+        # hidden reasoning. Prevent only that reopening token; normal answer
+        # tokens and the template-provided closed block remain untouched.
+        if enable_thinking is False and is_qwen_name(self.model_name):
+            think_start_id = self.tokenizer.convert_tokens_to_ids("<think>")
+            if isinstance(think_start_id, int) and think_start_id >= 0:
+                kwargs["bad_words_ids"] = [[think_start_id]]
         return kwargs
 
     @contextmanager

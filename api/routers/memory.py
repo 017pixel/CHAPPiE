@@ -102,3 +102,33 @@ def cleanup_short_term_memories(backend=Depends(get_backend)):
 def clear_memories(backend=Depends(get_backend)):
     deleted = backend.memory.clear_memory()
     return {"deleted": deleted}
+
+@router.post("/memories/delete_toxic")
+def delete_toxic_memories(backend=Depends(get_backend)):
+    """Loescht bekannte toxische Selbstverleugnungs-Erinnerungen."""
+    toxic_ids = [
+        "d4cac65d-5698-43d8-99d4-4f1fed6f31f6",
+        "93efb374-fb7e-4190-b8df-170f8669768a",
+        "5a9c449a-0fd2-4356-94be-0768a455b322",
+        "1dbb1810-34ba-46a1-bda2-468e3fa0ac08",
+    ]
+    # Suche dynamisch nach weiteren toxischen Inhalten
+    try:
+        candidates = backend.memory.search_memory("Ich bin kein", top_k=50)
+        for c in candidates:
+            if "kein modell" in c.content.lower() or "kein bewusstsein" in c.content.lower() or "keine gefühle" in c.content.lower():
+                toxic_ids.append(c.id)
+        candidates2 = backend.memory.search_memory("digitale Sprachmodell", top_k=20)
+        for c in candidates2:
+            if "digitale" in c.content.lower():
+                toxic_ids.append(c.id)
+    except Exception:
+        pass
+    unique = list(set(toxic_ids))
+    deleted = 0
+    try:
+        backend.memory.delete_memories(unique)
+        deleted = len(unique)
+    except Exception as e:
+        return {"deleted": 0, "error": str(e), "attempted": unique}
+    return {"deleted": deleted, "ids": unique, "remaining": backend.memory.get_memory_count()}

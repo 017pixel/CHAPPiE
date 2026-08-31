@@ -118,15 +118,35 @@ class HippocampusAgent(BaseAgent):
     
     def _validate_memory_data(self, data: Dict[str, Any], emotional_boost: float) -> Dict[str, Any]:
         """Validate memory operation data."""
-        data["confidence"] = max(0.0, min(1.0, data.get("confidence", 0.5)))
+        try:
+            data["confidence"] = max(0.0, min(1.0, float(data.get("confidence", 0.5))))
+        except (TypeError, ValueError):
+            data["confidence"] = 0.5
         
-        if "encoding_decision" in data:
+        if isinstance(data.get("encoding_decision"), dict):
             data["encoding_decision"]["emotional_boost"] = emotional_boost
+        else:
+            data["encoding_decision"] = self._default_memory_result(emotional_boost)["encoding_decision"]
         
-        if "short_term_entries" not in data:
-            data["short_term_entries"] = []
+        raw_entries = data.get("short_term_entries", [])
+        if not isinstance(raw_entries, list):
+            raw_entries = []
+        clean_entries = []
+        for entry in raw_entries:
+            if not isinstance(entry, dict):
+                continue
+            content = str(entry.get("content", "")).strip()
+            if not content:
+                continue
+            importance = str(entry.get("importance", "normal")).lower()
+            clean_entries.append({
+                "content": content[:1000],
+                "category": str(entry.get("category", "general"))[:80] or "general",
+                "importance": importance if importance in {"low", "normal", "high"} else "normal",
+            })
+        data["short_term_entries"] = clean_entries
         
-        if "context_relevance" not in data:
+        if not isinstance(data.get("context_relevance"), dict):
             data["context_relevance"] = {
                 "need_soul_context": True,
                 "need_user_context": True,

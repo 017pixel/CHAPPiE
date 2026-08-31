@@ -136,6 +136,7 @@ class VLLMBrain(BaseBrain):
                     max_tokens=config.max_tokens,
                     temperature=config.temperature,
                     stream=True,
+                    seed=config.seed,
                     extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
                 )
                 break
@@ -164,7 +165,7 @@ class VLLMBrain(BaseBrain):
                     continue
 
                 delta = chunk.choices[0].delta
-                reasoning = self._extract_reasoning_content(delta)
+                reasoning = self._extract_reasoning_content(delta, strip=False)
                 if reasoning and not reasoning_capped:
                     if reasoning_chars >= self._REASONING_CHAR_LIMIT:
                         if think_opened:
@@ -199,7 +200,7 @@ class VLLMBrain(BaseBrain):
                         self._repetition_events["reasoning_capped"] = {"chars": reasoning_chars, "limit": self._REASONING_CHAR_LIMIT}
                     continue
 
-                content = self._normalize_content(getattr(delta, "content", None))
+                content = self._normalize_content(getattr(delta, "content", None), strip=False)
                 if content:
                     if think_opened:
                         yield "</think>"
@@ -215,6 +216,9 @@ class VLLMBrain(BaseBrain):
 
             if think_opened:
                 yield "</think>"
+
+            if "steering-server fehler:" in accumulated_content.lower():
+                raise RuntimeError(accumulated_content.strip())
 
             if not emitted_text:
                 if reasoning_chars > 0:
@@ -244,6 +248,7 @@ class VLLMBrain(BaseBrain):
                     max_tokens=config.max_tokens,
                     temperature=config.temperature,
                     stream=False,
+                    seed=config.seed,
                     extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
                 )
                 break
@@ -315,10 +320,10 @@ class VLLMBrain(BaseBrain):
         return f"<model_reasoning>\n{cleaned_reasoning}\n</model_reasoning>\n\n{cleaned_answer}"
 
     @staticmethod
-    def _normalize_content(value: Any) -> str:
+    def _normalize_content(value: Any, *, strip: bool = True) -> str:
         """Normalisiert verschiedene Content-Formate auf String."""
         if isinstance(value, str):
-            return value.strip()
+            return value.strip() if strip else value
 
         if isinstance(value, list):
             parts: list[str] = []
@@ -329,16 +334,17 @@ class VLLMBrain(BaseBrain):
                     text = item.get("text") or item.get("content") or ""
                     if isinstance(text, str):
                         parts.append(text)
-            return "".join(parts).strip()
+            joined = "".join(parts)
+            return joined.strip() if strip else joined
 
         return ""
 
-    def _extract_reasoning_content(self, message_like: Any) -> str:
+    def _extract_reasoning_content(self, message_like: Any, *, strip: bool = True) -> str:
         """Extrahiert reasoning_content robust aus OpenAI/vLLM-Objekten."""
         if message_like is None:
             return ""
 
-        direct = self._normalize_content(getattr(message_like, "reasoning_content", None))
+        direct = self._normalize_content(getattr(message_like, "reasoning_content", None), strip=strip)
         if direct:
             return direct
 
@@ -348,13 +354,13 @@ class VLLMBrain(BaseBrain):
             except Exception:
                 dumped = {}
             for key in ("reasoning_content", "reasoning", "reasoningContent", "thinking", "thinking_content"):
-                reasoning = self._normalize_content(dumped.get(key))
+                reasoning = self._normalize_content(dumped.get(key), strip=strip)
                 if reasoning:
                     return reasoning
 
         if isinstance(message_like, dict):
             for key in ("reasoning_content", "reasoning", "reasoningContent", "thinking", "thinking_content"):
-                reasoning = self._normalize_content(message_like.get(key))
+                reasoning = self._normalize_content(message_like.get(key), strip=strip)
                 if reasoning:
                     return reasoning
 

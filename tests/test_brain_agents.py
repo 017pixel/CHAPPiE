@@ -117,6 +117,16 @@ def test_amygdala():
         
         agent = AmygdalaAgent()
         print(f"  [OK] Agent created: {agent.name}")
+        validated = agent._validate_emotion_data({
+            "emotional_intensity": "0.8",
+            "memory_boost_factor": "2.5",
+            "personal_relevance": "0.7",
+            "confidence": "0.9",
+            "emotions_update": {"happiness": {"delta": "12", "reason": "positiv"}},
+        })
+        assert validated["emotional_intensity"] == 0.8
+        assert validated["memory_boost_factor"] == 2.5
+        assert validated["emotions_update"]["happiness"]["delta"] == 10
         
         input_data = {
             "user_input": "Ich bin heute sehr gluecklich!",

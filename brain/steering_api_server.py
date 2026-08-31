@@ -139,6 +139,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
         temperature = float(body.get("temperature") or 0.0)
         top_p = body.get("top_p")
         top_k = body.get("top_k")
+        seed = body.get("seed")
         extra_body_for_penalty = body.get("extra_body") if isinstance(body.get("extra_body"), dict) else {}
         repetition_penalty = float(body.get("repetition_penalty") or extra_body_for_penalty.get("repetition_penalty") or 1.15)
         stream = bool(body.get("stream", False))
@@ -159,6 +160,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                         repetition_penalty=repetition_penalty,
                         top_p=float(top_p) if top_p is not None else None,
                         top_k=int(top_k) if top_k is not None else None,
+                        seed=int(seed) if seed is not None else None,
                     ):
                         chunk = {
                             "id": request_id,
@@ -200,8 +202,16 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 repetition_penalty=repetition_penalty,
                 top_p=float(top_p) if top_p is not None else None,
                 top_k=int(top_k) if top_k is not None else None,
+                seed=int(seed) if seed is not None else None,
             )
         except Exception as exc:
+            LOGGER.exception(
+                "Nicht-streamende Generierung fehlgeschlagen (model=%s, messages=%d, max_tokens=%d, thinking=%s)",
+                model,
+                len(messages),
+                max_tokens,
+                chat_kwargs.get("enable_thinking"),
+            )
             raise HTTPException(status_code=500, detail=f"Steering-Server Fehler: {exc}") from exc
 
         return JSONResponse({

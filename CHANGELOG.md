@@ -2,6 +2,42 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.0] - 2026-07-21
+
+### Verändert
+- Kontextbudgets verwenden die echten Qwen-, Gemma- und GPT-OSS-Tokenizer statt Zeichenschaetzungen
+- Gepuffertes Streaming, Gemma-Turn-EOS und Ausgabevalidierung verhindern Tool-, Prompt- und Reasoning-Lecks
+- Neutraler Persona-/Ethikprompt, Response-Planung und zehnheitliche Homeostase staerken messbaren Emotionseinfluss ohne Bewusstseinsbehauptungen
+- Benchmarks laufen in isoliertem Memory mit fuenf Seeds, Ablationsprofilen, Konfidenzintervallen, Signifikanztests und verblindbaren Mehrfachratings
+- Qwen 3.5 4B und Gemma 4 E4B koennen ueber Backend, API und Frontend sicher gewechselt und lokal betrieben werden
+
+## [15.3] - 2026-07-20
+
+### Verändert
+- Reproduzierbaren Offline-Forschungsbericht fuer Qwen, Gemma und GPT-OSS aufgebaut
+- Forschungsqualitaet trennt Context-Budget-, CoT-, Instruktions-, Setup- und Generationsfehler
+- GPT-OSS nutzt bei ausgeschaltetem Thinking die kleinste Groq-Reasoningstufe und schliesst die Reasoning-Ausgabe aus
+- Kurzzeitige Groq-Rate-Limits werden begrenzt wiederholt, ohne partielle Streams zu duplizieren
+- Runtime-Reload-Logs geben keine Provider-API-Keys mehr aus
+
+## [15.2] - 2026-07-19
+
+### Verändert
+- Kurzzeitgedaechtnis schreibt JSON-Dateien atomar statt direkt in die Zieldatei
+- Web-, CLI- und Forschungsprozesse koordinieren STM-Zugriffe ueber einen Prozess-Lock
+- Parallele STM-Ergaenzungen werden vor dem Speichern zusammengefuehrt statt ueberschrieben
+- Gezieltes Loeschen und vollstaendiges Leeren bleiben trotz Merge-Schutz erhalten
+- Forschungsharness und CUDA/vLLM-Livepfad wurden mit Qualitaetsauswertung validiert
+
+## [15.1] - 2026-07-19
+
+### Verändert
+- Qwen3.5-4B mit NF4 als stabilen CUDA-Standard fuer die Tesla T4 aktiviert
+- Streaming erhaelt Leerzeichen zwischen OpenAI-kompatiblen Token-Deltas korrekt
+- Amygdala validiert numerische Modellwerte robust und begrenzt Emotions-Deltas
+- Gleichzeitige Emotions-Engine-Instanzen uebernehmen vor Schreibzugriffen den Persistenzstand
+- CLI-, Deployment- und Backup-Pruefpfade auf den aktuellen Projektstand gebracht
+
 ## [15.0] - 2026-07-04
 
 ### Erstellt

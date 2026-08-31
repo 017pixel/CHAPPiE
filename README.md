@@ -135,14 +135,16 @@ cp CHAPPIE_CONFIG.example.json CHAPPIE_CONFIG.json
 
 `CHAPPIE_CONFIG.json` wird nicht nach GitHub gepusht. Dort werden API-Keys, lokale Modelle, Cloud-Modelle, Memory, Generation und Training gemeinsam gepflegt.
 
-Pflicht fuer den aktuellen optimierten Backend-Pfad:
+Pflicht fuer den stabilen Ein-Modell-Pfad:
 
-- `api.groq_api_key` eintragen (oder in `CHAPPIE_CONFIG.json`)
 - `local_models.llm_provider = "vllm"`
 - `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
+- `local_models.vllm_force_single_model = true`
 - optional `local_models.vllm_model = "google/gemma-4-E4B-it"` oder `"google/gemma-4-26B-A4B-it"`
-- `small_tasks.intent_provider = "groq"`
-- `small_tasks.query_extraction_provider = "groq"`
+- `small_tasks.intent_provider = "vllm"`
+- `small_tasks.query_extraction_provider = "vllm"`
+
+Bei aktiviertem Ein-Modell-Pfad verwendet CHAPPiE dasselbe vLLM-Modell fuer Antwort, Intent und Query-Extraktion. Formatierung, Memory-Konsolidierung und Kurzzeit-Zusammenfassungen starten weder Groq noch Ollama; das verhindert konkurrierende Modelle und CUDA-Speicherfehler auf 16-GB-GPUs.
 
 Empfohlen:
 
@@ -151,10 +153,11 @@ Empfohlen:
 - Qwen-3.5-4B lokal fuer Antworten
 - Gemma 4 E4B fuer bessere Qualitaet bei aehnlichem VRAM-Budget
 - Gemma 4 26B-A4B nur mit NF4-Quantisierung und 4K-8K Kontext auf 16-GB-GPUs
-- Groq `openai/gpt-oss-20b` fuer Intent, Query Extraction und STM-Zusammenfassungen
-- Groq `openai/gpt-oss-120b` fuer Formatierung und Memory-Consolidation
+- Groq nur bewusst als optionalen Cloud-Modus konfigurieren
 
 Details: [docs/local-models.md](docs/local-models.md)
+
+Die reproduzierbare Benchmark-, Ablations- und Blindrating-Methodik sowie ihre Grenzen sind in [docs/research-methodology.md](docs/research-methodology.md) dokumentiert. CHAPPiE misst Verhalten, Text und interne Softwarezustaende; daraus folgt keine Aussage ueber subjektives Erleben oder Bewusstsein.
 
 ### 3. Starten
 

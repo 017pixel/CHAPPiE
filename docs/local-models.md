@@ -28,10 +28,10 @@ local_models.vllm_url = "http://localhost:8000/v1"
 local_models.vllm_model = "Qwen/Qwen3.5-4B"
 local_models.vllm_force_single_model = true
 
-small_tasks.intent_provider = "groq"
-small_tasks.intent_processor_model_groq = "openai/gpt-oss-20b"
-small_tasks.query_extraction_provider = "groq"
-small_tasks.query_extraction_groq_model = "openai/gpt-oss-20b"
+small_tasks.intent_provider = "vllm"
+small_tasks.intent_processor_model_vllm = "Qwen/Qwen3.5-4B"
+small_tasks.query_extraction_provider = "vllm"
+small_tasks.query_extraction_vllm_model = "Qwen/Qwen3.5-4B"
 ```
 
 Wichtig:
@@ -39,7 +39,7 @@ Wichtig:
 1. `VLLM_URL` muss auf den steering-faehigen lokalen Endpoint zeigen.
 2. `VLLM_MODEL` ist das Hauptmodell fuer Antwortgenerierung.
 3. `VLLM_FORCE_SINGLE_MODEL = True` ist fuer einen einzelnen lokalen Endpoint robust.
-4. `api.groq_api_key` muss in `CHAPPIE_CONFIG.json` gesetzt sein, damit Intent, Query Extraction, Formatierung und STM-Zusammenfassungen ueber Groq laufen.
+4. Im Ein-Modell-Modus bleiben Intent und Query Extraction auf dem aktiven vLLM-Modell; selbststaendige Sach-, Rechen- und Technikfragen verwenden den lokalen deterministischen Intent-Fast-Path und vermeiden eine zweite Inferenz.
 5. Runtime-Settings werden ueber `CHAPPIE_CONFIG.json`, API und Frontend gepflegt.
 
 Empfohlene Antwortdefaults:
@@ -57,6 +57,9 @@ Empfohlene Antwortdefaults:
 - `Qwen/Qwen3.5-27B` braucht deutlich mehr GPU-Reserven
 - der lokale Service hinter `chappie-vllm.service` ist ein steering-faehiger OpenAI-kompatibler Server
 - wenn noetig wird `trust_remote_code=True` verwendet
+- Gemma nutzt alle in `generation_config.json` definierten Turn-End-IDs. Insbesondere beendet `<turn|>` die Antwort, damit kein simulierter Folgeturn oder interner Template-Text entsteht.
+- GPT-OSS auf Groq kann Reasoning nicht vollstaendig deaktivieren. CHAPPiE bildet `thinking=false` deshalb als `reasoning_effort=low` plus `include_reasoning=false` ab; das gemeinsame Providerbudget betraegt dann mindestens 1.024 Completion-Tokens. Diese Cloudbedingung ist nicht tokenidentisch zu einem lokalen 450-Token-Antwortlimit.
+- Der Groq-Client wiederholt kurzfristige 429-Limits maximal viermal. Bereits begonnene Streams werden nicht wiederholt.
 
 ## Server-Override fuer Produktivbetrieb
 

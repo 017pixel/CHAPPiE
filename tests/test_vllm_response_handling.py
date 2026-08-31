@@ -119,10 +119,26 @@ def test_prepare_extra_body_overrides_explicit_enable_thinking_with_settings():
         settings.chain_of_thought = original
 
 
+
+def test_stream_generate_preserves_delta_whitespace():
+    deltas = [
+        type("Delta", (), {"content": "Hallo ", "reasoning_content": None})(),
+        type("Delta", (), {"content": "Welt", "reasoning_content": None})(),
+    ]
+    stream = [
+        type("Chunk", (), {"choices": [type("StreamChoice", (), {"delta": delta})()]})()
+        for delta in deltas
+    ]
+    brain = _make_brain_with_response(stream)
+    result = "".join(brain._stream_generate([], GenerationConfig(stream=True), {}))
+    assert result == "Hallo Welt"
+
+
 if __name__ == "__main__":
     test_sync_generate_returns_content_when_present()
     test_sync_generate_reports_reasoning_only_output()
     test_sync_generate_preserves_answer_and_model_reasoning()
     test_prepare_extra_body_sets_qwen_thinking_from_settings()
     test_prepare_extra_body_overrides_explicit_enable_thinking_with_settings()
+    test_stream_generate_preserves_delta_whitespace()
     print("OK: vLLM response handling")

@@ -115,17 +115,14 @@ class TrainingLoop:
             self.messages_since_dream += 1
 
     def _compact_history_after_sleep(self, summary_result: str):
-        new_history = []
-        for msg in self.conversation_history:
-            if msg["role"] == "system" and "[TRAUM-ZUSAMMENFASSUNG]" in msg["content"]:
-                new_history.append(msg)
-
         short_summary = str(summary_result).split("Verlauf:")[0].strip()
-        new_history.append({
+        # Consolidation has already stored the details in Memory. Keeping a
+        # chain of old system messages makes local chat templates invalid and
+        # grows without bound, so retain exactly the newest summary.
+        self.conversation_history = [{
             "role": "system",
             "content": f"[TRAUM-ZUSAMMENFASSUNG]: {short_summary}\nAlle Details wurden als Fakten im Gedächtnis gespeichert."
-        })
-        self.conversation_history = new_history
+        }]
 
     def _run_sleep_cycle(self) -> bool:
         log.info("=== SLEEP-/TRAUM-PHASE EINGELEITET ===")
@@ -319,11 +316,20 @@ class TrainingLoop:
             use_chain_of_thought=False # CoT fuer Training ggf. zu verbose, wir wollen Interaktion
         )
         
+        dream_summary, prompt_history = normalize_training_prompt_history(
+            self.conversation_history,
+            user_input,
+            settings.history_max_messages,
+        )
+        if dream_summary:
+            system_prompt = f"{system_prompt}\n\n=== LETZTE TRAUM-ZUSAMMENFASSUNG ===\n{dream_summary}"
+
         messages = self.brain.build_prompt(
-            system_prompt, 
+            system_prompt,
             memories_for_prompt, 
             user_input, 
-            self.conversation_history
+            prompt_history,
+            max_history=settings.history_max_messages,
         )
         
         # 4. Generierung (erhoehte Tokens fuer vollstaendige Saetze)
@@ -844,3 +850,31 @@ class TrainingLoop:
         
         log.info("Conversation Reset abgeschlossen - starte frisch")
         console.print("[green]✅ Reset abgeschlossen. Starte mit frischer Konversation.[/green]")
+def normalize_training_prompt_history(
+    history: list[dict],
+    current_input: str,
+    max_history: int,
+) -> tuple[str, list[dict]]:
+    """Return one summary context plus valid user/assistant chat history.
+
+    Qwen and Gemma require system context at the start of the chat template.
+    Persisted dream summaries therefore belong in the leading system prompt,
+    never as interleaved history messages.
+    """
+    system_summaries = [
+        str(item.get("content", "")).strip()
+        for item in history
+        if item.get("role") == "system" and str(item.get("content", "")).strip()
+    ]
+    dialogue = [
+        {"role": item.get("role"), "content": str(item.get("content", ""))}
+        for item in history
+        if item.get("role") in {"user", "assistant"} and str(item.get("content", "")).strip()
+    ]
+    if dialogue and dialogue[-1]["role"] == "user" and dialogue[-1]["content"] == str(current_input):
+        dialogue.pop()
+    history_limit = max(0, int(max_history))
+    if history_limit:
+        dialogue = dialogue[-history_limit:]
+    latest_summary = system_summaries[-1] if system_summaries else ""
+    return latest_summary, dialogue

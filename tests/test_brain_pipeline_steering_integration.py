@@ -112,6 +112,44 @@ def test_brain_pipeline_keeps_context_workspace_and_tool_path_before_steering():
     assert pipeline.steering_manager.called_with["trust"] == 60
 
 
+def test_invalid_short_term_entries_never_become_tool_calls():
+    pipeline = BrainPipeline.__new__(BrainPipeline)
+    calls = pipeline._convert_to_tool_calls([
+        "model emitted a string",
+        None,
+        {},
+        {"content": "  "},
+        {"content": "valid", "importance": "unexpected"},
+    ])
+    assert len(calls) == 1
+    assert calls[0]["data"]["content"] == "valid"
+    assert calls[0]["data"]["importance"] == "normal"
+
+
+def test_hippocampus_normalizes_model_schema_before_pipeline():
+    from brain.agents.hippocampus import HippocampusAgent
+
+    agent = HippocampusAgent.__new__(HippocampusAgent)
+    data = agent._validate_memory_data({
+        "confidence": "bad",
+        "encoding_decision": "not-an-object",
+        "context_relevance": "all",
+        "short_term_entries": [
+            "bad",
+            {"content": "keep me", "importance": "HIGH"},
+            {"content": ""},
+        ],
+    }, 1.25)
+    assert data["confidence"] == 0.5
+    assert data["encoding_decision"]["emotional_boost"] == 1.25
+    assert data["short_term_entries"] == [{
+        "content": "keep me", "category": "general", "importance": "high",
+    }]
+    assert isinstance(data["context_relevance"], dict)
+
+
 if __name__ == "__main__":
     test_brain_pipeline_keeps_context_workspace_and_tool_path_before_steering()
+    test_invalid_short_term_entries_never_become_tool_calls()
+    test_hippocampus_normalizes_model_schema_before_pipeline()
     print("OK: brain pipeline steering integration")

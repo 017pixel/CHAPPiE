@@ -21,7 +21,7 @@ def main() -> int:
 
     failures = []
 
-    service_file = REPO_ROOT / "chappie-training.service"
+    service_file = REPO_ROOT / "deploy" / "chappie-training.service"
     service_content = service_file.read_text(encoding="utf-8")
     if "Chappies_Trainingspartner.training_daemon" in service_content or "training_daemon.py" in service_content:
         print("[OK] Service points to training_daemon entry point")

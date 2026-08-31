@@ -16,6 +16,7 @@ import uuid
 import re
 from datetime import datetime, timezone
 from typing import Optional, Any
+from pathlib import Path
 from dataclasses import dataclass
 
 # ============================================
@@ -63,6 +64,7 @@ class Memory:
     label: str = "original"  # "original" oder "zsm gefasst"
     match_type: str = ""
     matched_terms: str = ""
+    source: str = "unknown"
 
 
 class MemoryEngine:
@@ -73,8 +75,10 @@ class MemoryEngine:
     Sentence-Transformers fuer Embeddings.
     """
     
-    def __init__(self):
+    def __init__(self, persist_directory: Optional[Path] = None, collection_name: Optional[str] = None):
         """Initialisiert die Memory Engine."""
+        self.persist_directory = Path(persist_directory or settings.chroma_persist_directory or CHROMA_DB_DIR)
+        self.collection_name = str(collection_name or settings.chroma_collection_name)
         print("Initialisiere Memory Engine...")
         
         # Flag für den Modus (persistent vs in-memory)
@@ -140,10 +144,10 @@ class MemoryEngine:
     
     def _init_chromadb_persistent(self):
         """Versucht ChromaDB im persistenten Modus zu initialisieren."""
-        print(f"   Verbinde mit ChromaDB (persistent: {CHROMA_DB_DIR})")
+        print(f"   Verbinde mit ChromaDB (persistent: {self.persist_directory})")
         try:
             # Stelle sicher, dass das Verzeichnis existiert
-            os.makedirs(str(CHROMA_DB_DIR), exist_ok=True)
+            os.makedirs(str(self.persist_directory), exist_ok=True)
             
             # ChromaDB Settings für bessere Stabilität
             chroma_settings = ChromaSettings(
@@ -153,13 +157,13 @@ class MemoryEngine:
             )
             
             self.client = chromadb.PersistentClient(
-                path=str(CHROMA_DB_DIR),
+                path=str(self.persist_directory),
                 settings=chroma_settings
             )
             
             # Collection erstellen oder laden
             self.collection = self.client.get_or_create_collection(
-                name=settings.chroma_collection_name,
+                name=self.collection_name,
                 metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
             )
             
@@ -188,7 +192,7 @@ class MemoryEngine:
             )
             
             self.collection = self.client.get_or_create_collection(
-                name=settings.chroma_collection_name,
+                name=self.collection_name,
                 metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory (in-memory)"}
             )
             
@@ -373,7 +377,8 @@ class MemoryEngine:
                     timestamp=metadata.get("timestamp", ""),
                     mem_type=metadata.get("type", "interaction"),
                     relevance_score=relevance,
-                    label=metadata.get("label", "self_reflection")
+                    label=metadata.get("label", "self_reflection"),
+                    source=metadata.get("source", "unknown"),
                 )
                 memories.append(memory)
             
@@ -408,7 +413,7 @@ class MemoryEngine:
         return {
             "ich", "du", "er", "sie", "es", "wir", "ihr", "uns", "euch", "ihnen",
             "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer",
-            "und", "oder", "aber", "doch", "weil", "dass", "wenn", "als", "wie", "sowie",
+            "und", "oder", "aber", "doch", "weil", "dass", "wenn", "als", "wie", "sowie", "alle",
             "bin", "bist", "ist", "sind", "war", "waren", "waere", "sein", "haben", "hat", "hatte",
             "mich", "dich", "sich", "mir", "dir", "ihm", "ihr",
             "nicht", "auch", "noch", "schon", "nur", "sehr", "mehr", "ganz", "wirklich",
@@ -497,14 +502,51 @@ class MemoryEngine:
 
         normalized: list[str] = []
         seen: set[str] = set()
+        stop_words = self._default_stop_words()
         for item in raw_items:
             for token in self._tokenize_for_keywords(item):
-                if token in seen:
+                if token in seen or token in stop_words:
                     continue
                 seen.add(token)
                 normalized.append(token)
                 if len(normalized) >= max_terms:
                     return normalized
+        return normalized
+
+    def _normalize_entity_list(
+        self,
+        values: Optional[list[str] | tuple[str, ...] | set[str] | str],
+        max_terms: int = 12,
+    ) -> list[str]:
+        """Keep robust entity phrases/IDs intact and discard grammar noise."""
+        if not values:
+            return []
+        raw_items = re.split(r"[,;|\n]+", values) if isinstance(values, str) else [str(item) for item in values]
+        stop_words = self._default_stop_words()
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw_item in raw_items:
+            item = re.sub(r"\s+", " ", self._normalize_german_text(raw_item)).strip(" .,:;!?()[]{}\"")
+            meaningful = [token for token in self._tokenize_for_keywords(item) if token not in stop_words]
+            if not meaningful:
+                continue
+            # Preserve explicit identifiers (e.g. ORBIT-741) and multi-word
+            # names as a phrase. A sentence fragment is not promoted to Exact.
+            identifier = re.fullmatch(r"[a-z0-9]+(?:[-_./][a-z0-9]+)+", item)
+            if identifier:
+                candidate = item
+            elif len(meaningful) == 1:
+                candidate = meaningful[0]
+            elif len(meaningful) <= 4 and len(item.split()) <= 4:
+                candidate = " ".join(meaningful)
+            else:
+                continue
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            normalized.append(candidate)
+            if len(normalized) >= max_terms:
+                break
         return normalized
 
     @staticmethod
@@ -601,8 +643,8 @@ class MemoryEngine:
 
         exclude_ids = exclude_ids or set()
         keyword_terms = self._normalize_keyword_list(keywords, max_terms=20)
-        entity_terms = self._normalize_keyword_list(entities, max_terms=12)
-        if not keyword_terms:
+        entity_terms = self._normalize_entity_list(entities, max_terms=12)
+        if not keyword_terms and not entity_terms:
             keyword_terms = self._normalize_keyword_list(self._build_keyword_query(query or "", max_terms=12), max_terms=12)
         if not keyword_terms and not entity_terms:
             return []
@@ -648,6 +690,7 @@ class MemoryEngine:
                     label=f"keyword_{match_type.lower()}",
                     match_type=match_type,
                     matched_terms=", ".join(matched_terms),
+                    source=metadata.get("source", "unknown"),
                 )
             )
 
@@ -842,7 +885,8 @@ class MemoryEngine:
                             timestamp=metadata.get("timestamp", ""),
                             mem_type=metadata.get("type", "interaction"),
                             relevance_score=relevance,
-                            label=metadata.get("label", "original")
+                            label=metadata.get("label", "original"),
+                            source=metadata.get("source", "unknown"),
                         )
                         memories.append(memory)
                 
@@ -922,7 +966,8 @@ class MemoryEngine:
                     role=metadata.get("role", "unknown"),
                     timestamp=metadata.get("timestamp", ""),
                     mem_type=mem_type,
-                    label=label
+                    label=label,
+                    source=metadata.get("source", "unknown"),
                 )
                 memories.append(memory)
 
@@ -1006,9 +1051,9 @@ class MemoryEngine:
         count = self.collection.count()
         
         # Collection loeschen und neu erstellen
-        self.client.delete_collection(settings.chroma_collection_name)
+        self.client.delete_collection(self.collection_name)
         self.collection = self.client.get_or_create_collection(
-            name=settings.chroma_collection_name,
+            name=self.collection_name,
             metadata={"description": "CHAPiE episodic memory"}
         )
         
@@ -1093,9 +1138,9 @@ class MemoryEngine:
             return "Abgebrochen"
 
         # Collection löschen und neu erstellen
-        self.client.delete_collection(settings.chroma_collection_name)
+        self.client.delete_collection(self.collection_name)
         self.collection = self.client.get_or_create_collection(
-            name=settings.chroma_collection_name,
+            name=self.collection_name,
             metadata={"description": "CHAPiE episodic memory"}
         )
 
@@ -1118,13 +1163,18 @@ class MemoryEngine:
         if not memories:
             return "Keine relevanten Erinnerungen gefunden."
         
-        lines = ["=== RELEVANTE ERINNERUNGEN ==="]
+        lines = [
+            "=== RELEVANTE ERINNERUNGEN (QUELLENKONTEXT) ===",
+            "Nutze einen Treffer nur, wenn er die aktuelle Frage direkt beantwortet. Zitiere keine Erinnerung als sicher, wenn Quelle oder Bezug unklar ist.",
+            "Bei einer konkreten Recall-Frage haben passende, aktuelle USER-Fakten Vorrang vor Persona und freien Schlussfolgerungen.",
+        ]
         for i, mem in enumerate(memories, 1):
             if self._is_memory_contaminated(mem.content):
                 continue
             role_label = "USER" if mem.role == "user" else "CHAPIE"
             score_percent = int(mem.relevance_score * 100)
-            lines.append(f"\n[{i}] {role_label} (Relevanz: {score_percent}%)")
+            date = (mem.timestamp or "")[:10] or "ohne Datum"
+            lines.append(f"\n[{i} | ID {mem.id[:8]} | Quelle {mem.source} | {date}] {role_label} (Relevanz: {score_percent}%)")
             lines.append(f"    {mem.content}")
         
         return "\n".join(lines)
@@ -1136,8 +1186,8 @@ class MemoryEngine:
 
         lines = [
             "=== KEYWORD-RAG FAKTEN / EXAKTE TREFFER ===",
-            "Nutze diese Treffer bevorzugt fuer konkrete Fakten, Namen, Orte, Projekte und fruehere Aussagen.",
-            "Bei Widerspruechen neuere und exaktere Treffer bevorzugen; nutze sie nicht, wenn sie nicht zur Frage passen.",
+            "Diese belegten Treffer haben bei konkreten Fakten, Namen, Orten, Projekten und frueheren Aussagen Vorrang vor Persona und Vermutungen.",
+            "Bei Widerspruechen neuere und exaktere USER-Treffer bevorzugen. Wenn kein Treffer direkt passt, sage das statt eine Erinnerung zu erfinden.",
         ]
         for memory in memories:
             if self._is_memory_contaminated(memory.content):
@@ -1148,7 +1198,7 @@ class MemoryEngine:
             date = (memory.timestamp or "")[:10] or "ohne Datum"
             terms = f" | Treffer: {memory.matched_terms}" if memory.matched_terms else ""
             content = re.sub(r"\s+", " ", memory.content).strip()[:220]
-            candidate = f"\n[{match_type} | Score {score_percent}% | {date} | {role_label}{terms}]\n\"{content}\""
+            candidate = f"\n[{match_type} | ID {memory.id[:8]} | Quelle {memory.source} | Score {score_percent}% | {date} | {role_label}{terms}]\n\"{content}\""
             if len("\n".join(lines)) + len(candidate) > max_chars:
                 break
             lines.append(candidate)

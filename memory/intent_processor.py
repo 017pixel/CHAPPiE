@@ -89,7 +89,8 @@ class IntentProcessor:
         self.brain = get_brain(provider=intent_provider, model=intent_model)
     
     def process(self, user_input: str, history: List[Dict], 
-                current_emotions: Dict[str, int]) -> IntentResult:
+                current_emotions: Dict[str, int],
+                deterministic: bool = False) -> IntentResult:
         """
         Verarbeitet User Input und gibt Intent Analysis zurueck.
         
@@ -106,6 +107,41 @@ class IntentProcessor:
         if quick:
             return quick
 
+        if deterministic:
+            result = self._create_fallback_result(
+                user_input,
+                history,
+                current_emotions,
+                reason="research_deterministic_intent",
+            )
+            result.raw_json = {"research_deterministic_intent": True}
+            return result
+
+        # A second model pass is expensive (especially with Gemma) and adds no
+        # useful information for closed, self-contained questions.  Keep the
+        # LLM intent pass for messages that may mutate/retrieve personal state
+        # or depend on conversational context; analyse independent factual,
+        # mathematical and technical requests locally.
+        if self._is_self_contained_request(user_input):
+            result = self._create_fallback_result(
+                user_input,
+                history,
+                current_emotions,
+                reason="deterministic_fast_path",
+            )
+            result.retrieval_keywords = []
+            result.exact_entities = []
+            result.fact_lookup_intent = False
+            result.context_requirements = {
+                "need_soul_context": False,
+                "need_user_context": False,
+                "need_preferences": False,
+                "need_short_term_memory": False,
+                "need_long_term_memory": False,
+            }
+            result.raw_json = {"deterministic_fast_path": True}
+            return result
+
         # Baue Prompt
         system_prompt = self._build_system_prompt()
         user_prompt = self._build_user_prompt(user_input, history, current_emotions)
@@ -117,7 +153,7 @@ class IntentProcessor:
         
         # Generiere mit kleinem Modell
         gen_config = GenerationConfig(
-            max_tokens=640,
+            max_tokens=384,
             temperature=0.1,
             stream=False
         )
@@ -156,6 +192,65 @@ class IntentProcessor:
         if any(q in lower for q in trivial_questions):
             return self._create_quick_result("casual_chat", entities=[], user_input=stripped)
         return None
+
+    @staticmethod
+    def _is_self_contained_request(user_input: str) -> bool:
+        """Return True only when no profile, memory or prior-turn state is needed."""
+        text = user_input.strip()
+        if not text or len(text) > 700:
+            return False
+        lower = text.casefold()
+
+        stateful_markers = (
+            "merk dir", "erinnere dich", "erinnerst du", "weißt du noch",
+            "weisst du noch", "gestern", "damals", "letztes mal", "vorhin",
+            "mein name", "ich heiße", "ich heisse", "ich bin geboren",
+            "ich wohne", "ich arbeite als", "mein projekt", "mein termin",
+            "ich mag", "ich liebe", "ich hasse", "ich bevorzuge",
+            "für später", "fuer spaeter", "morgen um", "nächste woche",
+            "naechste woche", "mach weiter", "weiter damit", "wie zuvor",
+            "wie oben", "das davor", "diese antwort", "deine letzte",
+            # CHAPPiE-Persona/-Life/-Memory-Anker: diese Themen brauchen immer Kontext
+            "chappie", "wie geht es dir", "wie gehts dir", "nachgedacht",
+            "worüber hast du", "woroüber", "erinnerst", "gedanken",
+            "gefühle", "gefuehle", "bewusstsein", "persona", "wer bist du",
+            "was denkst du", "was fühlst du", "was fuehlst du",
+            "lange nicht", "in all der zeit", "seit wann",
+        )
+        if any(marker in lower for marker in stateful_markers):
+            return False
+
+        # Persona-/Identitätsfragen dürfen niemals als eigenständig gelten – sie brauchen
+        # CHAPPiE-Prompt, Memory und Life-Kontext.
+        persona_markers = (
+            "chappie", "wer bist du", "was bist du", "erzähl von dir",
+            "erzaehl von dir", "wie fühlst du", "wie fuehlst du",
+            "wie geht es dir", "worüber hast du", "woroüber hast",
+            "nachgedacht", "was denkst", "was beschäftigt dich",
+            "was beschaeftigt dich", "deine gedanken", "dein gefühl",
+            "dein gefuehl", "deine gefühle", "deine gefuehle",
+        )
+        if any(marker in lower for marker in persona_markers):
+            return False
+
+        # Explicit arithmetic is always closed. For prose requests require a
+        # clear question/task verb and enough subject matter to stand alone.
+        arithmetic = bool(re.search(
+            r"(?:\d|null|eins|zwei|drei|vier|fünf|fuenf|sechs|sieben|acht|neun)"
+            r".*(?:[-+*/=×÷]|\bminus\b|\bplus\b|\bmal\b|geteil)",
+            lower,
+        ))
+        if arithmetic:
+            return True
+
+        request_markers = (
+            "wer ", "was ", "wann ", "wo ", "warum ", "wieso ", "wie ",
+            "welche", "erklär", "erklaer", "beschreib", "berechne", "nenne ",
+            "vergleiche", "prüfe", "pruefe", "analysiere", "übersetze", "uebersetze",
+        )
+        if not ("?" in text or lower.startswith(request_markers)):
+            return False
+        return len(re.findall(r"\w+", text, flags=re.UNICODE)) >= 4
 
     def _create_quick_result(self, intent_str: str, entities: List[str], user_input: str = "") -> IntentResult:
         # Basic sentiment-based emotion deltas for trivial inputs
@@ -239,6 +334,16 @@ class IntentProcessor:
         """Parsed JSON zu IntentResult."""
         intent_data = json_data.get("intent_analysis", {})
         intent_type_str = intent_data.get("primary_intent", "casual_chat")
+        intent_aliases = {
+            "information_request": "information_exchange",
+            "fact_lookup": "information_exchange",
+            "question": "information_exchange",
+            "technical": "technical_discussion",
+            "task": "task_execution",
+            "creative": "creative_collaboration",
+            "personal": "personal_sharing",
+        }
+        intent_type_str = intent_aliases.get(str(intent_type_str), str(intent_type_str))
         
         # Sichere Enum-Konvertierung
         try:
@@ -269,6 +374,11 @@ class IntentProcessor:
                     emotions_update[emotion] = EmotionUpdate(
                         delta=data.get("delta", 0),
                         reason=data.get("reason", "")
+                    )
+                elif emotion in EMOTION_DEFAULTS and isinstance(data, (int, float)):
+                    emotions_update[emotion] = EmotionUpdate(
+                        delta=max(-15, min(15, int(data))),
+                        reason="Intent analysis",
                     )
             except Exception:
                 pass

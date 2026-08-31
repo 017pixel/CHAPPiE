@@ -80,7 +80,7 @@ CHAPPiE unterstuetzt Reasoning/Chain-of-Thought auf zwei Ebenen, gesteuert durch
 
 **Ollama (lokal)**: `think`-Parameter steuert natives Reasoning bei Qwen3/DeepSeek-Modellen.
 
-**Groq (Cloud)**: Kein API-level Reasoning. Stattdessen wird `CHAIN_OF_THOUGHT_INSTRUCTION` (aus `config/prompts.py`) an den System-Prompt angehaengt, sodass das Modell via `<gedanke>/<antwort>`-Tags strukturiert antwortet.
+**Groq (Cloud)**: GPT-OSS besitzt providerseitiges Reasoning. Groq erlaubt dafuer nur `low`, `medium` oder `high`, kein vollstaendiges Abschalten. Bei deaktiviertem CHAPPiE-Thinking setzt `GroqBrain` deshalb die kleinstmoegliche Stufe `low`, schliesst die Reasoning-Ausgabe mit dem fuer GPT-OSS unterstuetzten `include_reasoning=false` aus und reserviert 1.024 gemeinsame Completion-Tokens fuer internes Reasoning plus sichtbare Antwort. `reasoning_format` wird fuer GPT-OSS laut Groq nicht unterstuetzt. Bei aktiviertem Thinking wird `medium` verwendet; zusaetzlich kann `CHAIN_OF_THOUGHT_INSTRUCTION` aus `config/prompts.py` die sichtbare Antwortstruktur anfordern. Andere Groq-Modelle behalten ihren normalen `max_tokens`-Pfad.
 
 Der Toggle ist an drei Stellen verfuegbar:
 
@@ -92,6 +92,8 @@ Der Toggle ist an drei Stellen verfuegbar:
 
 Der Alignment-Test-Harness nutzt fuer die Antwortnachbearbeitung bewusst den lokalen Whitespace-/Tag-Fallback statt eines separaten Groq-Formatierungsrequests. Groq bleibt fuer Intent-Analyse und Query-Extraction konfigurierbar, aber Rate-Limits sollen nicht durch reine Formatierung verbraucht werden.
 
+Kurzzeitige Groq-429-Antworten werden bis zu viermal mit der vom Provider genannten Wartezeit wiederholt. Ein Stream wird nur vor dem ersten sichtbaren Token erneut gestartet, damit keine doppelten Teilantworten entstehen. Runtime-Reload-Logs zeigen nur Provider und Modell; API-Keys sind nie Teil der Logausgabe.
+
 Research-Runs validieren Setup- und Hauptantworten vor der Uebernahme in die Kategorie-History. Antworten mit kaputtem Whitespace, zu kurzen Symbolausgaben, Kontextbudget-Verletzungen, Backend-Fehlerstrings, Memory-Kontamination oder CoT-Leaks gelten nicht als `valid_completed` und werden nicht als Folgekontext gespeichert. Bestehende Logs koennen mit `forschung/analyze_session_quality.py` nachtraeglich bewertet werden.
 
 Relevante Dateien:
@@ -99,6 +101,7 @@ Relevante Dateien:
 - `config/prompts.py` → `CHAIN_OF_THOUGHT_INSTRUCTION`
 - `brain/vllm_brain.py` → `_prepare_extra_body()` (enable_thinking)
 - `brain/ollama_brain.py` → `_build_chat_kwargs()` (think)
+- `brain/groq_brain.py` → GPT-OSS-Reasoningbudget und begrenzter 429-Retry
 - `chappie_brain_cli.py` → `/thinking` Command
 - `frontend/src/pages/chat-page.tsx` → Thinking-Toggle
 

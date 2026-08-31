@@ -123,6 +123,39 @@ def test_keyword_rag_dedupes_semantic_memory_ids():
     assert results == []
 
 
+def test_exact_identifier_orbit_741_wins_without_partial_identifier_noise():
+    engine = _engine_without_init()
+    engine.collection = _FakeCollection([
+        ("mem-741", "User: Der kontrollierte Code lautet ORBIT-741.", {"role": "user", "timestamp": "2026-06-29T10:00:00+00:00"}),
+        ("mem-742", "User: Ein anderes Experiment lautet ORBIT-742.", {"role": "user", "timestamp": "2026-06-29T10:01:00+00:00"}),
+    ])
+
+    results = engine.search_memory_keywords(
+        "Wie lautet der kontrollierte Code?",
+        entities=["ORBIT-741"],
+        min_score=0.9,
+    )
+
+    assert [result.id for result in results] == ["mem-741"]
+    assert results[0].match_type == "Exact"
+    assert results[0].matched_terms == "orbit-741"
+
+
+def test_stopword_entities_never_create_exact_false_positives():
+    engine = _engine_without_init()
+    engine.collection = _FakeCollection([
+        ("mem-1", "Wenn alle bereit sind, beginnt ein alter Test.", {"role": "user", "timestamp": "2026-06-29T10:00:00+00:00"}),
+    ])
+
+    results = engine.search_memory_keywords(
+        "Wenn alle sind, ein ist.",
+        keywords=["wenn", "alle", "sind", "ein", "ist"],
+        entities=["Wenn", "alle", "sind"],
+    )
+
+    assert results == []
+
+
 if __name__ == "__main__":
     test_keyword_builder_normalizes_umlauts_and_filters_stop_words()
     test_clean_query_output_rejects_json_like_noise()
@@ -131,4 +164,6 @@ if __name__ == "__main__":
     test_keyword_rag_normalizes_umlauts_for_entities()
     test_keyword_rag_rejects_weak_only_matches()
     test_keyword_rag_dedupes_semantic_memory_ids()
+    test_exact_identifier_orbit_741_wins_without_partial_identifier_noise()
+    test_stopword_entities_never_create_exact_false_positives()
     print("OK: memory query extraction german")

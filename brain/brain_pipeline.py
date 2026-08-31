@@ -248,16 +248,24 @@ class BrainPipeline:
     def _convert_to_tool_calls(self, entries: List[Dict]) -> List[Dict]:
         """Convert short term entries to tool call format."""
         tool_calls = []
-        for entry in entries:
+        for entry in entries if isinstance(entries, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            content = str(entry.get("content", "")).strip()
+            if not content:
+                continue
+            importance = str(entry.get("importance", "normal")).lower()
+            if importance not in {"low", "normal", "high"}:
+                importance = "normal"
             tool_calls.append({
                 "tool": "add_short_term_memory",
                 "action": "add",
                 "data": {
-                    "content": entry.get("content", ""),
+                    "content": content[:1000],
                     "category": entry.get("category", "general"),
-                    "importance": entry.get("importance", "normal")
+                    "importance": importance
                 },
-                "priority": "medium" if entry.get("importance") == "normal" else "high",
+                "priority": "high" if importance == "high" else "medium",
                 "reason": "Processed by Hippocampus Agent"
             })
         return tool_calls

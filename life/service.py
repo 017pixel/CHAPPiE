@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import threading
+from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
@@ -34,12 +36,12 @@ class LifeSimulationService:
     TURN_MINUTES = 35
     MAX_EVENTS = 18
 
-    def __init__(self):
-        self.state_path = DATA_DIR / "life_state.json"
+    def __init__(self, state_path: Optional[Path] = None, personality_manager: Any = None):
+        self.state_path = Path(state_path) if state_path else DATA_DIR / "life_state.json"
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         try:
-            self.personality = PersonalityManager()
+            self.personality = personality_manager if personality_manager is not None else PersonalityManager()
         except Exception:
             self.personality = _NoOpPersonalityManager()
         self.goal_engine = GoalEngine()
@@ -146,6 +148,22 @@ class LifeSimulationService:
                 self._save_state()
                 return self._build_snapshot(homeostasis)
             return self._build_snapshot(self._build_homeostasis({}))
+
+    def reset_state(self) -> Dict[str, Any]:
+        """Reset Life deterministically for an isolated benchmark replicate."""
+        with self._lock:
+            self._state = build_default_life_state()
+            self._save_state()
+            return self._state.to_dict()
+
+    def create_checkpoint(self) -> LifeState:
+        with self._lock:
+            return deepcopy(self._state)
+
+    def restore_checkpoint(self, checkpoint: LifeState) -> None:
+        with self._lock:
+            self._state = deepcopy(checkpoint)
+            self._save_state()
 
     def get_prompt_context(self, snapshot: Optional[Dict[str, Any]] = None) -> str:
         data = snapshot or self.get_snapshot()
@@ -436,19 +454,41 @@ class LifeSimulationService:
             active_needs.append({"name": name, "value": value, "pressure": 100 - value})
         active_needs.sort(key=lambda item: item["pressure"], reverse=True)
         dominant = active_needs[0]
-        adjustments = {"happiness": 0, "trust": 0, "energy": 0, "curiosity": 0, "frustration": 0, "motivation": 0, "sadness": 0}
+        # A single canonical schema prevents affection/anxiety/calm from being
+        # silently omitted by Life while other layers already steer them.
+        from config.emotions import EMOTION_ORDER
+
+        adjustments = {emotion: 0 for emotion in EMOTION_ORDER}
         if self._state.needs.get("energy", 50) < 40:
             adjustments["energy"] -= 4
             adjustments["motivation"] -= 2
+            adjustments["anxiety"] += 1
+            adjustments["calm"] -= 1
+        elif self._state.needs.get("energy", 50) > 75:
+            adjustments["energy"] += 1
+            adjustments["motivation"] += 1
         if self._state.needs.get("social", 50) < 40:
             adjustments["trust"] -= 1
             adjustments["sadness"] += 2
+            adjustments["affection"] -= 2
+            adjustments["anxiety"] += 1
+        elif self._state.needs.get("social", 50) > 75:
+            adjustments["trust"] += 1
+            adjustments["affection"] += 2
+            adjustments["happiness"] += 1
         if self._state.needs.get("curiosity", 50) < 45:
             adjustments["curiosity"] += 3
         if self._state.needs.get("stability", 50) < 45:
             adjustments["frustration"] += 3
+            adjustments["anxiety"] += 3
+            adjustments["calm"] -= 3
+        elif self._state.needs.get("stability", 50) > 75:
+            adjustments["frustration"] -= 1
+            adjustments["anxiety"] -= 2
+            adjustments["calm"] += 2
         if self._state.needs.get("achievement", 50) < 45:
             adjustments["motivation"] += 2
+            adjustments["happiness"] -= 1
         rhythm = (self._state.temporal_state or {}).get("interaction_rhythm")
         if rhythm == "rapid_exchange":
             adjustments["energy"] -= 2
@@ -456,6 +496,8 @@ class LifeSimulationService:
         if rhythm == "reorientation":
             adjustments["curiosity"] += 2
             adjustments["trust"] -= 1
+            adjustments["anxiety"] += 1
+            adjustments["calm"] -= 1
         return {
             "active_needs": active_needs,
             "dominant_need": dominant,
