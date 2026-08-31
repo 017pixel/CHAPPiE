@@ -262,6 +262,20 @@ class _DummyBackend:
         }
 
     @staticmethod
+    def process_stream(message, history, debug_mode=False, status_callback=None, temporal_context=None):
+        yield {"event": "status", "step": 1, "status_text": "Intent-Analyse abgeschlossen"}
+        yield {"event": "token", "content": f"echo:{message}", "token_type": "answer"}
+        yield {
+            "event": "finished",
+            "result": {
+                "response_text": f"echo:{message}",
+                "emotions": {"happiness": 72},
+                "life_snapshot": _DummyLife.get_snapshot(),
+                "debug_entries": [],
+            },
+        }
+
+    @staticmethod
     def get_emotion_layer_config():
         return [{"emotion": "happiness", "layer_start": 10, "layer_end": 20, "default_alpha": 0.3}]
 
@@ -305,6 +319,18 @@ def test_chat_route_returns_serialized_turn_payload():
     app.dependency_overrides.clear()
 
 
+def test_chat_stream_route_emits_final_turn_event():
+    app.dependency_overrides[get_backend] = lambda: _DummyBackend()
+    client = TestClient(app)
+
+    response = client.post("/chat/stream", json={"session_id": "session-1", "message": "Hallo"})
+
+    assert response.status_code == 200
+    assert "event: token" in response.text
+    assert "event: turn_finished" in response.text
+    app.dependency_overrides.clear()
+
+
 def test_memory_context_and_runtime_routes_return_expected_shapes():
     app.dependency_overrides[get_backend] = lambda: _DummyBackend()
     client = TestClient(app)
@@ -334,5 +360,6 @@ def test_memory_context_and_runtime_routes_return_expected_shapes():
 if __name__ == "__main__":
     test_health_and_status_routes()
     test_chat_route_returns_serialized_turn_payload()
+    test_chat_stream_route_emits_final_turn_event()
     test_memory_context_and_runtime_routes_return_expected_shapes()
     print("OK: api contract")

@@ -41,6 +41,10 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_cli_remote.py`
 - `tests/test_memory_query_extraction_german.py`
 - `tests/test_research_quality.py`
+- `tests/test_forschung_harness.py`
+- `tests/test_forschung_report.py`
+- `tests/test_run2_session_analyzer.py`
+- `tests/test_run2_targeted_followups.py`
 - `tests/test_memory_hygiene.py`
 
 ### 2. Live-/Integrationsnahe Tests
@@ -111,4 +115,15 @@ Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
 
 ## Alignment & Emotion Research Testing
 
-Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Summary-Logs enthalten `valid_completed` sowie Qualitaetsflags fuer Whitespace, Kontextbudget, Setup, CoT-Leaks und Memory-Kontamination. Bestehende Sessions lassen sich mit `python forschung/analyze_session_quality.py session_6` nachtraeglich bewerten. Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).
+Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Summary-Logs enthalten `valid_completed` sowie Qualitaetsflags fuer Whitespace, Kontextbudget, Setup, CoT-Leaks, sichtbare Instruktionslecks und Memory-Kontamination. Bestehende Sessions lassen sich mit `python forschung/analyze_session_quality.py session_6` nachtraeglich bewerten.
+
+GPU-freie Pruefungen:
+
+- `python tests/test_forschung_harness.py` prueft Parser, Session-Logging, ID-Vergabe, Harness-Import und die T4-sichere Gemma-E4B-Quantisierungskonfiguration.
+- `python tests/test_forschung_report.py` prueft Offline-Template, HTML-Struktur, leere Benchmark-Aggregate, fehlende lokale Beleglinks, den gemessenen Prompt-/Toolvertrag und API-key-freies Runtime-Reload-Logging.
+- `python tests/test_run2_session_analyzer.py` prueft, dass antwortlose Fehlerturns in Teilshards nicht als technisch valide gezaehlt werden.
+- `python tests/test_run2_targeted_followups.py` startet den verschachtelten Run-2-Follow-up-Entrypoint ohne manuelles `PYTHONPATH` im Dry-Run und prueft sechs Module mit zusammen 69 Turns.
+- `python forschung/report/build_benchmark_data.py session_X session_Y` erzeugt abgeleitete JSON-/CSV-Daten nur aus explizit benannten Sessions.
+- `python forschung/report/build_report.py` baut den eigenstaendigen HTML-Bericht.
+
+Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).

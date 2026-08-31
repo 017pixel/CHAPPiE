@@ -22,9 +22,9 @@ class PersonalityManager:
     Managt die Persönlichkeits-Datei von CHAPI.
     """
 
-    def __init__(self):
+    def __init__(self, personality_path: Optional[Path] = None):
         """Initialisiert den Personality Manager."""
-        self.personality_path = Path(settings.personality_path)
+        self.personality_path = Path(personality_path or settings.personality_path)
         self._ensure_file_exists()
 
     def _ensure_file_exists(self):

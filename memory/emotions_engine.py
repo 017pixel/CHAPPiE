@@ -181,29 +181,38 @@ class EmotionsEngine:
     _cached_brain = None
     _brain_initialized = False
     
-    def __init__(self):
+    def __init__(self, status_file: Optional[Path] = None, force_simple: bool = False):
         """Initialisiert die Emotions Engine."""
+        self.status_file = Path(status_file) if status_file else STATUS_FILE
+        self.force_simple = bool(force_simple)
         self._last_state_mtime_ns: int | None = None
         self.state = self._load_state()
         
         # Brain einmal beim ersten Init laden (lazy loading)
-        if not EmotionsEngine._brain_initialized:
+        if self.force_simple:
+            # Research runs must never inherit or initialize an auxiliary
+            # sentiment model. Clearing the class cache also covers processes
+            # in which a normal EmotionsEngine was created beforehand.
+            EmotionsEngine._cached_brain = None
+            EmotionsEngine._brain_initialized = True
+            print("   Emotions: Simple-Analyse aktiv (Research-Ein-Modell-Modus)")
+        elif not EmotionsEngine._brain_initialized:
             self._init_ollama_brain()
         
         print(f"Emotions Engine geladen: H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
 
     def _status_mtime_ns(self) -> int | None:
         try:
-            return STATUS_FILE.stat().st_mtime_ns
+            return self.status_file.stat().st_mtime_ns
         except OSError:
             return None
 
     def _read_state_from_disk(self) -> EmotionalState | None:
-        if not STATUS_FILE.exists():
+        if not self.status_file.exists():
             self._last_state_mtime_ns = None
             return None
         try:
-            with open(STATUS_FILE, "r", encoding="utf-8") as f:
+            with open(self.status_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._last_state_mtime_ns = self._status_mtime_ns()
             return EmotionalState.from_dict(data)
@@ -223,6 +232,14 @@ class EmotionsEngine:
     
     def _init_ollama_brain(self):
         """Initialisiert die Ollama Brain-Instanz einmalig (gecached)."""
+        if settings.is_local_single_model_mode():
+            # The main vLLM/steering process already owns the one permitted
+            # local model.  Loading an Ollama sentiment model here would add a
+            # second GPU model and is a common source of T4 CUDA OOM errors.
+            EmotionsEngine._cached_brain = None
+            EmotionsEngine._brain_initialized = True
+            print("   Emotions: Simple-Analyse aktiv (Ein-Modell-Modus)")
+            return
         try:
             from brain.ollama_brain import OllamaBrain
             emotion_host = getattr(settings, 'emotion_analysis_host', settings.ollama_host)
@@ -250,9 +267,9 @@ class EmotionsEngine:
     
     def _save_state(self):
         """Speichert den Status in die Datei."""
-        STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        self.status_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(STATUS_FILE, "w", encoding="utf-8") as f:
+            with open(self.status_file, "w", encoding="utf-8") as f:
                 json.dump(self.state.to_dict(), f, indent=2)
             self._last_state_mtime_ns = self._status_mtime_ns()
         except Exception as e:
@@ -268,6 +285,11 @@ class EmotionsEngine:
         Returns:
             Dict mit emotion_changes oder None bei Fehler
         """
+        # A research engine remains deterministic even if another instance
+        # populates the class-level cache later in the same process.
+        if self.force_simple:
+            return None
+
         # Nutze gecachte Brain-Instanz
         if EmotionsEngine._cached_brain is None:
             return None
@@ -324,7 +346,10 @@ class EmotionsEngine:
         Args:
             user_message: Die zu analysierende User-Nachricht
         """
-        self._sync_state_from_disk_if_newer()
+        # Mutating operations must always start from the persisted state. Two
+        # engine instances can write within the same filesystem timestamp tick,
+        # in which case an mtime-only comparison would otherwise lose updates.
+        self._sync_state_from_disk_if_newer(force=True)
 
         # Versuche LLM-Analyse
         llm_result = self._analyze_with_llm(user_message)
@@ -391,7 +416,7 @@ class EmotionsEngine:
         Legacy-Methode fuer Rueckwaertskompatibilitaet.
         Verwendet intern _apply_simple_sentiment.
         """
-        self._sync_state_from_disk_if_newer()
+        self._sync_state_from_disk_if_newer(force=True)
         self._apply_simple_sentiment(sentiment)
         self.state.clamp()
         self._save_state()
@@ -406,7 +431,7 @@ class EmotionsEngine:
         Args:
             amount: Menge der wiederherzustellenden Energie
         """
-        self._sync_state_from_disk_if_newer()
+        self._sync_state_from_disk_if_newer(force=True)
         self.state.energy += amount
         self.state.clamp()
         self._save_state()
@@ -438,7 +463,7 @@ class EmotionsEngine:
             emotion: Name der Emotion (siehe config.emotions.EMOTION_ORDER)
             value: Neuer Wert (0-100)
         """
-        self._sync_state_from_disk_if_newer()
+        self._sync_state_from_disk_if_newer(force=True)
         value = clamp_emotion_value(value)
 
         if emotion in EMOTION_DEFAULTS:
@@ -448,7 +473,7 @@ class EmotionsEngine:
     
     def reset(self):
         """Setzt den emotionalen Zustand zurueck."""
-        self._sync_state_from_disk_if_newer()
+        self._sync_state_from_disk_if_newer(force=True)
         self.state = EmotionalState()
         self._save_state()
         print("Emotionaler Zustand zurueckgesetzt")

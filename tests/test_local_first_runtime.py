@@ -97,12 +97,50 @@ def test_vllm_single_model_mode_unifies_runtime_models():
         assert settings.get_intent_model() == "Qwen/Main-4B"
         assert settings.get_query_extraction_model() == "Qwen/Main-4B"
         assert SensoryCortexAgent()._get_brain().model == "Qwen/Main-4B"
+        assert settings.is_local_single_model_mode() is True
     finally:
         settings.llm_provider = original_provider
         settings.vllm_model = original_vllm_model
         settings.vllm_force_single_model = original_force_single
         settings.intent_processor_model_vllm = original_intent
         settings.query_extraction_vllm_model = original_query
+
+
+def test_vllm_multi_model_mode_disables_single_model_guard():
+    original_provider = settings.llm_provider
+    original_force_single = settings.vllm_force_single_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_force_single_model = False
+        assert settings.is_local_single_model_mode() is False
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_force_single_model = original_force_single
+
+
+def test_vllm_single_model_mode_overrides_cloud_substeps():
+    original_provider = settings.llm_provider
+    original_force_single = settings.vllm_force_single_model
+    original_intent = settings.intent_provider
+    original_query = settings.query_extraction_provider
+    original_model = settings.vllm_model
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_force_single_model = True
+        settings.vllm_model = "Qwen/Main-4B"
+        settings.intent_provider = LLMProvider.GROQ
+        settings.query_extraction_provider = LLMProvider.OLLAMA
+
+        assert settings.get_effective_provider(settings.intent_provider) == LLMProvider.VLLM
+        assert settings.get_effective_provider(settings.query_extraction_provider) == LLMProvider.VLLM
+        assert settings.get_intent_model() == "Qwen/Main-4B"
+        assert settings.get_query_extraction_model() == "Qwen/Main-4B"
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_force_single_model = original_force_single
+        settings.intent_provider = original_intent
+        settings.query_extraction_provider = original_query
+        settings.vllm_model = original_model
 
 
 def test_vllm_multi_model_mode_keeps_requested_runtime_models():
@@ -367,6 +405,8 @@ if __name__ == "__main__":
     test_get_active_model_supports_vllm()
     test_get_brain_can_target_provider_and_model()
     test_vllm_single_model_mode_unifies_runtime_models()
+    test_vllm_multi_model_mode_disables_single_model_guard()
+    test_vllm_single_model_mode_overrides_cloud_substeps()
     test_vllm_multi_model_mode_keeps_requested_runtime_models()
     test_local_qwen_prefers_layer_only_emotion_mode()
     test_api_models_keep_prompt_emotion_rules()

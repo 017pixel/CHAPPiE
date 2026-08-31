@@ -189,7 +189,7 @@ def copy_project(src: Path, dst: Path):
 
 def create_restore_guide(dst: Path):
     """Erstellt eine Anleitung zum Wiederherstellen."""
-    guide_content = """# CHAPiE Backup Wiederherstellung
+    guide_content = r"""# CHAPiE Backup Wiederherstellung
 ======================================
 
 ## Schritt 1: Projekt-Dateien

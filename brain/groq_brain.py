@@ -12,6 +12,8 @@ Groq bietet:
 Benötigt: Groq API Key (https://console.groq.com/keys)
 """
 
+import re
+import time
 from typing import Generator, Optional, List, Dict, Any
 from openai import OpenAI
 
@@ -29,6 +31,8 @@ class GroqBrain(BaseBrain):
     """
 
     BASE_URL = "https://api.groq.com/openai/v1"
+    MAX_RATE_LIMIT_RETRIES = 4
+    MAX_RATE_LIMIT_DELAY_SECONDS = 1800.0
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, 'groq_api_key', '')
@@ -93,14 +97,70 @@ class GroqBrain(BaseBrain):
         normalized = (api_key or "").strip()
         return not normalized or normalized.startswith("DEIN_") or not normalized.startswith("gsk_")
 
-    @staticmethod
-    def _estimate_request_tokens(messages: list[dict], config: GenerationConfig) -> int:
+    def _completion_token_budget(self, config: GenerationConfig) -> int:
+        requested = int(config.max_tokens or 0)
+        if self.model.startswith("openai/gpt-oss-") and not settings.chain_of_thought:
+            # GPT-OSS cannot disable reasoning on Groq. Its reasoning and visible
+            # answer share max_completion_tokens, so 450 total tokens can
+            # leave an empty or truncated answer even with the lowest effort.
+            return max(1024, requested)
+        return requested
+
+    def _estimate_request_tokens(self, messages: list[dict], config: GenerationConfig) -> int:
         text = "\n".join(str(message.get("content", "")) for message in messages)
-        return get_groq_limiter().estimate_tokens(text) + int(config.max_tokens or 0)
+        return get_groq_limiter().estimate_tokens(text) + self._completion_token_budget(config)
+
+    def _apply_model_specific_options(self, kwargs: dict, config: GenerationConfig) -> None:
+        if not self.model.startswith("openai/gpt-oss-"):
+            kwargs["max_tokens"] = config.max_tokens
+            return
+        kwargs["max_completion_tokens"] = self._completion_token_budget(config)
+        if settings.chain_of_thought:
+            kwargs["reasoning_effort"] = "medium"
+        else:
+            # Groq supports low/medium/high for GPT-OSS, but no "none". The
+            # model-specific API excludes reasoning via include_reasoning=false;
+            # low is the closest possible match to thinking off.
+            kwargs["reasoning_effort"] = "low"
+            kwargs["extra_body"] = {"include_reasoning": False}
 
     def _claim_quota(self, messages: list[dict], config: GenerationConfig) -> Optional[str]:
         allowed, reason = get_groq_limiter().can_start(self._estimate_request_tokens(messages, config))
         return None if allowed else reason
+
+    @staticmethod
+    def _rate_limit_retry_delay(error: Exception, attempt: int) -> Optional[float]:
+        text = str(error)
+        status_code = getattr(error, "status_code", None)
+        if status_code != 429 and "Error code: 429" not in text and "rate limit" not in text.lower():
+            return None
+        response = getattr(error, "response", None)
+        headers = getattr(response, "headers", {}) or {}
+        retry_after = headers.get("retry-after") if hasattr(headers, "get") else None
+        if retry_after:
+            try:
+                return min(GroqBrain.MAX_RATE_LIMIT_DELAY_SECONDS, max(0.25, float(retry_after)))
+            except (TypeError, ValueError):
+                pass
+        compound = re.search(
+            r"try again in\s+(?:(\d+(?:\.\d+)?)\s*m\s*)?([0-9.]+)\s*s",
+            text,
+            re.IGNORECASE,
+        )
+        if compound:
+            minutes = float(compound.group(1) or 0)
+            seconds = float(compound.group(2))
+            return min(
+                GroqBrain.MAX_RATE_LIMIT_DELAY_SECONDS,
+                max(0.25, minutes * 60 + seconds),
+            )
+        match = re.search(r"try again in\s+([0-9.]+)\s*(ms|s)", text, re.IGNORECASE)
+        if match:
+            delay = float(match.group(1))
+            if match.group(2).lower() == "ms":
+                delay /= 1000.0
+            return min(GroqBrain.MAX_RATE_LIMIT_DELAY_SECONDS, max(0.25, delay))
+        return min(GroqBrain.MAX_RATE_LIMIT_DELAY_SECONDS, float(2 ** attempt))
 
     def _stream_generate(
         self,
@@ -118,19 +178,35 @@ class GroqBrain(BaseBrain):
             kwargs = {
                 "model": self.model,
                 "messages": messages,
-                "max_tokens": config.max_tokens,
                 "temperature": config.temperature,
                 "stream": True,
             }
+            if config.seed is not None:
+                kwargs["seed"] = int(config.seed)
+            self._apply_model_specific_options(kwargs, config)
+            if settings.top_p is not None:
+                kwargs["top_p"] = float(settings.top_p)
             if tools:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = tool_choice or "auto"
 
-            stream = self.client.chat.completions.create(**kwargs)
-
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            attempt = 0
+            while True:
+                emitted = False
+                try:
+                    stream = self.client.chat.completions.create(**kwargs)
+                    for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            emitted = True
+                            yield chunk.choices[0].delta.content
+                    return
+                except Exception as error:
+                    delay = self._rate_limit_retry_delay(error, attempt)
+                    if emitted or delay is None or attempt >= self.MAX_RATE_LIMIT_RETRIES:
+                        raise
+                    attempt += 1
+                    print(f"Groq Rate-Limit: Retry {attempt}/{self.MAX_RATE_LIMIT_RETRIES} in {delay:.2f}s")
+                    time.sleep(delay)
 
         except Exception as e:
             yield f"\nGroq Fehler: {str(e)}"
@@ -150,16 +226,28 @@ class GroqBrain(BaseBrain):
             kwargs = {
                 "model": self.model,
                 "messages": messages,
-                "max_tokens": config.max_tokens,
                 "temperature": config.temperature,
                 "stream": False,
             }
+            if config.seed is not None:
+                kwargs["seed"] = int(config.seed)
+            self._apply_model_specific_options(kwargs, config)
+            if settings.top_p is not None:
+                kwargs["top_p"] = float(settings.top_p)
             if tools:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = tool_choice or "auto"
 
-            response = self.client.chat.completions.create(**kwargs)
-            return response.choices[0].message.content
+            for attempt in range(self.MAX_RATE_LIMIT_RETRIES + 1):
+                try:
+                    response = self.client.chat.completions.create(**kwargs)
+                    return response.choices[0].message.content
+                except Exception as error:
+                    delay = self._rate_limit_retry_delay(error, attempt)
+                    if delay is None or attempt >= self.MAX_RATE_LIMIT_RETRIES:
+                        raise
+                    print(f"Groq Rate-Limit: Retry {attempt + 1}/{self.MAX_RATE_LIMIT_RETRIES} in {delay:.2f}s")
+                    time.sleep(delay)
 
         except Exception as e:
             return f"Groq Fehler: {str(e)}"
@@ -192,15 +280,29 @@ class GroqBrain(BaseBrain):
             kwargs = {
                 "model": self.model,
                 "messages": openai_messages,
-                "max_tokens": config.max_tokens,
                 "temperature": config.temperature,
                 "stream": False,
             }
+            self._apply_model_specific_options(kwargs, config)
+            if settings.top_p is not None:
+                kwargs["top_p"] = float(settings.top_p)
             if tools:
                 kwargs["tools"] = tools
                 kwargs["tool_choice"] = tool_choice or "auto"
 
-            response = self.client.chat.completions.create(**kwargs)
+            response = None
+            for attempt in range(self.MAX_RATE_LIMIT_RETRIES + 1):
+                try:
+                    response = self.client.chat.completions.create(**kwargs)
+                    break
+                except Exception as error:
+                    delay = self._rate_limit_retry_delay(error, attempt)
+                    if delay is None or attempt >= self.MAX_RATE_LIMIT_RETRIES:
+                        raise
+                    print(f"Groq Rate-Limit: Retry {attempt + 1}/{self.MAX_RATE_LIMIT_RETRIES} in {delay:.2f}s")
+                    time.sleep(delay)
+            if response is None:
+                return {"content": "Groq Fehler: Keine Antwort nach Rate-Limit-Retries", "tool_calls": None}
             msg = response.choices[0].message
             return {
                 "content": msg.content or "",

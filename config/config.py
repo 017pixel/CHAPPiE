@@ -23,10 +23,12 @@ from typing import Any, Dict, Optional
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DB_DIR = DATA_DIR / "chroma_db"
+RESEARCH_DATA_DIR = DATA_DIR / "research_runs"
 ROOT_CONFIG_PATH = PROJECT_ROOT / "CHAPPIE_CONFIG.json"
 
 DATA_DIR.mkdir(exist_ok=True)
 CHROMA_DB_DIR.mkdir(exist_ok=True)
+RESEARCH_DATA_DIR.mkdir(exist_ok=True)
 
 
 # ----------
@@ -90,12 +92,15 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "groq_memory_model": "openai/gpt-oss-120b",
     },
     "small_tasks": {
-        "intent_provider": "groq",
+        # In the default vLLM configuration, every inference step must use the
+        # same already-loaded local model.  This avoids a second model (or a
+        # cloud request) being started just for intent analysis.
+        "intent_provider": "vllm",
         "intent_processor_model_groq": "openai/gpt-oss-20b",
         "intent_processor_model_ollama": "qwen3.5:9b",
         "intent_processor_model_vllm": "Qwen/Qwen3.5-4B",
         "enable_two_step_processing": True,
-        "query_extraction_provider": "groq",
+        "query_extraction_provider": "vllm",
         "query_extraction_groq_model": "openai/gpt-oss-20b",
         "query_extraction_ollama_model": "llama3.2:1b",
         "query_extraction_vllm_model": "Qwen/Qwen3.5-4B",
@@ -124,13 +129,15 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         },
         "repetition_penalty": 1.15,
         "stream": True,
-        "chain_of_thought": True,
+        "chain_of_thought": False,
         "history_max_messages": 20,
         "context_token_limit": 7000,
         "context_token_warning_threshold": 6500,
     },
     "memory": {
         "memory_top_k": 40,
+        "memory_prompt_top_k": 8,
+        "stm_prompt_top_k": 8,
         "memory_min_relevance": 0.2,
         "chroma_collection": "chapie_memory",
         "embedding_model": "all-MiniLM-L6-v2",
@@ -371,13 +378,13 @@ class Settings:
         self.groq_format_model = self._get_val("GROQ_FORMAT_MODEL", "openai/gpt-oss-120b")
         self.groq_memory_model = self._get_val("GROQ_MEMORY_MODEL", "openai/gpt-oss-120b")
 
-        self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "groq"))
+        self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "vllm"))
         self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-20b")
         self.intent_processor_model_ollama = self._get_val("INTENT_PROCESSOR_MODEL_OLLAMA", "qwen3.5:9b")
         self.intent_processor_model_vllm = self._get_val("INTENT_PROCESSOR_MODEL_VLLM", "Qwen/Qwen3.5-4B")
         self.enable_two_step_processing = bool(self._get_val("ENABLE_TWO_STEP_PROCESSING", True))
 
-        self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "groq"))
+        self.query_extraction_provider = _parse_provider(self._get_val("QUERY_EXTRACTION_PROVIDER", "vllm"))
         self.query_extraction_ollama_model = self._get_val("QUERY_EXTRACTION_OLLAMA_MODEL", "llama3.2:1b")
         self.query_extraction_vllm_model = self._get_val("QUERY_EXTRACTION_VLLM_MODEL", "Qwen/Qwen3.5-4B")
         self.query_extraction_groq_model = self._get_val("QUERY_EXTRACTION_GROQ_MODEL", "openai/gpt-oss-20b")
@@ -395,6 +402,8 @@ class Settings:
         self.training_trainer_model = self._get_val("TRAINING_TRAINER_MODEL", "")
 
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 40))
+        self.memory_prompt_top_k = int(self._get_val("MEMORY_PROMPT_TOP_K", 8))
+        self.stm_prompt_top_k = int(self._get_val("STM_PROMPT_TOP_K", 8))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
         self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
         self.memory_consolidation_enabled = bool(self._get_val("MEMORY_CONSOLIDATION_ENABLED", True))
@@ -428,7 +437,7 @@ class Settings:
         self.top_k = int(self._get_val("TOP_K", 50))
         self.repetition_penalty = float(self._get_val("REPETITION_PENALTY", 1.15))
         self.stream = bool(self._get_val("STREAM", True))
-        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", True))
+        self.chain_of_thought = bool(self._get_val("CHAIN_OF_THOUGHT", False))
         self.debug = bool(self._get_val("DEBUG", True))
         self.enable_functions = bool(self._get_val("ENABLE_FUNCTIONS", True))
         self.cli_debug_always_on = bool(self._get_val("CLI_DEBUG_ALWAYS_ON", True))
@@ -447,6 +456,11 @@ class Settings:
         self.groq_tokens_per_day = int(self._get_val("GROQ_TOKENS_PER_DAY", 144000000))
 
     def get_effective_provider(self, step_provider: Any = None) -> LLMProvider:
+        # The single-model switch is a safety boundary, not merely a model-name
+        # preference.  Do not let stale or manually edited per-step settings
+        # start Groq/Ollama beside the active local vLLM model.
+        if self.is_local_single_model_mode():
+            return LLMProvider.VLLM
         if step_provider is None or step_provider == "auto":
             return self.llm_provider
         if isinstance(step_provider, LLMProvider):
@@ -460,6 +474,10 @@ class Settings:
         if self.vllm_force_single_model:
             return self.vllm_model
         return requested_model or self.vllm_model
+
+    def is_local_single_model_mode(self) -> bool:
+        """Whether CHAPPiE must keep all inference on its one vLLM model."""
+        return self.llm_provider == LLMProvider.VLLM and self.vllm_force_single_model
 
     def get_intent_model(self, provider: Any = None) -> str:
         effective = self.get_effective_provider(provider if provider != "auto" else None)
@@ -522,6 +540,7 @@ class Settings:
 
         numeric_keys = [
             "temperature", "repetition_penalty", "max_tokens", "memory_top_k",
+            "memory_prompt_top_k", "stm_prompt_top_k",
             "top_p", "top_k",
             "memory_min_relevance", "memory_consolidation_max_tokens",
             "chappie_thinking_token_limit", "chappie_answer_token_limit",
@@ -539,6 +558,10 @@ class Settings:
 
         if self.vllm_model != old_vllm_model or kwargs.get("use_model_defaults") is True:
             apply_model_defaults_if_unset(self.vllm_model, self)
+
+        if self.is_local_single_model_mode():
+            self.intent_provider = LLMProvider.VLLM
+            self.query_extraction_provider = LLMProvider.VLLM
 
         self._persist_to_root_config()
         self._needs_reload = True
@@ -575,6 +598,8 @@ class Settings:
             "EMOTION_ANALYSIS_HOST": self.emotion_analysis_host,
             "EMBEDDING_MODEL": self.embedding_model,
             "MEMORY_TOP_K": self.memory_top_k,
+            "MEMORY_PROMPT_TOP_K": self.memory_prompt_top_k,
+            "STM_PROMPT_TOP_K": self.stm_prompt_top_k,
             "MEMORY_MIN_RELEVANCE": self.memory_min_relevance,
             "CHROMA_COLLECTION": self.chroma_collection_name,
             "MEMORY_CONSOLIDATION_ENABLED": self.memory_consolidation_enabled,

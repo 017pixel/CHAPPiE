@@ -181,6 +181,8 @@ class OllamaBrain(BaseBrain):
             "temperature": config.temperature,
             "num_predict": config.max_tokens,
         }
+        if config.seed is not None:
+            options["seed"] = int(config.seed)
         
         if config.stream:
             return self._stream_generate(ollama_messages, options)

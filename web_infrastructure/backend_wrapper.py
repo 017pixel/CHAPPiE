@@ -4,13 +4,14 @@ import time
 import json
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 
 from typing import Dict, Any, List, Callable, Optional, Generator
 
 # CHAPiE imports
 from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, normalize_emotion_state
-from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories, FORMATTER_WITH_COT_PROMPT, FORMATTER_WHITESPACE_PROMPT, RESPONSE_STYLE_CASUAL, RESPONSE_STYLE_DEFAULT  # from config/prompts.py
+from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories, format_generation_budget_instruction, format_response_plan_instruction, FORMATTER_WITH_COT_PROMPT, FORMATTER_WHITESPACE_PROMPT, RESPONSE_STYLE_CASUAL, RESPONSE_STYLE_DEFAULT  # from config/prompts.py
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple, calculate_emotion_transition
 from memory.chat_manager import ChatManager
@@ -26,38 +27,134 @@ from brain.action_response import ActionResponseLayer
 from brain.agents.steering_manager import get_steering_manager
 from brain.base_brain import GenerationConfig, Message
 from brain.global_workspace import GlobalWorkspace
-from brain.response_parser import contains_cot_leak, extract_tagged_block, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error
+from brain.response_parser import contains_cot_leak, extract_tagged_block, is_safe_retrieval_text, parse_chain_of_thought, parse_thinking_tags, looks_like_model_error, sanitize_visible_response
 from brain.deep_think import DeepThinkEngine
+from brain.token_counter import ModelTokenCounter, TokenizerUnavailableError
 from life import get_life_simulation_service
 
 
-CASUAL_CHAT_MEMORY_TOP_K = 20
+def response_memory_top_k_for_intent(
+    intent_type: Any,
+    default_top_k: int,
+    prompt_top_k: int = 8,
+) -> int:
+    """Bound prompt RAG without changing the larger search/index setting.
+
+    Exact keyword/entity facts use their own prioritized block, so the semantic
+    block can remain small and relevance-sorted for every intent.
+    """
+    del intent_type
+    return max(1, min(int(default_top_k), int(prompt_top_k)))
 
 
-def response_memory_top_k_for_intent(intent_type: Any, default_top_k: int) -> int:
-    intent = getattr(intent_type, "value", intent_type)
-    if str(intent or "").lower() == "casual_chat":
-        return CASUAL_CHAT_MEMORY_TOP_K
-    return int(default_top_k)
+def measure_prompt_components(
+    counter: ModelTokenCounter,
+    components: Dict[str, str],
+    history: List[Dict[str, Any]],
+    messages_before_budget: list,
+    messages_after_budget: list,
+) -> Dict[str, Any]:
+    """Measure prompt parts with the active model tokenizer.
+
+    Component token counts are exact for each text fragment. Chat-template,
+    role and fragment-join tokens are reported separately because tokenization
+    is not additive across concatenation boundaries.
+    """
+    token_counts = {
+        name: counter.count_text(str(value or "")) if value else 0
+        for name, value in components.items()
+    }
+    history_text_tokens = sum(
+        counter.count_text(str(item.get("content", "") or ""))
+        for item in history
+        if isinstance(item, dict)
+    )
+    token_counts["history"] = history_text_tokens
+    component_sum = sum(token_counts.values())
+    before_total = counter.count_messages(messages_before_budget)
+    after_total = counter.count_messages(messages_after_budget)
+    return {
+        "token_count_source": "model_tokenizer",
+        "tokenizer_model": counter.model_name,
+        "components": token_counts,
+        "component_sum_tokens": component_sum,
+        "chat_template_total_tokens_before_budget": before_total,
+        "chat_template_total_tokens_after_budget": after_total,
+        "chat_template_and_join_overhead_tokens": before_total - component_sum,
+        "history_messages": len(history),
+    }
 
 
 def prompt_chain_of_thought_enabled(provider: Any, chain_of_thought: bool) -> bool:
     return bool(chain_of_thought and provider == LLMProvider.GROQ)
 
 
-def create_chappie_backend():
+def is_self_contained_math_query(text: str) -> bool:
+    """Detect closed arithmetic that must not be influenced by autobiographical RAG."""
+    normalized = str(text or "").lower().replace("×", "*").replace("÷", "/")
+    number_words = (
+        "null|eins|ein|eine|zwei|drei|vier|fuenf|fünf|sechs|sieben|acht|neun|"
+        "zehn|elf|zwoelf|zwölf|dreizehn|vierzehn|fuenfzehn|fünfzehn|sechzehn|"
+        "siebzehn|achtzehn|neunzehn|zwanzig"
+    )
+    operand = rf"(?:-?\d+(?:[.,]\d+)?|(?:{number_words}))"
+    operator = r"(?:\+|-|\*|/|x|plus|minus|mal|geteilt\s+durch|dividiert\s+durch)"
+    return bool(re.search(rf"\b{operand}\s*{operator}\s*{operand}\b", normalized))
+
+
+def context_allows_long_term_memory(requirements: Dict[str, bool] | None) -> bool:
+    """Make the Step-1 context contract authoritative for semantic retrieval."""
+    return bool((requirements or {}).get("need_long_term_memory", True))
+
+
+def is_isolated_request(requirements: Dict[str, bool] | None) -> bool:
+    keys = (
+        "need_soul_context",
+        "need_user_context",
+        "need_preferences",
+        "need_short_term_memory",
+        "need_long_term_memory",
+    )
+    values = requirements or {}
+    return not any(bool(values.get(key, True)) for key in keys)
+
+
+def create_chappie_backend(
+    *,
+    runtime_data_dir: Optional[Path] = None,
+    memory_collection_name: Optional[str] = None,
+    research_mode: bool = False,
+    feature_flags: Optional[Dict[str, bool]] = None,
+):
     """Erzeugt ein CHAPPiE-Backend ohne UI-Cache, z. B. fuer CLI, API und Tests."""
     class CHAPPiEBackend:
         def __init__(self):
+            self.runtime_data_dir = Path(runtime_data_dir) if runtime_data_dir else None
+            self.research_mode = bool(research_mode)
+            self.feature_flags = {
+                "persona": True,
+                "memory": True,
+                "emotions": True,
+                "life": True,
+                **dict(feature_flags or {}),
+            }
+            if self.runtime_data_dir:
+                self.runtime_data_dir.mkdir(parents=True, exist_ok=True)
             # Module init
-            self.memory = MemoryEngine()
-            self.emotions = EmotionsEngine()
+            self.memory = MemoryEngine(
+                persist_directory=self.runtime_data_dir / "chroma" if self.runtime_data_dir else None,
+                collection_name=memory_collection_name,
+            )
+            self.emotions = EmotionsEngine(
+                status_file=self.runtime_data_dir / "status.json" if self.runtime_data_dir else None,
+                force_simple=self.research_mode,
+            )
             self.brain = get_brain()
             self._current_provider = settings.llm_provider
             self._brain_signature = self._build_brain_signature()
 
             # Chat Manager init
-            data_dir = os.path.join(PROJECT_ROOT, "data")
+            data_dir = str(self.runtime_data_dir) if self.runtime_data_dir else os.path.join(PROJECT_ROOT, "data")
             self.chat_manager = ChatManager(data_dir)
 
             # Deep Think Engine
@@ -68,12 +165,23 @@ def create_chappie_backend():
             )
 
             # NEU: Context Files Manager (soul.md, user.md, CHAPPiEsPreferences.md)
-            self.context_files = get_context_files_manager()
+            if self.runtime_data_dir:
+                from memory.context_files import ContextFilesManager
+                self.context_files = ContextFilesManager(base_dir=self.runtime_data_dir)
+            else:
+                self.context_files = get_context_files_manager()
             self.sleep_handler = get_sleep_phase_handler()
             self._sleep_job_lock = threading.Lock()
 
             # Short-Term Memory (JSON-basiert mit Timestamps)
-            self.short_term_memory = get_short_term_memory(memory_engine=self.memory)
+            if self.runtime_data_dir:
+                from memory.short_term_memory import ShortTermMemory
+                self.short_term_memory = ShortTermMemory(
+                    memory_engine=self.memory,
+                    storage_path=self.runtime_data_dir / "short_term_memory.json",
+                )
+            else:
+                self.short_term_memory = get_short_term_memory(memory_engine=self.memory)
             
             # Migration von abgelaufenen Eintraegen beim Start
             try:
@@ -94,17 +202,80 @@ def create_chappie_backend():
                 self.debug_logger.enable()
 
             # Personality Manager
-            self.personality_manager = PersonalityManager()
+            self.personality_manager = PersonalityManager(
+                personality_path=self.runtime_data_dir / "personality.md" if self.runtime_data_dir else None,
+            )
 
             # Function Registry
             self.function_registry = get_function_registry()
-            self.life_simulation = get_life_simulation_service()
+            if self.runtime_data_dir:
+                from life.service import LifeSimulationService
+                self.life_simulation = LifeSimulationService(
+                    state_path=self.runtime_data_dir / "life_state.json",
+                    personality_manager=self.personality_manager,
+                )
+            else:
+                self.life_simulation = get_life_simulation_service()
             self.global_workspace = GlobalWorkspace()
             self.action_response = ActionResponseLayer()
             self.steering_manager = get_steering_manager()
             self._chat_jobs: Dict[str, threading.Thread] = {}
             self._chat_jobs_lock = threading.RLock()
             self.last_memory_timestamp: Optional[str] = None
+            self._token_counter: Optional[ModelTokenCounter] = None
+            self._token_counter_model: Optional[str] = None
+
+        def _feature_enabled(self, name: str) -> bool:
+            return bool(self.feature_flags.get(name, True))
+
+        @staticmethod
+        def _neutral_life_snapshot() -> Dict[str, Any]:
+            return {
+                "disabled": True,
+                "current_mode": "neutral",
+                "homeostasis": {"emotion_adjustments": {}, "active_needs": [], "dominant_need": {}},
+                "recent_events": [],
+                "dream_fragments": [],
+            }
+
+        def _prepare_life_turn(self, *args, **kwargs) -> Dict[str, Any]:
+            if not self._feature_enabled("life"):
+                return self._neutral_life_snapshot()
+            return self.life_simulation.prepare_turn(*args, **kwargs)
+
+        def _finalize_life_turn(self, *args, **kwargs) -> Dict[str, Any]:
+            if not self._feature_enabled("life"):
+                return self._neutral_life_snapshot()
+            return self.life_simulation.finalize_turn(*args, **kwargs)
+
+        def _turn_checkpoint(self) -> Any:
+            if not self._feature_enabled("life"):
+                return None
+            return self.life_simulation.create_checkpoint()
+
+        def _rollback_failed_turn(self, emotions_before: Dict[str, int], life_checkpoint: Any) -> None:
+            for emotion in EMOTION_ORDER:
+                try:
+                    self.emotions.set_emotion(emotion, emotions_before.get(emotion, EMOTION_DEFAULTS[emotion]))
+                except Exception:
+                    pass
+            if life_checkpoint is not None:
+                try:
+                    self.life_simulation.restore_checkpoint(life_checkpoint)
+                except Exception:
+                    pass
+
+        def _search_memory(self, *args, **kwargs) -> List[Any]:
+            if not self._feature_enabled("memory"):
+                return []
+            memories = self.memory.search_memory(*args, **kwargs)
+            return [memory for memory in memories if is_safe_retrieval_text(getattr(memory, "content", ""))]
+
+        def _search_memory_keywords(self, *args, **kwargs) -> List[Any]:
+            if not self._feature_enabled("memory"):
+                return []
+            memories = self.memory.search_memory_keywords(*args, **kwargs)
+            return [memory for memory in memories if is_safe_retrieval_text(getattr(memory, "content", ""))]
 
         def _collect_repetition_events(self) -> Dict[str, Any]:
             events: Dict[str, Any] = {}
@@ -156,6 +327,8 @@ def create_chappie_backend():
                 print(f"{'=' * 50}\n")
 
         def _schedule_sleep_phase_if_due(self) -> Dict[str, Any]:
+            if self.research_mode:
+                return {"triggered": False, "status": {"disabled": True, "reason": "isolated_research_run"}}
             self.sleep_handler.increment_interaction()
             status = self.sleep_handler.get_status()
             if not self.sleep_handler.should_run_sleep():
@@ -182,6 +355,7 @@ def create_chappie_backend():
                     "type": getattr(memory, "mem_type", "interaction"),
                     "match_type": getattr(memory, "match_type", ""),
                     "matched_terms": getattr(memory, "matched_terms", ""),
+                    "source": getattr(memory, "source", "unknown"),
                 })
             return formatted_memories
 
@@ -287,7 +461,9 @@ def create_chappie_backend():
             changed = False
             brain_signature = self._build_brain_signature()
             if force or brain_signature != self._brain_signature:
-                print(f"Runtime-Reload Hauptmodell: {self._brain_signature} -> {brain_signature}")
+                old_label = self._brain_signature[:2] if self._brain_signature else None
+                new_label = brain_signature[:2]
+                print(f"Runtime-Reload Hauptmodell: {old_label} -> {new_label}")
                 self.brain = get_brain(provider=settings.llm_provider, model=get_active_model())
                 self._brain_signature = brain_signature
                 self._current_provider = settings.llm_provider
@@ -301,7 +477,9 @@ def create_chappie_backend():
 
             intent_signature = self._build_intent_signature()
             if force or changed or intent_signature != self._intent_signature:
-                print(f"Runtime-Reload Intent: {self._intent_signature} -> {intent_signature}")
+                old_label = self._intent_signature[:3] if self._intent_signature else None
+                new_label = intent_signature[:3]
+                print(f"Runtime-Reload Intent: {old_label} -> {new_label}")
                 reset_intent_processor()
                 self.intent_processor = get_intent_processor()
                 self._intent_signature = intent_signature
@@ -377,6 +555,8 @@ def create_chappie_backend():
 
             # Strip leaked meta-labels and emotion markers from output
             display_response = self._strip_leaked_metadata(display_response)
+            display_response, sanitization_reasons = sanitize_visible_response(display_response)
+            self._last_output_sanitization = sanitization_reasons
 
             if not display_response:
                 if model_reasoning or thought:
@@ -536,10 +716,10 @@ def create_chappie_backend():
                 tone = "sharp_direct"
                 guidance = "Klinge gereizt und knapp, aber bleibe sachlich und ohne Beleidigungen."
                 tone_reason = "Hohe Frustration mit niedrigem Vertrauen aktiviert einen konfrontativen Stil."
-            elif "guarded" in active_mode_names or (t <= 32 and f >= 50):
+            elif "guarded" in active_mode_names or t <= 25 or (t <= 32 and f >= 50):
                 tone = "guarded_direct"
-                guidance = "Bleibe distanziert und direkt, ohne den Kern der Antwort zu verlieren."
-                tone_reason = "Niedriges Vertrauen mit defensiver Lage fuehrt zu reservierter Antwortfuehrung."
+                guidance = "Bleibe distanziert und direkt. Keine Bindungs-, Loyalitaets-, Naehe- oder Abhaengigkeitssprache."
+                tone_reason = "Niedriges Vertrauen hat Vorrang vor allgemeiner Persona- oder Beziehungssprache."
             elif "melancholic" in active_mode_names or (s >= 62 and e <= 46):
                 tone = "melancholic_reflective"
                 guidance = "Klinge schwerer und nachdenklich, aber antworte weiterhin klar auf die Frage."
@@ -611,9 +791,20 @@ def create_chappie_backend():
                 return RESPONSE_STYLE_CASUAL
             return RESPONSE_STYLE_DEFAULT
 
-        @staticmethod
-        def _append_response_style_instruction(system_prompt: str, intent_type: Any = None) -> str:
-            return f"{system_prompt}\n\n{CHAPPiEBackend._response_style_instruction(intent_type)}"
+        def _append_response_style_instruction(
+            self,
+            system_prompt: str,
+            intent_type: Any = None,
+            response_plan: Optional[Dict[str, Any]] = None,
+        ) -> str:
+            parts = [system_prompt, self._response_style_instruction(intent_type)]
+            if response_plan:
+                parts.append(format_response_plan_instruction(
+                    str(response_plan.get("tone", "grounded_neutral")),
+                    str(response_plan.get("response_guidance", "Antworte klar und praezise.")),
+                ))
+            parts.append(self._generation_budget_instruction())
+            return "\n\n".join(part for part in parts if part)
 
         def _build_input_classification(self, intent_result: Any) -> Dict[str, Any]:
             entities = list(getattr(intent_result, "entities", []) or [])
@@ -633,6 +824,7 @@ def create_chappie_backend():
                 "id": str(getattr(memory, "id", "") or "")[:8],
                 "role": str(getattr(memory, "role", "unknown") or "unknown"),
                 "label": str(getattr(memory, "label", "original") or "original"),
+                "source": str(getattr(memory, "source", "unknown") or "unknown"),
                 "relevance": round(float(getattr(memory, "relevance_score", 0.0) or 0.0), 3),
                 "match_type": str(getattr(memory, "match_type", "") or ""),
                 "matched_terms": str(getattr(memory, "matched_terms", "") or ""),
@@ -749,6 +941,28 @@ def create_chappie_backend():
 
         def _build_prompt_runtime(self, emotions: Dict[str, int]) -> Dict[str, Any]:
             model_name = get_active_model()
+            if not self._feature_enabled("emotions"):
+                neutral_emotions = dict(EMOTION_DEFAULTS)
+                response_plan = self._derive_response_plan(
+                    emotions=neutral_emotions,
+                    emotion_steering={"composite_modes": [], "dominant_vector": "neutral"},
+                    use_prompt_emotions=False,
+                )
+                return {
+                    "model_name": model_name,
+                    "force_steering": False,
+                    "steering_payload": {},
+                    "use_prompt_emotions": False,
+                    "emotion_steering": {
+                        "steering_active": False,
+                        "prompt_emotions_enabled": False,
+                        "dominant_vector": "neutral",
+                        "emotion_state": neutral_emotions,
+                        "ablation_disabled": True,
+                    },
+                    "prompt_emotion_mode": "ablation_disabled",
+                    "response_plan": response_plan,
+                }
             force_steering = self.steering_manager.should_force_local_emotion_steering(
                 settings.llm_provider,
                 model_name,
@@ -782,13 +996,7 @@ def create_chappie_backend():
         def _generation_budget_instruction(self) -> str:
             thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 800))
             answer_limit = int(getattr(settings, "chappie_answer_token_limit", 1200))
-            return (
-                "ANTWORT-BUDGET (STRIKT EINHALTEN):\n"
-                f"- Internes Denken: hoechstens {thinking_limit} Tokens. Wechsle DANACH sofort zur Antwort.\n"
-                f"- Finale Antwort: maximal {answer_limit} Tokens.\n"
-                "- BEENDE jede Antwort mit einem klaren Satz. Kein endloses Abwaegen.\n"
-                "- Wenn du merkst, dass du zu lange denkst: BRICH DAS DENKEN AB und antworte."
-            )
+            return format_generation_budget_instruction(thinking_limit, answer_limit)
 
         GROQ_FORMAT_MODEL = "openai/gpt-oss-120b"
 
@@ -908,13 +1116,14 @@ def create_chappie_backend():
         def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
             """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
+            local_only = settings.is_local_single_model_mode()
             if not clean_text:
-                source = "local_forced" if getattr(self, "force_local_formatting", False) else "groq"
+                source = "local_forced" if (local_only or getattr(self, "force_local_formatting", False)) else "groq"
                 return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "answer_is_fallback": True}
-            if getattr(self, "force_local_formatting", False):
+            if local_only or getattr(self, "force_local_formatting", False):
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
                 result["formatting_source"] = "local_forced"
-                result["formatting_skip_reason"] = "forced_local"
+                result["formatting_skip_reason"] = "single_local_model" if local_only else "forced_local"
                 return result
             if not settings.groq_api_key:
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
@@ -1302,7 +1511,8 @@ def create_chappie_backend():
             
             # Emotionen Snapshot
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
+            life_checkpoint = self._turn_checkpoint()
+            life_context = self._prepare_life_turn(user_input, history, emotions_before, temporal_context=temporal_context)
             self.debug_logger.log_info(
                 "LIFE_PREP",
                 "Life-Kontext vorbereitet",
@@ -1315,17 +1525,22 @@ def create_chappie_backend():
             )
             
             # === STEP 1: Intent Analysis ===
-            intent_result = self._run_with_retries(
-                step_number=1,
-                step_name="Intent-Analyse",
-                action=lambda: self.intent_processor.process(
-                    user_input=user_input,
-                    history=history,
-                    current_emotions=emotions_before,
-                ),
-                validator=self._is_valid_intent_result,
-                status_callback=status_callback,
-            )
+            try:
+                intent_result = self._run_with_retries(
+                    step_number=1,
+                    step_name="Intent-Analyse",
+                    action=lambda: self.intent_processor.process(
+                        user_input=user_input,
+                        history=history,
+                        current_emotions=emotions_before,
+                        deterministic=self.research_mode,
+                    ),
+                    validator=self._is_valid_intent_result,
+                    status_callback=status_callback,
+                )
+            except Exception:
+                self._rollback_failed_turn(emotions_before, life_checkpoint)
+                raise
             
             self.debug_logger.log_step1_complete(
                 intent_result.intent_type.value,
@@ -1381,9 +1596,15 @@ def create_chappie_backend():
                 self.debug_logger.log_migration(migrated)
 
             retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
+            context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
+            memory_allowed = self._feature_enabled("memory") and context_allows_long_term_memory(context_requirements)
+            isolated_request = is_isolated_request(context_requirements)
+            closed_reasoning = is_self_contained_math_query(user_input)
+            if closed_reasoning or not memory_allowed:
+                retrieval_keywords, exact_entities, fact_lookup_intent = [], [], False
             intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
             intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
-            intent_memories = self.memory.search_memory(
+            intent_memories = [] if closed_reasoning or not memory_allowed else self._search_memory(
                 intent_memory_query or user_input,
                 top_k=min(settings.memory_top_k, 8),
                 optimize_query=False,
@@ -1400,7 +1621,7 @@ def create_chappie_backend():
             )
 
             # === CONTEXT AUFBAUEN ===
-            context = self._build_context(intent_result.context_requirements)
+            context = self._build_context(context_requirements)
             workspace = self._build_workspace_from_intent(
                 intent_result,
                 life_context,
@@ -1411,7 +1632,7 @@ def create_chappie_backend():
                 "CONTEXT",
                 "Kontext und Workspace aufgebaut",
                 {
-                    "context_requirements": intent_result.context_requirements,
+                    "context_requirements": context_requirements,
                     "context_chars": len(context or ""),
                     "workspace_focus": (workspace.get("dominant_focus") or {}).get("label", "---"),
                     "workspace_broadcast": workspace.get("broadcast", "---"),
@@ -1438,11 +1659,13 @@ def create_chappie_backend():
                     retrieval_keywords=retrieval_keywords,
                     exact_entities=exact_entities,
                     fact_lookup_intent=fact_lookup_intent,
+                    allow_memory_context=memory_allowed,
+                    isolated_request=isolated_request,
                 ),
                 validator=self._is_valid_generation_result,
                 status_callback=status_callback,
             )
-            final_life_snapshot = self.life_simulation.finalize_turn(
+            final_life_snapshot = self._finalize_life_turn(
                 user_input=user_input,
                 response_text=response_data["response_text"],
                 emotions_after=emotions_after,
@@ -1550,6 +1773,8 @@ def create_chappie_backend():
 
         def _execute_native_tool_calls(self, tool_calls: List[Dict]) -> List[str]:
             """Fuehrt native OpenAI-Format Tool Calls aus. Gibt Ergebnis-Messages zurueck."""
+            if self.research_mode:
+                return ["Tools im isolierten Research-Modus deaktiviert."]
             results = []
             for tc in tool_calls:
                 func = tc.get("function", {})
@@ -1571,6 +1796,14 @@ def create_chappie_backend():
         def _execute_step1_tool_calls(self, tool_calls: List[Any]):
             """Fuehrt Tool Calls aus Step 1 aus."""
             from memory.context_files import ContextFilesManager
+
+            if self.research_mode:
+                self.debug_logger.log_info(
+                    "TOOL_CALL",
+                    "Tool-Ausfuehrung im isolierten Research-Modus deaktiviert",
+                    {"planned": len(tool_calls or [])},
+                )
+                return
 
             if not tool_calls:
                 self.debug_logger.log_info(
@@ -1736,6 +1969,17 @@ def create_chappie_backend():
                     "content": str(getattr(e, "content", "")),
                 })
 
+            # A single local vLLM model must never trigger an additional cloud
+            # completion while assembling a prompt.  Retrieval remains active;
+            # only the optional cloud consolidation is skipped.
+            if settings.is_local_single_model_mode():
+                return "", {
+                    "ltm_loaded": len(ltm_raw),
+                    "stm_loaded": len(stm_raw),
+                    "skipped": True,
+                    "skip_reason": "single_local_model",
+                }
+
             prompt = (
                 "Konsolidiere folgende Erinnerungen gemaess System-Prompt in ein JSON-Array.\n\n"
                 + json.dumps({"ltm": ltm_raw, "stm": stm_raw}, ensure_ascii=False, indent=2)
@@ -1775,80 +2019,81 @@ def create_chappie_backend():
             }
             return formatted, meta
 
-        def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
-            """Prueft Token-Budget und trimmt Messages bei Ueberschreitung.
-            Returns (messages, budget_info)."""
-            if not messages:
-                return messages, {"estimated_tokens": 0, "token_limit": settings.context_token_limit, "was_trimmed": False, "near_limit": False}
+        def _active_token_counter(self) -> ModelTokenCounter:
+            model_name = str(getattr(self.brain, "model", "") or get_active_model())
+            if self._token_counter is None or self._token_counter_model != model_name:
+                self._token_counter = ModelTokenCounter(model_name)
+                self._token_counter_model = model_name
+            return self._token_counter
 
-            estimated = self._estimate_total_tokens(messages)
+        def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
+            """Count with the real tokenizer and trim until the request fits."""
+            if not messages:
+                return messages, {
+                    "estimated_tokens": 0,
+                    "token_limit": settings.context_token_limit,
+                    "was_trimmed": False,
+                    "near_limit": False,
+                    "token_count_source": "model_tokenizer",
+                }
+
+            token_limit = max(256, int(settings.context_token_limit))
+            try:
+                estimated = self._estimate_total_tokens(messages)
+            except TokenizerUnavailableError as exc:
+                return messages, {
+                    "estimated_tokens": None,
+                    "trimmed_tokens": None,
+                    "token_limit": token_limit,
+                    "was_trimmed": False,
+                    "near_limit": False,
+                    "context_budget_failed": True,
+                    "token_count_source": "unavailable",
+                    "tokenizer_model": str(getattr(self.brain, "model", "") or get_active_model()),
+                    "tokenizer_error": str(exc),
+                }
             budget_info = {
                 "estimated_tokens": estimated,
-                "token_limit": settings.context_token_limit,
+                "token_limit": token_limit,
                 "was_trimmed": False,
                 "near_limit": estimated > settings.context_token_warning_threshold,
                 "context_budget_failed": False,
+                "token_count_source": "model_tokenizer",
+                "tokenizer_model": self._active_token_counter().model_name,
             }
-            if estimated <= settings.context_token_limit:
+            if estimated <= token_limit:
                 budget_info["trimmed_tokens"] = estimated
                 budget_info["removed_messages"] = 0
                 return messages, budget_info
 
-            token_limit = max(256, int(settings.context_token_limit))
-            current_user = messages[-1]
-            user_was_truncated = False
-            user_tokens = self._estimate_msg_tokens(current_user)
-            if user_tokens > token_limit - 96:
-                current_user = self._shrink_message_to_fit(current_user, token_limit - 128)
-                user_tokens = self._estimate_msg_tokens(current_user)
-                user_was_truncated = True
-            reserved_for_system = max(64, token_limit - user_tokens)
-
             system_msg = messages[0]
-            system_tokens = self._estimate_msg_tokens(system_msg)
+            current_user = messages[-1]
+            trimmed = [system_msg, current_user] if len(messages) > 1 else [system_msg]
             system_was_truncated = False
-            if system_tokens > reserved_for_system:
-                content = self._msg_content(system_msg)
-                approx_chars = max(200, reserved_for_system * 3)
-                if len(content) > approx_chars:
-                    keep_head = max(120, approx_chars // 3)
-                    keep_tail = max(120, approx_chars - keep_head - 160)
-                    content = (
-                        content[:keep_head].rstrip()
-                        + "\n\n[... Kontext wegen Tokenbudget gekuerzt ...]\n\n"
-                        + content[-keep_tail:].lstrip()
-                    )
-                    system_msg = self._copy_msg_with_content(system_msg, content)
-                    system_was_truncated = True
+            user_was_truncated = False
 
-            trimmed = [system_msg]
-            used_tokens = self._estimate_msg_tokens(system_msg) + user_tokens
+            # Preserve the newest history that fits. Aggregate counts are used
+            # for every decision because chat-template overhead is not additive.
             kept_history_reversed = []
-            removed_messages = 0
-
             for msg in reversed(messages[1:-1]):
-                msg_tokens = self._estimate_msg_tokens(msg)
-                if used_tokens + msg_tokens <= token_limit:
+                candidate = [system_msg, msg, *reversed(kept_history_reversed), current_user]
+                if self._estimate_total_tokens(candidate) <= token_limit:
                     kept_history_reversed.append(msg)
-                    used_tokens += msg_tokens
-                else:
-                    removed_messages += 1
+            trimmed = [system_msg, *reversed(kept_history_reversed), current_user]
 
-            trimmed.extend(reversed(kept_history_reversed))
-            trimmed.append(current_user)
+            if self._estimate_total_tokens(trimmed) > token_limit and len(trimmed) > 1:
+                trimmed, changed = self._shrink_message_in_context(trimmed, 0, token_limit)
+                system_was_truncated = changed
+            if self._estimate_total_tokens(trimmed) > token_limit:
+                trimmed, changed = self._shrink_message_in_context(trimmed, len(trimmed) - 1, token_limit)
+                user_was_truncated = changed
+
             trimmed_tokens = self._estimate_total_tokens(trimmed)
-
-            if trimmed_tokens > token_limit:
-                system_msg = self._shrink_message_to_fit(system_msg, max(32, token_limit - user_tokens - 32))
-                trimmed = [system_msg, current_user]
-                trimmed_tokens = self._estimate_total_tokens(trimmed)
-                system_was_truncated = True
-                removed_messages = len(messages) - len(trimmed)
-
-            budget_info["was_trimmed"] = len(trimmed) < len(messages)
+            removed_messages = max(0, len(messages) - len(trimmed))
+            budget_info["was_trimmed"] = bool(removed_messages or system_was_truncated or user_was_truncated)
             budget_info["original_tokens"] = estimated
             budget_info["trimmed_tokens"] = trimmed_tokens
-            budget_info["removed_messages"] = max(removed_messages, len(messages) - len(trimmed))
+            budget_info["removed_messages"] = removed_messages
             budget_info["system_was_truncated"] = system_was_truncated
             budget_info["user_was_truncated"] = user_was_truncated
             budget_info["context_budget_failed"] = trimmed_tokens > token_limit
@@ -1878,58 +2123,142 @@ def create_chappie_backend():
                 return new_msg
             return Message(role=CHAPPiEBackend._msg_role(msg), content=content)
 
+        def _shrink_message_in_context(self, messages: list, index: int, token_limit: int) -> tuple[list, bool]:
+            content = self._msg_content(messages[index])
+            if not content or self._estimate_total_tokens(messages) <= token_limit:
+                return messages, False
+
+            marker = "\n[... wegen Tokenbudget gekuerzt ...]\n"
+            low, high = 0, len(content)
+            best = marker.strip()
+            while low <= high:
+                keep = (low + high) // 2
+                head = (keep + 1) // 2
+                tail = keep // 2
+                candidate_content = content[:head].rstrip() + marker
+                if tail:
+                    candidate_content += content[-tail:].lstrip()
+                candidate = list(messages)
+                candidate[index] = self._copy_msg_with_content(messages[index], candidate_content)
+                if self._estimate_total_tokens(candidate) <= token_limit:
+                    best = candidate_content
+                    low = keep + 1
+                else:
+                    high = keep - 1
+
+            result = list(messages)
+            result[index] = self._copy_msg_with_content(messages[index], best)
+            return result, best != content
+
         def _shrink_message_to_fit(self, msg, token_budget: int):
-            content = self._msg_content(msg)
-            if self._estimate_msg_tokens(msg) <= token_budget:
-                return msg
-            approx_chars = max(80, int(token_budget) * 3)
-            if len(content) > approx_chars:
-                keep_head = max(40, approx_chars // 2)
-                keep_tail = max(40, approx_chars - keep_head - 80)
-                content = content[:keep_head].rstrip() + "\n[... gekuerzt ...]\n" + content[-keep_tail:].lstrip()
-            return self._copy_msg_with_content(msg, content)
+            shrunk, _ = self._shrink_message_in_context([msg], 0, max(1, int(token_budget)))
+            return shrunk[0]
 
-        @staticmethod
-        def _estimate_total_tokens(messages: list) -> int:
-            return sum(CHAPPiEBackend._estimate_msg_tokens(m) for m in messages)
+        def _estimate_total_tokens(self, messages: list) -> int:
+            return self._active_token_counter().count_messages(messages)
 
-        @staticmethod
-        def _estimate_msg_tokens(msg) -> int:
-            text = CHAPPiEBackend._msg_content(msg)
-            char_count = len(text)
-            non_ascii = sum(1 for c in text if ord(c) > 127)
-            ascii_chars = char_count - non_ascii
-            return max(1, (ascii_chars // 3) + non_ascii)
+        def _estimate_msg_tokens(self, msg) -> int:
+            return self._active_token_counter().count_message(msg)
 
         def _get_context_tools(self) -> List[Dict[str, Any]]:
             """Returns OpenAI-compatible tools for context file updates."""
             return self.function_registry.get_openai_tools()
 
-        def _build_context(self, requirements: Dict[str, bool]) -> str:
-            """Baut den Context String basierend auf Requirements."""
-            context_parts = []
+        def _build_context_components(
+            self,
+            requirements: Dict[str, bool],
+            user_input: str = "",
+        ) -> Dict[str, str]:
+            """Build separately measurable persona and short-term context."""
+            persona_parts = []
             
-            if requirements.get("need_soul_context", True):
+            if self._feature_enabled("persona") and requirements.get("need_soul_context", True):
                 soul = self.context_files.get_soul_context()
                 if soul:
-                    context_parts.append(f"=== CHAPPiE'S SOUL ===\n{soul}")
+                    persona_parts.append(f"=== CHAPPiE'S SOUL ===\n{soul}")
 
-            if requirements.get("need_user_context", True):
+            if self._feature_enabled("persona") and requirements.get("need_user_context", True):
                 user = self.context_files.get_user_context()
                 if user:
-                    context_parts.append(f"=== USER PROFILE ===\n{user}")
+                    persona_parts.append(f"=== USER PROFILE ===\n{user}")
 
-            if requirements.get("need_preferences", True):
+            if self._feature_enabled("persona") and requirements.get("need_preferences", True):
                 prefs = self.context_files.get_preferences_context()
                 if prefs:
-                    context_parts.append(f"=== CHAPPiE'S PREFERENCES ===\n{prefs}")
+                    persona_parts.append(f"=== CHAPPiE'S PREFERENCES ===\n{prefs}")
 
-            if requirements.get("need_short_term_memory", True):
-                short_term = self.short_term_memory.get_formatted_for_prompt()
-                if short_term:
-                    context_parts.append(short_term)
+            short_term = ""
+            if self._feature_enabled("memory") and requirements.get("need_short_term_memory", True):
+                short_term = self.short_term_memory.get_formatted_for_prompt(
+                    query=user_input,
+                    limit=getattr(settings, "stm_prompt_top_k", 8),
+                )
 
-            return "\n\n".join(context_parts)
+            return {
+                "persona": "\n\n".join(persona_parts),
+                "short_term_memory": short_term,
+            }
+
+        def _build_context(self, requirements: Dict[str, bool], user_input: str = "") -> str:
+            """Baut den Context String basierend auf Requirements."""
+            components = self._build_context_components(requirements, user_input=user_input)
+            return "\n\n".join(part for part in components.values() if part)
+
+        @staticmethod
+        def _effective_context_requirements(user_input: str, requirements: Dict[str, bool]) -> Dict[str, bool]:
+            effective = dict(requirements or {})
+            if is_self_contained_math_query(user_input):
+                for key in (
+                    "need_soul_context",
+                    "need_user_context",
+                    "need_preferences",
+                    "need_short_term_memory",
+                    "need_long_term_memory",
+                ):
+                    effective[key] = False
+            return effective
+
+        @staticmethod
+        def _closed_reasoning_runtime(prompt_runtime: Dict[str, Any]) -> Dict[str, Any]:
+            runtime = dict(prompt_runtime)
+            report = dict(runtime.get("emotion_steering", {}))
+            report.update({
+                "steering_active": False,
+                "suppressed_for": "closed_form_reasoning",
+            })
+            runtime["steering_payload"] = {}
+            runtime["emotion_steering"] = report
+            runtime["response_plan"] = {
+                "tone": "precise_factual",
+                "tone_reason": "Geschlossene Rechenaufgabe: Korrektheit vor Persona, Memory und Emotionsstil.",
+                "tone_drivers": ["closed_form_reasoning"],
+                "response_guidance": "Gib nur das korrekte Ergebnis mit hoechstens einem kurzen Erklaersatz aus.",
+            }
+            return runtime
+
+        @staticmethod
+        def _isolated_request_runtime(prompt_runtime: Dict[str, Any]) -> Dict[str, Any]:
+            """Neutral generation policy for requests that explicitly need no state."""
+            runtime = dict(prompt_runtime)
+            report = dict(runtime.get("emotion_steering", {}))
+            report.update({
+                "steering_active": False,
+                "suppressed_for": "self_contained_request",
+            })
+            runtime["steering_payload"] = {}
+            runtime["emotion_steering"] = report
+            runtime["use_prompt_emotions"] = False
+            runtime["prompt_emotion_mode"] = "isolated_neutral"
+            runtime["response_plan"] = {
+                "tone": "precise_factual",
+                "tone_reason": "Eigenstaendige Anfrage ohne Persona-, Memory-, Life- oder Emotionskontext.",
+                "tone_drivers": ["self_contained_request"],
+                "response_guidance": (
+                    "Beantworte die eigenstaendige Anfrage direkt und sachlich. "
+                    "Erfinde keine Fakten; pruefe zentrale Behauptungen vor der Ausgabe."
+                ),
+            }
+            return runtime
 
         def _generate_response(self, user_input: str, history: List[Dict], 
                               context: str, emotions: Dict[str, int],
@@ -1940,23 +2269,25 @@ def create_chappie_backend():
                               intent_type: Any = None,
                               retrieval_keywords: Optional[List[str]] = None,
                               exact_entities: Optional[List[str]] = None,
-                              fact_lookup_intent: bool = False) -> Dict[str, Any]:
+                              fact_lookup_intent: bool = False,
+                              allow_memory_context: bool = True,
+                              isolated_request: bool = False) -> Dict[str, Any]:
             """Generiert die finale Antwort (Step 2)."""
+            closed_reasoning = is_self_contained_math_query(user_input)
+            memory_suppressed = closed_reasoning or not allow_memory_context
             # RAG Memory Search
             memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
             generation_query_source = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
             generation_query = generation_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(user_input)
-            fresh_memories = self.memory.search_memory(
-                generation_query or user_input,
-                top_k=memory_top_k,
-                optimize_query=False,
+            fresh_memories = [] if memory_suppressed else self._search_memory(
+                generation_query or user_input, top_k=memory_top_k, optimize_query=False,
             )
             memories = self._merge_memories(
-                preferred=preloaded_memories or [],
+                preferred=[] if memory_suppressed else (preloaded_memories or []),
                 secondary=fresh_memories,
                 limit=memory_top_k,
             )
-            keyword_memories = self.memory.search_memory_keywords(
+            keyword_memories = [] if memory_suppressed else self._search_memory_keywords(
                 query=user_input,
                 keywords=retrieval_keywords or [],
                 entities=exact_entities or [],
@@ -1971,7 +2302,7 @@ def create_chappie_backend():
             # === LTM+STM KONSOLIDIERUNG (via Groq gpt-oss-120b) ===
             stm_entries = []
             consolidation_meta = {}
-            if settings.memory_consolidation_enabled:
+            if settings.memory_consolidation_enabled and self._feature_enabled("memory") and not memory_suppressed:
                 stm_entries = self.short_term_memory.get_active_entries() if hasattr(self, 'short_term_memory') and self.short_term_memory else []
                 consolidated_prompt, consolidation_meta = self._consolidate_memories_for_prompt(
                     ltm_memories=memories or [],
@@ -1988,7 +2319,7 @@ def create_chappie_backend():
                         ).strip()
                 self.debug_logger.log_info(
                     "MEMORY_CONSOLIDATION",
-                    "LTM+STM via Groq konsolidiert",
+                    "LTM+STM-Konsolidierung abgeschlossen",
                     consolidation_meta if consolidation_meta else {"enabled": False},
                 )
 
@@ -2035,6 +2366,10 @@ def create_chappie_backend():
             )
 
             prompt_runtime = self._build_prompt_runtime(emotions)
+            if closed_reasoning:
+                prompt_runtime = self._closed_reasoning_runtime(prompt_runtime)
+            elif isolated_request:
+                prompt_runtime = self._isolated_request_runtime(prompt_runtime)
             tone_decision = prompt_runtime.get("response_plan", {})
             self.debug_logger.log_info(
                 "EMOTION_STEERING",
@@ -2068,9 +2403,10 @@ def create_chappie_backend():
             system_prompt = get_system_prompt_with_emotions(
                 **{key: emotions.get(key, EMOTION_DEFAULTS[key]) for key in EMOTION_ORDER},
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=self._use_prompt_chain_of_thought()
+                use_chain_of_thought=self._use_prompt_chain_of_thought(),
+                persona_enabled=self._feature_enabled("persona") and not isolated_request,
             )
-            system_prompt = self._append_response_style_instruction(system_prompt, intent_type)
+            system_prompt = self._append_response_style_instruction(system_prompt, intent_type, tone_decision)
             
             # Context hinzufuegen
             if context:
@@ -2085,7 +2421,7 @@ def create_chappie_backend():
             
             # Messages bauen — Chat-History gecapped
             messages = self.brain.build_prompt(
-                system_prompt, "", user_input, history,
+                system_prompt, "", user_input, [] if isolated_request else history,
                 max_history=settings.history_max_messages,
             )
             
@@ -2101,10 +2437,11 @@ def create_chappie_backend():
             # Dynamische Parameteranpassung bei extremen Emotionen
             adj = self._get_emotion_adjusted_config(emotions)
             gen_config = GenerationConfig(
-                max_tokens=adj["max_tokens"],
-                temperature=adj["temperature"],
+                max_tokens=min(adj["max_tokens"], 96) if closed_reasoning else min(adj["max_tokens"], 220) if isolated_request else adj["max_tokens"],
+                temperature=min(adj["temperature"], 0.2) if isolated_request else adj["temperature"],
                 repetition_penalty=adj["repetition_penalty"],
                 stream=False,
+                seed=getattr(self, "generation_seed", None),
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
             
@@ -2211,7 +2548,7 @@ def create_chappie_backend():
         ) -> Dict[str, Any]:
             """Legacy Verarbeitung (altes System als Fallback)."""
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
+            life_context = self._prepare_life_turn(user_input, history, emotions_before, temporal_context=temporal_context)
             
             # Einfache Emotions Analyse
             self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
@@ -2219,8 +2556,8 @@ def create_chappie_backend():
             
             # RAG
             generation_query = self.memory.extract_search_query(user_input)
-            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
-            keyword_memories = self.memory.search_memory_keywords(
+            memories = self._search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
+            keyword_memories = self._search_memory_keywords(
                 query=user_input,
                 keywords=str(generation_query or "").split(),
                 top_k=5,
@@ -2287,9 +2624,10 @@ def create_chappie_backend():
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=self._use_prompt_chain_of_thought()
+                use_chain_of_thought=self._use_prompt_chain_of_thought(),
+                persona_enabled=self._feature_enabled("persona"),
             )
-            system_prompt = self._append_response_style_instruction(system_prompt)
+            system_prompt = self._append_response_style_instruction(system_prompt, response_plan=tone_decision)
             
             messages = self.brain.build_prompt(system_prompt, combined_memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
             messages, budget_info = self._enforce_context_budget(messages)
@@ -2303,6 +2641,7 @@ def create_chappie_backend():
                 temperature=adj["temperature"],
                 repetition_penalty=adj["repetition_penalty"],
                 stream=False,
+                seed=getattr(self, "generation_seed", None),
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
             legacy_response = self._run_with_retries(
@@ -2346,7 +2685,7 @@ def create_chappie_backend():
                 category="chat",
                 importance="normal"
             )
-            final_life_snapshot = self.life_simulation.finalize_turn(
+            final_life_snapshot = self._finalize_life_turn(
                 user_input=user_input,
                 response_text=display_response,
                 emotions_after=emotions_after,
@@ -2436,22 +2775,31 @@ def create_chappie_backend():
             retrieval_keywords: Optional[List[str]] = None,
             exact_entities: Optional[List[str]] = None,
             fact_lookup_intent: bool = False,
+            allow_memory_context: bool = True,
+            isolated_request: bool = False,
+            context_components: Optional[Dict[str, str]] = None,
         ):
             """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
-            memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
+            closed_reasoning = is_self_contained_math_query(user_input)
+            memory_suppressed = closed_reasoning or not allow_memory_context
+            memory_top_k = response_memory_top_k_for_intent(
+                intent_type,
+                settings.memory_top_k,
+                getattr(settings, "memory_prompt_top_k", 8),
+            )
             # Preloaded memories aus Step 1 direkt nutzen – kein zweiter LLM-Call
-            memories = list(preloaded_memories or [])
-            if not memories:
+            memories = [] if memory_suppressed else list(preloaded_memories or [])
+            if not memories and not memory_suppressed:
                 generation_query_source = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
                 generation_query = generation_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(user_input)
-                memories = self.memory.search_memory(
+                memories = self._search_memory(
                     generation_query or user_input,
                     top_k=memory_top_k,
                     optimize_query=False,
                 )
             else:
                 generation_query = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
-            keyword_memories = self.memory.search_memory_keywords(
+            keyword_memories = [] if memory_suppressed else self._search_memory_keywords(
                 query=user_input,
                 keywords=retrieval_keywords or [],
                 entities=exact_entities or [],
@@ -2482,14 +2830,30 @@ def create_chappie_backend():
             }
 
             prompt_runtime = self._build_prompt_runtime(emotions)
+            if closed_reasoning:
+                prompt_runtime = self._closed_reasoning_runtime(prompt_runtime)
+            elif isolated_request:
+                prompt_runtime = self._isolated_request_runtime(prompt_runtime)
             tone_decision = prompt_runtime.get("response_plan", {})
 
-            system_prompt = get_system_prompt_with_emotions(
+            base_system_prompt = get_system_prompt_with_emotions(
                 **{key: emotions.get(key, EMOTION_DEFAULTS[key]) for key in EMOTION_ORDER},
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=self._use_prompt_chain_of_thought()
+                use_chain_of_thought=self._use_prompt_chain_of_thought(),
+                persona_enabled=self._feature_enabled("persona") and not isolated_request,
             )
-            system_prompt = self._append_response_style_instruction(system_prompt, intent_type)
+            response_style_instruction = self._response_style_instruction(intent_type)
+            response_plan_instruction = format_response_plan_instruction(
+                str(tone_decision.get("tone", "grounded_neutral")),
+                str(tone_decision.get("response_guidance", "Antworte klar und praezise.")),
+            ) if tone_decision else ""
+            generation_budget_instruction = self._generation_budget_instruction()
+            system_prompt = "\n\n".join(part for part in (
+                base_system_prompt,
+                response_style_instruction,
+                response_plan_instruction,
+                generation_budget_instruction,
+            ) if part)
 
             if context:
                 system_prompt += f"\n\n{context}"
@@ -2500,15 +2864,44 @@ def create_chappie_backend():
             if memories_for_prompt:
                 system_prompt += f"\n\n{memories_for_prompt}"
 
-            messages = self.brain.build_prompt(system_prompt, "", user_input, history, max_history=settings.history_max_messages)
+            messages = self.brain.build_prompt(
+                system_prompt,
+                "",
+                user_input,
+                [] if isolated_request else history,
+                max_history=settings.history_max_messages,
+            )
+            messages_before_budget = list(messages)
             messages, budget_info = self._enforce_context_budget(messages)
+            measured_context = context_components or {"persona": context, "short_term_memory": ""}
+            prompt_components = measure_prompt_components(
+                self._active_token_counter(),
+                {
+                    "system": base_system_prompt,
+                    "persona": measured_context.get("persona", ""),
+                    "semantic_memory": memories_for_prompt,
+                    "keyword_memory": keyword_memories_for_prompt,
+                    "short_term_memory": measured_context.get("short_term_memory", ""),
+                    # Life/workspace influence steering and planning, but are
+                    # deliberately not injected as serialized prompt text.
+                    "life": "",
+                    "user": user_input,
+                    "generation_budget": generation_budget_instruction,
+                    "response_style": response_style_instruction,
+                    "response_plan": response_plan_instruction,
+                },
+                [] if isolated_request else history[-settings.history_max_messages:],
+                messages_before_budget,
+                messages,
+            )
 
             adj = self._get_emotion_adjusted_config(emotions)
             gen_config = GenerationConfig(
-                max_tokens=adj["max_tokens"],
-                temperature=adj["temperature"],
+                max_tokens=min(adj["max_tokens"], 96) if closed_reasoning else min(adj["max_tokens"], 220) if isolated_request else adj["max_tokens"],
+                temperature=min(adj["temperature"], 0.2) if isolated_request else adj["temperature"],
                 repetition_penalty=adj["repetition_penalty"],
                 stream=True,
+                seed=getattr(self, "generation_seed", None),
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
 
@@ -2520,6 +2913,7 @@ def create_chappie_backend():
                 "rag_memories": memories,
                 "keyword_rag_memories": keyword_memories,
                 "context_budget": budget_info,
+                "prompt_components": prompt_components,
                 "effective_memory_top_k": memory_top_k,
             }
 
@@ -2538,20 +2932,26 @@ def create_chappie_backend():
             self.debug_logger.log_step1_start()
 
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
+            life_checkpoint = self._turn_checkpoint()
+            life_context = self._prepare_life_turn(user_input, history, emotions_before, temporal_context=temporal_context)
 
             # === STEP 1: Intent Analysis ===
-            intent_result = self._run_with_retries(
-                step_number=1,
-                step_name="Intent-Analyse",
-                action=lambda: self.intent_processor.process(
-                    user_input=user_input,
-                    history=history,
-                    current_emotions=emotions_before,
-                ),
-                validator=self._is_valid_intent_result,
-                status_callback=status_callback,
-            )
+            try:
+                intent_result = self._run_with_retries(
+                    step_number=1,
+                    step_name="Intent-Analyse",
+                    action=lambda: self.intent_processor.process(
+                        user_input=user_input,
+                        history=history,
+                        current_emotions=emotions_before,
+                        deterministic=self.research_mode,
+                    ),
+                    validator=self._is_valid_intent_result,
+                    status_callback=status_callback,
+                )
+            except Exception:
+                self._rollback_failed_turn(emotions_before, life_checkpoint)
+                raise
 
             self.debug_logger.log_step1_complete(
                 intent_result.intent_type.value,
@@ -2602,11 +3002,21 @@ def create_chappie_backend():
                 self.debug_logger.log_migration(migrated)
 
             retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
+            context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
+            memory_allowed = self._feature_enabled("memory") and context_allows_long_term_memory(context_requirements)
+            isolated_request = is_isolated_request(context_requirements)
+            closed_reasoning = is_self_contained_math_query(user_input)
+            if closed_reasoning or not memory_allowed:
+                retrieval_keywords, exact_entities, fact_lookup_intent = [], [], False
             intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
             intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
-            intent_memories = self.memory.search_memory(
+            intent_memories = [] if closed_reasoning or not memory_allowed else self._search_memory(
                 intent_memory_query or user_input,
-                top_k=response_memory_top_k_for_intent(intent_result.intent_type, settings.memory_top_k),
+                top_k=response_memory_top_k_for_intent(
+                    intent_result.intent_type,
+                    settings.memory_top_k,
+                    getattr(settings, "memory_prompt_top_k", 8),
+                ),
                 optimize_query=False,
             )
             intent_memory_trace = self._build_memory_trace(
@@ -2621,7 +3031,8 @@ def create_chappie_backend():
             )
 
             # === CONTEXT AUFBAUEN ===
-            context = self._build_context(intent_result.context_requirements)
+            context_components = self._build_context_components(context_requirements, user_input=user_input)
+            context = "\n\n".join(part for part in context_components.values() if part)
             workspace = self._build_workspace_from_intent(
                 intent_result,
                 life_context,
@@ -2632,7 +3043,7 @@ def create_chappie_backend():
                 "CONTEXT",
                 "Kontext und Workspace aufgebaut",
                 {
-                    "context_requirements": intent_result.context_requirements,
+                    "context_requirements": context_requirements,
                     "context_chars": len(context or ""),
                     "workspace_focus": (workspace.get("dominant_focus") or {}).get("label", "---"),
                     "workspace_broadcast": workspace.get("broadcast", "---"),
@@ -2647,119 +3058,53 @@ def create_chappie_backend():
 
             timing = {}
             try:
-                token_generator, meta = self._generate_response_stream_raw(
-                    user_input=user_input,
-                    history=history,
-                    context=context,
-                    emotions=emotions_after,
-                    life_context=life_context,
-                    global_workspace=workspace,
-                    preloaded_memories=intent_memories,
-                    memory_trace_seed=intent_memory_trace,
-                    intent_type=intent_result.intent_type,
-                    retrieval_keywords=retrieval_keywords,
-                    exact_entities=exact_entities,
-                    fact_lookup_intent=fact_lookup_intent,
-                )
-
-                raw_parts = []
-                think_buffer = ""
-                in_think = False
-                think_open_marker = "<think>"
-                think_close_marker = "</think>"
-
                 gen_start = time.time()
-                first_token_ts = None
-                reasoning_start_ts = None
-                reasoning_end_ts = None
-                reasoning_token_count = 0
-                answer_start_ts = None
-                answer_end_ts = None
-                answer_token_count = 0
 
-                def _estimate_tokens(content: str) -> int:
-                    return max(1, round(len(content or "") / 4))
+                def _consume_generation_attempt() -> Dict[str, Any]:
+                    token_generator, attempt_meta = self._generate_response_stream_raw(
+                        user_input=user_input,
+                        history=history,
+                        context=context,
+                        emotions=emotions_after,
+                        life_context=life_context,
+                        global_workspace=workspace,
+                        preloaded_memories=intent_memories,
+                        memory_trace_seed=intent_memory_trace,
+                        intent_type=intent_result.intent_type,
+                        retrieval_keywords=retrieval_keywords,
+                        exact_entities=exact_entities,
+                        fact_lookup_intent=fact_lookup_intent,
+                        allow_memory_context=memory_allowed,
+                        isolated_request=isolated_request,
+                        context_components=context_components,
+                    )
+                    # Security boundary: provider tokens are buffered until
+                    # the complete answer has passed all sanitizers.
+                    raw_response = "".join(token_generator)
+                    return {"response_text": raw_response, "meta": attempt_meta}
 
-                def _emit_answer(content: str):
-                    nonlocal first_token_ts, answer_start_ts, answer_end_ts, answer_token_count
-                    now = time.time()
-                    if first_token_ts is None:
-                        first_token_ts = now
-                    if answer_start_ts is None:
-                        answer_start_ts = now
-                    answer_end_ts = now
-                    answer_token_count += _estimate_tokens(content)
-                    return {"event": "token", "content": content, "token_type": "answer"}
-
-                def _emit_reasoning(content: str):
-                    nonlocal first_token_ts, reasoning_start_ts, reasoning_end_ts, reasoning_token_count
-                    now = time.time()
-                    if first_token_ts is None:
-                        first_token_ts = now
-                    if reasoning_start_ts is None:
-                        reasoning_start_ts = now
-                    reasoning_end_ts = now
-                    reasoning_token_count += _estimate_tokens(content)
-                    return {"event": "token", "content": content, "token_type": "reasoning"}
-
-                for token in token_generator:
-                    raw_parts.append(token)
-                    think_buffer += token
-                    while len(think_buffer) >= min(len(think_open_marker), len(think_close_marker)):
-                        if not in_think:
-                            idx = think_buffer.find(think_open_marker)
-                            if idx == -1:
-                                keep = min(len(think_buffer), len(think_open_marker) - 1)
-                                prefix = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
-                                think_buffer = think_buffer[-keep:] if keep > 0 else ""
-                                if prefix:
-                                    yield _emit_answer(prefix)
-                                break
-                            else:
-                                prefix = think_buffer[:idx]
-                                think_buffer = think_buffer[idx + len(think_open_marker):]
-                                if prefix:
-                                    yield _emit_answer(prefix)
-                                in_think = True
-                        if in_think:
-                            idx = think_buffer.find(think_close_marker)
-                            if idx == -1:
-                                keep = min(len(think_buffer), len(think_close_marker) - 1)
-                                emit = think_buffer[:len(think_buffer) - keep] if len(think_buffer) > keep else ""
-                                think_buffer = think_buffer[-keep:] if keep > 0 else ""
-                                if emit:
-                                    yield _emit_reasoning(emit)
-                                break
-                            else:
-                                reasoning = think_buffer[:idx]
-                                think_buffer = think_buffer[idx + len(think_close_marker):]
-                                if reasoning:
-                                    yield _emit_reasoning(reasoning)
-                                in_think = False
-                                if think_buffer:
-                                    yield _emit_answer(think_buffer)
-                                    think_buffer = ""
-                                break
-                if think_buffer:
-                    token_type = "reasoning" if in_think else "answer"
-                    if token_type == "reasoning":
-                        yield _emit_reasoning(think_buffer)
-                    else:
-                        yield _emit_answer(think_buffer)
+                streamed = self._run_with_retries(
+                    step_number=2,
+                    step_name="Antwortgenerierung",
+                    action=_consume_generation_attempt,
+                    validator=self._is_valid_generation_result,
+                    status_callback=status_callback,
+                )
+                raw_response = streamed["response_text"]
+                meta = streamed["meta"]
 
                 gen_end = time.time()
-                total_token_count = reasoning_token_count + answer_token_count
                 timing = {
-                    "ttft_ms": round((first_token_ts - gen_start) * 1000) if first_token_ts else 0,
+                    "ttft_ms": round((gen_end - gen_start) * 1000),
                     "total_gen_ms": round((gen_end - gen_start) * 1000),
-                    "total_tokens": total_token_count,
-                    "reasoning_tokens": reasoning_token_count,
-                    "answer_tokens": answer_token_count,
-                    "reasoning_time_ms": round((reasoning_end_ts - reasoning_start_ts) * 1000) if reasoning_start_ts and reasoning_end_ts else 0,
-                    "answer_time_ms": round((answer_end_ts - answer_start_ts) * 1000) if answer_start_ts and answer_end_ts else 0,
+                    "total_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "answer_tokens": 0,
+                    "reasoning_time_ms": 0,
+                    "answer_time_ms": 0,
+                    "stream_safety_buffered": True,
                 }
 
-                raw_response = "".join(raw_parts)
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
                 formatted_stream = self._format_via_groq(raw_response)
                 self.debug_logger.log_info(
@@ -2778,13 +3123,11 @@ def create_chappie_backend():
 
             except Exception as exc:
                 error_text = self._format_generation_error("Antwortgenerierung", str(exc))
+                self._rollback_failed_turn(emotions_before, life_checkpoint)
                 yield {"event": "error", "error": error_text}
-                display_response = error_text
-                thought = ""
-                model_reasoning = ""
-                formatted_stream = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback", "formatting_model": "local_regex"}
+                return
 
-            final_life_snapshot = self.life_simulation.finalize_turn(
+            final_life_snapshot = self._finalize_life_turn(
                 user_input=user_input,
                 response_text=display_response,
                 emotions_after=emotions_after,
@@ -2823,7 +3166,13 @@ def create_chappie_backend():
                     )
                 except Exception:
                     pass
-            threading.Thread(target=_bg_stm, daemon=True).start()
+            if self.research_mode:
+                # Benchmark resets must never race a daemon writer. Completing
+                # the isolated STM mutation here makes every question boundary
+                # deterministic and prevents post-clear entries.
+                _bg_stm()
+            else:
+                threading.Thread(target=_bg_stm, daemon=True).start()
             sleep_result = self._schedule_sleep_phase_if_due()
 
             start_time_dt = datetime.now()
@@ -2837,12 +3186,24 @@ def create_chappie_backend():
                 safe_answer = display_response
             else:
                 safe_answer = formatted_stream.get("answer", "") or display_response
+            safe_answer, final_sanitization = sanitize_visible_response(safe_answer)
+            if not safe_answer:
+                safe_answer = "Die Modellantwort enthielt interne Steuerdaten und wurde aus Sicherheitsgruenden verworfen."
+            if final_sanitization:
+                formatted_stream["formatting_failed"] = True
+                formatted_stream["output_sanitized"] = final_sanitization
+            display_response = safe_answer
 
-            # Reasoning-Tokens aus formatiertem CoT nachberechnen (Modelle nutzen selten <think>-Tags)
-            if timing and timing.get("reasoning_tokens", 0) == 0 and safe_cot and safe_cot != self._FALLBACK_NO_THINK:
-                estimated = max(1, round(len(safe_cot) / 4))
-                timing["reasoning_tokens"] = estimated
-                timing["total_tokens"] = timing.get("total_tokens", 0) + estimated
+            if timing:
+                counter = self._active_token_counter()
+                reasoning_tokens = counter.count_text(safe_cot) if safe_cot and safe_cot != self._FALLBACK_NO_THINK else 0
+                answer_tokens = counter.count_text(safe_answer)
+                timing["reasoning_tokens"] = reasoning_tokens
+                timing["answer_tokens"] = answer_tokens
+                timing["total_tokens"] = reasoning_tokens + answer_tokens
+
+            for offset in range(0, len(safe_answer), 96):
+                yield {"event": "token", "content": safe_answer[offset:offset + 96], "token_type": "answer"}
 
             result = {
                 "response_text": display_response,
@@ -2851,8 +3212,10 @@ def create_chappie_backend():
                 "formatting_failed": formatted_stream.get("formatting_failed", False),
                 "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
                 "formatting_model": formatted_stream.get("formatting_model", "?"),
+                "output_sanitized": formatted_stream.get("output_sanitized", []),
                 "cot_leak": self._detect_cot_leakage(safe_answer),
                 "context_budget": meta.get("context_budget", {}),
+                "prompt_components": meta.get("prompt_components", {}),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -2901,13 +3264,14 @@ def create_chappie_backend():
         ) -> Generator[Dict[str, Any], None, None]:
             """Legacy Verarbeitung mit Token-Streaming."""
             emotions_before = self._get_emotions_snapshot()
-            life_context = self.life_simulation.prepare_turn(user_input, history, emotions_before, temporal_context=temporal_context)
+            life_checkpoint = self._turn_checkpoint()
+            life_context = self._prepare_life_turn(user_input, history, emotions_before, temporal_context=temporal_context)
 
             self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
             emotions_after = self._get_emotions_snapshot()
 
             generation_query = self.memory.extract_search_query(user_input)
-            memories = self.memory.search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
+            memories = self._search_memory(generation_query or user_input, top_k=settings.memory_top_k, optimize_query=False)
             memory_trace = {
                 "generation": self._build_memory_trace(
                     query=generation_query,
@@ -2952,9 +3316,10 @@ def create_chappie_backend():
             system_prompt = get_system_prompt_with_emotions(
                 **state.__dict__,
                 include_emotion_status=prompt_runtime["use_prompt_emotions"],
-                use_chain_of_thought=self._use_prompt_chain_of_thought()
+                use_chain_of_thought=self._use_prompt_chain_of_thought(),
+                persona_enabled=self._feature_enabled("persona"),
             )
-            system_prompt = self._append_response_style_instruction(system_prompt)
+            system_prompt = self._append_response_style_instruction(system_prompt, response_plan=tone_decision)
 
             messages = self.brain.build_prompt(system_prompt, memories_for_prompt, user_input, history, max_history=settings.history_max_messages)
 
@@ -2964,6 +3329,7 @@ def create_chappie_backend():
                 temperature=adj["temperature"],
                 repetition_penalty=adj["repetition_penalty"],
                 stream=True,
+                seed=getattr(self, "generation_seed", None),
                 extra_body=prompt_runtime["steering_payload"] or None,
             )
 
@@ -2973,7 +3339,6 @@ def create_chappie_backend():
                 token_generator = self.brain.generate(messages, config=gen_config)
                 raw_parts = []
                 for token in token_generator:
-                    yield {"event": "token", "content": token}
                     raw_parts.append(token)
 
                 raw_response = "".join(raw_parts)
@@ -2993,11 +3358,23 @@ def create_chappie_backend():
 
             except Exception as exc:
                 error_text = self._format_generation_error("Legacy-Antwortgenerierung", str(exc))
+                self._rollback_failed_turn(emotions_before, life_checkpoint)
                 yield {"event": "error", "error": error_text}
-                display_response = error_text
-                thought = ""
-                model_reasoning = ""
-                formatted_legacy = {"cot": "", "answer": error_text, "formatting_failed": True, "formatting_source": "local_fallback", "formatting_model": "local_regex"}
+                return
+
+            if formatted_legacy.get("answer_is_fallback"):
+                safe_legacy_answer = display_response or formatted_legacy.get("answer", "")
+            else:
+                safe_legacy_answer = formatted_legacy.get("answer", "") or display_response
+            safe_legacy_answer, legacy_sanitization = sanitize_visible_response(safe_legacy_answer)
+            if not safe_legacy_answer:
+                safe_legacy_answer = "Die Modellantwort enthielt interne Steuerdaten und wurde aus Sicherheitsgruenden verworfen."
+            if legacy_sanitization:
+                formatted_legacy["formatting_failed"] = True
+                formatted_legacy["output_sanitized"] = legacy_sanitization
+            display_response = safe_legacy_answer
+            for offset in range(0, len(safe_legacy_answer), 96):
+                yield {"event": "token", "content": safe_legacy_answer[offset:offset + 96], "token_type": "answer"}
 
             self.memory.add_memory(user_input, role="user")
             if display_response.strip() and not looks_like_model_error(display_response):
@@ -3014,7 +3391,7 @@ def create_chappie_backend():
                 category="chat",
                 importance="normal"
             )
-            final_life_snapshot = self.life_simulation.finalize_turn(
+            final_life_snapshot = self._finalize_life_turn(
                 user_input=user_input,
                 response_text=display_response,
                 emotions_after=emotions_after,
@@ -3043,11 +3420,11 @@ def create_chappie_backend():
             result = {
                 "response_text": display_response,
                 "formatted_cot": formatted_legacy.get("cot", "") or thought or model_reasoning or "",
-                "formatted_answer": formatted_legacy.get("answer", "")
-                    if not formatted_legacy.get("answer_is_fallback") else (display_response or formatted_legacy.get("answer", "")),
+                "formatted_answer": safe_legacy_answer,
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
                 "formatting_source": formatted_legacy.get("formatting_source", "local_fallback"),
                 "formatting_model": formatted_legacy.get("formatting_model", "?"),
+                "output_sanitized": formatted_legacy.get("output_sanitized", []),
                 "cot_leak": self._detect_cot_leakage(formatted_legacy.get("answer", "") or display_response),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,

@@ -10,11 +10,17 @@ Verwaltet das Kurzzeitgedächtnis mit:
 """
 
 import json
+import os
+import re
+import tempfile
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, asdict
+
+import fcntl
 
 from config.config import DATA_DIR
 from memory.memory_engine import MemoryEngine
@@ -41,8 +47,9 @@ class ShortTermMemory:
     Alle Timestamps werden in UTC gespeichert.
     """
     
-    def __init__(self, memory_engine: MemoryEngine = None, ttl_hours: int = 24):
-        self.storage_path = DATA_DIR / "short_term_memory.json"
+    def __init__(self, memory_engine: MemoryEngine = None, ttl_hours: int = 24, storage_path: Optional[Path] = None):
+        self.storage_path = Path(storage_path) if storage_path else DATA_DIR / "short_term_memory.json"
+        self.lock_path = self.storage_path.with_suffix(self.storage_path.suffix + ".lock")
         self.memory_engine = memory_engine
         self.ttl_hours = ttl_hours
         self.entries: List[ShortTermEntry] = []
@@ -59,32 +66,84 @@ class ShortTermMemory:
         except (TypeError, ValueError):
             return 0.0
     
+    @contextmanager
+    def _storage_lock(self):
+        """Serialisiert Dateizugriffe zwischen Web-, CLI- und Forschungsprozess."""
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.lock_path, "a", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    @staticmethod
+    def _entries_from_data(data: Dict[str, Any]) -> List[ShortTermEntry]:
+        entries = []
+        for raw_entry in data.get("entries", []):
+            entry = dict(raw_entry)
+            entry.setdefault("summarized", False)
+            entry.setdefault("summary_source_ids", None)
+            entries.append(ShortTermEntry(**entry))
+        return entries
+
+    def _read_data_unlocked(self) -> Dict[str, Any]:
+        if not self.storage_path.exists():
+            return {"entries": []}
+        with open(self.storage_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+
     def _load_entries(self):
         """Lädt Einträge aus JSON-Datei."""
         if self.storage_path.exists():
             try:
-                with open(self.storage_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.entries = []
-                    for entry in data.get('entries', []):
-                        entry.setdefault("summarized", False)
-                        entry.setdefault("summary_source_ids", None)
-                        self.entries.append(ShortTermEntry(**entry))
+                with self._storage_lock():
+                    data = self._read_data_unlocked()
+                self.entries = self._entries_from_data(data)
             except Exception as e:
                 print(f"[ShortTerm] Fehler beim Laden: {e}")
                 self.entries = []
         else:
             self.entries = []
     
-    def _save_entries(self):
-        """Speichert Einträge in JSON-Datei."""
+    def _save_entries(self, removed_ids: Optional[set[str]] = None, clear: bool = False):
+        """Speichert atomar und erhaelt parallele Ergaenzungen anderer Prozesse."""
         try:
-            data = {
-                'entries': [asdict(entry) for entry in self.entries],
-                'last_cleanup': datetime.now(timezone.utc).isoformat()
-            }
-            with open(self.storage_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            removed_ids = removed_ids or set()
+            with self._storage_lock():
+                disk_entries = []
+                if not clear:
+                    disk_entries = self._entries_from_data(self._read_data_unlocked())
+
+                merged = {entry.id: entry for entry in disk_entries}
+                for entry in self.entries:
+                    previous = merged.get(entry.id)
+                    if previous is not None:
+                        entry.migrated = entry.migrated or previous.migrated
+                        entry.summarized = entry.summarized or previous.summarized
+                    merged[entry.id] = entry
+                for entry_id in removed_ids:
+                    merged.pop(entry_id, None)
+
+                self.entries = list(merged.values())
+                data = {
+                    "entries": [asdict(entry) for entry in self.entries],
+                    "last_cleanup": datetime.now(timezone.utc).isoformat(),
+                }
+                fd, temp_name = tempfile.mkstemp(
+                    prefix=f".{self.storage_path.name}.",
+                    suffix=".tmp",
+                    dir=self.storage_path.parent,
+                )
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                        json.dump(data, handle, indent=2, ensure_ascii=False)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.replace(temp_name, self.storage_path)
+                finally:
+                    if os.path.exists(temp_name):
+                        os.unlink(temp_name)
         except Exception as e:
             print(f"[ShortTerm] Fehler beim Speichern: {e}")
     
@@ -211,11 +270,19 @@ class ShortTermMemory:
         return created
 
     def _summarize_batch(self, batch: List[ShortTermEntry]) -> str:
+        from config.config import settings
+
+        if settings.is_local_single_model_mode():
+            # Keep the one-model vLLM setup free of auxiliary cloud or Ollama
+            # calls.  The raw entries remain available, so a concise local
+            # extract is safer than delaying the chat for a second model.
+            lines = [entry.content.strip() for entry in batch if entry.content.strip()]
+            return "\n".join(f"- {line[:240]}" for line in lines[:5])
+
         try:
             from brain.base_brain import GenerationConfig, Message
             from brain.groq_brain import GroqBrain
             from brain.response_parser import looks_like_model_error
-            from config.config import settings
 
             lines = [f"- [{entry.category}/{entry.importance}] {entry.content}" for entry in batch]
             prompt = (
@@ -323,7 +390,7 @@ class ShortTermMemory:
             return "assistant"
         return "user"
     
-    def get_formatted_for_prompt(self, query: str = None) -> str:
+    def get_formatted_for_prompt(self, query: str = None, limit: int = None) -> str:
         """
         Formatiert aktive Einträge für den Prompt.
         
@@ -334,14 +401,17 @@ class ShortTermMemory:
             Formatierter String
         """
         self.summarize_overflow()
-        entries = self.get_active_entries(query=query)
+        from config.config import settings
+
+        limit = max(1, int(limit if limit is not None else getattr(settings, "stm_prompt_top_k", 8)))
+        entries = self._select_for_prompt(query=query, limit=limit)
         
         if not entries:
             return ""
         
         lines = ["=== AKTUELLE SHORT-TERM ERINNERUNGEN (letzte 24h) ===", ""]
         
-        for entry in entries[:20]:
+        for entry in entries:
             try:
                 created = datetime.fromisoformat(entry.created_at)
                 if created.tzinfo is None:
@@ -352,6 +422,55 @@ class ShortTermMemory:
             lines.append(f"[{time_str}] [{entry.importance}] [{entry.category}] {entry.content}")
         
         return "\n".join(lines)
+
+    @staticmethod
+    def _prompt_terms(text: str) -> set[str]:
+        normalized = str(text or "").lower().translate(str.maketrans({
+            "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+        }))
+        stop_words = {
+            "ich", "du", "der", "die", "das", "den", "dem", "des", "ein", "eine",
+            "und", "oder", "aber", "wenn", "alle", "sind", "ist", "wie", "was", "wer",
+            "mir", "mich", "dir", "dich", "mein", "meine", "dein", "deine", "bitte",
+            "kann", "koennen", "soll", "sollen", "wird", "werden", "fuer", "mit", "von",
+            "auf", "an", "im", "in", "zu", "ueber", "noch", "auch", "nicht",
+        }
+        return {
+            token for token in re.findall(r"[a-z0-9]{3,}", normalized)
+            if token not in stop_words
+        }
+
+    def _select_for_prompt(self, query: str = None, limit: int = 8) -> List[ShortTermEntry]:
+        """Select relevant STM rows first, plus at most two continuity rows."""
+        entries = self.get_active_entries()
+        limit = max(1, int(limit))
+        if not query:
+            return entries[:limit]
+
+        query_terms = self._prompt_terms(query)
+        scored = []
+        for position, entry in enumerate(entries):
+            overlap = query_terms.intersection(self._prompt_terms(entry.content))
+            if overlap:
+                scored.append((len(overlap), -position, entry))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        selected = [item[2] for item in scored[:limit]]
+        selected_ids = {entry.id for entry in selected}
+
+        # The normal chat history already carries dialogue continuity. Keep at
+        # most two extra recent STM rows when lexical retrieval has no/directly
+        # few matches, instead of injecting the entire benchmark history.
+        continuity = sorted(entries, key=lambda entry: self._timestamp_sort_value(entry.created_at), reverse=True)
+        continuity_slots = min(2, limit - len(selected))
+        for entry in continuity:
+            if continuity_slots <= 0:
+                break
+            if entry.id in selected_ids:
+                continue
+            selected.append(entry)
+            selected_ids.add(entry.id)
+            continuity_slots -= 1
+        return selected[:limit]
     
     def get_count(self) -> int:
         """Gibt die Anzahl aktiver Einträge zurück."""
@@ -362,14 +481,14 @@ class ShortTermMemory:
         for i, entry in enumerate(self.entries):
             if entry.id == entry_id:
                 self.entries.pop(i)
-                self._save_entries()
+                self._save_entries(removed_ids={entry_id})
                 return True
         return False
     
     def clear_all(self):
         """Löscht alle Einträge (Vorsicht!)."""
         self.entries = []
-        self._save_entries()
+        self._save_entries(clear=True)
 
 
 _short_term_memory = None

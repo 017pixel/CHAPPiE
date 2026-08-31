@@ -17,9 +17,10 @@ from config.prompts import get_system_prompt_with_emotions  # from config/prompt
 from web_infrastructure.backend_wrapper import prompt_chain_of_thought_enabled, response_memory_top_k_for_intent  # noqa: E402
 
 
-def test_casual_chat_uses_twenty_memories_and_other_intents_keep_default():
-    assert response_memory_top_k_for_intent("casual_chat", 40) == 20
-    assert response_memory_top_k_for_intent("technical_discussion", 40) == 40
+def test_all_intents_use_bounded_relevance_sorted_prompt_memory():
+    assert response_memory_top_k_for_intent("casual_chat", 40, 8) == 8
+    assert response_memory_top_k_for_intent("technical_discussion", 40, 8) == 8
+    assert response_memory_top_k_for_intent("personal_recall", 5, 8) == 5
 
 
 def test_local_vllm_does_not_add_long_cot_prompt_block():
@@ -36,6 +37,6 @@ def test_local_vllm_does_not_add_long_cot_prompt_block():
 
 
 if __name__ == "__main__":
-    test_casual_chat_uses_twenty_memories_and_other_intents_keep_default()
+    test_all_intents_use_bounded_relevance_sorted_prompt_memory()
     test_local_vllm_does_not_add_long_cot_prompt_block()
     print("OK: response policy")

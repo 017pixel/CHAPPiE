@@ -1,4 +1,4 @@
-"""CHAPPiE Terminal Interface v14.0
+"""CHAPPiE Terminal Interface v16.0
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
@@ -200,7 +200,7 @@ class CHAPPiEBrainCLI:
         self._use_remote = remote_url is not None
         self._show_full_report = _FULL_REPORT_DEFAULT
 
-        _log("INIT", "Initialisiere CHAPPiE Brain Interface v14.0...", Colors.AI)
+        _log("INIT", "Initialisiere CHAPPiE Brain Interface v16.0...", Colors.AI)
 
         if self._use_remote:
             if not HAS_REQUESTS:
@@ -1565,7 +1565,7 @@ class CHAPPiEBrainCLI:
 
     def _print_help(self):
         print(f"""
-{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v14.0{Colors.RESET}
+{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v16.0{Colors.RESET}
 {Colors.DEBUG}───────────────────────────────────────────────
   /status        Emotionaler Status + Life-Simulation
   /runtime       Modell, Provider, Steering-Konfiguration
@@ -1610,7 +1610,7 @@ class CHAPPiEBrainCLI:
   ██╔══██╗██╔══██╗██╔══██║██║██║╚██╗██║
   ██████╔╝██║  ██║██║  ██║██║██║ ╚████║
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
-{Colors.AI}CHAPPiE Terminal Interface v14.0 [{mode_str}]
+{Colors.AI}CHAPPiE Terminal Interface v16.0 [{mode_str}]
 {Colors.STEER}Steering: {steering_info} | {len(EMOTION_NAMES)} Emotionale Dimensionen
 {Colors.DEBUG}Live Streaming + Debug-Report | Tippe /help fuer alle Befehle
 {Colors.RESET}""")
@@ -1646,7 +1646,7 @@ class CHAPPiEBrainCLI:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v14.0")
+    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.0")
     parser.add_argument("--remote", action="store_true", help="Connect to remote backend via SSE")
     parser.add_argument("--url", default="http://localhost:8010", help="Backend URL (default: localhost:8010)")
     parser.add_argument("--model", type=str, default=None, help="Lokales vLLM-Modell ueberschreiben (z.B. gemma4-26b)")

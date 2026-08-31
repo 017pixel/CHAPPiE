@@ -100,24 +100,42 @@ class AmygdalaAgent(BaseAgent):
         return self._default_emotion_result()
     
     def _validate_emotion_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and clamp emotion values."""
-        data["emotional_intensity"] = max(0.0, min(1.0, data.get("emotional_intensity", 0.5)))
-        data["memory_boost_factor"] = max(1.0, min(3.0, data.get("memory_boost_factor", 1.0)))
-        data["personal_relevance"] = max(0.0, min(1.0, data.get("personal_relevance", 0.5)))
-        data["confidence"] = max(0.0, min(1.0, data.get("confidence", 0.5)))
-        
-        if "emotions_update" not in data:
-            data["emotions_update"] = {}
-        
+        """Validate, coerce, and clamp model-provided emotion values."""
+        if not isinstance(data, dict):
+            return self._default_emotion_result()
+
+        def clamped_number(key: str, default: float, lower: float, upper: float) -> float:
+            try:
+                value = float(data.get(key, default))
+            except (TypeError, ValueError):
+                value = default
+            return max(lower, min(upper, value))
+
+        data["emotional_intensity"] = clamped_number("emotional_intensity", 0.5, 0.0, 1.0)
+        data["memory_boost_factor"] = clamped_number("memory_boost_factor", 1.0, 1.0, 3.0)
+        data["personal_relevance"] = clamped_number("personal_relevance", 0.5, 0.0, 1.0)
+        data["confidence"] = clamped_number("confidence", 0.5, 0.0, 1.0)
+
+        raw_updates = data.get("emotions_update")
+        if not isinstance(raw_updates, dict):
+            raw_updates = {}
+        normalized_updates: Dict[str, Dict[str, Any]] = {}
         for emotion in EMOTION_ORDER:
-            if emotion not in data["emotions_update"]:
-                data["emotions_update"][emotion] = {"delta": 0, "reason": ""}
-            else:
-                delta = data["emotions_update"][emotion].get("delta", 0)
-                data["emotions_update"][emotion]["delta"] = max(-10, min(10, delta))
-        
+            entry = raw_updates.get(emotion)
+            if not isinstance(entry, dict):
+                entry = {}
+            try:
+                delta = int(round(float(entry.get("delta", 0))))
+            except (TypeError, ValueError):
+                delta = 0
+            normalized_updates[emotion] = {
+                **entry,
+                "delta": max(-10, min(10, delta)),
+                "reason": str(entry.get("reason", "") or ""),
+            }
+        data["emotions_update"] = normalized_updates
         return data
-    
+
     def _default_emotion_result(self) -> Dict[str, Any]:
         """Return default emotion result."""
         return {
