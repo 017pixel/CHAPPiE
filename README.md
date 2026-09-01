@@ -149,7 +149,7 @@ Bei aktiviertem Ein-Modell-Pfad verwendet CHAPPiE dasselbe vLLM-Modell fuer Antw
 Empfohlen:
 
 - lokaler CHAPPiE-Hauptpfad ueber `vllm`
-- lokaler Endpoint auf `http://localhost:8000/v1`
+- lokaler Endpoint auf `http://127.0.0.1:8000/v1`
 - Qwen-3.5-4B lokal fuer Antworten
 - Gemma 4 E4B fuer bessere Qualitaet bei aehnlichem VRAM-Budget
 - Gemma 4 26B-A4B nur mit NF4-Quantisierung und 4K-8K Kontext auf 16-GB-GPUs

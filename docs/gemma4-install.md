@@ -71,7 +71,7 @@ python -m brain.steering_api_server \
 ### 3c. Server-Status pruefen
 
 ```bash
-curl http://localhost:8000/health
+curl http://127.0.0.1:8000/health
 # {"status":"ok","model":"google/gemma-4-26B-A4B-it","restart_status":"ready"}
 ```
 
@@ -88,7 +88,7 @@ In `CHAPPIE_CONFIG.json`:
   "local_models": {
     "llm_provider": "vllm",
     "vllm_model": "google/gemma-4-E4B-it",
-    "vllm_url": "http://localhost:8000/v1",
+    "vllm_url": "http://127.0.0.1:8000/v1",
     "vllm_force_single_model": true
   },
   "steering": {
@@ -114,7 +114,7 @@ In `CHAPPIE_CONFIG.json`:
   "local_models": {
     "llm_provider": "vllm",
     "vllm_model": "google/gemma-4-26B-A4B-it",
-    "vllm_url": "http://localhost:8000/v1",
+    "vllm_url": "http://127.0.0.1:8000/v1",
     "vllm_force_single_model": true
   },
   "steering": {
@@ -156,7 +156,7 @@ python chappie_brain_cli.py --model gemma4-e4b
 
 ```bash
 # Steering-Server antwortet?
-curl http://localhost:8000/v1/chat/completions \
+curl http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "google/gemma-4-E4B-it",

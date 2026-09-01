@@ -2,6 +2,75 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.2.2] - 2026-09-01
+
+### Erstellt
+- Dauerhafte lokale Vektorerinnerungen für den aktiven Chat wiederhergestellt
+- Vollständiger Zustandsfluss für Emotionen, Kontext und simuliertes Leben abgesichert
+- Lokales Layer-Steering für alle zehn Emotionsdimensionen nachweisbar aktiviert
+- End-to-End-Prüfung für Memory, Generation, Streaming und Laufzeitstatus ergänzt
+- Sicherer Trainingsbereich für unabhängige Daemon-Daten eingerichtet
+
+### Verändert
+- Alte und verfälschte Assistenz-Erinnerungen werden vor dem Abruf quarantänisiert
+- Der lokale Qwen- und Gemma-Pfad bleibt als alleiniger Generierungspfad aktiv
+- Explizite User-Fakten werden zuverlässig erkannt, gespeichert und später beantwortet
+- Trainingsantworten und Kontextdateien werden vor der weiteren Verarbeitung bereinigt
+- Versionsanzeige und API-Status auf den aktuellen Reparaturstand angehoben
+
+### Gelöscht
+- Beschädigter Vektorindex aus dem aktiven Produktionspfad entfernt
+- Alte Modellselbstbeschreibungen aus CHAPPiEs autobiografischem Kontext entfernt
+- Verfälschte Trainings- und Gewaltzusammenfassungen aus dem Erinnerungsabruf entfernt
+- Falsche Trainingsfehler durch harmlose Antwortwörter beseitigt
+- Veraltete direkte Zugriffe auf gemeinsam genutzte Laufzeitdaten vermieden
+
+## [16.2.1] - 2026-09-01
+
+### Erstellt
+- Sichere aktive Memory-Sammlung für den lokalen Webdienst eingerichtet
+- Vorhandene Erinnerungen bestandserhaltend in die sichere Sammlung übernommen
+- Schutz vor dem Laden des fehlerhaften alten HNSW-Indexes ergänzt
+- Wiederherstellung des lokalen Modellstatus nach dem Dienststart geprüft
+- Chat-SSE-Streaming im isolierten Backend verifiziert
+
+### Verändert
+- Memory-Konfiguration verwendet jetzt dauerhaft chappie_memories
+- Alte Sammlungsnamen werden zur Laufzeit auf den sicheren Pfad umgeleitet
+- API-Health, Status, Emotion-Steering und Memory-Health liefern wieder Daten
+- Webdienst startet nach einem Neustart ohne den alten Chroma-Absturz
+- Versionsstand der sichtbaren Anwendung auf 16.2.1 angehoben
+
+### Gelöscht
+- Direkter Zugriff des laufenden Systems auf den beschädigten alten HNSW-Index
+- Fehlerhafte Chroma-Sammlung als aktiver Runtime-Pfad
+- Ursache für den NetworkError beim ersten Backend-Zugriff
+- Modellstatus `LOADING` durch den ausgefallenen Backend-Start
+- Fehlende Datenverbindung zwischen Chat-Oberfläche und lokalem Backend
+
+## [16.2.0] - 2026-09-01
+
+### Erstellt
+- Vereinfachte Rollenanzeige für User und CHAPPiE im Chat
+- Sichtbare Kopierbestätigung für erfolgreiche Rohtext-Kopien
+- Bedienbare Raw- und CoT-Steuerung im Detailbereich
+- Kennzeichnungen für Commands und Systemausgaben ergänzt
+- Änderbare Breite zwischen Explorer und Detailbereich ergänzt
+
+### Verändert
+- Kopfzeile zeigt den Modellnamen und Anbieter nur noch einmal
+- Detailinhalte sind für bessere Lesbarkeit vergrößert
+- Pipeline-Timeline und Tokenrate werden live aktualisiert
+- Emotion-Steering läuft über den einheitlichen lokalen Verarbeitungspfad
+- Chat-Kopfzeile und Tastaturhinweise wurden auf die wichtigen Funktionen reduziert
+
+### Gelöscht
+- Irrelevante Terminal-, Session- und Trace-Zusatztexte entfernt
+- Doppelte Fullscreen-Schaltflächen entfernt
+- Pin-, Collapse- und Verhältnis-Schaltflächen aus der Oberfläche entfernt
+- Nicht benötigte Online-Markierung entfernt
+- Zusätzliche Provider- und Modellwiederholungen aus Detailkarten entfernt
+
 ## [16.1] - 2026-08-16
 
 ### Verändert

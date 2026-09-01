@@ -332,7 +332,7 @@ Gemma 4 26B-A4B: Layer-Steering (L12-30, hidden_dim=2560, 4B active)
   "local_models": {
     "llm_provider": "vllm",
     "vllm_model": "google/gemma-4-26B-A4B-it",
-    "vllm_url": "http://localhost:8000/v1",
+    "vllm_url": "http://127.0.0.1:8000/v1",
     "vllm_force_single_model": true
   },
   "steering": {
@@ -1187,7 +1187,7 @@ def _restart_steering_server(self, model_name: str):
     
     while time.time() - start_time < timeout:
         try:
-            status = requests.get("http://localhost:8000/v1/steering/restart-status").json()
+            status = requests.get("http://127.0.0.1:8000/v1/steering/restart-status").json()
             progress = status.get("progress", 0)
             step = status.get("current_step", "")
             remaining = status.get("estimated_remaining", 0)
@@ -1639,7 +1639,7 @@ vllm serve google/gemma-4-26B-A4B-it \
   "local_models": {
     "llm_provider": "vllm",
     "vllm_model": "google/gemma-4-26B-A4B-it",
-    "vllm_url": "http://localhost:8000/v1",
+    "vllm_url": "http://127.0.0.1:8000/v1",
     "vllm_force_single_model": true
   },
   "steering": {

@@ -24,7 +24,7 @@ CHAPPiE soll primaer lokal mit Qwen-3.5-Modellen laufen. APIs sind nur der Fallb
 
 ```python
 local_models.llm_provider = "vllm"
-local_models.vllm_url = "http://localhost:8000/v1"
+local_models.vllm_url = "http://127.0.0.1:8000/v1"
 local_models.vllm_model = "Qwen/Qwen3.5-4B"
 local_models.vllm_force_single_model = true
 

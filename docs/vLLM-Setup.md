@@ -18,7 +18,7 @@ Du brauchst:
 
 ## 2. Steering-Endpoint starten
 
-Typischerweise auf `http://localhost:8000/v1`.
+Typischerweise auf `http://127.0.0.1:8000/v1`.
 
 Wichtige Punkte:
 
@@ -33,7 +33,7 @@ Wichtige Punkte:
 Mindestens setzen:
 
 - `local_models.llm_provider = "vllm"` in `CHAPPIE_CONFIG.json`
-- `local_models.vllm_url = "http://localhost:8000/v1"`
+- `local_models.vllm_url = "http://127.0.0.1:8000/v1"`
 - `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
 - `local_models.vllm_force_single_model = true`
 

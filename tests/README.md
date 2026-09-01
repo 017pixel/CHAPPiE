@@ -46,6 +46,8 @@ Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests
 - `tests/test_run2_session_analyzer.py`
 - `tests/test_run2_targeted_followups.py`
 - `tests/test_memory_hygiene.py`
+- `tests/test_output_sanitization.py`
+- `tests/test_chappie_end_to_end.py`
 
 ### 2. Live-/Integrationsnahe Tests
 
