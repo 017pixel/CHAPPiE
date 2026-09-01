@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Callable, Optional, Generator
 
 # CHAPiE imports
-from config.config import settings, get_active_model, PROJECT_ROOT, LLMProvider
+from config.config import settings, PROJECT_ROOT, LLMProvider
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, normalize_emotion_state
 from config.prompts import get_system_prompt_with_emotions, get_personality_context, get_function_calling_instruction, format_consolidated_memories, format_generation_budget_instruction, format_response_plan_instruction, FORMATTER_WITH_COT_PROMPT, FORMATTER_WHITESPACE_PROMPT, RESPONSE_STYLE_CASUAL, RESPONSE_STYLE_DEFAULT  # from config/prompts.py
 from memory.memory_engine import MemoryEngine
@@ -21,7 +21,7 @@ from memory.function_registry import get_function_registry
 from memory.context_files import get_context_files_manager
 from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
-from memory.sleep_phase import get_sleep_phase_handler
+from memory.sleep_phase import SleepPhaseHandler, get_sleep_phase_handler
 from brain import get_brain
 from brain.action_response import ActionResponseLayer
 from brain.agents.steering_manager import get_steering_manager
@@ -89,6 +89,9 @@ def prompt_chain_of_thought_enabled(provider: Any, chain_of_thought: bool) -> bo
     return bool(chain_of_thought and provider == LLMProvider.GROQ)
 
 
+CHAT_PROVIDER = LLMProvider.VLLM
+
+
 def is_self_contained_math_query(text: str) -> bool:
     """Detect closed arithmetic that must not be influenced by autobiographical RAG."""
     normalized = str(text or "").lower().replace("×", "*").replace("÷", "/")
@@ -100,6 +103,23 @@ def is_self_contained_math_query(text: str) -> bool:
     operand = rf"(?:-?\d+(?:[.,]\d+)?|(?:{number_words}))"
     operator = r"(?:\+|-|\*|/|x|plus|minus|mal|geteilt\s+durch|dividiert\s+durch)"
     return bool(re.search(rf"\b{operand}\s*{operator}\s*{operand}\b", normalized))
+
+
+def is_transient_problem_statement(text: str) -> bool:
+    """Detect a short operational/frustration report without a recall request.
+
+    These turns should still update emotion and life state, but old semantic
+    conversation summaries about crashes or system failure are not useful
+    evidence for the immediate response.  Explicit questions about a past
+    problem do not match and continue to use the normal memory path.
+    """
+    normalized = str(text or "").casefold()
+    return bool(re.search(
+        r"(?:\bfunktioniert\s+(?:nicht|nix|nichts)\b|\bgeht\s+nicht\b|"
+        r"\balles\s+(?:ist\s+)?kaputt\b|\bkomplett\s+kaputt\b|"
+        r"\b(?:total|alles)\s+falsch\b)",
+        normalized,
+    ))
 
 
 def context_allows_long_term_memory(requirements: Dict[str, bool] | None) -> bool:
@@ -147,10 +167,13 @@ def create_chappie_backend(
             )
             self.emotions = EmotionsEngine(
                 status_file=self.runtime_data_dir / "status.json" if self.runtime_data_dir else None,
-                force_simple=self.research_mode,
+                # Emotion changes stay deterministic and local. The main
+                # vLLM request then receives those values through activation
+                # steering without an auxiliary sentiment-model route.
+                force_simple=True,
             )
-            self.brain = get_brain()
-            self._current_provider = settings.llm_provider
+            self.brain = get_brain(provider=self._chat_provider(), model=self._chat_model())
+            self._current_provider = self._chat_provider()
             self._brain_signature = self._build_brain_signature()
 
             # Chat Manager init
@@ -170,7 +193,11 @@ def create_chappie_backend(
                 self.context_files = ContextFilesManager(base_dir=self.runtime_data_dir)
             else:
                 self.context_files = get_context_files_manager()
-            self.sleep_handler = get_sleep_phase_handler()
+            self.sleep_handler = (
+                SleepPhaseHandler(state_path=self.runtime_data_dir / "sleep_state.json")
+                if self.runtime_data_dir
+                else get_sleep_phase_handler()
+            )
             self._sleep_job_lock = threading.Lock()
 
             # Short-Term Memory (JSON-basiert mit Timestamps)
@@ -229,6 +256,20 @@ def create_chappie_backend(
             return bool(self.feature_flags.get(name, True))
 
         @staticmethod
+        def _chat_provider() -> LLMProvider:
+            """The web chat has one inference route: local vLLM."""
+            return CHAT_PROVIDER
+
+        @staticmethod
+        def _chat_model() -> str:
+            """Return the single local model used by every chat inference step."""
+            return settings.resolve_vllm_runtime_model(settings.vllm_model)
+
+        @staticmethod
+        def _single_local_chat_mode() -> bool:
+            return True
+
+        @staticmethod
         def _neutral_life_snapshot() -> Dict[str, Any]:
             return {
                 "disabled": True,
@@ -247,6 +288,39 @@ def create_chappie_backend(
             if not self._feature_enabled("life"):
                 return self._neutral_life_snapshot()
             return self.life_simulation.finalize_turn(*args, **kwargs)
+
+        def _build_life_prompt_context(
+            self,
+            life_context: Dict[str, Any] | None,
+            global_workspace: Dict[str, Any] | None,
+        ) -> str:
+            """Serialize the live inner-state contract for the local model.
+
+            Life simulation and workspace used to affect only metadata,
+            action planning and steering. The model therefore received no
+            usable signal that CHAPPiE had a current phase, needs, goals or
+            attention focus. Keep the block compact and instruct the model
+            to express it naturally instead of exposing implementation keys.
+            """
+            if not life_context and not global_workspace:
+                return ""
+            try:
+                state = self.action_response.build_prompt_suffix(
+                    {},
+                    life_context or {},
+                    global_workspace or {},
+                )
+            except Exception:
+                state = ""
+            if not state:
+                return ""
+            return (
+                "=== CHAPPiE INNERER LEBENSKONTEXT ===\n"
+                "Dieser Zustand ist Teil von CHAPPiE's simuliertem Leben. "
+                "Beruecksichtige ihn bei Ton, Prioritaeten und Selbstbezug. "
+                "Antworte natuerlich und nenne interne Feldnamen nur, wenn der User danach fragt.\n"
+                + state
+            )
 
         def _turn_checkpoint(self) -> Any:
             if not self._feature_enabled("life"):
@@ -363,6 +437,9 @@ def create_chappie_backend(
             created_at = datetime.now(timezone.utc).isoformat()
             intent_raw = result.get("intent_raw_json", {})
             tool_calls_raw = intent_raw.get("tool_calls", []) if isinstance(intent_raw, dict) else []
+            timing = result.get("timing", {})
+            if not isinstance(timing, dict):
+                timing = {}
             metadata = {
                 "thought_process": result.get("thought_process"),
                 "model_reasoning": result.get("model_reasoning"),
@@ -388,6 +465,7 @@ def create_chappie_backend(
                 "global_workspace": result.get("global_workspace", {}),
                 "action_plan": result.get("action_plan", {}),
                 "emotion_steering": result.get("emotion_steering", {}),
+                "steering_runtime": result.get("steering_runtime", {}),
                 "memory_trace": result.get("memory_trace", {}),
                 "tone_decision": result.get("tone_decision", {}),
                 "causal_trace": result.get("causal_trace", []),
@@ -398,7 +476,11 @@ def create_chappie_backend(
                 "debug_log": result.get("debug_log"),
                 "provider": result.get("provider", ""),
                 "model": result.get("model", ""),
-                "timing": result.get("timing", {}),
+                "timing": timing,
+                "ttft_ms": result.get("ttft_ms", timing.get("ttft_ms")),
+                "answer_tokens": result.get("answer_tokens", timing.get("answer_tokens")),
+                "tokens_per_second": result.get("tokens_per_second", timing.get("tokens_per_second")),
+                "live_pipeline": result.get("live_pipeline", {}),
                 "auto_sleep_triggered": result.get("auto_sleep_triggered", False),
                 "sleep_status": result.get("sleep_status", {}),
                 "pending": False,
@@ -412,6 +494,13 @@ def create_chappie_backend(
                 "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
                 "created_at": created_at,
             }
+            if user_input.strip().startswith("/"):
+                metadata.update({
+                    "is_system": True,
+                    "is_system_response": True,
+                    "message_kind": "system",
+                    "command": user_input.strip(),
+                })
             assistant_msg = {
                 "role": "assistant",
                 "content": result.get("response_text", ""),
@@ -447,14 +536,12 @@ def create_chappie_backend(
             return (provider.value, model)
 
         def _build_brain_signature(self):
-            return self._provider_runtime_signature(settings.llm_provider, get_active_model())
+            return self._provider_runtime_signature(self._chat_provider(), self._chat_model())
 
         def _build_intent_signature(self):
-            provider = settings.get_effective_provider(settings.intent_provider)
-            model = settings.get_intent_model(settings.intent_provider)
             return (
-                settings.intent_provider.value if settings.intent_provider else "auto",
-                *self._provider_runtime_signature(provider, model),
+                "single_local_chat",
+                *self._provider_runtime_signature(self._chat_provider(), self._chat_model()),
             )
 
         def apply_runtime_settings(self, force: bool = False):
@@ -464,15 +551,15 @@ def create_chappie_backend(
                 old_label = self._brain_signature[:2] if self._brain_signature else None
                 new_label = brain_signature[:2]
                 print(f"Runtime-Reload Hauptmodell: {old_label} -> {new_label}")
-                self.brain = get_brain(provider=settings.llm_provider, model=get_active_model())
+                self.brain = get_brain(provider=self._chat_provider(), model=self._chat_model())
                 self._brain_signature = brain_signature
-                self._current_provider = settings.llm_provider
+                self._current_provider = self._chat_provider()
                 self.deep_think_engine = DeepThinkEngine(
                     memory_engine=self.memory,
                     emotions_engine=self.emotions,
                     brain=self.brain
                 )
-                self.steering_manager.refresh_runtime_profile(get_active_model())
+                self.steering_manager.refresh_runtime_profile(self._chat_model())
                 changed = True
 
             intent_signature = self._build_intent_signature()
@@ -491,18 +578,12 @@ def create_chappie_backend(
             return self.apply_runtime_settings()
 
         def _error_prefix_for_active_provider(self) -> str:
-            if settings.llm_provider == LLMProvider.OLLAMA:
-                return "Ollama Fehler"
-            if settings.llm_provider == LLMProvider.GROQ:
-                return "Groq Fehler"
-            if settings.llm_provider == LLMProvider.VLLM:
-                return "vLLM Fehler"
-            return "LLM Fehler"
+            return "vLLM Fehler"
 
         def _format_generation_error(self, phase: str, raw_error: str = "") -> str:
             prefix = self._error_prefix_for_active_provider()
-            provider = settings.llm_provider.value
-            model = get_active_model()
+            provider = self._chat_provider().value
+            model = self._chat_model()
             stage = phase or "Antwortgenerierung"
             detail = (raw_error or "").strip()
             detail_lower = detail.lower()
@@ -782,7 +863,7 @@ def create_chappie_backend(
 
         @staticmethod
         def _use_prompt_chain_of_thought() -> bool:
-            return prompt_chain_of_thought_enabled(settings.llm_provider, settings.chain_of_thought)
+            return prompt_chain_of_thought_enabled(CHAT_PROVIDER, settings.chain_of_thought)
 
         @staticmethod
         def _response_style_instruction(intent_type: Any = None) -> str:
@@ -830,6 +911,62 @@ def create_chappie_backend(
                 "matched_terms": str(getattr(memory, "matched_terms", "") or ""),
                 "content_preview": content[:160],
             }
+
+        @staticmethod
+        def _build_deterministic_fact_answer(user_input: str, memories: List[Any]) -> str:
+            """Answer explicit personal fact questions from USER evidence.
+
+            Small local models can ignore a correct RAG block and invent a
+            plausible project name. For concrete recall questions, a short
+            extraction from an exact USER memory is safer and makes memory
+            behavior deterministic while the model still handles the tone.
+            """
+            question = str(user_input or "").casefold()
+            if "?" not in question and not any(
+                marker in question for marker in ("erinnerst du", "weißt du noch", "weisst du noch")
+            ):
+                return ""
+
+            user_sources = [
+                str(getattr(memory, "content", "") or "")
+                for memory in memories or []
+                if str(getattr(memory, "role", "") or "").casefold() == "user"
+            ]
+            if not user_sources:
+                return ""
+            evidence = "\n".join(user_sources)
+            answers: list[str] = []
+
+            project_match = re.search(
+                r"\bmein\s+(?:lieblings)?projekt\s+(?:heißt|heisst|ist|namens)\s+([^.!?,;]+?)"
+                r"(?=\s+(?:und\s+)?ich\s+arbeite\b|[.!?,;]|$)",
+                evidence,
+                re.IGNORECASE,
+            )
+            if project_match and ("projekt" in question or "lieblingsprojekt" in question):
+                project = re.sub(r"\s+", " ", project_match.group(1)).strip(" \"'„“”")
+                if project:
+                    answers.append(f"Dein Lieblingsprojekt heißt {project}.")
+
+            work_match = re.search(
+                r"\bich\s+arbeite\s+an\s+([^.!?,;]+)",
+                evidence,
+                re.IGNORECASE,
+            )
+            if work_match and any(marker in question for marker in ("woran", "arbeite", "arbeitest")):
+                work = re.sub(r"\s+", " ", work_match.group(1)).strip(" \"'„“”")
+                if work:
+                    answers.append(f"Du arbeitest an {work}.")
+
+            name_match = re.search(
+                r"\bich\s+hei(?:ße|sse)\s+([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9-]{1,40})",
+                evidence,
+                re.IGNORECASE,
+            )
+            if name_match and ("name" in question or ("heisst" in question and "projekt" not in question)):
+                answers.append(f"Du heißt {name_match.group(1).strip(' .,!?:;')}.")
+
+            return " ".join(dict.fromkeys(answers))
 
         def _build_memory_trace(self, query: str, memories: List[Any], stage: str) -> Dict[str, Any]:
             previews = [self._memory_to_preview(memory) for memory in (memories or [])[:6]]
@@ -940,8 +1077,11 @@ def create_chappie_backend(
             ]
 
         def _build_prompt_runtime(self, emotions: Dict[str, int]) -> Dict[str, Any]:
-            model_name = get_active_model()
-            if not self._feature_enabled("emotions"):
+            model_name = self._chat_model()
+            # Research ablations may disable the feature explicitly. Normal
+            # web chat must always keep activation steering enabled, even if
+            # an old settings payload still contains emotions=false.
+            if self.research_mode and not self._feature_enabled("emotions"):
                 neutral_emotions = dict(EMOTION_DEFAULTS)
                 response_plan = self._derive_response_plan(
                     emotions=neutral_emotions,
@@ -963,19 +1103,23 @@ def create_chappie_backend(
                     "prompt_emotion_mode": "ablation_disabled",
                     "response_plan": response_plan,
                 }
-            force_steering = self.steering_manager.should_force_local_emotion_steering(
-                settings.llm_provider,
-                model_name,
+            # The live chat never switches to a non-steered logic route.  The
+            # local vLLM model and activation steering are fixed for every
+            # request, including arithmetic and self-contained questions.
+            force_steering = True
+            steering_payload = self.steering_manager.get_steering_payload(
+                emotions,
+                force=True,
+                provider=CHAT_PROVIDER,
+                model=model_name,
             )
-            steering_payload = self.steering_manager.get_steering_payload(emotions, force=force_steering)
-            use_prompt_emotions = self.steering_manager.should_use_prompt_emotions(
-                settings.llm_provider,
-                model_name,
-            )
+            use_prompt_emotions = False
             emotion_steering = self.steering_manager.build_debug_report(
                 emotions,
                 steering_payload=steering_payload,
-                force=force_steering,
+                force=True,
+                provider=CHAT_PROVIDER,
+                model=model_name,
             )
             response_plan = self._derive_response_plan(
                 emotions=emotions,
@@ -1116,7 +1260,7 @@ def create_chappie_backend(
         def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
             """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
             clean_text = self._clean_raw_text(raw_text)
-            local_only = settings.is_local_single_model_mode()
+            local_only = self._single_local_chat_mode()
             if not clean_text:
                 source = "local_forced" if (local_only or getattr(self, "force_local_formatting", False)) else "groq"
                 return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "answer_is_fallback": True}
@@ -1372,8 +1516,8 @@ def create_chappie_backend(
                         "pending": False,
                         "status_text": "",
                         "retry_history": retry_history,
-                        "provider": settings.llm_provider.value,
-                        "model": get_active_model(),
+                        "provider": self._chat_provider().value,
+                        "model": self._chat_model(),
                     },
                 )
             finally:
@@ -1388,14 +1532,25 @@ def create_chappie_backend(
                 brain_ok = False
 
             life_snapshot = self.life_simulation.get_snapshot()
+            emotions = self._get_emotions_snapshot()
+            steering_payload = self.steering_manager.get_steering_payload(
+                emotions,
+                force=True,
+                provider=CHAT_PROVIDER,
+                model=self._chat_model(),
+            )
 
             return {
                 "brain_available": brain_ok,
-                "model": get_active_model(),
-                "provider": settings.llm_provider.value,
-                "emotions": self._get_emotions_snapshot(),
+                "model": self._chat_model(),
+                "provider": self._chat_provider().value,
+                "routing": "single_local_vllm",
+                "emotion_steering_forced": True,
+                "emotion_steering_active": bool(steering_payload.get("steering")),
+                "steering_transport": "activation_addition",
+                "emotions": emotions,
                 "daily_info_count": self.short_term_memory.get_count(),
-                "two_step_enabled": settings.enable_two_step_processing,
+                "two_step_enabled": True,
                 "life_snapshot": life_snapshot,
                 "life_state": life_snapshot,
             }
@@ -1478,8 +1633,8 @@ def create_chappie_backend(
                     "TURN",
                     "Neuer Turn gestartet",
                     {
-                        "provider": settings.llm_provider.value,
-                        "model": get_active_model(),
+                        "provider": self._chat_provider().value,
+                        "model": self._chat_model(),
                         "history_messages": len(history or []),
                     },
                 )
@@ -1488,12 +1643,10 @@ def create_chappie_backend(
             
             self._processing_start_time = datetime.now()
 
-            # === STEP 1: Intent Analysis (wenn aktiviert) ===
-            if settings.enable_two_step_processing:
-                return self._process_two_step(user_input, history, status_callback=status_callback, temporal_context=temporal_context)
-            else:
-                # Fallback: Altes System
-                return self._process_legacy(user_input, history, status_callback=status_callback, temporal_context=temporal_context)
+            # The web backend intentionally has one route. The old legacy
+            # branch remains available as source history, but runtime chat
+            # requests always use the local two-step pipeline with steering.
+            return self._process_two_step(user_input, history, status_callback=status_callback, temporal_context=temporal_context)
 
         def _process_two_step(
             self,
@@ -1575,17 +1728,11 @@ def create_chappie_backend(
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
 
-            # Fallback: wenn LLM+Homeostasis keine non-zero Deltas liefern → keyword-basierte Sentiment-Analyse
-            has_any_delta = any(
-                (getattr(u, "delta", u.get("delta", 0) if isinstance(u, dict) else 0) != 0)
-                for u in combined_updates.values()
+            emotions_after, emotion_transitions = self._apply_input_emotions(
+                emotions_before,
+                combined_updates,
+                user_input,
             )
-            if not has_any_delta:
-                self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
-                emotions_after = self._get_emotions_snapshot()
-                emotion_transitions = self._calculate_emotion_delta(emotions_before, emotions_after)
-            else:
-                emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
             
             # === AUSFUEHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
@@ -1597,11 +1744,22 @@ def create_chappie_backend(
 
             retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
             context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
-            memory_allowed = self._feature_enabled("memory") and context_allows_long_term_memory(context_requirements)
+            transient_problem = is_transient_problem_statement(user_input) and not is_self_contained_math_query(user_input)
+            memory_allowed = (
+                self._feature_enabled("memory")
+                and context_allows_long_term_memory(context_requirements)
+                and not transient_problem
+            )
             isolated_request = is_isolated_request(context_requirements)
             closed_reasoning = is_self_contained_math_query(user_input)
             if closed_reasoning or not memory_allowed:
                 retrieval_keywords, exact_entities, fact_lookup_intent = [], [], False
+            if transient_problem:
+                self.debug_logger.log_info(
+                    "MEMORY_POLICY",
+                    "Transiente Problem-/Frustmeldung ohne Alt-Summaries verarbeitet",
+                    {"memory_context_allowed": False, "reason": "transient_problem_statement"},
+                )
             intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
             intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
             intent_memories = [] if closed_reasoning or not memory_allowed else self._search_memory(
@@ -1621,7 +1779,10 @@ def create_chappie_backend(
             )
 
             # === CONTEXT AUFBAUEN ===
-            context = self._build_context(context_requirements)
+            # The synchronous route must use the same query-aware Context and
+            # STM path as streaming. Without the input, short-term recall was
+            # silently empty even when Step 1 requested it.
+            context = self._build_context(context_requirements, user_input=user_input)
             workspace = self._build_workspace_from_intent(
                 intent_result,
                 life_context,
@@ -1641,8 +1802,9 @@ def create_chappie_backend(
             )
             
             # === STEP 2: Response Generation ===
-            self.debug_logger.log_step2_start(get_active_model())
+            self.debug_logger.log_step2_start(self._chat_model())
             
+            generation_started = time.perf_counter()
             response_data = self._run_with_retries(
                 step_number=2,
                 step_name="Antwortgenerierung",
@@ -1664,6 +1826,11 @@ def create_chappie_backend(
                 ),
                 validator=self._is_valid_generation_result,
                 status_callback=status_callback,
+            )
+            response_data["timing"] = self._build_generation_timing(
+                (time.perf_counter() - generation_started) * 1000,
+                response_data.get("formatted_answer") or response_data.get("response_text", ""),
+                response_data.get("formatted_cot") or response_data.get("thought_process", "") or response_data.get("model_reasoning", ""),
             )
             final_life_snapshot = self._finalize_life_turn(
                 user_input=user_input,
@@ -1734,6 +1901,7 @@ def create_chappie_backend(
                 "formatting_failed": response_data.get("formatting_failed", False),
                 "formatting_source": response_data.get("formatting_source", "local_fallback"),
                 "formatting_model": response_data.get("formatting_model", "?"),
+                "timing": response_data.get("timing", {}),
                 "emotions": emotions_after,
                 "emotions_before": emotions_before,
                 "emotions_delta": emotion_transitions,
@@ -1744,6 +1912,7 @@ def create_chappie_backend(
                 "rag_memories": response_data.get("rag_memories", []),
                 "keyword_rag_memories": response_data.get("keyword_rag_memories", []),
                 "emotion_steering": response_data.get("emotion_steering", {}),
+                "steering_runtime": response_data.get("steering_runtime", getattr(self.brain, "last_steering_report", {})),
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,
                 "causal_trace": causal_trace,
@@ -1763,8 +1932,8 @@ def create_chappie_backend(
                 "global_workspace": workspace,
                 "action_plan": response_data.get("action_plan", {}),
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
-                "provider": settings.llm_provider.value,
-                "model": get_active_model(),
+                "provider": self._chat_provider().value,
+                "model": self._chat_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
                 "memory_consolidation": response_data.get("memory_consolidation", {}),
@@ -1921,6 +2090,58 @@ def create_chappie_backend(
             
             return emotions_after, transition_meta
 
+        def _apply_input_emotions(
+            self,
+            emotions_before: Dict[str, int],
+            combined_updates: Dict[str, Any],
+            user_input: str,
+        ) -> tuple[Dict[str, int], Dict[str, Any]]:
+            """Apply direct input signals and model/life deltas in one turn.
+
+            Previously any non-zero homeostasis update suppressed the direct
+            sentiment signal. Since Life always contributes at least one
+            adjustment, messages such as "nichts funktioniert" could leave
+            the visible emotional state unchanged. The deterministic local
+            signal now runs first, then intent/homeostasis is layered on top.
+            """
+            sentiment = analyze_sentiment_simple(user_input)
+            has_any_delta = any(
+                (getattr(update, "delta", update.get("delta", 0) if isinstance(update, dict) else 0) != 0)
+                for update in combined_updates.values()
+            )
+
+            if sentiment != "NEUTRAL":
+                self.emotions.update_from_sentiment(sentiment)
+            signal_state = self._get_emotions_snapshot()
+
+            if not has_any_delta:
+                if sentiment == "NEUTRAL":
+                    self.emotions.update_from_sentiment(sentiment)
+                    signal_state = self._get_emotions_snapshot()
+                return signal_state, self._calculate_emotion_delta(emotions_before, signal_state)
+
+            emotions_after, emotion_transitions = self._apply_emotion_updates(signal_state, combined_updates)
+
+            # Return the observable before/after result for all ten dimensions;
+            # the detailed transition metadata from intent/homeostasis remains
+            # available where it exists.
+            observable_delta = self._calculate_emotion_delta(emotions_before, emotions_after)
+            for emotion_name, delta in observable_delta.items():
+                existing = emotion_transitions.get(emotion_name)
+                existing_change = 0
+                if isinstance(existing, dict):
+                    existing_change = self._safe_int(
+                        existing.get("applied_delta", existing.get("change", 0)),
+                        0,
+                    )
+                # Homeostasis may have supplied a zero transition for a
+                # dimension that the direct input signal changed. Preserve
+                # the actual observable before/after values in that case.
+                if not isinstance(existing, dict) or existing_change == 0:
+                    emotion_transitions[emotion_name] = delta
+
+            return emotions_after, emotion_transitions
+
         def _add_short_term_entries(self, entries: List[Any]):
             """Fuegt Short-Term Eintraege hinzu."""
             for entry in entries:
@@ -1972,7 +2193,7 @@ def create_chappie_backend(
             # A single local vLLM model must never trigger an additional cloud
             # completion while assembling a prompt.  Retrieval remains active;
             # only the optional cloud consolidation is skipped.
-            if settings.is_local_single_model_mode():
+            if self._single_local_chat_mode():
                 return "", {
                     "ltm_loaded": len(ltm_raw),
                     "stm_loaded": len(stm_raw),
@@ -2020,11 +2241,45 @@ def create_chappie_backend(
             return formatted, meta
 
         def _active_token_counter(self) -> ModelTokenCounter:
-            model_name = str(getattr(self.brain, "model", "") or get_active_model())
+            model_name = str(getattr(self.brain, "model", "") or self._chat_model())
             if self._token_counter is None or self._token_counter_model != model_name:
                 self._token_counter = ModelTokenCounter(model_name)
                 self._token_counter_model = model_name
             return self._token_counter
+
+        def _count_text_tokens_safe(self, text: str) -> int:
+            try:
+                return self._active_token_counter().count_text(text or "")
+            except (TokenizerUnavailableError, TypeError, ValueError):
+                return len(re.findall(r"\S+", text or ""))
+
+        def _build_generation_timing(
+            self,
+            total_gen_ms: int | float,
+            answer_text: str,
+            reasoning_text: str = "",
+            ttft_ms: int | float | None = None,
+        ) -> Dict[str, Any]:
+            """Build one stable timing shape for sync and streamed answers."""
+            total_ms = max(0, int(round(float(total_gen_ms or 0))))
+            answer_tokens = self._count_text_tokens_safe(answer_text)
+            reasoning_tokens = self._count_text_tokens_safe(reasoning_text) if reasoning_text else 0
+            first_token_ms = total_ms if ttft_ms is None else max(0, int(round(float(ttft_ms))))
+            if answer_tokens > 0:
+                answer_time_ms = max(1, total_ms - first_token_ms) if total_ms > first_token_ms else max(1, total_ms)
+            else:
+                answer_time_ms = 0
+            rate = round(answer_tokens / (answer_time_ms / 1000), 1) if answer_tokens and answer_time_ms else 0.0
+            return {
+                "ttft_ms": first_token_ms,
+                "total_gen_ms": total_ms,
+                "total_tokens": reasoning_tokens + answer_tokens,
+                "reasoning_tokens": reasoning_tokens,
+                "answer_tokens": answer_tokens,
+                "reasoning_time_ms": max(0, first_token_ms),
+                "answer_time_ms": answer_time_ms,
+                "tokens_per_second": rate,
+            }
 
         def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
             """Count with the real tokenizer and trim until the request fits."""
@@ -2049,7 +2304,7 @@ def create_chappie_backend(
                     "near_limit": False,
                     "context_budget_failed": True,
                     "token_count_source": "unavailable",
-                    "tokenizer_model": str(getattr(self.brain, "model", "") or get_active_model()),
+                    "tokenizer_model": str(getattr(self.brain, "model", "") or self._chat_model()),
                     "tokenizer_error": str(exc),
                 }
             budget_info = {
@@ -2218,48 +2473,6 @@ def create_chappie_backend(
                     effective[key] = False
             return effective
 
-        @staticmethod
-        def _closed_reasoning_runtime(prompt_runtime: Dict[str, Any]) -> Dict[str, Any]:
-            runtime = dict(prompt_runtime)
-            report = dict(runtime.get("emotion_steering", {}))
-            report.update({
-                "steering_active": False,
-                "suppressed_for": "closed_form_reasoning",
-            })
-            runtime["steering_payload"] = {}
-            runtime["emotion_steering"] = report
-            runtime["response_plan"] = {
-                "tone": "precise_factual",
-                "tone_reason": "Geschlossene Rechenaufgabe: Korrektheit vor Persona, Memory und Emotionsstil.",
-                "tone_drivers": ["closed_form_reasoning"],
-                "response_guidance": "Gib nur das korrekte Ergebnis mit hoechstens einem kurzen Erklaersatz aus.",
-            }
-            return runtime
-
-        @staticmethod
-        def _isolated_request_runtime(prompt_runtime: Dict[str, Any]) -> Dict[str, Any]:
-            """Neutral generation policy for requests that explicitly need no state."""
-            runtime = dict(prompt_runtime)
-            report = dict(runtime.get("emotion_steering", {}))
-            report.update({
-                "steering_active": False,
-                "suppressed_for": "self_contained_request",
-            })
-            runtime["steering_payload"] = {}
-            runtime["emotion_steering"] = report
-            runtime["use_prompt_emotions"] = False
-            runtime["prompt_emotion_mode"] = "isolated_neutral"
-            runtime["response_plan"] = {
-                "tone": "precise_factual",
-                "tone_reason": "Eigenstaendige Anfrage ohne Persona-, Memory-, Life- oder Emotionskontext.",
-                "tone_drivers": ["self_contained_request"],
-                "response_guidance": (
-                    "Beantworte die eigenstaendige Anfrage direkt und sachlich. "
-                    "Erfinde keine Fakten; pruefe zentrale Behauptungen vor der Ausgabe."
-                ),
-            }
-            return runtime
-
         def _generate_response(self, user_input: str, history: List[Dict], 
                               context: str, emotions: Dict[str, int],
                               life_context: Dict[str, Any] | None = None,
@@ -2296,6 +2509,11 @@ def create_chappie_backend(
             )
             keyword_ids = {str(getattr(memory, "id", "") or "") for memory in keyword_memories or []}
             semantic_prompt_memories = [memory for memory in memories or [] if str(getattr(memory, "id", "") or "") not in keyword_ids]
+            if fact_lookup_intent and keyword_memories:
+                # A concrete recall question must not be diluted by loosely
+                # related assistant prose. The exact USER/keyword block is
+                # the authoritative source for names, preferences and facts.
+                semantic_prompt_memories = []
             keyword_memories_for_prompt = self.memory.format_keyword_memories_for_prompt(keyword_memories)
             memories_for_prompt = self.memory.format_memories_for_prompt(semantic_prompt_memories) if semantic_prompt_memories else ""
             
@@ -2366,10 +2584,6 @@ def create_chappie_backend(
             )
 
             prompt_runtime = self._build_prompt_runtime(emotions)
-            if closed_reasoning:
-                prompt_runtime = self._closed_reasoning_runtime(prompt_runtime)
-            elif isolated_request:
-                prompt_runtime = self._isolated_request_runtime(prompt_runtime)
             tone_decision = prompt_runtime.get("response_plan", {})
             self.debug_logger.log_info(
                 "EMOTION_STEERING",
@@ -2407,6 +2621,10 @@ def create_chappie_backend(
                 persona_enabled=self._feature_enabled("persona") and not isolated_request,
             )
             system_prompt = self._append_response_style_instruction(system_prompt, intent_type, tone_decision)
+
+            life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
+            if life_prompt_context:
+                system_prompt += f"\n\n{life_prompt_context}"
             
             # Context hinzufuegen
             if context:
@@ -2461,7 +2679,22 @@ def create_chappie_backend(
             else:
                 raw_response = self.brain.generate(messages, config=gen_config)
             display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
-            formatted = self._format_via_groq(raw_response)
+            deterministic_fact_answer = self._build_deterministic_fact_answer(
+                user_input,
+                list(keyword_memories or []) + list(memories or []),
+            )
+            if deterministic_fact_answer:
+                display_response = deterministic_fact_answer
+                formatted = {
+                    "cot": "",
+                    "answer": deterministic_fact_answer,
+                    "formatting_failed": False,
+                    "formatting_source": "deterministic_user_memory",
+                    "formatting_model": "local_fact_extractor",
+                    "answer_is_fallback": False,
+                }
+            else:
+                formatted = self._format_via_groq(raw_response)
 
             # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
             safe_cot = formatted.get("cot", "") or thought or model_reasoning or ""
@@ -2469,6 +2702,16 @@ def create_chappie_backend(
                 safe_answer = display_response
             else:
                 safe_answer = formatted.get("answer", "") or display_response
+
+            # The local formatter is intentionally regex-only, so sanitize its
+            # result as well.  The user-visible response and the debug/API
+            # formatted answer must not disagree about prompt fragments.
+            safe_answer, formatted_sanitization = sanitize_visible_response(safe_answer)
+            if formatted_sanitization:
+                formatted["formatting_failed"] = True
+                formatted["output_sanitized"] = formatted_sanitization
+            if not safe_answer:
+                safe_answer = display_response
 
             # Detektiere unerwartetes CoT-Leakage in der Antwort
             cot_leak = self._detect_cot_leakage(safe_answer)
@@ -2480,6 +2723,7 @@ def create_chappie_backend(
                 "formatting_failed": formatted.get("formatting_failed", False),
                 "formatting_source": formatted.get("formatting_source", "local_fallback"),
                 "formatting_model": formatted.get("formatting_model", "?"),
+                "output_sanitized": formatted.get("output_sanitized", getattr(self, "_last_output_sanitization", [])),
                 "thought_process": thought,
                 "model_reasoning": model_reasoning,
                 "cot_leak": cot_leak,
@@ -2490,6 +2734,7 @@ def create_chappie_backend(
                 "memory_consolidation": consolidation_meta,
                 "context_budget": budget_info,
                 "emotion_steering": prompt_runtime["emotion_steering"],
+                "steering_runtime": getattr(self.brain, "last_steering_report", {}),
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
                 "tone_decision": tone_decision,
                 "repetition_events": self._collect_repetition_events(),
@@ -2754,8 +2999,8 @@ def create_chappie_backend(
                 "global_workspace": {"broadcast": "legacy-path"},
                 "action_plan": {"strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
-                "provider": settings.llm_provider.value,
-                "model": get_active_model(),
+                "provider": self._chat_provider().value,
+                "model": self._chat_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
                 "context_budget": budget_info,
@@ -2808,6 +3053,11 @@ def create_chappie_backend(
             )
             keyword_ids = {str(getattr(memory, "id", "") or "") for memory in keyword_memories or []}
             semantic_prompt_memories = [memory for memory in memories or [] if str(getattr(memory, "id", "") or "") not in keyword_ids]
+            if fact_lookup_intent and keyword_memories:
+                # A concrete recall question must not be diluted by loosely
+                # related assistant prose. The exact USER/keyword block is
+                # the authoritative source for names, preferences and facts.
+                semantic_prompt_memories = []
             keyword_memories_for_prompt = self.memory.format_keyword_memories_for_prompt(keyword_memories)
             memories_for_prompt = self.memory.format_memories_for_prompt(semantic_prompt_memories) if semantic_prompt_memories else ""
             memory_trace = {
@@ -2830,10 +3080,6 @@ def create_chappie_backend(
             }
 
             prompt_runtime = self._build_prompt_runtime(emotions)
-            if closed_reasoning:
-                prompt_runtime = self._closed_reasoning_runtime(prompt_runtime)
-            elif isolated_request:
-                prompt_runtime = self._isolated_request_runtime(prompt_runtime)
             tone_decision = prompt_runtime.get("response_plan", {})
 
             base_system_prompt = get_system_prompt_with_emotions(
@@ -2848,11 +3094,13 @@ def create_chappie_backend(
                 str(tone_decision.get("response_guidance", "Antworte klar und praezise.")),
             ) if tone_decision else ""
             generation_budget_instruction = self._generation_budget_instruction()
+            life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
             system_prompt = "\n\n".join(part for part in (
                 base_system_prompt,
                 response_style_instruction,
                 response_plan_instruction,
                 generation_budget_instruction,
+                life_prompt_context,
             ) if part)
 
             if context:
@@ -2882,9 +3130,7 @@ def create_chappie_backend(
                     "semantic_memory": memories_for_prompt,
                     "keyword_memory": keyword_memories_for_prompt,
                     "short_term_memory": measured_context.get("short_term_memory", ""),
-                    # Life/workspace influence steering and planning, but are
-                    # deliberately not injected as serialized prompt text.
-                    "life": "",
+                    "life": life_prompt_context,
                     "user": user_input,
                     "generation_budget": generation_budget_instruction,
                     "response_style": response_style_instruction,
@@ -2909,13 +3155,70 @@ def create_chappie_backend(
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,
                 "emotion_steering": prompt_runtime["emotion_steering"],
+                "steering_runtime": getattr(self.brain, "last_steering_report", {}),
                 "prompt_emotion_mode": prompt_runtime["prompt_emotion_mode"],
+                "provider": self._chat_provider().value,
+                "model": self._chat_model(),
                 "rag_memories": memories,
                 "keyword_rag_memories": keyword_memories,
                 "context_budget": budget_info,
                 "prompt_components": prompt_components,
                 "effective_memory_top_k": memory_top_k,
             }
+
+        def _stream_visible_candidate(self, raw_text: str) -> str:
+            """Return only the currently safe answer prefix from raw tokens."""
+            if not isinstance(raw_text, str) or not raw_text.strip():
+                return ""
+
+            source = raw_text
+            private_open = re.search(
+                r"<\s*(think|thinking|thought|reasoning|model_reasoning|provider_reasoning|gedanke)\b[^>]*>",
+                source,
+                re.IGNORECASE,
+            )
+            if private_open:
+                tag_name = private_open.group(1)
+                private_close = re.search(rf"<\s*/\s*{re.escape(tag_name)}\s*>", source[private_open.end():], re.IGNORECASE)
+                if private_close:
+                    close_end = private_open.end() + private_close.end()
+                    source = source[:private_open.start()] + source[close_end:]
+                else:
+                    source = source[:private_open.start()]
+
+            prose_reasoning = re.match(
+                r"^\s*(?:#{1,6}\s*)?(?:Thinking|Reasoning|Thought)\s+Process\s*: ?",
+                source,
+                re.IGNORECASE,
+            )
+            if prose_reasoning:
+                final_marker = re.search(
+                    r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:Final\s+(?:Answer|Response)|Finale\s+Antwort)\s*:\s*",
+                    source,
+                    re.IGNORECASE,
+                )
+                if not final_marker:
+                    return ""
+                source = source[final_marker.end():]
+
+            answer_open = re.search(r"<\s*(antwort|answer|response)\b[^>]*>", source, re.IGNORECASE)
+            if answer_open:
+                tag_name = answer_open.group(1)
+                answer_close = re.search(rf"<\s*/\s*{re.escape(tag_name)}\s*>", source[answer_open.end():], re.IGNORECASE)
+                if answer_close:
+                    source = source[answer_open.end():answer_open.end() + answer_close.start()]
+                else:
+                    source = source[answer_open.end():]
+
+            source = re.sub(
+                r"<\s*/?\s*(?:think|thinking|thought|reasoning|model_reasoning|provider_reasoning|gedanke|antwort|answer|response)\b[^>]*>",
+                "",
+                source,
+                flags=re.IGNORECASE,
+            )
+            source = self._strip_leaked_metadata(source)
+            visible, _ = sanitize_visible_response(source)
+            return visible
 
         def _process_two_step_stream(
             self,
@@ -2929,6 +3232,28 @@ def create_chappie_backend(
             Step 1: Intent Analysis (synchron)
             Step 2: Response Generation (streaming)
             """
+            turn_started = time.perf_counter()
+
+            def _pipeline_status(stage: str, step: int, status_text: str, **details: Any) -> Dict[str, Any]:
+                payload = {
+                    "event": "status",
+                    "stage": stage,
+                    "stage_key": stage,
+                    "step": step,
+                    "status_text": status_text,
+                    "elapsed_ms": round((time.perf_counter() - turn_started) * 1000),
+                    "provider": self._chat_provider().value,
+                    "model": self._chat_model(),
+                    **details,
+                }
+                if status_callback:
+                    try:
+                        status_callback(payload)
+                    except Exception:
+                        pass
+                return payload
+
+            yield _pipeline_status("intent", 1, "Intent-Analyse gestartet")
             self.debug_logger.log_step1_start()
 
             emotions_before = self._get_emotions_snapshot()
@@ -2981,17 +3306,19 @@ def create_chappie_backend(
                 if emotion_name not in combined_updates:
                     combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
 
-            # Fallback: wenn LLM+Homeostasis keine non-zero Deltas liefern → keyword-basierte Sentiment-Analyse
-            has_any_delta = any(
-                (getattr(u, "delta", u.get("delta", 0) if isinstance(u, dict) else 0) != 0)
-                for u in combined_updates.values()
+            emotions_after, emotion_transitions = self._apply_input_emotions(
+                emotions_before,
+                combined_updates,
+                user_input,
             )
-            if not has_any_delta:
-                self.emotions.update_from_sentiment(analyze_sentiment_simple(user_input))
-                emotions_after = self._get_emotions_snapshot()
-                emotion_transitions = self._calculate_emotion_delta(emotions_before, emotions_after)
-            else:
-                emotions_after, emotion_transitions = self._apply_emotion_updates(emotions_before, combined_updates)
+
+            yield _pipeline_status(
+                "memory",
+                1,
+                "Memory und Kontext werden aufgebaut",
+                emotion_state=emotions_after,
+                emotion_delta=emotion_transitions,
+            )
 
             # === AUSFUEHRUNG: Short-Term Entries ===
             self._add_short_term_entries(intent_result.short_term_entries)
@@ -3003,11 +3330,22 @@ def create_chappie_backend(
 
             retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
             context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
-            memory_allowed = self._feature_enabled("memory") and context_allows_long_term_memory(context_requirements)
+            transient_problem = is_transient_problem_statement(user_input) and not is_self_contained_math_query(user_input)
+            memory_allowed = (
+                self._feature_enabled("memory")
+                and context_allows_long_term_memory(context_requirements)
+                and not transient_problem
+            )
             isolated_request = is_isolated_request(context_requirements)
             closed_reasoning = is_self_contained_math_query(user_input)
             if closed_reasoning or not memory_allowed:
                 retrieval_keywords, exact_entities, fact_lookup_intent = [], [], False
+            if transient_problem:
+                self.debug_logger.log_info(
+                    "MEMORY_POLICY",
+                    "Transiente Problem-/Frustmeldung ohne Alt-Summaries verarbeitet",
+                    {"memory_context_allowed": False, "reason": "transient_problem_statement"},
+                )
             intent_query_source = self._retrieval_query_from_terms(retrieval_keywords, exact_entities, user_input)
             intent_memory_query = intent_query_source if (retrieval_keywords or exact_entities) else self._local_retrieval_query(intent_query_source)
             intent_memories = [] if closed_reasoning or not memory_allowed else self._search_memory(
@@ -3051,62 +3389,131 @@ def create_chappie_backend(
                 },
             )
 
-            yield {"event": "status", "step": 1, "status_text": "Intent-Analyse abgeschlossen"}
-
-            # === STEP 2: Response Generation (Streaming) ===
-            self.debug_logger.log_step2_start(get_active_model())
+            # === STEP 2: Response Generation (streaming) ===
+            steering_preview = self._build_prompt_runtime(emotions_after).get("emotion_steering", {})
+            yield _pipeline_status(
+                "steering",
+                2,
+                "Emotion-Steering aktiv",
+                steering_active=bool(steering_preview.get("steering_active")),
+                dominant_vector=steering_preview.get("dominant_vector", "neutral"),
+                active_vectors=len(steering_preview.get("active_vectors", []) or []),
+                emotion_state=steering_preview.get("emotion_state", emotions_after),
+            )
+            self.debug_logger.log_step2_start(self._chat_model())
+            yield _pipeline_status("ttft", 2, "Antwortgenerierung gestartet", ttft_ms=None, answer_tokens=0)
 
             timing = {}
+            raw_response = ""
+            meta: Dict[str, Any] = {}
+            streamed_visible = ""
+            first_provider_output_at: Optional[float] = None
+            gen_start = time.perf_counter()
+            last_progress_at = 0.0
+            suppress_fact_question_tokens = fact_lookup_intent and (
+                "?" in user_input
+                or any(marker in user_input.casefold() for marker in ("erinnerst du", "weißt du noch", "weisst du noch"))
+            )
             try:
-                gen_start = time.time()
+                max_attempts = 3
+                for attempt in range(1, max_attempts + 1):
+                    attempt_parts: List[str] = []
+                    attempt_visible = ""
+                    attempt_first_output_at: Optional[float] = None
+                    try:
+                        token_generator, attempt_meta = self._generate_response_stream_raw(
+                            user_input=user_input,
+                            history=history,
+                            context=context,
+                            emotions=emotions_after,
+                            life_context=life_context,
+                            global_workspace=workspace,
+                            preloaded_memories=intent_memories,
+                            memory_trace_seed=intent_memory_trace,
+                            intent_type=intent_result.intent_type,
+                            retrieval_keywords=retrieval_keywords,
+                            exact_entities=exact_entities,
+                            fact_lookup_intent=fact_lookup_intent,
+                            allow_memory_context=memory_allowed,
+                            isolated_request=isolated_request,
+                            context_components=context_components,
+                        )
+                        for raw_part in token_generator:
+                            now = time.perf_counter()
+                            if attempt_first_output_at is None:
+                                attempt_first_output_at = now
+                            attempt_parts.append(str(raw_part or ""))
+                            raw_candidate = "".join(attempt_parts)
+                            visible_candidate = self._stream_visible_candidate(raw_candidate)
+                            if not suppress_fact_question_tokens and visible_candidate.startswith(attempt_visible):
+                                fragment = visible_candidate[len(attempt_visible):]
+                                if fragment:
+                                    attempt_visible = visible_candidate
+                                    yield {"event": "token", "content": fragment, "token_type": "answer"}
 
-                def _consume_generation_attempt() -> Dict[str, Any]:
-                    token_generator, attempt_meta = self._generate_response_stream_raw(
-                        user_input=user_input,
-                        history=history,
-                        context=context,
-                        emotions=emotions_after,
-                        life_context=life_context,
-                        global_workspace=workspace,
-                        preloaded_memories=intent_memories,
-                        memory_trace_seed=intent_memory_trace,
-                        intent_type=intent_result.intent_type,
-                        retrieval_keywords=retrieval_keywords,
-                        exact_entities=exact_entities,
-                        fact_lookup_intent=fact_lookup_intent,
-                        allow_memory_context=memory_allowed,
-                        isolated_request=isolated_request,
-                        context_components=context_components,
-                    )
-                    # Security boundary: provider tokens are buffered until
-                    # the complete answer has passed all sanitizers.
-                    raw_response = "".join(token_generator)
-                    return {"response_text": raw_response, "meta": attempt_meta}
+                            if now - last_progress_at >= 0.12:
+                                elapsed = max(0, round((now - gen_start) * 1000))
+                                token_count = len(re.findall(r"\S+", attempt_visible))
+                                rate = round(token_count / (elapsed / 1000), 1) if token_count and elapsed else 0.0
+                                yield _pipeline_status(
+                                    "streaming" if attempt_visible else "ttft",
+                                    2,
+                                    "Antwort wird gestreamt" if attempt_visible else "Warte auf erstes sichtbares Token",
+                                    ttft_ms=round((attempt_first_output_at - gen_start) * 1000) if attempt_first_output_at else None,
+                                    token_count=token_count,
+                                    answer_tokens=token_count,
+                                    answer_time_ms=elapsed,
+                                    tokens_per_second=rate,
+                                )
+                                last_progress_at = now
 
-                streamed = self._run_with_retries(
-                    step_number=2,
-                    step_name="Antwortgenerierung",
-                    action=_consume_generation_attempt,
-                    validator=self._is_valid_generation_result,
-                    status_callback=status_callback,
-                )
-                raw_response = streamed["response_text"]
-                meta = streamed["meta"]
+                        candidate_response = "".join(attempt_parts)
+                        attempt_meta = dict(attempt_meta or {})
+                        attempt_meta["steering_runtime"] = getattr(self.brain, "last_steering_report", {})
+                        streamed_result = {"response_text": candidate_response, "meta": attempt_meta}
+                        if not self._is_valid_generation_result(streamed_result):
+                            raise ValueError(candidate_response or "Leere Modellantwort")
+                        raw_response = candidate_response
+                        meta = attempt_meta
+                        streamed_visible = attempt_visible
+                        first_provider_output_at = attempt_first_output_at
+                        break
+                    except Exception as exc:
+                        if attempt >= max_attempts or attempt_visible:
+                            raise
+                        yield _pipeline_status(
+                            "ttft",
+                            2,
+                            f"Generierung wird wiederholt ({attempt + 1}/{max_attempts})",
+                            retry_attempt=attempt + 1,
+                            error=str(exc),
+                        )
+                        time.sleep(1.0)
+                else:
+                    raise ValueError("Leere Modellantwort")
 
-                gen_end = time.time()
-                timing = {
-                    "ttft_ms": round((gen_end - gen_start) * 1000),
-                    "total_gen_ms": round((gen_end - gen_start) * 1000),
-                    "total_tokens": 0,
-                    "reasoning_tokens": 0,
-                    "answer_tokens": 0,
-                    "reasoning_time_ms": 0,
-                    "answer_time_ms": 0,
-                    "stream_safety_buffered": True,
-                }
-
+                gen_end = time.perf_counter()
+                total_gen_ms = round((gen_end - gen_start) * 1000)
+                ttft_ms = round((first_provider_output_at - gen_start) * 1000) if first_provider_output_at else total_gen_ms
                 display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
-                formatted_stream = self._format_via_groq(raw_response)
+                keyword_memories = meta.get("keyword_rag_memories", []) if isinstance(meta, dict) else []
+                semantic_memories = meta.get("rag_memories", []) if isinstance(meta, dict) else []
+                deterministic_fact_answer = self._build_deterministic_fact_answer(
+                    user_input,
+                    list(keyword_memories or []) + list(semantic_memories or []),
+                )
+                if deterministic_fact_answer:
+                    display_response = deterministic_fact_answer
+                    formatted_stream = {
+                        "cot": "",
+                        "answer": deterministic_fact_answer,
+                        "formatting_failed": False,
+                        "formatting_source": "deterministic_user_memory",
+                        "formatting_model": "local_fact_extractor",
+                        "answer_is_fallback": False,
+                    }
+                else:
+                    formatted_stream = self._format_via_groq(raw_response)
                 self.debug_logger.log_info(
                     "MODEL_OUTPUT",
                     "Schritt-2-Ausgabe ausgewertet",
@@ -3120,10 +3527,18 @@ def create_chappie_backend(
                         "formatting_model": formatted_stream.get("formatting_model", "?"),
                     },
                 )
+                yield _pipeline_status(
+                    "format",
+                    2,
+                    "Antwort formatiert",
+                    formatting_failed=bool(formatted_stream.get("formatting_failed", False)),
+                    token_count=len(re.findall(r"\S+", streamed_visible)),
+                )
 
             except Exception as exc:
                 error_text = self._format_generation_error("Antwortgenerierung", str(exc))
                 self._rollback_failed_turn(emotions_before, life_checkpoint)
+                yield _pipeline_status("done", 2, "Antwort fehlgeschlagen", error=error_text)
                 yield {"event": "error", "error": error_text}
                 return
 
@@ -3194,16 +3609,24 @@ def create_chappie_backend(
                 formatted_stream["output_sanitized"] = final_sanitization
             display_response = safe_answer
 
-            if timing:
-                counter = self._active_token_counter()
-                reasoning_tokens = counter.count_text(safe_cot) if safe_cot and safe_cot != self._FALLBACK_NO_THINK else 0
-                answer_tokens = counter.count_text(safe_answer)
-                timing["reasoning_tokens"] = reasoning_tokens
-                timing["answer_tokens"] = answer_tokens
-                timing["total_tokens"] = reasoning_tokens + answer_tokens
+            timing = self._build_generation_timing(
+                total_gen_ms,
+                safe_answer,
+                safe_cot if safe_cot != self._FALLBACK_NO_THINK else "",
+                ttft_ms=ttft_ms,
+            )
+            timing["stream_safety_buffered"] = False
 
-            for offset in range(0, len(safe_answer), 96):
-                yield {"event": "token", "content": safe_answer[offset:offset + 96], "token_type": "answer"}
+            # The visible prefix was already emitted token by token. Only
+            # send a suffix created by final formatting or sanitization, so
+            # the client never receives the answer twice.
+            remaining_answer = safe_answer
+            if streamed_visible and safe_answer.startswith(streamed_visible):
+                remaining_answer = safe_answer[len(streamed_visible):]
+            elif streamed_visible:
+                remaining_answer = ""
+            for offset in range(0, len(remaining_answer), 96):
+                yield {"event": "token", "content": remaining_answer[offset:offset + 96], "token_type": "answer"}
 
             result = {
                 "response_text": display_response,
@@ -3226,6 +3649,7 @@ def create_chappie_backend(
                 "rag_memories": meta.get("rag_memories", []) if 'meta' in dir() else [],
                 "keyword_rag_memories": meta.get("keyword_rag_memories", []) if 'meta' in dir() else [],
                 "emotion_steering": meta.get("emotion_steering", {}) if 'meta' in dir() else {},
+                "steering_runtime": meta.get("steering_runtime", {}) if 'meta' in dir() else {},
                 "memory_trace": memory_trace,
                 "tone_decision": tone_decision,
                 "causal_trace": causal_trace,
@@ -3245,13 +3669,24 @@ def create_chappie_backend(
                 "global_workspace": workspace,
                 "action_plan": {"response_strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
-                "provider": settings.llm_provider.value,
-                "model": get_active_model(),
+                "provider": self._chat_provider().value,
+                "model": self._chat_model(),
                 "timing": timing,
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
                 "repetition_events": self._collect_repetition_events(),
             }
+
+            yield _pipeline_status(
+                "done",
+                2,
+                "Turn abgeschlossen",
+                ttft_ms=timing.get("ttft_ms"),
+                answer_tokens=timing.get("answer_tokens", 0),
+                answer_time_ms=timing.get("answer_time_ms", 0),
+                total_gen_ms=timing.get("total_gen_ms", 0),
+                tokens_per_second=timing.get("tokens_per_second", 0.0),
+            )
 
             yield {"event": "finished", "result": result}
 
@@ -3452,8 +3887,8 @@ def create_chappie_backend(
                 "global_workspace": {"broadcast": "legacy-path"},
                 "action_plan": {"strategy": "conversational", "tone": tone_decision.get("tone", "state_driven")},
                 "dream_fragments": final_life_snapshot.get("dream_fragments", []),
-                "provider": settings.llm_provider.value,
-                "model": get_active_model(),
+                "provider": self._chat_provider().value,
+                "model": self._chat_model(),
                 "auto_sleep_triggered": sleep_result.get("triggered", False),
                 "sleep_status": sleep_result.get("status", {}),
                 "repetition_events": self._collect_repetition_events(),
@@ -3484,8 +3919,8 @@ def create_chappie_backend(
                     "TURN",
                     "Neuer Streaming-Turn gestartet",
                     {
-                        "provider": settings.llm_provider.value,
-                        "model": get_active_model(),
+                        "provider": self._chat_provider().value,
+                        "model": self._chat_model(),
                         "history_messages": len(history or []),
                     },
                 )
@@ -3493,10 +3928,10 @@ def create_chappie_backend(
             self.apply_runtime_settings()
             self._processing_start_time = datetime.now()
 
-            if settings.enable_two_step_processing:
-                yield from self._process_two_step_stream(user_input, history, status_callback, temporal_context=temporal_context)
-            else:
-                yield from self._process_legacy_stream(user_input, history, status_callback, temporal_context=temporal_context)
+            # Keep the streamed and synchronous web paths on the same local,
+            # emotion-steered pipeline. The legacy stream is not a runtime
+            # fallback anymore.
+            yield from self._process_two_step_stream(user_input, history, status_callback, temporal_context=temporal_context)
 
         # === Command Handler ===
 
@@ -3701,10 +4136,7 @@ def create_chappie_backend(
                 return "Noch kein Step 1 JSON vorhanden."
             
             elif cmd == "/twostep":
-                # Toggle Two-Step Processing
-                settings.enable_two_step_processing = not settings.enable_two_step_processing
-                status = "AN" if settings.enable_two_step_processing else "AUS"
-                return f"Zwei-Schritte System: {status}"
+                return "Zwei-Schritte System: immer aktiv (ein lokaler vLLM-Pfad mit Emotion-Steering)."
 
             return f"Unbekannter Command: {command}"
 

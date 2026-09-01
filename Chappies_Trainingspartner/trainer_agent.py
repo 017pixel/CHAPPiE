@@ -23,6 +23,7 @@ from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from brain.base_brain import Message, GenerationConfig
+from brain.response_parser import looks_like_model_error, sanitize_visible_response
 from .repetition_tracker import RepetitionTracker
 
 console = Console()
@@ -270,13 +271,19 @@ class TrainerAgent:
             )
             
             response = self.brain.generate(messages, config=gen_config)
+
+            response, sanitization_reasons = sanitize_visible_response(str(response or ""))
+            if not response or "unresolved_leak" in sanitization_reasons:
+                self._fallback_counter += 1
+                log.warning("Unsichere oder leere Trainerantwort verworfen")
+                return self._get_fallback_response()
             
             if not response or len(response.strip()) < 5:
                 self._fallback_counter += 1
                 log.warning(f"Trainer Antwort zu kurz, Fallback #{self._fallback_counter}")
                 return self._get_fallback_response()
             
-            if isinstance(response, str) and "fehler" in response.lower():
+            if looks_like_model_error(response):
                 self._fallback_counter += 1
                 log.error(f"API Fehler in Trainer: {response}")
                 return self._get_fallback_response()

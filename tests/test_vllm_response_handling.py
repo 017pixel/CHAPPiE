@@ -134,6 +134,20 @@ def test_stream_generate_preserves_delta_whitespace():
     assert result == "Hallo Welt"
 
 
+def test_is_available_uses_fast_models_probe_before_health():
+    brain = _make_brain_with_response(_FakeResponse([]))
+    calls = []
+
+    def fake_get(url, timeout):
+        calls.append((url, timeout))
+        return type("Response", (), {"status_code": 200})()
+
+    with patch("requests.get", side_effect=fake_get):
+        assert brain.is_available()
+
+    assert calls == [("http://localhost:8000/v1/models", brain.AVAILABILITY_TIMEOUT_SECONDS)]
+
+
 if __name__ == "__main__":
     test_sync_generate_returns_content_when_present()
     test_sync_generate_reports_reasoning_only_output()
@@ -141,4 +155,5 @@ if __name__ == "__main__":
     test_prepare_extra_body_sets_qwen_thinking_from_settings()
     test_prepare_extra_body_overrides_explicit_enable_thinking_with_settings()
     test_stream_generate_preserves_delta_whitespace()
+    test_is_available_uses_fast_models_probe_before_health()
     print("OK: vLLM response handling")

@@ -13,6 +13,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Callable, Any, Dict
 import traceback
+from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
@@ -27,14 +28,15 @@ from config.prompts import get_system_prompt_with_emotions  # from config/prompt
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.chat_manager import ChatManager
-from memory.context_files import get_context_files_manager
+from memory.context_files import ContextFilesManager
 from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from brain.base_brain import GenerationConfig
 from brain.agents.steering_manager import get_steering_manager
 from brain.deep_think import DeepThinkEngine
-from memory.sleep_phase import get_sleep_phase_handler
+from brain.response_parser import looks_like_model_error, sanitize_visible_response
+from memory.sleep_phase import SleepPhaseHandler
 
 from .trainer_agent import TrainerAgent
 from .repetition_tracker import RepetitionTracker
@@ -42,8 +44,14 @@ from .repetition_tracker import RepetitionTracker
 console = Console()
 
 class TrainingLoop:
-    def __init__(self, trainer: TrainerAgent):
+    def __init__(self, trainer: TrainerAgent, runtime_data_dir: Optional[Path] = None):
         self.trainer = trainer
+        self.runtime_data_dir = Path(
+            runtime_data_dir
+            or getattr(settings, "training_runtime_directory", None)
+            or (PROJECT_ROOT / "data" / "training_runtime")
+        )
+        self.runtime_data_dir.mkdir(parents=True, exist_ok=True)
         self.stop_flag = threading.Event()
         self.conversation_history = []
         self.messages_since_dream = 0
@@ -80,14 +88,23 @@ class TrainingLoop:
         msg = "Initialisiere Chappie Backend..."
         print(msg)
         log.info(msg)
-        self.memory = MemoryEngine()
-        self.emotions = EmotionsEngine()
+        # Training is intentionally sandboxed. A trainer is allowed to learn
+        # inside its own experiment, but it must never poison CHAPPiE's live
+        # Chroma collection, status.json or persona files.
+        self.memory = MemoryEngine(
+            persist_directory=self.runtime_data_dir / "chroma",
+            collection_name="training_memories",
+        )
+        self.emotions = EmotionsEngine(
+            status_file=self.runtime_data_dir / "status.json",
+            force_simple=True,
+        )
         self.brain = get_brain()
         self.steering_manager = get_steering_manager()
-        self.context_files = get_context_files_manager()
-        self.sleep_handler = get_sleep_phase_handler()
-        data_dir = os.path.join(PROJECT_ROOT, "data")
-        self.state_file = os.path.join(PROJECT_ROOT, "training_state.json")
+        self.context_files = ContextFilesManager(base_dir=self.runtime_data_dir)
+        self.sleep_handler = SleepPhaseHandler(state_path=self.runtime_data_dir / "sleep_state.json")
+        data_dir = str(self.runtime_data_dir)
+        self.state_file = self.runtime_data_dir / "training_state.json"
         self.chat_manager = ChatManager(data_dir)
         self.deep_think_engine = DeepThinkEngine(
             memory_engine=self.memory,
@@ -190,7 +207,12 @@ class TrainingLoop:
             try:
                 response = func(*args, **kwargs)
                 
-                if isinstance(response, str) and response.strip().startswith("Groq Fehler"):
+                if isinstance(response, str) and response.strip().lower().startswith((
+                    "groq fehler",
+                    "vllm fehler",
+                    "ollama fehler",
+                    "steering-server fehler",
+                )):
                     error_msg = response
                     error_type = self._classify_error(error_msg)
                     consecutive_errors += 1
@@ -344,6 +366,11 @@ class TrainingLoop:
         
         if not isinstance(response, str):
             response = str(response)
+
+        response = sanitize_training_response(response, role="assistant")
+        if not response:
+            log.warning("Unsichere oder leere CHAPPiE-Trainingsantwort verworfen")
+            response = "Ich sortiere meine Antwort neu und bleibe beim aktuellen Trainingsthema."
             
         # Speichern nur wenn KEIN Fehler
         if not self._is_error_response(response):
@@ -744,7 +771,7 @@ class TrainingLoop:
             with open(self.state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
                 
-            self.conversation_history = state.get("history", [])
+            self.conversation_history = sanitize_training_history(state.get("history", []))
             self.messages_since_dream = state.get("messages_since_dream", 0)
             self.total_dreams = state.get("total_dreams", self.total_dreams)
             self.stats.update(state.get("stats", {}))
@@ -790,15 +817,16 @@ class TrainingLoop:
     def _is_error_response(self, response: str) -> bool:
         """Prüft ob eine Antwort eine Fehlermeldung ist."""
         if not isinstance(response, str):
-            return False
+            return True
+        if looks_like_model_error(response):
+            return True
         response_lower = response.lower()
-        error_indicators = [
-            "fehler", "error", "exception",
-            "ollama fehler",
-            "429", "500", "timeout", "context",
-            "rate limit", "quota", "rpd", "rpm"
-        ]
-        return any(indicator in response_lower for indicator in error_indicators)
+        error_prefixes = (
+            "fehler:", "error:", "exception:", "timeout:",
+            "ollama fehler:", "groq fehler:", "vllm fehler:",
+            "steering-server fehler:", "verbindungsfehler:",
+        )
+        return response_lower.startswith(error_prefixes)
 
     def _classify_error(self, error_msg: str) -> str:
         """Klassifiziert den Fehler-Typ basierend auf der Fehlermeldung."""
@@ -878,3 +906,33 @@ def normalize_training_prompt_history(
         dialogue = dialogue[-history_limit:]
     latest_summary = system_summaries[-1] if system_summaries else ""
     return latest_summary, dialogue
+
+
+def sanitize_training_response(response: Any, role: str = "assistant") -> str:
+    """Remove leaked prompts/transcripts before training state or memory writes."""
+    visible, reasons = sanitize_visible_response(str(response or ""))
+    if not visible or "unresolved_leak" in reasons or looks_like_model_error(visible):
+        return ""
+    return visible.strip()
+
+
+def sanitize_training_history(history: Any) -> list[dict]:
+    """Load only safe dialogue entries from a previous autonomous run."""
+    if not isinstance(history, list):
+        return []
+    cleaned: list[dict] = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role", "")).casefold()
+        content = str(item.get("content", "")).strip()
+        if role == "system":
+            if content:
+                cleaned.append({"role": "system", "content": content})
+            continue
+        if role not in {"user", "assistant"}:
+            continue
+        safe_content = sanitize_training_response(content, role=role)
+        if safe_content:
+            cleaned.append({"role": role, "content": safe_content})
+    return cleaned

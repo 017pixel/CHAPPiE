@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -21,8 +22,10 @@ from typing import Any, Dict, Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).parent.parent
 PID_FILE = PROJECT_ROOT / "training.pid"
-LOG_FILE = PROJECT_ROOT / "training_daemon.log"
-STATE_FILE = PROJECT_ROOT / "training_state.json"
+# The daemon is an isolated experiment. Its heartbeat belongs beside its
+# sandboxed Chroma/status/context files, never in CHAPPiE's live workspace.
+STATE_FILE = PROJECT_ROOT / "data" / "training_runtime" / "training_state.json"
+LOG_FILE = PROJECT_ROOT / "data" / "training_runtime" / "training_daemon.log"
 CONFIG_FILE = PROJECT_ROOT / "training_config.json"
 
 DEFAULT_TRAINING_CONFIG = {
@@ -230,6 +233,32 @@ def _resolve_daemon_pid() -> Tuple[Optional[int], list[str], bool]:
     pid, pid_error = _read_pid_from_file()
     if pid_error:
         diagnostics.append(pid_error)
+    if pid is None and not pid_error:
+        # systemd starts the production daemon independently from the web
+        # control process. Recover its PID when an overlapping restart or an
+        # older daemon removed the shared marker. The command-line marker is
+        # deliberately exact so unrelated processes are never adopted.
+        if os.name != "nt":
+            try:
+                candidates = []
+                for proc_dir in Path("/proc").iterdir():
+                    if not proc_dir.name.isdigit():
+                        continue
+                    candidate = int(proc_dir.name)
+                    if _process_exists(candidate) and _process_looks_like_training(candidate):
+                        candidates.append(candidate)
+                if candidates:
+                    pid = min(candidates)
+                    try:
+                        _write_pid_file(pid)
+                    except Exception:
+                        pass
+                    diagnostics.append(f"Daemon-PID aus laufendem Prozess wiederhergestellt ({pid})")
+                    return pid, diagnostics, False
+            except Exception:
+                pass
+        return None, diagnostics, False
+
     if pid is None:
         return None, diagnostics, False
 
@@ -447,9 +476,16 @@ def _count_log_signals() -> Tuple[int, int]:
     try:
         with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as handle:
             recent = deque(handle, maxlen=800)
-        merged = "".join(recent).lower()
-        errors = merged.count("error")
-        dreams = merged.count("traum-phase")
+        # Count the structured logging level, not words inside model output
+        # (training prompts naturally contain words such as "error" and
+        # "Traum-Phase").
+        errors = sum(1 for line in recent if re.search(r" - (?:ERROR|CRITICAL) - ", line))
+        dreams = sum(
+            1
+            for line in recent
+            if " - SLEEP-/TRAUM-PHASE EINGELEITET" in line
+            or " - Traum-Phase erfolgreich" in line
+        )
         return errors, dreams
     except Exception:
         return 0, 0

@@ -144,7 +144,10 @@ class RepetitionTracker:
             embedder = self._get_embedder()
             if embedder is None:
                 return []
-            embedding = embedder.encode(text, convert_to_list=True)
+            # sentence-transformers exposes convert_to_numpy/convert_to_tensor,
+            # not convert_to_list. The old keyword made every training turn
+            # log an embedding error and disabled novelty tracking.
+            embedding = embedder.encode(text, convert_to_numpy=True)
             return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
         except Exception as e:
             log.debug(f"Embedding Fehler: {e}")

@@ -8,7 +8,7 @@ Perfekt fuer:
 - Geringe Latenz bei lokaler GPU
 - Lokalen Steering-/OpenAI-kompatiblen Transport
 
-Benoetigt: lokaler OpenAI-kompatibler Server laufend (Standard: http://localhost:8000/v1)
+Benoetigt: lokaler OpenAI-kompatibler Server laufend (Standard: http://127.0.0.1:8000/v1)
 """
 
 import re
@@ -30,6 +30,10 @@ class VLLMBrain(BaseBrain):
 
     MAX_RETRIES = 3
     RETRY_BACKOFF_BASE = 2
+    # The local server can briefly queue the lightweight model-list request
+    # behind a GPU generation/training request.  Keep the probe tolerant of
+    # that queue without making normal failures retry for a long time.
+    AVAILABILITY_TIMEOUT_SECONDS = 15
 
     def __init__(self, model: Optional[str] = None, url: Optional[str] = None):
         """
@@ -50,6 +54,7 @@ class VLLMBrain(BaseBrain):
         )
         self._is_initialized = True
         self._repetition_events: Dict[str, Any] = {}
+        self.last_steering_report: Dict[str, Any] = {}
         print("Lokales OpenAI-Brain initialisiert")
         print(f"   Lokal verbunden: {self.url}")
         print(f"   Modell: {self.model}")
@@ -161,6 +166,7 @@ class VLLMBrain(BaseBrain):
             reasoning_capped = False
 
             for chunk in stream:
+                self._capture_steering_report(chunk)
                 if not chunk.choices:
                     continue
 
@@ -240,6 +246,7 @@ class VLLMBrain(BaseBrain):
         extra_body: Dict[str, Any]
     ) -> str:
         """Synchrone Generierung mit Retry bei Connection-Errors."""
+        response = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = self.client.chat.completions.create(
@@ -251,6 +258,7 @@ class VLLMBrain(BaseBrain):
                     seed=config.seed,
                     extra_body={**extra_body, "repetition_penalty": config.repetition_penalty},
                 )
+                self._capture_steering_report(response)
                 break
             except Exception as conn_err:
                 is_connection_error = any(kw in str(conn_err).lower() for kw in ("connection", "connect", "refused", "timeout", "503"))
@@ -294,6 +302,37 @@ class VLLMBrain(BaseBrain):
 
         except Exception as e:
             return f"vLLM Fehler: {str(e)}"
+
+    def _capture_steering_report(self, response: Any) -> None:
+        """Uebernimmt den Laufzeitnachweis des lokalen Steering-Servers."""
+        if response is None:
+            return
+        try:
+            if hasattr(response, "model_dump"):
+                payload = response.model_dump()
+            elif isinstance(response, dict):
+                payload = response
+            else:
+                payload = getattr(response, "__dict__", {})
+            report = payload.get("chappie_steering") if isinstance(payload, dict) else None
+            if not isinstance(report, dict) and isinstance(payload, dict):
+                usage = payload.get("usage")
+                if isinstance(usage, dict):
+                    report = usage.get("chappie_steering")
+            if not isinstance(report, dict):
+                extra = getattr(response, "model_extra", None)
+                if isinstance(extra, dict):
+                    report = extra.get("chappie_steering")
+                    if not isinstance(report, dict):
+                        usage = extra.get("usage")
+                        if isinstance(usage, dict):
+                            report = usage.get("chappie_steering")
+            if not isinstance(report, dict):
+                report = getattr(response, "chappie_steering", None)
+            if isinstance(report, dict):
+                self.last_steering_report = dict(report)
+        except Exception:
+            pass
 
     def _prepare_extra_body(self, extra_body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Bereitet provider-spezifische Optionen vor.
@@ -377,9 +416,13 @@ class VLLMBrain(BaseBrain):
 
             api_url = self.url.rstrip("/")
             root_url = api_url[:-3] if api_url.endswith("/v1") else api_url
-            for candidate in (f"{root_url}/health", f"{api_url}/models"):
+            # /health also includes the steering report and can briefly block
+            # while a generation is active.  The OpenAI-compatible model list
+            # is the cheap readiness probe; health remains the fallback for
+            # servers that do not expose /v1/models.
+            for candidate in (f"{api_url}/models", f"{root_url}/health"):
                 try:
-                    response = requests.get(candidate, timeout=5)
+                    response = requests.get(candidate, timeout=self.AVAILABILITY_TIMEOUT_SECONDS)
                     if response.status_code == 200:
                         return True
                 except Exception:

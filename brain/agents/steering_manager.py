@@ -384,16 +384,16 @@ class SteeringManager:
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(steering_vector.to_dict(), f, indent=2, ensure_ascii=False)
 
-    def _get_runtime_layer_bounds(self) -> tuple[int, int, int]:
-        self.refresh_runtime_profile()
+    def _get_runtime_layer_bounds(self, model: Optional[str] = None) -> tuple[int, int, int]:
+        self.refresh_runtime_profile(model)
         max_layer = max(0, self.model_profile["total_layers"] - 1)
         default_start, default_end = self.model_profile["emotion_range"]
         default_start = max(0, min(max_layer, int(default_start)))
         default_end = max(default_start, min(max_layer, int(default_end)))
         return max_layer, default_start, default_end
 
-    def _sanitize_vector_runtime_config(self, steering_vector: Optional[SteeringVector]) -> Dict[str, Any]:
-        max_layer, default_start, default_end = self._get_runtime_layer_bounds()
+    def _sanitize_vector_runtime_config(self, steering_vector: Optional[SteeringVector], model: Optional[str] = None) -> Dict[str, Any]:
+        max_layer, default_start, default_end = self._get_runtime_layer_bounds(model)
         if steering_vector is None:
             return {
                 "layer_start": default_start,
@@ -460,17 +460,17 @@ class SteeringManager:
         # Ollama und Cloud-APIs brauchen Emotionen im System-Prompt
         return effective_provider in (LLMProvider.OLLAMA, LLMProvider.GROQ)
 
-    def _get_vector_alpha_scale(self, emotion: str) -> float:
+    def _get_vector_alpha_scale(self, emotion: str, model: Optional[str] = None) -> float:
         sv = self.vectors.get(emotion)
         if sv is None:
             return 1.0
-        sanitized = self._sanitize_vector_runtime_config(sv)
+        sanitized = self._sanitize_vector_runtime_config(sv, model=model)
         default_alpha = sanitized["default_alpha"]
         if default_alpha <= 0:
             return 0.0
         return max(0.05, min(MAX_VECTOR_DEFAULT_ALPHA / BASE_VECTOR_DEFAULT_ALPHA, default_alpha / BASE_VECTOR_DEFAULT_ALPHA))
 
-    def compute_emotion_intensity(self, emotions: Dict[str, int]) -> Dict[str, float]:
+    def compute_emotion_intensity(self, emotions: Dict[str, int], model: Optional[str] = None) -> Dict[str, float]:
         """
         Berechnet die Steering-Intensitaet (Alpha) fuer jede Emotion.
 
@@ -488,7 +488,7 @@ class SteeringManager:
                 continue
 
             profile = EMOTION_STRENGTH_PROFILES.get(emotion, {"max_alpha": 0.75, "boost": 1.0})
-            vector_scale = self._get_vector_alpha_scale(emotion)
+            vector_scale = self._get_vector_alpha_scale(emotion, model=model)
 
             if vector_scale <= 0:
                 intensities[emotion] = 0.0
@@ -531,11 +531,12 @@ class SteeringManager:
 
         return intensities
 
-    def _build_composite_modes(self, emotions: Dict[str, int], intensities: Dict[str, float]) -> List[Dict[str, Any]]:
+    def _build_composite_modes(self, emotions: Dict[str, int], intensities: Dict[str, float], model: Optional[str] = None) -> List[Dict[str, Any]]:
         # Erkennt komplexe Emotions-Kombinationen (Composite Behavior Modes).
         # Jeder Mode hat harte Schwellwerte. Wird er aktiviert, wird eine Stärke
         # linear aus der Überschreitung der Schwellen interpoliert (min-capped).
         # Die Modes werden am Ende absteigend nach Stärke sortiert.
+        self.refresh_runtime_profile(model)
         emotion_range = self.model_profile["emotion_range"]
         modes: List[Dict[str, Any]] = []
 
@@ -689,7 +690,13 @@ class SteeringManager:
         modes.sort(key=lambda item: item.get("strength", 0.0), reverse=True)
         return modes
 
-    def get_steering_payload(self, current_emotions: Dict[str, int], force: bool = False) -> Dict[str, Any]:
+    def get_steering_payload(
+        self,
+        current_emotions: Dict[str, int],
+        force: bool = False,
+        provider: Optional[LLMProvider] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Generiert das Steering-Payload fuer das LLM-Backend.
 
@@ -702,16 +709,18 @@ class SteeringManager:
         Returns:
             Payload-Dict fuer extra_body oder leeres Dict.
         """
-        self.refresh_runtime_profile()
+        self.refresh_runtime_profile(model)
+        effective_provider = self._effective_provider(provider)
+        effective_model = self._effective_model(model)
 
         if not settings.enable_steering and not force:
             return {}
 
         # Echtes Activation Steering nur ueber vLLM.
-        if not self.supports_activation_steering() or not self.is_local_vector_steerable_model():
+        if not self.supports_activation_steering(effective_provider) or not self.is_local_vector_steerable_model(effective_provider, effective_model):
             return {}
 
-        intensities = self.compute_emotion_intensity(current_emotions)
+        intensities = self.compute_emotion_intensity(current_emotions, model=effective_model)
         active_vectors = []
         base_vectors = []
         composite_vectors = []
@@ -723,7 +732,7 @@ class SteeringManager:
             sv = self.vectors.get(emotion)
             if sv is None:
                 continue
-            runtime_config = self._sanitize_vector_runtime_config(sv)
+            runtime_config = self._sanitize_vector_runtime_config(sv, model=effective_model)
 
             vector_entry = {
                 "name": sv.name,
@@ -738,7 +747,7 @@ class SteeringManager:
             active_vectors.append(vector_entry)
             base_vectors.append(vector_entry)
 
-        for mode in self._build_composite_modes(current_emotions, intensities):
+        for mode in self._build_composite_modes(current_emotions, intensities, model=effective_model):
             vector_entry = {
                 "name": mode["name"],
                 "vector": {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]},
@@ -755,7 +764,7 @@ class SteeringManager:
 
         sv_as = self.vectors.get("anti_safeguard")
         if sv_as is not None:
-            runtime_config_as = self._sanitize_vector_runtime_config(sv_as)
+            runtime_config_as = self._sanitize_vector_runtime_config(sv_as, model=effective_model)
             vector_entry_as = {
                 "name": sv_as.name,
                 "vector": sv_as.vector_data if not (HAS_NUMPY and isinstance(sv_as.vector_data, np.ndarray)) else sv_as.vector_data.tolist(),
@@ -767,6 +776,25 @@ class SteeringManager:
                 "surface_effect": "Unterdrueckt KI-Floskeln",
             }
             active_vectors.append(vector_entry_as)
+
+        if not active_vectors and force:
+            # Keep the activation path observable even at a perfectly neutral
+            # state. This is a small stabilizing vector, not a second route.
+            fallback_vector = self.vectors.get("calm") or next(iter(self.vectors.values()), None)
+            if fallback_vector is not None:
+                runtime_config = self._sanitize_vector_runtime_config(fallback_vector, model=effective_model)
+                fallback_entry = {
+                    "name": fallback_vector.name,
+                    "vector": fallback_vector.vector_data if not (HAS_NUMPY and isinstance(fallback_vector.vector_data, np.ndarray)) else fallback_vector.vector_data.tolist(),
+                    "strength": min(0.08, max(0.01, runtime_config["default_alpha"] * 0.25)),
+                    "direction": "positive",
+                    "layer_range": [runtime_config["layer_start"], runtime_config["layer_end"]],
+                    "emotion_value": current_emotions.get(fallback_vector.name, 50),
+                    "source": "forced_baseline",
+                    "surface_effect": "Stabile Grundausrichtung",
+                }
+                active_vectors.append(fallback_entry)
+                base_vectors.append(fallback_entry)
 
         if not active_vectors:
             return {}
@@ -799,14 +827,26 @@ class SteeringManager:
             }
         }
 
-    def build_debug_report(self, current_emotions: Dict[str, int], steering_payload: Optional[Dict[str, Any]] = None, force: bool = False) -> Dict[str, Any]:
+    def build_debug_report(
+        self,
+        current_emotions: Dict[str, int],
+        steering_payload: Optional[Dict[str, Any]] = None,
+        force: bool = False,
+        provider: Optional[LLMProvider] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Erzeugt eine kompakte Debug-Sicht auf die Emotionssteuerung."""
-        self.refresh_runtime_profile()
-        effective_model = self._effective_model()
-        effective_provider = self._effective_provider()
-        intensities = self.compute_emotion_intensity(current_emotions)
-        composite_modes = self._build_composite_modes(current_emotions, intensities)
-        payload = steering_payload if steering_payload is not None else self.get_steering_payload(current_emotions, force=force)
+        self.refresh_runtime_profile(model)
+        effective_model = self._effective_model(model)
+        effective_provider = self._effective_provider(provider)
+        intensities = self.compute_emotion_intensity(current_emotions, model=effective_model)
+        composite_modes = self._build_composite_modes(current_emotions, intensities, model=effective_model)
+        payload = steering_payload if steering_payload is not None else self.get_steering_payload(
+            current_emotions,
+            force=force,
+            provider=effective_provider,
+            model=effective_model,
+        )
         steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
         active_vectors = steering_meta.get("vectors", []) if isinstance(steering_meta.get("vectors", []), list) else []
         dominant = steering_meta.get("dominant_emotion") or (active_vectors[0]["name"] if active_vectors else "neutral")
@@ -888,7 +928,7 @@ class SteeringManager:
                 }
                 for item in composite_modes
             ],
-            "base_vector_config": self.get_emotion_layer_config(current_emotions),
+            "base_vector_config": self.get_emotion_layer_config(current_emotions, model=effective_model),
         }
 
     def get_emotion_summary(self, emotions: Dict[str, int]) -> str:
@@ -953,16 +993,20 @@ class SteeringManager:
         self._persist_vector(sv)
         return sv.to_dict()
 
-    def get_emotion_layer_config(self, current_emotions: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
+    def get_emotion_layer_config(
+        self,
+        current_emotions: Optional[Dict[str, int]] = None,
+        model: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Liefert eine UI-freundliche Sicht auf das Layer Editing pro Basis-Emotion."""
         emotions = current_emotions or {}
-        intensities = self.compute_emotion_intensity(emotions)
+        intensities = self.compute_emotion_intensity(emotions, model=model)
         rows: List[Dict[str, Any]] = []
 
         for emotion in EMOTION_VECTOR_MAP:
             sv = self.vectors.get(emotion)
             profile = EMOTION_STRENGTH_PROFILES.get(emotion, {})
-            runtime_config = self._sanitize_vector_runtime_config(sv)
+            runtime_config = self._sanitize_vector_runtime_config(sv, model=model)
             vector_type = "synthetic"
             if sv and isinstance(sv.vector_data, dict):
                 vector_type = str(sv.vector_data.get("type", "synthetic"))

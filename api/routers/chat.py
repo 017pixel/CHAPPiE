@@ -27,6 +27,23 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _build_user_message(backend, content: str) -> Dict[str, Any]:
+    normalized = content.strip()
+    message: Dict[str, Any] = {
+        "id": backend.chat_manager.create_message_id(),
+        "role": "user",
+        "content": content,
+        "created_at": _utc_now_iso(),
+    }
+    if normalized.startswith("/"):
+        message["metadata"] = {
+            "is_command": True,
+            "message_kind": "command",
+            "command": normalized,
+        }
+    return message
+
+
 def _ensure_session(backend, session_id: Optional[str]) -> Dict[str, Any]:
     normalized_id = backend.chat_manager.ensure_session_id(session_id)
     session = backend.chat_manager.load_session(normalized_id)
@@ -75,7 +92,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
     session_id = session["id"]
     history = list(session.get("messages", []))
 
-    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message, "created_at": _utc_now_iso()}
+    user_message = _build_user_message(backend, request.message)
     message_id = backend.chat_manager.create_message_id()
     pending_message = backend._build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
@@ -104,7 +121,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
     session_id = session["id"]
     history = list(session.get("messages", []))
 
-    user_message = {"id": backend.chat_manager.create_message_id(), "role": "user", "content": request.message, "created_at": _utc_now_iso()}
+    user_message = _build_user_message(backend, request.message)
     message_id = backend.chat_manager.create_message_id()
     pending_message = backend._build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
@@ -151,7 +168,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                     message_id,
                     content=error_text,
                     role="assistant",
-                    metadata_updates={"pending": False, "status_text": ""},
+                    metadata_updates={"pending": False, "status_text": "", "stream_error": True, "error_message": error_text, "status": "error"},
                 )
                 yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
             return
@@ -179,7 +196,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                         message_id,
                         content=error_text,
                         role="assistant",
-                        metadata_updates={"pending": False, "status_text": ""},
+                        metadata_updates={"pending": False, "status_text": "", "stream_error": True, "error_message": error_text, "status": "error"},
                     )
                     yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
                     return
@@ -213,7 +230,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                 message_id,
                 content=error_text,
                 role="assistant",
-                metadata_updates={"pending": False, "status_text": ""},
+                metadata_updates={"pending": False, "status_text": "", "stream_error": True, "error_message": error_text, "status": "error"},
             )
             yield _format_sse("turn_error", {"session_id": session_id, "message_id": message_id, "error": error_text})
 
@@ -240,19 +257,22 @@ def post_command(request: CommandRequest, backend=Depends(get_backend)):
 
     session_id = result.get("replacement_session_id", request.session_id)
     session = _ensure_session(backend, session_id)
-    user_message = {
-        "id": backend.chat_manager.create_message_id(),
-        "role": "user",
-        "content": request.command.strip(),
-        "created_at": _utc_now_iso(),
-    }
+    user_message = _build_user_message(backend, request.command.strip())
     assistant_created_at = _utc_now_iso()
     assistant_message = {
         "id": backend.chat_manager.create_message_id(),
         "role": "assistant",
         "content": output,
         "created_at": assistant_created_at,
-        "metadata": {"pending": False, "status_text": "", "created_at": assistant_created_at},
+        "metadata": {
+            "pending": False,
+            "status_text": "",
+            "created_at": assistant_created_at,
+            "is_system": True,
+            "is_system_response": True,
+            "message_kind": "system",
+            "command": request.command.strip(),
+        },
     }
     history = list(session.get("messages", []))
     history.extend([user_message, assistant_message])

@@ -19,6 +19,7 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 import json
+from pathlib import Path
 
 # Force UTF-8 encoding
 os.environ['PYTHONIOENCODING'] = 'utf-8'
@@ -46,7 +47,12 @@ except ImportError:
 
 def setup_logging():
     """Setup logging to file for headless operation."""
-    log_file = os.path.join(PROJECT_ROOT, 'training_daemon.log')
+    # systemd opens its StandardOutput target before dropping privileges and
+    # can therefore recreate a root-owned project-root log. Keep the daemon's
+    # application log in its writable, isolated runtime directory instead.
+    log_dir = Path(PROJECT_ROOT) / "data" / "training_runtime"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = str(log_dir / "training_daemon.log")
 
     root_logger = logging.getLogger('')
     for handler in root_logger.handlers[:]:
@@ -161,7 +167,11 @@ def save_config(config_dict: dict, config_path: str):
 
 def clear_training_state():
     """Loescht den gespeicherten Training-State fuer frischen Start."""
-    state_path = os.path.join(PROJECT_ROOT, 'training_state.json')
+    try:
+        from config.config import settings
+        state_path = Path(getattr(settings, "training_runtime_directory", Path(PROJECT_ROOT) / "data" / "training_runtime")) / "training_state.json"
+    except Exception:
+        state_path = Path(PROJECT_ROOT) / "data" / "training_runtime" / "training_state.json"
     if os.path.exists(state_path):
         os.remove(state_path)
         logging.info("Alter Training-State geloescht - starte frisch")
@@ -182,7 +192,14 @@ def remove_pid_file():
     """Entfernt die PID-Datei beim Beenden."""
     pid_file = os.path.join(PROJECT_ROOT, 'training.pid')
     try:
+        # A restarting systemd instance can overlap briefly with the old
+        # process. Only the owner may remove the PID file; otherwise the old
+        # process can erase the new daemon's heartbeat marker.
+        owns_pid_file = False
         if os.path.exists(pid_file):
+            with open(pid_file, 'r', encoding='utf-8') as handle:
+                owns_pid_file = handle.read().strip() == str(os.getpid())
+        if owns_pid_file:
             os.remove(pid_file)
             logging.info("PID-Datei entfernt")
     except Exception as e:
@@ -343,4 +360,3 @@ Beispiele:
 
 if __name__ == "__main__":
     main()
-

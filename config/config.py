@@ -26,6 +26,13 @@ CHROMA_DB_DIR = DATA_DIR / "chroma_db"
 RESEARCH_DATA_DIR = DATA_DIR / "research_runs"
 ROOT_CONFIG_PATH = PROJECT_ROOT / "CHAPPIE_CONFIG.json"
 
+# The previous default collection contains a stale HNSW index on the local
+# installation.  Keep its name as a migration reference, but never open it
+# from the runtime again because Chroma can crash at native level while
+# loading that index.
+DEFAULT_CHROMA_COLLECTION = "chappie_memories"
+LEGACY_CHROMA_COLLECTION = "chapie_memory"
+
 DATA_DIR.mkdir(exist_ok=True)
 CHROMA_DB_DIR.mkdir(exist_ok=True)
 RESEARCH_DATA_DIR.mkdir(exist_ok=True)
@@ -73,7 +80,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "local_models": {
         "llm_provider": "vllm",
-        "vllm_url": "http://localhost:8000/v1",
+        "vllm_url": "http://127.0.0.1:8000/v1",
         "vllm_model": "Qwen/Qwen3.5-4B",
         "gemma4_model": "google/gemma-4-26B-A4B-it",
         "gemma4_steering_model": "google/gemma-4-26B-A4B-it",
@@ -139,7 +146,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "memory_prompt_top_k": 8,
         "stm_prompt_top_k": 8,
         "memory_min_relevance": 0.2,
-        "chroma_collection": "chapie_memory",
+        "chroma_collection": DEFAULT_CHROMA_COLLECTION,
         "embedding_model": "all-MiniLM-L6-v2",
         "short_term_ttl_hours": 24,
         "stm_summary_threshold": 5,
@@ -172,6 +179,9 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "training_chappie_model": "",
         "training_trainer_provider": "auto",
         "training_trainer_model": "",
+        # Training is a separate experiment and must never write into the
+        # live autobiographical memory, emotion state or context files.
+        "training_runtime_directory": "data/training_runtime",
     },
     "debug": {
         "debug": True,
@@ -367,7 +377,7 @@ class Settings:
 
         self.ollama_host = self._get_val("OLLAMA_HOST", "http://localhost:11434")
         self.ollama_model = self._get_val("OLLAMA_MODEL", "qwen3.5:9b")
-        self.vllm_url = self._get_val("VLLM_URL", "http://localhost:8000/v1")
+        self.vllm_url = self._get_val("VLLM_URL", "http://127.0.0.1:8000/v1")
         self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-4B")
         self.gemma4_model = self._get_val("GEMMA4_MODEL", "google/gemma-4-26B-A4B-it")
         self.gemma4_steering_model = self._get_val("GEMMA4_STEERING_MODEL", "google/gemma-4-26B-A4B-it")
@@ -400,12 +410,16 @@ class Settings:
         self.training_chappie_model = self._get_val("TRAINING_CHAPPIE_MODEL", "")
         self.training_trainer_provider = _parse_provider(self._get_val("TRAINING_TRAINER_PROVIDER", "auto"))
         self.training_trainer_model = self._get_val("TRAINING_TRAINER_MODEL", "")
+        self.training_runtime_directory = self._get_path(
+            "TRAINING_RUNTIME_DIRECTORY",
+            str(DATA_DIR / "training_runtime"),
+        )
 
         self.memory_top_k = int(self._get_val("MEMORY_TOP_K", 40))
         self.memory_prompt_top_k = int(self._get_val("MEMORY_PROMPT_TOP_K", 8))
         self.stm_prompt_top_k = int(self._get_val("STM_PROMPT_TOP_K", 8))
         self.memory_min_relevance = float(self._get_val("MEMORY_MIN_RELEVANCE", 0.2))
-        self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", "chapie_memory")
+        self.chroma_collection_name = self._get_val("CHROMA_COLLECTION", DEFAULT_CHROMA_COLLECTION)
         self.memory_consolidation_enabled = bool(self._get_val("MEMORY_CONSOLIDATION_ENABLED", True))
         self.memory_consolidation_groq_model = self._get_val("MEMORY_CONSOLIDATION_GROQ_MODEL", "openai/gpt-oss-120b")
         self.memory_consolidation_max_tokens = int(self._get_val("MEMORY_CONSOLIDATION_MAX_TOKENS", 1500))
@@ -516,6 +530,7 @@ class Settings:
             "query_extraction_groq_model", "emotion_analysis_model",
             "emotion_analysis_host", "embedding_model", "steering_model",
             "training_chappie_model", "training_trainer_model",
+            "training_runtime_directory",
         ]
         for key in string_keys:
             if key in kwargs and kwargs[key]:
@@ -636,6 +651,7 @@ class Settings:
             "TRAINING_CHAPPIE_MODEL": self.training_chappie_model,
             "TRAINING_TRAINER_PROVIDER": provider_value(self.training_trainer_provider),
             "TRAINING_TRAINER_MODEL": self.training_trainer_model,
+            "TRAINING_RUNTIME_DIRECTORY": self.training_runtime_directory,
             "DEBUG": self.debug,
             "ENABLE_FUNCTIONS": self.enable_functions,
             "CLI_DEBUG_ALWAYS_ON": self.cli_debug_always_on,

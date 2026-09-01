@@ -114,7 +114,15 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
 
     @app.get("/health")
     def health() -> Dict[str, Any]:
-        return {"status": "ok", "model": app.state.model_name, "restart_status": app.state.restart_status}
+        engine = app.state.engine
+        report = getattr(engine, "last_steering_report", {}) if engine is not None else {}
+        return {
+            "status": "ok",
+            "model": app.state.model_name,
+            "restart_status": app.state.restart_status,
+            "device": str(getattr(engine, "device", "unknown")) if engine is not None else "unknown",
+            "steering": report,
+        }
 
     @app.get("/v1/models")
     def models() -> Dict[str, Any]:
@@ -175,6 +183,10 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                         "object": "chat.completion.chunk",
                         "created": created,
                         "model": model,
+                        "chappie_steering": getattr(engine, "last_steering_report", {}),
+                        "usage": {
+                            "chappie_steering": getattr(engine, "last_steering_report", {}),
+                        },
                         "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
                     }
                     yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
@@ -210,7 +222,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 model,
                 len(messages),
                 max_tokens,
-                chat_kwargs.get("enable_thinking"),
+                (chat_kwargs or {}).get("enable_thinking"),
             )
             raise HTTPException(status_code=500, detail=f"Steering-Server Fehler: {exc}") from exc
 
@@ -219,6 +231,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
             "object": "chat.completion",
             "created": created,
             "model": model,
+            "chappie_steering": result.get("steering_runtime", {}),
             "choices": [{
                 "index": 0,
                 "message": {
@@ -232,6 +245,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 "prompt_tokens": result["prompt_tokens"],
                 "completion_tokens": result["completion_tokens"],
                 "total_tokens": result["prompt_tokens"] + result["completion_tokens"],
+                "chappie_steering": result.get("steering_runtime", {}),
             },
         })
 

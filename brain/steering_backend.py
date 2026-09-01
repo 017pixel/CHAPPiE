@@ -530,6 +530,14 @@ class LocalSteeringEngine:
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
         self._generation_lock = threading.Lock()
+        self.last_steering_report: Dict[str, Any] = {
+            "active": False,
+            "hook_count": 0,
+            "requested_layers": [],
+            "applied_layers": [],
+            "mode": "activation_addition",
+            "model": model_name,
+        }
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, **self._build_loader_kwargs())
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -814,6 +822,7 @@ class LocalSteeringEngine:
             "completion_tokens": completion_tokens,
             "prompt": prompt,
             "cache_implementation": generation_kwargs.get("cache_implementation", "dynamic"),
+            "steering_runtime": dict(self.last_steering_report),
         }
         if reasoning:
             result["reasoning"] = reasoning
@@ -965,7 +974,21 @@ class LocalSteeringEngine:
 
     @contextmanager
     def _apply_activation_plan(self, steering_payload: Optional[Dict[str, Any]]) -> Iterable[None]:
-        plan = build_activation_plan(steering_payload, self.resolver.resolve)
+        try:
+            plan = build_activation_plan(steering_payload, self.resolver.resolve)
+        except Exception as exc:
+            self.last_steering_report = {
+                "active": False,
+                "hook_count": 0,
+                "requested_layers": [],
+                "applied_layers": [],
+                "mode": "activation_addition",
+                "model": self.model_name,
+                "error": str(exc),
+            }
+            raise
+
+        requested_layers = sorted(int(layer) for layer in plan)
         handles = []
         try:
             for layer_idx, vector in plan.items():
@@ -973,6 +996,16 @@ class LocalSteeringEngine:
                     continue
                 layer = self.layers[layer_idx]
                 handles.append(layer.register_forward_pre_hook(self._pre_hook_factory(vector.to(self.device, dtype=self.dtype))))
+            self.last_steering_report = {
+                "active": bool(handles),
+                "hook_count": len(handles),
+                "requested_layers": requested_layers,
+                "applied_layers": sorted(
+                    int(layer) for layer in plan if 0 <= int(layer) < len(self.layers)
+                ),
+                "mode": "activation_addition",
+                "model": self.model_name,
+            }
             yield
         finally:
             for handle in handles:
