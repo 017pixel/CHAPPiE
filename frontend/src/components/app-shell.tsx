@@ -1,112 +1,146 @@
-import { useEffect } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { useUiStore } from "../store/ui";
+import { useEffect, useRef, useState } from "react";
 
-const items = [
-  { label: "Chat", to: "/", icon: "chat_bubble" },
-  { label: "Kontext", to: "/context", icon: "database" },
-  { label: "Memories", to: "/memories", icon: "history" },
-  { label: "Life", to: "/life", icon: "favorite" },
-  { label: "Growth", to: "/growth", icon: "trending_up" },
-  { label: "Settings", to: "/settings", icon: "settings" },
-  { label: "Training", to: "/training", icon: "model_training" },
-  { label: "Debug", to: "/debug", icon: "bug_report" }
-];
+import { InspectorPane } from "./inspector-pane";
+import { ChatPage } from "../pages/chat-page";
+
+const DEFAULT_SPLIT = 35;
+const MIN_SPLIT = 25;
+const MAX_SPLIT = 75;
+const MIN_PANEL_WIDTH = 320;
+const SPLIT_STORAGE_KEY = "chappie-split-ratio";
+
+function clamp(value: number, lower: number, upper: number): number {
+  return Math.min(upper, Math.max(lower, value));
+}
+
+function readStoredSplit(): number {
+  if (typeof window === "undefined") return DEFAULT_SPLIT;
+  try {
+    const stored = Number(window.localStorage.getItem(SPLIT_STORAGE_KEY));
+    return Number.isFinite(stored) ? clamp(stored, MIN_SPLIT, MAX_SPLIT) : DEFAULT_SPLIT;
+  } catch {
+    return DEFAULT_SPLIT;
+  }
+}
 
 export function AppShell() {
-  const { isSidebarOpen, toggleSidebar, closeSidebar } = useUiStore();
-  const location = useLocation();
+  const [splitRatio, setSplitRatio] = useState(readStoredSplit);
+  const [dragging, setDragging] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"terminal" | "inspector">("terminal");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.innerWidth < 1024) {
-      closeSidebar();
+    try {
+      window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitRatio));
+    } catch {
+      // Storage can be disabled in a private or embedded browser context.
     }
-  }, [location.pathname]);
+  }, [splitRatio]);
+
+  function setRatioFromPointer(clientX: number) {
+    const bounds = workspaceRef.current?.getBoundingClientRect();
+    if (!bounds || bounds.width <= 0) return;
+    const availableWidth = bounds.width - 4;
+    const minimumRatio = Math.max(MIN_SPLIT, (MIN_PANEL_WIDTH / availableWidth) * 100);
+    const maximumRatio = Math.min(MAX_SPLIT, 100 - (MIN_PANEL_WIDTH / availableWidth) * 100);
+    setSplitRatio(clamp(((clientX - bounds.left) / availableWidth) * 100, minimumRatio, maximumRatio));
+  }
+
+  function handleDividerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (moveEvent: PointerEvent) => setRatioFromPointer(moveEvent.clientX);
+    const onUp = () => {
+      setDragging(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", onMove);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  function resetSplit() {
+    setSplitRatio(DEFAULT_SPLIT);
+  }
+
+  function handleDividerDoubleClick() {
+    resetSplit();
+  }
+
+  function handleDividerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setSplitRatio((ratio) => clamp(ratio - 2, MIN_SPLIT, MAX_SPLIT));
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setSplitRatio((ratio) => clamp(ratio + 2, MIN_SPLIT, MAX_SPLIT));
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      resetSplit();
+    }
+  }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-ink text-mist">
-      {/* Mobile Sidebar Backdrop */}
-      <div
-        className={`sidebar-backdrop ${isSidebarOpen ? "" : "hidden"}`}
-        onClick={closeSidebar}
-      />
-
-      {/* Sidebar */}
-      <aside
-        className={`app-sidebar flex flex-col border-r border-white/5 bg-night transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "open w-72" : "closed w-0 border-r-0"
-        }`}
-      >
-        <div className="flex h-24 min-w-72 items-center justify-center px-6">
-          <span className="text-xl font-black tracking-tighter text-mist uppercase">CHAPPiE</span>
-        </div>
-
-        <nav className="min-w-72 flex-1 space-y-2 px-3">
-          {items.map(({ label, to, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `group flex items-center gap-4 rounded-none p-3 text-sm font-medium transition-all duration-300 ${
-                  isActive
-                    ? "bg-ember text-white shadow-glass"
-                    : "text-slate hover:bg-white/5 hover:text-mist"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[22px] leading-none">{icon}</span>
-              <span className="truncate whitespace-nowrap">{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="min-w-72 p-4">
-          <button
-            onClick={closeSidebar}
-            className="flex w-full items-center justify-center rounded-none bg-white/5 py-3 text-slate transition-all hover:bg-ember hover:text-white"
-          >
-            <span className="material-symbols-outlined">close</span>
-          </button>
-        </div>
-
-        <a
-          href={import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="m-4 block min-w-64 rounded-none bg-pine/20 p-4 text-[10px] text-slate border border-pine/10 hover:bg-pine/30 hover:border-pine/30 transition-all"
+    <div className="terminal-app flex h-screen w-screen flex-col overflow-hidden bg-ink font-mono text-mist">
+      <div className="terminal-mobile-tabs flex shrink-0 border-b border-white/10 bg-night lg:hidden" role="tablist" aria-label="Workspace panes">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === "terminal"}
+          className={`flex-1 border-r border-white/10 px-3 py-2 text-left text-[10px] uppercase tracking-widest ${mobilePane === "terminal" ? "text-terminal-green" : "text-slate/50"}`}
+          onClick={() => setMobilePane("terminal")}
         >
-          <p className="font-bold uppercase tracking-widest text-pine">API-Target</p>
-          <p className="mt-1 break-all opacity-80">{import.meta.env.VITE_API_BASE_URL ?? "http://100.105.94.71:8010"}</p>
-        </a>
-      </aside>
+          01 terminal
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === "inspector"}
+          className={`flex-1 px-3 py-2 text-left text-[10px] uppercase tracking-widest ${mobilePane === "inspector" ? "text-terminal-green" : "text-slate/50"}`}
+          onClick={() => setMobilePane("inspector")}
+        >
+          02 inspector
+        </button>
+      </div>
 
-      {/* Main Content Area */}
-      <main className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        <header className="app-header flex h-20 items-center justify-between px-8 lg:h-24">
-          {/* Sidebar Toggle */}
-          <button
-            className="mobile-hamburger"
-            onClick={toggleSidebar}
-            aria-label="Toggle Sidebar"
-          >
-            <span className="material-symbols-outlined text-mist">menu</span>
-          </button>
+      <main ref={workspaceRef} className={`terminal-split-layout flex min-h-0 flex-1 ${dragging ? "is-dragging" : ""}`}>
+        <section
+          className={`terminal-split-pane terminal-pane-wrapper min-w-0 ${mobilePane === "terminal" ? "mobile-pane-visible" : "mobile-pane-hidden"}`}
+          style={{ flex: `0 0 ${splitRatio}%` }}
+          aria-label="Ubuntu terminal chat"
+        >
+          <ChatPage />
+        </section>
 
-          {/* Space */}
-          <div className="flex-1" />
-
-          {/* Online Indicator */}
-          {location.pathname === "/" && (
-            <div className="flex items-center gap-4">
-              <div className="h-2 w-2 animate-pulse rounded-none bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
-              <span className="text-[10px] uppercase tracking-widest text-slate">Online</span>
-            </div>
-          )}
-        </header>
-
-        <div className="app-content-wrapper mx-auto w-full max-w-[95%] px-6 pb-12 lg:px-12">
-          <Outlet />
+        <div
+          className="terminal-divider"
+          onPointerDown={handleDividerPointerDown}
+          onDoubleClick={handleDividerDoubleClick}
+          onKeyDown={handleDividerKeyDown}
+          tabIndex={0}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize terminal and inspector"
+          title="Drag to resize · double-click to reset"
+        >
+          <span className="terminal-divider-handle" />
         </div>
+
+        <section
+          className={`terminal-split-pane inspector-pane-wrapper min-w-0 flex-1 ${mobilePane === "inspector" ? "mobile-pane-visible" : "mobile-pane-hidden"}`}
+          aria-label="Research tracing inspector"
+        >
+          <InspectorPane
+            commandPaletteOpen={commandPaletteOpen}
+            onCommandPaletteChange={setCommandPaletteOpen}
+          />
+        </section>
       </main>
     </div>
   );

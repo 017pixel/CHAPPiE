@@ -1,13 +1,36 @@
 import { create } from "zustand";
 
-type ChatMessage = {
+export type ChatMessage = {
   id?: string;
   role: string;
   content: string;
   metadata?: Record<string, unknown>;
 };
 
-type ProcessingState = "idle" | "thinking" | "streaming" | "error";
+export function isSlashCommand(content: string): boolean {
+  return content.trimStart().startsWith("/");
+}
+
+export type ProcessingState = "idle" | "thinking" | "streaming" | "error";
+
+export type LivePipelineState = {
+  stage?: string;
+  stage_key?: string;
+  step?: number;
+  status_text?: string;
+  started_at?: number;
+  updated_at?: number;
+  elapsed_ms?: number;
+  token_count?: number;
+  answer_tokens?: number;
+  ttft_ms?: number | null;
+  answer_time_ms?: number;
+  total_gen_ms?: number;
+  tokens_per_second?: number;
+  provider?: string;
+  model?: string;
+  error?: string;
+};
 
 type UiState = {
   currentSessionId: string | null;
@@ -36,6 +59,12 @@ type UiState = {
   setLoadedOnce: (value: boolean) => void;
   thinkingEnabled: boolean;
   setThinkingEnabled: (value: boolean) => void;
+  activeTraceId: string | null;
+  setActiveTraceId: (value: string | null) => void;
+  streamError: string | null;
+  setStreamError: (value: string | null) => void;
+  livePipeline: LivePipelineState | null;
+  setLivePipeline: (value: LivePipelineState | null | ((previous: LivePipelineState | null) => LivePipelineState | null)) => void;
   resetStreamingState: () => void;
 };
 
@@ -67,10 +96,20 @@ export const useUiStore = create<UiState>((set) => ({
   setLoadedOnce: (value) => set({ loadedOnce: value }),
   thinkingEnabled: true,
   setThinkingEnabled: (value) => set({ thinkingEnabled: value }),
+  activeTraceId: null,
+  setActiveTraceId: (value) => set({ activeTraceId: value }),
+  streamError: null,
+  setStreamError: (value) => set({ streamError: value }),
+  livePipeline: null,
+  setLivePipeline: (value) => set((state) => ({
+    livePipeline: typeof value === "function" ? value(state.livePipeline) : value,
+  })),
   resetStreamingState: () => set({
     processingState: "idle",
     streamingContent: "",
     reasoningContent: "",
+    streamError: null,
+    livePipeline: null,
     isProcessing: false,
     genStartTime: null,
     elapsedMs: 0,

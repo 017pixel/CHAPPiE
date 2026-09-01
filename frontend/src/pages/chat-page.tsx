@@ -1,16 +1,11 @@
-import { FormEvent, useEffect, useState, useRef, useCallback } from "react";
+import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { EmotionalTextPart, parseEmotionalText } from "../lib/format";
 import { api } from "../services/api";
+import { isSlashCommand } from "../store/ui";
+import type { ChatMessage } from "../store/ui";
 import { useUiStore } from "../store/ui";
-
-type ChatMessage = {
-  id?: string;
-  role: string;
-  content: string;
-  metadata?: Record<string, unknown>;
-};
 
 type SessionDetail = {
   messages: ChatMessage[];
@@ -20,6 +15,7 @@ type StatusSnapshot = {
   model?: string;
   provider?: string;
   emotions?: Record<string, number>;
+  routing?: string;
 };
 
 type QueuedMessage = {
@@ -29,17 +25,10 @@ type QueuedMessage = {
 
 const THINKING_MESSAGES = [
   "CHAPPiE denkt nach...",
-  "Hmm, warte, ich ueberlege noch...",
-  "Habs gleich, versprochen!",
-  "Gib mir noch einen Moment...",
-  "Ich durchforste mein Langzeitgedaechtnis...",
-  "Das ist eine interessante Frage...",
-  "Ich analysiere die emotionalen Nuancen...",
-  "Fast fertig mit der Verarbeitung...",
-  "Bereite die Antwort vor...",
-  "Einen kleinen Moment noch...",
-  "Ich sortiere gerade meine Gedanken...",
+  "Kontext wird geladen...",
+  "Emotionale Nuancen werden geprüft...",
   "Die Antwort formt sich...",
+  "Fast fertig mit der Verarbeitung...",
 ];
 
 const EMOTION_NAMES = [
@@ -55,15 +44,102 @@ const EMOTION_NAMES = [
   "calm",
 ] as const;
 
+const ALL_COMMANDS = ["/sleep", "/stats", "/help", "/clear", "/new", "/emotion", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
+
 function emotionalPartClass(part: EmotionalTextPart): string {
-  if (part.tone === "ember") return "text-ember italic";
-  if (part.tone === "pine") return "text-pine italic";
+  if (part.tone === "ember") return "text-terminal-amber italic";
+  if (part.tone === "pine") return "text-terminal-green italic";
   if (part.tone === "muted") return "text-slate/50 italic";
   return "";
 }
 
-function isPending(msg: ChatMessage): boolean {
-  return msg.metadata?.pending === true;
+function isPending(message: ChatMessage): boolean {
+  return message.metadata?.pending === true;
+}
+
+function metadataOf(message: ChatMessage): Record<string, any> {
+  return (message.metadata ?? {}) as Record<string, any>;
+}
+
+function withDisplayMetadata(message: ChatMessage, previous?: ChatMessage): ChatMessage {
+  const metadata = metadataOf(message);
+  const command = message.role === "user" && (metadata.is_command === true || metadata.message_kind === "command" || isSlashCommand(message.content));
+  const system = message.role === "system" || metadata.is_system === true || metadata.is_system_response === true || metadata.message_kind === "system" || (message.role === "assistant" && previous?.role === "user" && isSlashCommand(previous.content));
+  const formatted = message.role === "assistant" ? metadata.formatted_answer : undefined;
+  if (!command && !system && !formatted) return message;
+
+  const commandText = command ? message.content.trim() : system && previous?.role === "user" ? previous.content.trim() : metadata.command;
+  return {
+    ...message,
+    content: formatted || message.content,
+    metadata: {
+      ...metadata,
+      ...(command ? { is_command: true, message_kind: "command", command: commandText } : {}),
+      ...(system ? { is_system: true, is_system_response: true, message_kind: "system", command: commandText } : {}),
+      ...(formatted ? { raw_response: message.content } : {}),
+    },
+  };
+}
+
+function formatDuration(value: unknown): string {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
+  return numeric < 1000 ? `${Math.round(numeric)}ms` : `${(numeric / 1000).toFixed(2)}s`;
+}
+
+function estimateTokens(value: string): number {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
+}
+
+function formatTokenRate(timing: Record<string, any>, metadata: Record<string, any>, content: string): string {
+  const pipeline = (metadata.live_pipeline ?? metadata.pipeline ?? {}) as Record<string, any>;
+  const explicit = Number(timing.tokens_per_second ?? timing.tokens_per_sec ?? metadata.tokens_per_second ?? pipeline.tokens_per_second);
+  if (Number.isFinite(explicit) && explicit > 0) return `${explicit.toFixed(1)} tok/s`;
+
+  const tokens = Number(timing.answer_tokens ?? pipeline.answer_tokens) || estimateTokens(content);
+  const durationMs = Number(timing.answer_time_ms ?? pipeline.answer_time_ms ?? timing.total_gen_ms ?? metadata.processing_time_ms ?? pipeline.elapsed_ms);
+  if (tokens > 0 && Number.isFinite(durationMs) && durationMs > 0) {
+    return `${(tokens / (durationMs / 1000)).toFixed(1)} tok/s`;
+  }
+  return "— tok/s";
+}
+
+function NumberedText({ content, className = "" }: { content: string; className?: string }) {
+  const lines = content.split("\n");
+  return <div className={className}>{lines.map((line, index) => <div key={`${index}-${line.slice(0, 12)}`} className="flex min-w-0"><span className="mr-2 w-5 shrink-0 select-none text-right text-[9px] text-slate/25">{String(index + 1).padStart(2, "0")}</span><span className="min-w-0 whitespace-pre-wrap break-words">{line || " "}</span></div>)}</div>;
+}
+
+function hasError(message: ChatMessage): boolean {
+  const meta = metadataOf(message);
+  return Boolean(meta.stream_error || meta.error_message || meta.formatting_failed || /^fehler[:\s]/i.test(message.content) || /^(?:vllm|ollama|groq|steering-server)\b[^\n]{0,120}\b(?:error|failed|failure|fehler|fehlgeschlagen)\b/i.test(message.content));
+}
+
+function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: ChatMessage; thinkingEnabled: boolean; onSelectTrace: (message: ChatMessage) => void }) {
+  const meta = metadataOf(message);
+  const isReasoning = message.id === "reasoning-live" || Boolean(meta.isReasoning);
+  const isThinking = message.id === "thinking";
+  const isStreaming = message.id === "streaming";
+  const isLive = isReasoning || isThinking || isStreaming;
+  const isCommand = message.role === "user" && (meta.is_command === true || meta.message_kind === "command" || isSlashCommand(message.content));
+  const isSystem = message.role === "system" || meta.message_kind === "system" || meta.is_system === true || meta.is_system_response === true;
+  const cot = meta.formatted_cot || meta.reasoning || "";
+  const error = meta.error_message || (meta.stream_error ? "Stream wurde beendet." : meta.formatting_failed ? "Formatierungsdienst fehlgeschlagen; Rohtext wird angezeigt." : "");
+  const timing = (meta.timing ?? {}) as Record<string, any>;
+
+  if (message.role === "user") {
+    return <article className="terminal-log-entry terminal-user-entry" data-message-kind={isCommand ? "command" : "message"}><div className="terminal-prompt-line"><span className="text-terminal-green">User</span>{isCommand && <span className="ml-2 border border-terminal-amber/45 px-1 text-[8px] uppercase tracking-widest text-terminal-amber">command</span>}<span className="ml-2 min-w-0 break-words text-mist [overflow-wrap:anywhere]">{message.content}</span></div></article>;
+  }
+
+  return <article className={`terminal-log-entry terminal-assistant-entry ${hasError(message) ? "has-error" : ""}`} data-message-kind={isSystem ? "system" : "message"}>
+    <div className="terminal-prompt-line mb-1"><span className={hasError(message) ? "text-terminal-red" : "text-terminal-green"}>CHAPPiE</span><span className="ml-2 text-slate/45">{isReasoning ? "reasoning" : isThinking ? "processing" : isSystem ? "system" : "answer"}</span>{isSystem && <span className="ml-2 border border-slate/30 px-1 text-[8px] uppercase tracking-widest text-slate/50">system</span>}{!isLive && <button type="button" className="ml-auto text-[9px] uppercase tracking-widest text-slate/35 hover:text-terminal-green" onClick={() => onSelectTrace(message)}>inspect</button>}</div>
+    {error && <div className="terminal-error-line mb-2 border-l-2 border-terminal-red bg-terminal-red/[0.08] px-2 py-1 text-[10px] text-terminal-red">[ERR] {error}</div>}
+    {isReasoning ? <details open className="terminal-reasoning"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT — live</summary><NumberedText content={message.content} className="mt-2 text-[10px] leading-relaxed text-slate/60" /></details> : isThinking ? <div className="text-[11px] text-terminal-green/75"><span className="terminal-cursor mr-1">▌</span>{message.content}<span className="ml-2 text-[9px] text-slate/35">{formatDuration(meta.timer_ms)}</span></div> : <>
+      {thinkingEnabled && cot && <details className="terminal-reasoning mb-2"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT</summary><NumberedText content={String(cot).length > 4000 ? `${String(cot).slice(0, 4000)}\n... (truncated)` : String(cot)} className={`mt-2 text-[10px] leading-relaxed ${hasError(message) ? "text-terminal-red/70" : "text-slate/55"}`} /></details>}
+      <NumberedText content={message.content} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />
+      {!isSystem && (isLive || timing.ttft_ms != null || timing.answer_tokens != null || meta.provider) && <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>ttft {formatDuration(timing.ttft_ms)}</span><span>{timing.answer_tokens ?? meta.live_pipeline?.answer_tokens ?? "—"} tk</span><span>{formatTokenRate(timing, meta, message.content)}</span><span>{meta.provider ?? "provider —"}</span></div>}
+    </>}
+    {isStreaming && <span className="terminal-cursor ml-7 text-terminal-green">▌</span>}
+  </article>;
 }
 
 export function ChatPage() {
@@ -87,924 +163,375 @@ export function ChatPage() {
   const setLoadedOnce = useUiStore((state) => state.setLoadedOnce);
   const thinkingEnabled = useUiStore((state) => state.thinkingEnabled);
   const setThinkingEnabled = useUiStore((state) => state.setThinkingEnabled);
+  const setActiveTraceId = useUiStore((state) => state.setActiveTraceId);
+  const setStreamError = useUiStore((state) => state.setStreamError);
+  const setLivePipeline = useUiStore((state) => state.setLivePipeline);
   const resetStreamingState = useUiStore((state) => state.resetStreamingState);
 
   const [message, setMessage] = useState("");
   const [commandsExpanded, setCommandsExpanded] = useState(false);
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const [thinkingIndex, setThinkingIndex] = useState(0);
-  const [popupMsg, setPopupMsg] = useState<ChatMessage | null>(null);
-  const [rawPopupMsg, setRawPopupMsg] = useState<ChatMessage | null>(null);
   const [showEmotionPopup, setShowEmotionPopup] = useState(false);
-  const emotionPopupRef = useRef<HTMLDivElement>(null);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const emotionPopupRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const processingRef = useRef(false);
+  const lastUserMessageRef = useRef("");
+  const retryRef = useRef<() => void>(() => undefined);
 
   const sessionsQuery = useQuery({ queryKey: ["sessions"], queryFn: api.getSessions });
   const activeSessionQuery = useQuery({ queryKey: ["active-session"], queryFn: api.getActiveSession });
-  const sessionQuery = useQuery({
-    queryKey: ["session", currentSessionId],
-    queryFn: () => api.getSession(currentSessionId!),
-    enabled: Boolean(currentSessionId)
-  });
+  const sessionQuery = useQuery({ queryKey: ["session", currentSessionId], queryFn: () => api.getSession(currentSessionId!), enabled: Boolean(currentSessionId) });
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus, refetchInterval: 3000 });
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const status = (statusQuery.data ?? {}) as StatusSnapshot;
 
   useEffect(() => {
-    const settings = settingsQuery.data as any;
-    if (settings?.chain_of_thought !== undefined) {
-      setThinkingEnabled(settings.chain_of_thought);
-    }
+    const settings = (settingsQuery.data ?? {}) as Record<string, any>;
+    if (settings.chain_of_thought !== undefined) setThinkingEnabled(Boolean(settings.chain_of_thought));
   }, [settingsQuery.data, setThinkingEnabled]);
 
-  // Sync display messages from server on initial load, but only when idle
   useEffect(() => {
-    const storeProcessing = useUiStore.getState().processingState;
-    if (storeProcessing !== "idle") return;
-    if (useUiStore.getState().loadedOnce) return;
-    const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
-    if (rawMessages.length === 0) return;
-    const cleanMessages = rawMessages
-      .filter(msg => !isPending(msg) && !msg.content.startsWith("_CHAPPiE"))
-      .map(msg => {
-        if (msg.role === "assistant") {
-          const formatted = (msg.metadata as any)?.formatted_answer;
-          if (formatted) {
-            return { ...msg, content: formatted, metadata: { ...msg.metadata, raw_response: msg.content } };
-          }
-        }
-        return msg;
-      });
-    if (cleanMessages.length > 0) {
-      setDisplayMessages(cleanMessages);
+    const storeState = useUiStore.getState();
+    if (storeState.processingState !== "idle") {
       setLoadedOnce(true);
-    }
-  }, [sessionQuery.data]);
-
-  // Initialize session
-  useEffect(() => {
-    if (!currentSessionId && (activeSessionQuery.data as any)?.id) {
-      setCurrentSessionId((activeSessionQuery.data as any).id);
+      processingRef.current = storeState.isProcessing;
       return;
     }
-    if (!currentSessionId && Array.isArray(sessionsQuery.data) && sessionsQuery.data[0]?.id) {
-      setCurrentSessionId(sessionsQuery.data[0].id);
+    if (storeState.loadedOnce) return;
+    const rawMessages = (sessionQuery.data as SessionDetail | undefined)?.messages ?? [];
+    const cleanMessages = rawMessages.filter((item) => !isPending(item) && !item.content.startsWith("_CHAPPiE"));
+    const normalizedMessages = cleanMessages.map((item, index) => withDisplayMetadata(item, cleanMessages[index - 1]));
+    if (normalizedMessages.length > 0) {
+      setDisplayMessages(normalizedMessages);
+      setLoadedOnce(true);
     }
+  }, [sessionQuery.data, setDisplayMessages, setLoadedOnce]);
+
+  useEffect(() => {
+    if (!currentSessionId && (activeSessionQuery.data as any)?.id) setCurrentSessionId((activeSessionQuery.data as any).id);
+    else if (!currentSessionId && Array.isArray(sessionsQuery.data) && (sessionsQuery.data as any[])[0]?.id) setCurrentSessionId((sessionsQuery.data as any[])[0].id);
   }, [activeSessionQuery.data, currentSessionId, sessionsQuery.data, setCurrentSessionId]);
 
-  // Reset loadedOnce when session changes
   useEffect(() => {
     setLoadedOnce(false);
   }, [currentSessionId, setLoadedOnce]);
 
-  // Auto-scroll
   useEffect(() => {
-    if (!scrollRef.current) return;
-    const el = scrollRef.current;
-    const onScroll = () => {
-      autoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    const element = scrollRef.current;
+    if (!element) return;
+    const onScroll = () => { autoScrollRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 60; };
+    element.addEventListener("scroll", onScroll, { passive: true });
+    return () => element.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    if (autoScrollRef.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [displayMessages, streamingContent, thinkingIndex]);
+    if (autoScrollRef.current && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [displayMessages, streamingContent, reasoningContent, thinkingIndex]);
 
-  // Thinking animation
   useEffect(() => {
     if (processingState !== "thinking") return;
-    const interval = setInterval(() => {
-      setThinkingIndex(i => (i + 1) % THINKING_MESSAGES.length);
-    }, 2500);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(() => setThinkingIndex((index) => (index + 1) % THINKING_MESSAGES.length), 2200);
+    return () => window.clearInterval(interval);
   }, [processingState]);
 
-  // Live timer during generation
   useEffect(() => {
     if (processingState !== "thinking" && processingState !== "streaming") {
       setElapsedMs(0);
       return;
     }
-    const timer = setInterval(() => {
-      const startTime = useUiStore.getState().genStartTime;
-      if (startTime) {
-        setElapsedMs(Date.now() - startTime);
+    const interval = window.setInterval(() => {
+      const start = useUiStore.getState().genStartTime;
+      const now = Date.now();
+      if (start) {
+        const elapsed = now - start;
+        setElapsedMs(elapsed);
+        setLivePipeline((previous) => previous ? { ...previous, elapsed_ms: elapsed, updated_at: now } : previous);
       }
     }, 100);
-    return () => clearInterval(timer);
-  }, [processingState, setElapsedMs]);
+    return () => window.clearInterval(interval);
+  }, [processingState, setElapsedMs, setLivePipeline]);
 
-  // On mount: if there's active processing, show it to avoid blank screen
   useEffect(() => {
-    const storeState = useUiStore.getState();
-    if (storeState.processingState !== "idle" && storeState.displayMessages.length > 0) {
-      // Store has active streaming — restore from store, don't overwrite with session
-      setLoadedOnce(true);
-    }
-    // Also set processingRef from store on mount in case we navigate back mid-stream
-    processingRef.current = storeState.isProcessing;
+    const onRetry = () => retryRef.current();
+    window.addEventListener("chappie:retry-last", onRetry);
+    return () => window.removeEventListener("chappie:retry-last", onRetry);
   }, []);
 
-  // Emotion popup: show when typing /emotion
   useEffect(() => {
     const trimmed = message.trimStart();
-    setShowEmotionPopup(trimmed.startsWith("/emotion") && !trimmed.match(/^\/emotion\s+\w+\s+[+-]?\d+/));
+    setShowEmotionPopup(trimmed.startsWith("/emotion") && !/^\/emotion\s+\w+\s+[+-]?\d+/.test(trimmed));
   }, [message]);
 
-  // Close emotion popup on click outside
   useEffect(() => {
     if (!showEmotionPopup) return;
-    const handleClick = (e: MouseEvent) => {
-      if (emotionPopupRef.current && !emotionPopupRef.current.contains(e.target as Node)) {
-        setShowEmotionPopup(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    const onClick = (event: MouseEvent) => { if (emotionPopupRef.current && !emotionPopupRef.current.contains(event.target as Node)) setShowEmotionPopup(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, [showEmotionPopup]);
 
-  // Close emotion popup on Escape
-  useEffect(() => {
-    if (!showEmotionPopup) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowEmotionPopup(false);
-    };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [showEmotionPopup]);
-
-  // Auto-send from queue when idle
   useEffect(() => {
     if (processingState !== "idle" || queue.length === 0) return;
-
     const next = queue[0];
-    setQueue(prev => prev.slice(1));
-
-    const timer = setTimeout(() => {
-      processMessage(next.text);
-    }, 300);
-
-    return () => clearTimeout(timer);
+    setQueue((items) => items.slice(1));
+    const timeout = window.setTimeout(() => { void processMessage(next.text); }, 300);
+    return () => window.clearTimeout(timeout);
   }, [processingState, queue.length]);
 
-  async function sendMessage(text: string) {
-    if (!text.trim()) return;
+  function replaceLiveMessage(content: string, metadata: Record<string, any> = {}) {
+    const commandText = isSlashCommand(lastUserMessageRef.current) ? lastUserMessageRef.current.trim() : "";
+    setDisplayMessages((previous) => {
+      const withoutLive = previous.filter((item) => item.id !== "streaming" && item.id !== "thinking");
+      return [...withoutLive, { id: "streaming", role: "assistant", content, metadata: { ...metadata, ...(commandText ? { is_system: true, is_system_response: true, message_kind: "system", command: commandText } : {}), live: true } }];
+    });
+  }
 
-    if (processingRef.current) {
-      setQueue(prev => [...prev, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text }]);
-      setMessage("");
-      return;
-    }
-
-    await processMessage(text);
+  function commitAssistant(content: string, metadata: Record<string, any>, replacementSessionId?: string) {
+    const assistantId = `assistant-${Date.now()}`;
+    const commandText = isSlashCommand(lastUserMessageRef.current) ? lastUserMessageRef.current.trim() : "";
+    const displayMetadata = commandText ? { ...metadata, is_system: true, is_system_response: true, message_kind: "system", command: commandText } : metadata;
+    if (replacementSessionId && replacementSessionId !== currentSessionId) setCurrentSessionId(replacementSessionId);
+    setDisplayMessages((previous) => {
+      const withoutLive = previous.filter((item) => item.id !== "streaming" && item.id !== "thinking");
+      return [...withoutLive, { id: assistantId, role: "assistant", content, metadata: displayMetadata }];
+    });
+    setActiveTraceId(assistantId);
   }
 
   async function processMessage(text: string) {
     if (!text.trim() || processingRef.current) return;
-
     processingRef.current = true;
+    lastUserMessageRef.current = text;
     setIsProcessing(true);
-
-    const isClearCommand = text.trim().toLowerCase() === "/clear" || text.trim().toLowerCase() === "/new";
+    setStreamError(null);
+    const isClearCommand = ["/clear", "/new"].includes(text.trim().toLowerCase());
     if (isClearCommand) {
       setDisplayMessages([]);
       setQueue([]);
     }
-
-    const userMsg: ChatMessage = {
+    const commandText = isSlashCommand(text) ? text.trim() : "";
+    const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       content: text,
+      ...(commandText ? { metadata: { is_command: true, message_kind: "command", command: commandText } } : {}),
     };
-
-    setDisplayMessages(prev => [...prev, userMsg]);
-    autoScrollRef.current = true;
+    setDisplayMessages((previous) => [...previous, userMessage]);
+    // Keep the inspector on the live pipeline from the first processing frame.
+    // The final assistant id replaces this when turn_finished arrives.
+    setActiveTraceId("streaming");
     setMessage("");
+    setHistoryIndex(-1);
     setStreamingContent("");
     setReasoningContent("");
     setThinkingIndex(0);
     setGenStartTime(Date.now());
+    setLivePipeline({
+      stage: "intent",
+      stage_key: "intent",
+      step: 1,
+      status_text: "Intent-Analyse gestartet",
+      started_at: Date.now(),
+      updated_at: Date.now(),
+      elapsed_ms: 0,
+      provider: status.provider,
+      model: status.model,
+    });
     setProcessingState("thinking");
+    autoScrollRef.current = true;
 
-    let usedStream = false;
     let streamedContent = "";
     let streamedReasoning = "";
+    let finished = false;
 
     try {
-      const stream = api.sendMessageStream({
-        session_id: currentSessionId,
-        message: text,
-        debug_mode: true,
-        command_mode: text.trim().startsWith("/"),
-      });
-
-      usedStream = true;
-
+      const stream = api.sendMessageStream({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") });
       for await (const event of stream) {
-        if (event.event === "token") {
-          if (useUiStore.getState().processingState === "thinking") {
-            setProcessingState("streaming");
-          }
-          const tokenType = event.data.token_type || "answer";
-          if (tokenType === "reasoning") {
-            streamedReasoning += event.data.content || "";
-            const truncated = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
-            setReasoningContent(truncated);
+        if (event.event === "status") {
+          const data = (event.data ?? {}) as Record<string, any>;
+          const now = Date.now();
+          setLivePipeline((previous) => {
+            const startedAt = previous?.started_at ?? useUiStore.getState().genStartTime ?? now;
+            return {
+              ...(previous ?? {}),
+              ...data,
+              stage: data.stage ?? data.stage_key ?? previous?.stage ?? "intent",
+              stage_key: data.stage_key ?? data.stage ?? previous?.stage_key ?? "intent",
+              status_text: data.status_text ?? data.status ?? previous?.status_text,
+              started_at: startedAt,
+              updated_at: now,
+              elapsed_ms: data.elapsed_ms ?? now - startedAt,
+              provider: data.provider ?? previous?.provider ?? status.provider,
+              model: data.model ?? previous?.model ?? status.model,
+            };
+          });
+          const stage = String(data.stage ?? data.stage_key ?? "").toLowerCase();
+          if (stage === "streaming" && useUiStore.getState().processingState === "thinking") setProcessingState("streaming");
+        } else if (event.event === "token") {
+          if (useUiStore.getState().processingState === "thinking") setProcessingState("streaming");
+          const content = event.data?.content || "";
+          if ((event.data?.token_type || "answer") === "reasoning") {
+            streamedReasoning += content;
+            setReasoningContent(streamedReasoning.length > 3000 ? `${streamedReasoning.slice(0, 3000)}...` : streamedReasoning);
           } else {
-            streamedContent += event.data.content || "";
+            streamedContent += content;
             setStreamingContent(streamedContent);
-            // Update displayMessages via store directly for navigation-resilience
-            const currentMsgs = useUiStore.getState().displayMessages;
-            const updated = [...currentMsgs];
-            while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
-              updated.pop();
-            }
-            updated.push({ id: "streaming", role: "assistant", content: streamedContent });
-            setDisplayMessages(updated);
+            const now = Date.now();
+            setLivePipeline((previous) => {
+              const startedAt = previous?.started_at ?? useUiStore.getState().genStartTime ?? now;
+              const elapsed = Math.max(0, now - startedAt);
+              const answerTokens = estimateTokens(streamedContent);
+              return {
+                ...(previous ?? {}),
+                stage: "streaming",
+                stage_key: "streaming",
+                status_text: "Antwort wird gestreamt",
+                updated_at: now,
+                elapsed_ms: elapsed,
+                token_count: answerTokens,
+                answer_tokens: answerTokens,
+                answer_time_ms: elapsed,
+                tokens_per_second: elapsed > 0 ? answerTokens / (elapsed / 1000) : 0,
+                provider: previous?.provider ?? status.provider,
+                model: previous?.model ?? status.model,
+              };
+            });
+            const livePipeline = useUiStore.getState().livePipeline;
+            replaceLiveMessage(streamedContent, {
+              provider: livePipeline?.provider ?? status.provider,
+              model: livePipeline?.model ?? status.model,
+              live_pipeline: livePipeline,
+              timing: {
+                answer_tokens: livePipeline?.answer_tokens ?? estimateTokens(streamedContent),
+                answer_time_ms: livePipeline?.answer_time_ms ?? 0,
+                tokens_per_second: livePipeline?.tokens_per_second ?? 0,
+              },
+            });
           }
         } else if (event.event === "turn_error") {
-          streamedContent += "\n[Fehler: " + (event.data.error || "Unbekannter Fehler") + "]";
-          const currentMsgs = useUiStore.getState().displayMessages;
-          const updated = [...currentMsgs];
-          while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
-            updated.pop();
-          }
-          updated.push({ id: `error-${Date.now()}`, role: "assistant", content: streamedContent });
-          setDisplayMessages(updated);
+          const errorText = String(event.data?.error || "Unbekannter Fehler");
+          setStreamError(errorText);
+          setLivePipeline((previous) => ({ ...(previous ?? {}), stage: "done", stage_key: "done", status_text: "Antwort fehlgeschlagen", error: errorText, updated_at: Date.now() }));
+          commitAssistant(streamedContent || `[Fehler: ${errorText}]`, { stream_error: true, error_message: errorText, raw_response: streamedContent });
+          finished = true;
           break;
         } else if (event.event === "turn_finished") {
           const finalContent = streamedContent || event.data?.assistant_message?.content || "";
-          const finalReasoning = streamedReasoning.length > 3000 ? streamedReasoning.slice(0, 3000) + "..." : streamedReasoning;
-          const finalMeta = event.data?.assistant_message?.metadata || {};
+          const finalMeta = (event.data?.assistant_message?.metadata || {}) as Record<string, any>;
           const displayContent = finalMeta.formatted_answer || finalContent;
-          const newSessionId = event.data?.session_id || "";
-          const mergedMeta = { ...finalMeta, reasoning: finalReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalContent || undefined };
-          if (newSessionId && newSessionId !== currentSessionId) {
-            setCurrentSessionId(newSessionId);
-            setDisplayMessages(prev => {
-              const last = prev[prev.length - 1];
-              if (last && last.role === "user" && last.content.trim().startsWith("/")) {
-                return [{ id: `assistant-${Date.now()}`, role: "assistant", content: displayContent || "Chat geleert.", metadata: mergedMeta }];
-              }
-              return prev;
-            });
-          } else {
-            setDisplayMessages(prev => {
-              const updated = [...prev];
-              while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "streaming" || updated[updated.length - 1].id === "thinking")) {
-                updated.pop();
-              }
-              updated.push({ id: `assistant-${Date.now()}`, role: "assistant", content: displayContent || finalContent, metadata: mergedMeta });
-              return updated;
-            });
-          }
+          const finalTiming = (finalMeta.timing ?? {}) as Record<string, any>;
+          setLivePipeline((previous) => ({
+            ...(previous ?? {}),
+            stage: "done",
+            stage_key: "done",
+            status_text: "Turn abgeschlossen",
+            updated_at: Date.now(),
+            elapsed_ms: Number(finalTiming.total_gen_ms) || previous?.elapsed_ms,
+            answer_tokens: Number(finalTiming.answer_tokens) || previous?.answer_tokens,
+            ttft_ms: finalTiming.ttft_ms ?? previous?.ttft_ms,
+            answer_time_ms: finalTiming.answer_time_ms ?? previous?.answer_time_ms,
+            total_gen_ms: finalTiming.total_gen_ms ?? previous?.total_gen_ms,
+            tokens_per_second: finalTiming.tokens_per_second ?? previous?.tokens_per_second,
+            provider: finalMeta.provider ?? previous?.provider ?? status.provider,
+            model: finalMeta.model ?? previous?.model ?? status.model,
+          }));
+          const mergedMeta = { ...finalMeta, reasoning: streamedReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalContent || undefined };
+          commitAssistant(displayContent || finalContent, mergedMeta, event.data?.session_id || undefined);
+          finished = true;
           break;
         }
       }
-    } catch (streamErr) {
-      console.warn("Streaming failed, falling back to synchronous endpoint:", streamErr);
-
-      setDisplayMessages(prev => {
-        const updated = [...prev];
-        while (updated.length > 0 && updated[updated.length - 1].role === "assistant" && (updated[updated.length - 1].id === "thinking")) {
-          updated.pop();
-        }
-        return updated;
-      });
-
+      if (!finished && (streamedContent || streamedReasoning)) {
+        const errorText = "Stream beendet, bevor turn_finished empfangen wurde.";
+        setStreamError(errorText);
+        commitAssistant(streamedContent || `[Fehler: ${errorText}]`, { stream_error: true, error_message: errorText, raw_response: streamedContent });
+      }
+    } catch {
+      setDisplayMessages((previous) => previous.filter((item) => item.id !== "streaming" && item.id !== "thinking"));
       try {
-        const result = await api.sendMessage({
-          session_id: currentSessionId,
-          message: text,
-          debug_mode: true,
-          command_mode: text.trim().startsWith("/"),
-        }) as any;
-
-        const assistantContent = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
-        const assistantMeta = result?.assistant_message?.metadata || result?.metadata || {};
-        const displayContent = (assistantMeta as any).formatted_answer || assistantContent;
-        const sessionId = result?.session_id || result?.replacement_session_id;
-        if (sessionId && sessionId !== currentSessionId) {
-          setCurrentSessionId(sessionId);
-        }
-
-        setDisplayMessages(prev => [...prev, {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: displayContent,
-          metadata: { ...assistantMeta, raw_response: assistantContent },
-        }]);
-      } catch (syncErr: any) {
-        setDisplayMessages(prev => [...prev, {
-          id: `error-${Date.now()}`,
-          role: "assistant",
-          content: `Fehler: ${syncErr.message || "Unbekannter Fehler"}`,
-        }]);
+        const result = await api.sendMessage({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") }) as any;
+        const content = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
+        const metadata = (result?.assistant_message?.metadata || result?.metadata || {}) as Record<string, any>;
+        commitAssistant(metadata.formatted_answer || content, { ...metadata, raw_response: content }, result?.session_id || result?.replacement_session_id);
+      } catch (error: any) {
+        const errorText = error?.message || "Unbekannter Fehler";
+        setStreamError(errorText);
+        commitAssistant(`Fehler: ${errorText}`, { stream_error: true, error_message: errorText });
       }
     } finally {
       processingRef.current = false;
-      useUiStore.getState().resetStreamingState();
-      statusQuery.refetch();
+      resetStreamingState();
+      void statusQuery.refetch();
     }
+  }
+
+  retryRef.current = () => {
+    if (!processingRef.current && lastUserMessageRef.current) void processMessage(lastUserMessageRef.current);
+  };
+
+  function sendMessage(text: string) {
+    if (!text.trim()) return;
+    if (processingRef.current) {
+      setQueue((items) => [...items, { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, text }]);
+      setMessage("");
+      return;
+    }
+    void processMessage(text);
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!message.trim()) return;
     sendMessage(message);
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!message.trim()) return;
-      sendMessage(message);
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    const history = displayMessages.filter((item) => item.role === "user").map((item) => item.content);
+    if (event.key === "ArrowUp" && (message.trim() === "" || message.startsWith("/"))) {
+      event.preventDefault();
+      if (history.length === 0) return;
+      const nextIndex = historyIndex < 0 ? history.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(nextIndex);
+      setMessage(history[nextIndex]);
+    } else if (event.key === "ArrowDown" && historyIndex >= 0) {
+      event.preventDefault();
+      const nextIndex = historyIndex + 1;
+      if (nextIndex >= history.length) { setHistoryIndex(-1); setMessage(""); } else { setHistoryIndex(nextIndex); setMessage(history[nextIndex]); }
+    } else if (event.key === "Tab" && message.trim().startsWith("/")) {
+      const match = ALL_COMMANDS.find((command) => command.startsWith(message.trim().toLowerCase()));
+      if (match) { event.preventDefault(); setMessage(match); }
+    } else if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault(); sendMessage(message);
     }
   }
 
-  function removeFromQueue(id: string) {
-    setQueue(prev => prev.filter(q => q.id !== id));
+  const visibleCommands = commandsExpanded ? ALL_COMMANDS : ALL_COMMANDS.slice(0, 4);
+  const finalMessages: ChatMessage[] = [...displayMessages];
+  if (processingState === "thinking") finalMessages.push({ id: "thinking", role: "assistant", content: THINKING_MESSAGES[thinkingIndex], metadata: { timer_ms: elapsedMs } });
+  if (processingState === "streaming" && reasoningContent) finalMessages.push({ id: "reasoning-live", role: "assistant", content: reasoningContent, metadata: { isReasoning: true } });
+
+  function selectTrace(entry: ChatMessage) {
+    setActiveTraceId(entry.id ?? null);
   }
 
-  const status = (statusQuery.data ?? {}) as StatusSnapshot;
-  const allCommands = ["/sleep", "/stats", "/help", "/clear", "/emotion", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
-  const visibleCommands = commandsExpanded ? allCommands : allCommands.slice(0, 4);
-
-  // Build final display messages: add thinking/streaming overlay
-  let finalMessages = [...displayMessages];
-  if (processingState === "thinking") {
-    finalMessages = [...finalMessages, {
-      id: "thinking",
-      role: "assistant",
-      content: THINKING_MESSAGES[thinkingIndex],
-      metadata: { timer_ms: elapsedMs },
-    }];
-  } else if (processingState === "streaming") {
-    if (reasoningContent) {
-      finalMessages = [...finalMessages, {
-        id: "reasoning-live",
-        role: "assistant",
-        content: reasoningContent,
-        metadata: { isReasoning: true },
-      }];
-    }
-  }
-
-  const hasLiveReasoning = processingState === "streaming" && reasoningContent;
-
-  // Context budget from latest assistant message
-  const lastAssistantMsg = [...displayMessages].reverse().find(m => m.role === "assistant" && m.metadata);
-  const contextBudget = (lastAssistantMsg?.metadata as any)?.context_budget || {};
-  const contextNearLimit = contextBudget.near_limit || contextBudget.was_trimmed;
-  const contextTokens = contextBudget.estimated_tokens || contextBudget.trimmed_tokens || 0;
-
-  const handleToggleThinking = () => {
+  function toggleThinking() {
     const next = !thinkingEnabled;
     setThinkingEnabled(next);
-    api.saveSettings({ chain_of_thought: next });
-  };
+    void api.saveSettings({ chain_of_thought: next });
+  }
 
-  return (
-    <div className="flex h-[calc(100vh-10rem)] flex-col gap-6">
-      {/* Header Info Card */}
-      <div className="flex shrink-0 items-center justify-between rounded-none border border-white/5 bg-night p-6 shadow-glass">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">CHAPPiE</h1>
-          <div className="mt-2 flex gap-4 text-[10px] uppercase tracking-widest text-slate">
-            <span>Model: <span className="text-ember">{status.model ?? "Loading..."}</span></span>
-            <span>via: <span className="text-mist">{status.provider ?? "---"}</span></span>
-            <span>Status: <span className="text-green-500">Active</span></span>
-            {contextTokens > 0 && (
-              <span>Kontext: <span className={contextBudget.was_trimmed ? "text-ember" : contextNearLimit ? "text-yellow-400" : "text-pine"}>
-                {contextBudget.was_trimmed ? "GETRIMMT" : contextTokens + "/7000"}
-              </span></span>
-                    )}
-                  </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleToggleThinking}
-            className={`flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all ${
-              thinkingEnabled
-                ? "bg-pine/20 border-pine/40 text-pine"
-                : "bg-white/5 border-white/10 text-slate"
-            }`}
-            title={thinkingEnabled ? "Reasoning deaktivieren" : "Reasoning aktivieren"}
-          >
-            <span className={`material-symbols-outlined text-[12px] ${thinkingEnabled ? "" : "opacity-50"}`}>psychology</span>
-            <span>Thinking</span>
-            <span className={`ml-0.5 text-[14px] font-bold ${thinkingEnabled ? "" : "opacity-0"}`}>●</span>
-          </button>
-          {Object.entries(status.emotions ?? {}).map(([key, value]) => (
-            <div key={key} className="flex flex-col items-center rounded-none bg-white/5 px-3 py-1.5 min-w-[60px] border border-white/5">
-              <span className="text-[10px] text-slate uppercase">{key}</span>
-              <span className="text-xs font-bold text-mist">{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Messages Area */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto rounded-none border border-white/5 bg-white/[0.02] p-8 space-y-6 scroll-smooth shadow-inner"
-      >
-        {finalMessages.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-slate">
-            <div className="text-center">
-              <span className="material-symbols-outlined text-4xl opacity-20 transition-transform duration-700 hover:scale-110">bubble_chart</span>
-              <p className="mt-4 text-sm tracking-widest uppercase opacity-40">Waiting for interaction...</p>
-            </div>
-          </div>
-        ) : (
-          finalMessages.map((entry, idx) => (
-            <div
-              key={entry.id ?? idx}
-              className={`flex flex-col gap-2 ${entry.role === "assistant" ? "items-start" : "items-end"}`}
-            >
-              {/* CoT box */}
-              {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
-                <div className={`max-w-full lg:max-w-[85%] w-full rounded-none border overflow-hidden ${(entry.metadata as any)?.formatting_failed ? 'border-ember/30 bg-ember/[0.04]' : 'border-pine/20 bg-pine/[0.06]'}`}>
-                  <div className={`flex items-center justify-between px-5 py-2 border-b ${(entry.metadata as any)?.formatting_failed ? 'border-ember/20' : 'border-pine/10'}`}>
-                    <div className="flex items-center gap-2">
-                       <span className={`material-symbols-outlined text-[12px] ${(entry.metadata as any)?.formatting_failed ? 'text-ember' : 'text-pine'}`}>psychology</span>
-                      <p className={`text-[10px] uppercase tracking-widest font-bold ${(entry.metadata as any)?.formatting_failed ? 'text-ember' : 'text-pine'}`}>CHAPPiEs Gedanken <span className="opacity-50 font-normal">(CoT)</span></p>
-                    </div>
-                    {(entry.metadata as any)?.formatting_failed ? (
-                      <span className="text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen</span>
-                    ) : (
-                      <span className="text-[9px] text-slate/60">{(entry.metadata as any)?.formatted_cot ? "formatted" : "raw"}</span>
-                    )}
-                  </div>
-                  <div className={`px-5 py-3 text-xs leading-relaxed break-words max-h-64 overflow-y-auto overflow-x-hidden whitespace-pre-line ${(entry.metadata as any)?.formatting_failed ? 'text-ember/70' : 'text-slate/70'}`}>
-                    {(() => {
-                      const cot = (entry.metadata as any)?.formatted_cot || (entry.metadata as any)?.reasoning || "";
-                      if (cot) {
-                        return cot.length > 4000 ? cot.slice(0, 4000) + "\n\n... (truncated)" : cot;
-                      }
-                      return "CHAPPiE hat nicht darüber nachgedacht und sofort geantwortet.";
-                    })()}
-                  </div>
-                </div>
-              )}
-              {/* Output box */}
-              <div className="flex items-start gap-2 max-w-full lg:max-w-[85%] w-full">
-                <div
-                  className={`flex-1 rounded-none px-6 py-4 shadow-glass transition-all duration-300 border-2 ${
-                    entry.role === "assistant"
-                      ? (entry.metadata as any)?.cot_leak?.is_unexpected_cot
-                        ? "bg-night border-love/40 text-love/85"
-                        : (entry.metadata as any)?.formatting_failed
-                          ? "bg-night border-ember/30 text-ember/80"
-                          : "bg-night border-white/10 text-mist"
-                      : "bg-ember border-ember/20 text-white"
-                  } ${entry.id === "thinking" ? "animate-pulse opacity-70" : ""}`}
-                >
-                  <p className={`mb-2 text-[10px] uppercase tracking-widest opacity-50 ${(entry.metadata as any)?.cot_leak?.is_unexpected_cot ? 'text-love' : ''}`}>
-                    {entry.role === "assistant" ? (!["streaming", "thinking", "reasoning-live"].includes(entry.id || "") ? "CHAPPiEs Antwort" : "CHAPPiE") : entry.role}
-                  </p>
-                  {entry.role === "assistant" && (entry.metadata as any)?.cot_leak?.is_unexpected_cot && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
-                    <p className="mb-1 text-[9px] text-love font-bold uppercase flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[11px]">warning</span>
-                      Unerwartetes Reasoning in Antwort (Score: {(entry.metadata as any).cot_leak?.score?.toFixed(2)})
-                    </p>
-                  )}
-                  {entry.role === "assistant" && (entry.metadata as any)?.formatting_failed && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && (
-                    <p className="mb-1 text-[9px] text-ember font-bold uppercase">Formatierungs-API fehlgeschlagen — Rohtext</p>
-                  )}
-                  {entry.id === "streaming" ? (
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-all">
-                      {entry.content}
-                    </div>
-                  ) : entry.id === "reasoning-live" ? (
-                    <details open className="text-xs leading-relaxed whitespace-pre-wrap break-all">
-                      <summary className="text-[10px] uppercase tracking-widest text-pine cursor-pointer mb-1">CHAPPiEs Gedanken (CoT) — live</summary>
-                      <div className="text-slate/70">{entry.content}</div>
-                    </details>
-                  ) : entry.id === "thinking" ? (
-                    <div>
-                      <div className="text-sm leading-relaxed break-all">{entry.content}</div>
-                      {((entry.metadata as any)?.timer_ms > 0) && (
-                        <div className="mt-1.5 text-[10px] text-slate/40 font-mono">
-                          {(entry.metadata as any).timer_ms < 60000
-                            ? `${((entry.metadata as any).timer_ms / 1000).toFixed(1)}s`
-                            : `${Math.floor((entry.metadata as any).timer_ms / 60000)}m ${Math.floor(((entry.metadata as any).timer_ms % 60000) / 1000)}s`}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-sm leading-relaxed whitespace-pre-line">
-                      {parseEmotionalText(entry.content).map((part, index) => (
-                        <span key={`${index}-${part.tone}`} className={emotionalPartClass(part)}>
-                          {part.text}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* Info + Raw Buttons */}
-                {entry.role === "assistant" && !["streaming", "thinking", "reasoning-live"].includes(entry.id || "") && entry.metadata && (
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <div className="relative group">
-                      <button
-                        onClick={() => setPopupMsg(entry)}
-                        className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[10px] text-slate transition-all hover:bg-ember hover:text-white hover:border-ember/30"
-                        title="Details anzeigen"
-                      >
-                        i
-                      </button>
-                      <div className="pointer-events-none absolute left-0 bottom-full mb-1 z-50 hidden group-hover:block">
-                         <div className="rounded-none border border-white/10 bg-night/95 p-3 shadow-glass w-72">
-                          <p className="mb-1.5 text-[9px] uppercase tracking-widest text-ember">Preview</p>
-                          {(() => {
-                            const meta = entry.metadata as any;
-                            const memories = meta.rag_memories || [];
-                            const topMem = memories.slice(0, 3);
-                            const deltas = meta.emotions_delta || {};
-                            const deltaKeys = Object.keys(deltas).filter(k => deltas[k]?.change !== 0);
-                             const previewLines: string[] = [];
-                             if (memories.length > 0) previewLines.push(`${memories.length} LTM-Erinnerungen (top: ${topMem.length > 0 ? Math.round((topMem[0].relevance_score || 0) * 100) : 0}% Relevanz)`);
-                             if (deltaKeys.length > 0) previewLines.push(`Emotionen: ${deltaKeys.slice(0, 2).map(k => `${k} ${deltas[k]?.change > 0 ? "+" : ""}${deltas[k]?.change}`).join(", ")}`);
-                             const consol = meta.memory_consolidation || {};
-                             if (consol.ltm_loaded) previewLines.push(`Konsolidierung: ${consol.ltm_loaded} LTM → ${consol.ltm_consolidated} | ${consol.stm_loaded} STM → ${consol.stm_consolidated}`);
-                             const budget = meta.context_budget || {};
-                             if (budget.estimated_tokens) previewLines.push(`Kontext: ${budget.estimated_tokens}/7000 Tokens${budget.was_trimmed ? " (GETRIMMT)" : ""}`);
-                              previewLines.push(`Intent: ${meta.intent_type || "casual_chat"}`);
-                              const repEvt = meta.repetition_events || {};
-                              const repKeys = Object.keys(repEvt);
-                              if (repKeys.length > 0) previewLines.push(`⚠ Repetition: ${repKeys.join(", ")}`);
-                              if (meta.processing_time_ms) previewLines.push(`Dauer: ${(meta.processing_time_ms / 1000).toFixed(1)}s`);
-                             previewLines.push(`Provider: ${meta.provider || "---"} / ${meta.model || "---"}`);
-                            return previewLines.slice(0, 8).map((line, i) => (
-                              <div key={i} className="text-[10px] leading-relaxed text-slate/60">- {line}</div>
-                            ));
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                    {(entry.metadata as any)?.raw_response && (
-                      <button
-                        onClick={() => setRawPopupMsg(entry)}
-                        className="flex h-7 w-7 items-center justify-center rounded-none border border-white/10 bg-white/5 text-[8px] font-bold text-slate transition-all hover:bg-pine hover:text-white hover:border-pine/30"
-                        title="Raw Output anzeigen"
-                      >
-                        R
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Info Popup Modal — Split-Layout, größer */}
-      {popupMsg && (
-        <div className="fixed inset-[4%] z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setPopupMsg(null)}>
-          <div className="w-full h-full max-w-[1600px] overflow-hidden rounded-none border border-white/10 bg-night shadow-glass flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-mist">Verarbeitungsdetails</h2>
-              <button onClick={() => setPopupMsg(null)} className="text-slate hover:text-white transition-colors">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            {(() => {
-              const meta = (popupMsg.metadata || {}) as any;
-              const memories = meta.rag_memories || [];
-              const deltas = meta.emotions_delta || {};
-              const before = meta.emotions_before || {};
-              const steering = meta.emotion_steering || {};
-              const trace = meta.memory_trace || {};
-              const causal = meta.causal_trace || [];
-              const consolidation = meta.memory_consolidation || {};
-              const budget = meta.context_budget || {};
-              const repEvents = meta.repetition_events || {};
-              return (
-                <div className="flex-1 overflow-y-auto p-6 space-y-3 text-xs text-slate">
-
-                  {/* 1. Ueberblick */}
-                  <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                    <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Ueberblick</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-3 gap-y-1 text-[10px]">
-                      <div><span className="text-slate/40">Provider</span><br/><span className="text-slate/70">{meta.provider||"?"}</span></div>
-                      <div><span className="text-slate/40">Modell</span><br/><span className="text-slate/70">{meta.model||"?"}</span></div>
-                      <div><span className="text-slate/40">Dauer</span><br/><span className="text-slate/70">{meta.processing_time_ms?(meta.processing_time_ms/1000).toFixed(1)+"s":"?"}</span></div>
-                      <div><span className="text-slate/40">Intent</span><br/><span className="text-slate/70">{meta.intent_type||"?"} {meta.intent_confidence!=null?Math.round(meta.intent_confidence*100)+"%":""}</span></div>
-                      <div><span className="text-slate/40">Tone</span><br/><span className="text-slate/70">{meta.tone_decision?.tone||"?"}</span></div>
-                      <div><span className="text-slate/40">Tool Calls</span><br/>
-                        <span className="text-slate/70">{meta.tool_calls_executed??"0"}</span>
-                        {meta.selected_tools && (Array.isArray(meta.selected_tools) ? meta.selected_tools : String(meta.selected_tools).split(",")).filter(Boolean).length > 0 && (
-                          <div className="flex flex-wrap gap-0.5 mt-0.5">
-                            {(Array.isArray(meta.selected_tools) ? meta.selected_tools : String(meta.selected_tools).split(",")).filter(Boolean).map((t: string) => (
-                              <span key={t} className="text-[7px] px-1 border border-white/10 text-slate/30">{t.trim()}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div><span className="text-slate/40">Short-Term</span><br/><span className="text-slate/70">{meta.short_term_count??"?"}</span></div>
-                      <div><span className="text-slate/40">Format</span><br/>
-                        <span className={meta.formatting_failed ? "text-ember" : meta.formatting_source === "groq" ? "text-emerald" : "text-amber"}>
-                          {meta.formatting_failed ? "FAIL" : meta.formatting_source === "groq" ? "GROQ" : "LOCAL"}
-                          {!meta.formatting_failed && <span className="opacity-40 ml-0.5">({meta.formatting_model || "?"})</span>}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. Emotionen + Steering */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Emotionen</p>
-                      {Object.keys(deltas).length===0?(
-                        <p className="text-slate/40 italic text-[10px]">Keine Aenderungen</p>
-                      ):(
-                        <div className="grid grid-cols-4 gap-1">
-                          {Object.entries(deltas).map(([key,val]:[string,any])=>{
-                            const change=val?.change||0;
-                            const color=change>0?"text-green-400":change<0?"text-red-400":"text-slate/50";
-                            return (
-                              <div key={key} className="border border-white/5 bg-white/[0.01] px-1.5 py-1 text-center">
-                                <div className="text-[8px] uppercase text-slate/40">{key}</div>
-                                <div className="text-[10px] font-medium">
-                                  <span className="text-slate/60">{val?.before??(before[key]??"?")}</span>
-                                  <span className="mx-0.5 text-slate/30">→</span>
-                                  <span className="text-slate/70">{val?.after??"?"}</span>
-                                  <span className={`ml-0.5 ${color}`}>{change>0?"+":""}{change}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Steering</p>
-                      {steering.steering_active?(
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                          <div><span className="text-slate/40">Mode</span><br/><span className="text-slate/70">{steering.summary||meta.prompt_emotion_mode||"vector"}</span></div>
-                          <div><span className="text-slate/40">Dominant</span><br/><span className="text-slate/70">{steering.dominant_vector||"neutral"} ({steering.dominant_strength||0})</span></div>
-                          <div className="col-span-2"><span className="text-slate/40">Aktive Vektoren</span><br/><span className="text-slate/70">{(steering.active_vectors||steering.base_vectors||[]).map((v:any)=>v?.name||v).filter(Boolean).join(", ")||"none"}</span></div>
-                          {steering.composite_modes?.length>0&&(
-                            <div className="col-span-2"><span className="text-slate/40">Composite</span><br/><span className="text-slate/70">{steering.composite_modes.map((m:any)=>`${m?.name}(${m?.strength})`).join(", ")}</span></div>
-                          )}
-                        </div>
-                      ):(
-                        <p className="text-slate/40 italic text-[10px]">Steering inaktiv</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 3. Memory */}
-                  {(memories.length>0||(consolidation&&(consolidation.ltm_loaded||consolidation.stm_loaded)))&&(
-                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                      <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-                        <p className="text-[10px] uppercase tracking-widest text-ember">Memory</p>
-                        <span className="text-[9px] text-slate/40">{memories.length} LTM-Matches</span>
-                        {(consolidation&&(consolidation.ltm_loaded||consolidation.stm_loaded))&&(
-                          <span className="text-[9px] text-pine/60">
-                            Konsol.: LTM {consolidation.ltm_loaded}→{consolidation.ltm_consolidated}, STM {consolidation.stm_loaded}→{consolidation.stm_consolidated}
-                            {consolidation.duplicates_merged?`, ${consolidation.duplicates_merged} Merges`:""}
-                            {consolidation.critical_events?`, ${consolidation.critical_events} Kritisch`:""}
-                          </span>
-                        )}
-                      </div>
-                      {memories.length>0&&(
-                        <div className="space-y-1.5 max-h-[160px] overflow-y-auto">
-                          {memories.map((mem:any,i:number)=>(
-                            <div key={i} className="border-l-2 border-white/10 pl-2 py-0.5">
-                              <div className="flex gap-2 items-baseline">
-                                <span className="text-[8px] uppercase text-slate/40">{mem.role}</span>
-                                <span className="text-[8px] text-ember font-bold">{Math.round((mem.relevance_score||0)*100)}%</span>
-                                <span className="text-[8px] text-slate/30">{mem.label}</span>
-                              </div>
-                              <div className="text-[9px] leading-relaxed text-slate/60 mt-0.5 line-clamp-2">{mem.content}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 3b. Focus + Global Workspace */}
-                  {(() => {
-                    const ws = meta.global_workspace || {};
-                    const focus = ws.dominant_focus || {};
-                    const trace = meta.memory_trace || {};
-                    const merged = trace.merged || trace.seed || {};
-                    if (!focus.label && !merged.memories_found) return null;
-                    return (
-                      <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Focus + Kontext</p>
-                        <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[10px]">
-                          <div><span className="text-slate/40">Dominant Focus</span><br/><span className="text-slate/70">{focus.label || "—"}</span></div>
-                          <div><span className="text-slate/40">Salience</span><br/><span className="text-slate/70">{focus.salience != null ? focus.salience.toFixed(2) : "—"}</span></div>
-                          <div><span className="text-slate/40">Broadcast</span><br/><span className="text-slate/70">{(ws.broadcast || "—").slice(0, 40)}</span></div>
-                          <div><span className="text-slate/40">Memories</span><br/><span className="text-slate/70">{merged.memories_found ?? "—"}</span></div>
-                          <div><span className="text-slate/40">Top Relevance</span><br/><span className="text-slate/70">{merged.top_relevance != null ? merged.top_relevance.toFixed(2) : "—"}</span></div>
-                          <div><span className="text-slate/40">Query</span><br/><span className="text-slate/70">{(merged.query || merged.stage || "—").slice(0, 30)}</span></div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* 4. Timing + Budget */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {meta.timing&&(
-                      <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Timing</p>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-                          <div><span className="text-slate/40">TTFT</span><br/><span className="text-slate/70">{meta.timing.ttft_ms!=null?(meta.timing.ttft_ms/1000).toFixed(2)+"s":"?"}</span></div>
-                          <div><span className="text-slate/40">Gesamt</span><br/><span className="text-slate/70">{meta.timing.total_gen_ms!=null?(meta.timing.total_gen_ms/1000).toFixed(2)+"s":"?"}</span></div>
-                          <div><span className="text-slate/40">Thinking</span><br/><span className="text-slate/70">{meta.timing.reasoning_time_ms!=null?(meta.timing.reasoning_time_ms/1000).toFixed(2)+"s":"?"} ({meta.timing.reasoning_tokens??0}tk)</span></div>
-                          <div><span className="text-slate/40">Antwort</span><br/><span className="text-slate/70">{meta.timing.answer_time_ms!=null?(meta.timing.answer_time_ms/1000).toFixed(2)+"s":"?"} ({meta.timing.answer_tokens??0}tk)</span></div>
-                          <div className="col-span-2"><span className="text-slate/40">Total Tokens</span><br/><span className="text-slate/70">{meta.timing.total_tokens??"?"}</span></div>
-                        </div>
-                      </div>
-                    )}
-                    {(budget.estimated_tokens||budget.near_limit||budget.was_trimmed)&&(
-                      <div className={`rounded-none border p-3 ${budget.was_trimmed?'border-ember/30 bg-ember/[0.04]':budget.near_limit?'border-yellow-500/20 bg-yellow-500/[0.04]':'border-white/5 bg-white/[0.02]'}`}>
-                        <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Kontext-Budget</p>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-                          <div><span className="text-slate/40">Tokens</span><br/><span className="text-slate/70">{budget.estimated_tokens??"?"} / {budget.trimmed_tokens?budget.original_tokens+"→"+budget.trimmed_tokens:"7000"}</span></div>
-                          <div><span className="text-slate/40">Status</span><br/><span className={budget.was_trimmed?"text-ember":budget.near_limit?"text-yellow-400":"text-pine"}>{budget.was_trimmed?"GETRIMMT":budget.near_limit?"NAHE LIMIT":"OK"}</span></div>
-                          {budget.was_trimmed&&(
-                            <div className="col-span-2"><span className="text-slate/40">Aktion</span><br/><span className="text-ember">{budget.removed_messages} aeltere Messages entfernt</span></div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. Causal Trace */}
-                  {causal&&causal.length>0&&(
-                    <div className="rounded-none border border-white/5 bg-white/[0.02] p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Causal Trace</p>
-                      <div className="space-y-1">
-                        {causal.map((step:any,idx:number)=>(
-                          <div key={idx} className="text-[10px] text-slate/50 border-l-2 border-white/10 pl-2">
-                            <span className="text-slate/70">{step.phase}:</span> {step.driver}
-                            {step.effect&&<span className="text-slate/40"> — {step.effect}</span>}
-                            {step.evidence&&(Array.isArray(step.evidence)?step.evidence.length>0:step.evidence)&&(
-                              <span className="text-slate/30 ml-1">[{Array.isArray(step.evidence)?step.evidence.join(", "):String(step.evidence)}]</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 6. Repetition Events */}
-                  {repEvents&&Object.keys(repEvents).length>0&&(
-                    <div className="rounded-none border border-ember/20 bg-ember/[0.04] p-3">
-                      <p className="text-[10px] uppercase tracking-widest text-ember mb-2">Repetition-Events erkannt</p>
-                      <div className="space-y-1">
-                        {Object.entries(repEvents).map(([key,val]:[string,any])=>(
-                          <div key={key} className="text-[10px] text-slate/50 border-l-2 border-ember/30 pl-2">
-                            <span className="text-ember font-medium">{key}</span>
-                            {typeof val==="object"&&val!==null&&(
-                              <span className="text-slate/40 ml-1">{Object.entries(val).map(([k,v])=>`${k}=${v}`).join(", ")}</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Raw Output Popup Modal — größer */}
-      {rawPopupMsg && (
-        <div className="fixed inset-[8%] z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setRawPopupMsg(null)}>
-          <div className="w-full h-full max-w-[1600px] overflow-hidden rounded-none border border-pine/20 bg-night flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 shrink-0">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-pine">Raw Output (Unformatted)</h2>
-              <button onClick={() => setRawPopupMsg(null)} className="text-slate hover:text-white transition-colors">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            {(() => {
-              const meta = (rawPopupMsg.metadata || {}) as any;
-              const rawText = meta.raw_response || rawPopupMsg.content || "";
-              const fmtModel = meta.formatting_model || "?";
-              return (
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                  <div className="rounded-none border border-pine/10 bg-pine/[0.04] p-4">
-                    <p className="text-xs leading-relaxed text-slate/70">
-                      Dies ist CHAPPiEs interne Antwort <strong className="text-pine">vor</strong> der Formatierung. Das KI-Modell <strong className="text-pine">{fmtModel}</strong> wurde verwendet, um Chain-of-Thought und Antwort lesbar zu strukturieren. Dabei koennen kleine Details verloren gehen, Wiederholungen herausgeschnitten oder Rechtschreibfehler korrigiert werden. Hier siehst du den originalen Roh-Output.
-                    </p>
-                  </div>
-                  <div className="flex-1 overflow-y-auto rounded-none border border-white/5 bg-white/[0.02] p-4 min-h-[40vh]">
-                    <pre className="text-xs leading-relaxed text-slate/60 whitespace-pre-wrap break-words font-mono">{rawText}</pre>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* Input Section */}
-      <div className="shrink-0 space-y-4">
-        {/* Message Queue */}
-        {queue.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {queue.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 rounded-none bg-ember/10 border border-ember/20 px-3 py-1.5 text-xs text-mist max-w-[280px]"
-              >
-                <span className="truncate">{item.text}</span>
-                <button
-                  type="button"
-                  onClick={() => removeFromQueue(item.id)}
-                  className="text-slate hover:text-white transition-colors flex-shrink-0"
-                >
-                  <span className="material-symbols-outlined text-sm leading-none">close</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className={`flex flex-wrap gap-2 transition-all duration-500`}>
-          {visibleCommands.map((command) => (
-            <button
-              key={command}
-              type="button"
-              onClick={() => setMessage(command)}
-              className="rounded-none bg-white/5 border border-white/5 px-4 py-2 text-xs text-slate transition-all hover:bg-ember hover:text-white"
-            >
-              {command}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setCommandsExpanded(!commandsExpanded)}
-            className={`rounded-none px-4 py-2 text-xs transition-all ${commandsExpanded ? "bg-ember text-white" : "bg-white/5 text-slate hover:bg-white/10"}`}
-          >
-            <span className="material-symbols-outlined text-sm leading-none">{commandsExpanded ? "close" : "more_horiz"}</span>
-          </button>
-        </div>
-
-        {/* Emotion Autocomplete Popup */}
-        {showEmotionPopup && (
-          <div ref={emotionPopupRef} className="rounded-none border border-ember/30 bg-[#121212] p-4 shadow-2xl">
-            <p className="text-xs text-slate mb-3">Emotion auswaehlen (Syntax: /emotion &lt;name&gt; [+/-]wert)</p>
-            <div className="grid grid-cols-4 gap-2">
-              {EMOTION_NAMES.map((name) => {
-                const current = status.emotions?.[name] ?? 0;
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => {
-                      setMessage(`/emotion ${name} `);
-                      setShowEmotionPopup(false);
-                    }}
-                    className="rounded-none border border-white/10 bg-white/5 px-3 py-2 text-left transition-all hover:border-ember hover:bg-white/10"
-                  >
-                    <div className="text-xs font-bold text-mist">{name}</div>
-                    <div className="text-[10px] text-slate">{current}/100</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex gap-2 text-[10px] text-slate">
-              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion happiness +10</span>
-              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion sadness -5</span>
-              <span className="bg-white/5 px-2 py-0.5 rounded-none">/emotion energy 80</span>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="relative">
-          <textarea
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isProcessing ? "CHAPPiE antwortet gerade..." : "Write a message or use /commands..."}
-            className="w-full rounded-none border border-white/10 bg-input p-5 pr-32 text-sm text-mist shadow-glass outline-none transition-all placeholder:text-slate focus:border-ember focus:ring-1 focus:ring-ember/20"
-            rows={2}
-          />
-          <button
-            type="submit"
-            disabled={!message.trim()}
-            className="absolute right-3 bottom-3 rounded-none bg-ember px-6 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale disabled:hover:scale-100"
-          >
-            Send
-          </button>
-        </form>
-      </div>
+  return <div className="terminal-chat flex h-full min-h-0 flex-col bg-ink">
+    <div className="terminal-session-bar flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2"><span className="font-semibold text-[10px] uppercase tracking-[0.28em] text-mist">CHAPPiE</span><button type="button" onClick={toggleThinking} className={`terminal-toggle px-[0.5rem] py-[0.3rem] text-[10px] ${thinkingEnabled ? "is-active" : ""}`} title="Toggle reasoning">{thinkingEnabled ? "CoT on" : "CoT off"}</button></div>
+    <div ref={scrollRef} className="terminal-log min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:px-5" aria-live="polite">
+      {finalMessages.length === 0 ? <div className="flex min-h-full items-center justify-center"><div className="w-full max-w-[34rem] border-l-2 border-terminal-green/35 pl-3 text-[11px] leading-relaxed text-slate/45"><div className="text-terminal-green">User _</div><p className="mt-2">No traces yet. Send a message or run a command to start the workspace.</p><p className="mt-1 text-slate/30">Try /help · /stats · /debug</p></div></div> : <div className="space-y-5">{finalMessages.map((entry, index) => <TerminalEntry key={entry.id ?? index} message={entry} thinkingEnabled={thinkingEnabled} onSelectTrace={selectTrace} />)}</div>}
     </div>
-  );
+    <div className="terminal-input-area relative shrink-0 border-t border-white/10 bg-night px-3 py-3 lg:px-5">
+      {queue.length > 0 && <div className="mb-2 space-y-1">{queue.map((item, index) => <div key={item.id} className="flex items-center gap-2 text-[9px] text-terminal-amber/80"><span>[queue {index + 1}]</span><span className="min-w-0 truncate">{item.text}</span><button type="button" className="ml-auto text-slate/40 hover:text-terminal-red" onClick={() => setQueue((items) => items.filter((queued) => queued.id !== item.id))}>x</button></div>)}</div>}
+      <div className="mb-2 flex flex-wrap gap-1">{visibleCommands.map((command) => <button key={command} type="button" className="terminal-command" onClick={() => setMessage(command)}>{command}</button>)}<button type="button" className="terminal-command text-terminal-green" onClick={() => setCommandsExpanded((value) => !value)}>{commandsExpanded ? "less" : "more"}</button></div>
+      {showEmotionPopup && <div ref={emotionPopupRef} className="absolute inset-x-3 bottom-[calc(100%-1px)] z-10 border border-terminal-green/30 bg-[#111615] p-3 lg:inset-x-5"><div className="mb-2 text-[9px] uppercase tracking-widest text-slate/45">/emotion &lt;name&gt; [+/-]value</div><div className="grid grid-cols-2 gap-1 sm:grid-cols-5">{EMOTION_NAMES.map((name) => <button key={name} type="button" className="border border-white/10 px-2 py-1 text-left text-[9px] text-slate/65 hover:border-terminal-green/50 hover:text-terminal-green" onClick={() => { setMessage(`/emotion ${name} `); setShowEmotionPopup(false); }}>{name}<span className="ml-1 text-slate/30">{status.emotions?.[name] ?? "—"}</span></button>)}</div></div>}
+      <form onSubmit={handleSubmit} className="flex items-end gap-2"><textarea value={message} onChange={(event) => { setMessage(event.target.value); setHistoryIndex(-1); }} onKeyDown={handleKeyDown} rows={2} placeholder={isProcessing ? "_ CHAPPiE antwortet gerade..." : "_ write a message or use /commands..."} className="terminal-input min-h-[3.5rem] flex-1 resize-none border border-white/12 bg-input px-3 py-2 text-[11px] leading-relaxed text-mist outline-none placeholder:text-slate/35 focus:border-terminal-green/55" /><button type="submit" disabled={!message.trim()} className="terminal-send h-[3.5rem] border border-terminal-green/45 px-3 text-[10px] uppercase tracking-widest text-terminal-green hover:bg-terminal-green/10 disabled:cursor-not-allowed disabled:opacity-25">send</button></form>
+      <div className="mt-2 flex items-center justify-between text-[8px] uppercase tracking-widest text-slate/25"><span>enter send · shift+enter newline · tab complete</span>{isProcessing && <span>{formatDuration(elapsedMs)} elapsed</span>}</div>
+    </div>
+  </div>;
 }

@@ -13,10 +13,14 @@ export default {
                 cream: "#EADFCE", // Warm secondary
                 input: "#1A1A1A", // NEW: Dark gray for input boxes
                 loading: "#F26A1B", // Orange for loading
-                warning: "#EF4444" // Red for warning
+                warning: "#EF4444", // Red for warning
+                "terminal-green": "#2DD4BF",
+                "terminal-amber": "#FBBF24",
+                "terminal-red": "#EF4444"
             },
             fontFamily: {
-                sans: ["Space Grotesk", "ui-sans-serif", "system-ui"]
+                sans: ["Space Grotesk", "ui-sans-serif", "system-ui"],
+                mono: ["JetBrains Mono", "Ubuntu Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
             },
             borderRadius: {
                 "squircle-sm": "1rem",

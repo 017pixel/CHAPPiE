@@ -3,49 +3,281 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply min-h-screen bg-ink text-mist antialiased;
-    background-image: 
-      radial-gradient(circle at 10% 20%, rgba(106, 141, 115, 0.08), transparent 40%),
-      radial-gradient(circle at 90% 80%, rgba(61, 90, 68, 0.15), transparent 40%);
+  :root {
+    color-scheme: dark;
+    font-family: "JetBrains Mono", "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
+  html,
+  body,
   #root {
-    @apply min-h-screen overflow-x-hidden;
+    min-height: 100%;
+    width: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-ink text-mist antialiased;
+    overflow: hidden;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 1px solid #2dd4bf;
+    outline-offset: 2px;
   }
 }
 
-/* Custom Scrollbar Styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #315343 #101312;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #121212;
+  background: #101312;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3D5A44;
-  border-radius: 0;
+  background: #315343;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6A8D73;
-}
-
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3D5A44 #121212;
+  background: #2dd4bf;
 }
 
 @layer components {
-  .glass-panel {
-    @apply border border-white/5 bg-white/5 backdrop-blur-xl;
+  .terminal-icon-button {
+    display: inline-flex;
+    height: 1.5rem;
+    min-width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(244, 239, 230, 0.65);
   }
 
-  .square-button {
-    @apply rounded-none border-2 border-white/10 transition-all duration-300 active:scale-95;
+  .terminal-icon-button:hover {
+    border-color: rgba(45, 212, 191, 0.55);
+    color: #2dd4bf;
+  }
+
+  .terminal-split-layout {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .inspector-content {
+    grid-template-columns: minmax(180px, var(--inspector-tree-split, 34%)) 4px minmax(0, 1fr);
+  }
+
+  .terminal-split-pane {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .terminal-divider {
+    position: relative;
+    z-index: 10;
+    width: 4px;
+    flex: 0 0 4px;
+    cursor: col-resize;
+    background: #1c2821;
+    transition: background-color 120ms ease;
+  }
+
+  .terminal-divider:hover,
+  .terminal-split-layout.is-dragging .terminal-divider {
+    background: #2dd4bf;
+  }
+
+  .terminal-divider-handle {
+    position: absolute;
+    top: 50%;
+    left: -3px;
+    width: 10px;
+    height: 42px;
+    border: 1px solid rgba(45, 212, 191, 0.45);
+    background: #101312;
+    transform: translateY(-50%);
+    opacity: 0;
+  }
+
+  .terminal-divider:hover .terminal-divider-handle,
+  .terminal-split-layout.is-dragging .terminal-divider-handle {
+    opacity: 1;
+  }
+
+  .terminal-pane-wrapper {
+    border-right: 0;
+  }
+
+  .terminal-session-bar,
+  .inspector-header,
+  .inspector-toolbar {
+    background: #121715;
+  }
+
+  .terminal-log {
+    background: #0d0f0e;
+    box-shadow: inset 0 12px 28px rgba(0, 0, 0, 0.2);
+  }
+
+  .terminal-log-entry {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .terminal-user-entry {
+    border-left: 2px solid rgba(45, 212, 191, 0.55);
+    padding-left: 0.75rem;
+  }
+
+  .terminal-assistant-entry {
+    border-left: 2px solid rgba(244, 239, 230, 0.18);
+    padding-left: 0.75rem;
+  }
+
+  .terminal-assistant-entry.has-error {
+    border-left-color: rgba(239, 68, 68, 0.8);
+  }
+
+  .terminal-prompt-line {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    flex-wrap: wrap;
+    font-size: 10px;
+    line-height: 1.5;
+  }
+
+  .terminal-output {
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .terminal-reasoning summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .terminal-cursor {
+    animation: terminal-blink 1s steps(2, start) infinite;
+  }
+
+  .terminal-toggle,
+  .terminal-command,
+  .inspector-action,
+  .mode-toggle,
+  .filter-chip {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    padding: 0.25rem 0.45rem;
+    font-size: 9px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(140, 140, 140, 0.72);
+    transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+  }
+
+  .terminal-toggle:hover,
+  .terminal-command:hover,
+  .inspector-action:hover,
+  .mode-toggle:hover,
+  .filter-chip:hover {
+    border-color: rgba(45, 212, 191, 0.5);
+    color: #2dd4bf;
+  }
+
+  .terminal-toggle.is-active,
+  .mode-toggle.is-active,
+  .filter-chip.is-active {
+    border-color: rgba(45, 212, 191, 0.55);
+    background: rgba(45, 212, 191, 0.08);
+    color: #2dd4bf;
+  }
+
+  .terminal-send:disabled {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .tree-badge {
+    border: 1px solid currentColor;
+    padding: 0.05rem 0.2rem;
+    font-size: 8px;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  .timeline-dot {
+    display: block;
+    height: 6px;
+    width: 6px;
+    flex: 0 0 6px;
+  }
+
+  .trace-card {
+    box-shadow: none;
+  }
+
+  @keyframes terminal-blink {
+    50% { opacity: 0; }
+  }
+}
+
+@media (min-width: 1024px) {
+  .terminal-pane-wrapper {
+    min-width: 320px;
+  }
+
+  .inspector-pane-wrapper {
+    min-width: 320px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .terminal-split-layout {
+    display: block;
+  }
+
+  .terminal-split-pane {
+    height: 100%;
+    width: 100%;
+  }
+
+  .terminal-pane-wrapper,
+  .inspector-pane-wrapper {
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+
+  .terminal-divider {
+    display: none;
+  }
+
+  .mobile-pane-hidden {
+    display: none;
+  }
+
+  .mobile-pane-visible {
+    display: block;
+  }
+
+  .inspector-content {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
