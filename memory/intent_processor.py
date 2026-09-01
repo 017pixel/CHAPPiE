@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from config.config import settings
+from config.config import settings, LLMProvider
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, emotion_list_text
 from config.prompts import INTENT_SYSTEM_PROMPT_TEMPLATE, INTENT_USER_PROMPT_TEMPLATE  # from config/prompts.py
 from brain import get_brain
@@ -83,10 +83,9 @@ class IntentProcessor:
         self._init_brain()
     
     def _init_brain(self):
-        """Initialisiert das Modell basierend auf Intent-Provider oder Haupt-Provider."""
-        intent_provider = settings.get_effective_provider(settings.intent_provider)
-        intent_model = settings.get_intent_model(settings.intent_provider)
-        self.brain = get_brain(provider=intent_provider, model=intent_model)
+        """Uses the same local vLLM model as the main chat path."""
+        intent_model = settings.resolve_vllm_runtime_model(settings.vllm_model)
+        self.brain = get_brain(provider=LLMProvider.VLLM, model=intent_model)
     
     def process(self, user_input: str, history: List[Dict], 
                 current_emotions: Dict[str, int],
@@ -105,7 +104,7 @@ class IntentProcessor:
         # Quick-Classify: triviale Inputs ohne LLM-Call erkennen
         quick = self._quick_classify(user_input)
         if quick:
-            return quick
+            return self._augment_local_state_tools(quick, user_input)
 
         if deterministic:
             result = self._create_fallback_result(
@@ -115,7 +114,7 @@ class IntentProcessor:
                 reason="research_deterministic_intent",
             )
             result.raw_json = {"research_deterministic_intent": True}
-            return result
+            return self._augment_local_state_tools(result, user_input)
 
         # A second model pass is expensive (especially with Gemma) and adds no
         # useful information for closed, self-contained questions.  Keep the
@@ -140,7 +139,7 @@ class IntentProcessor:
                 "need_long_term_memory": False,
             }
             result.raw_json = {"deterministic_fast_path": True}
-            return result
+            return self._augment_local_state_tools(result, user_input)
 
         # Baue Prompt
         system_prompt = self._build_system_prompt()
@@ -167,12 +166,140 @@ class IntentProcessor:
             json_data = self._extract_json(raw_response)
             
             # Parse zu IntentResult
-            return self._parse_intent_result(json_data)
+            return self._augment_local_state_tools(self._parse_intent_result(json_data), user_input)
             
         except Exception as e:
             # Lokaler Fallback bei Provider-Fehlern oder Groq-Rate-Limits.
             print(f"[IntentProcessor] Fehler: {e}")
-            return self._create_fallback_result(user_input, history, current_emotions, reason=str(e))
+            return self._augment_local_state_tools(
+                self._create_fallback_result(user_input, history, current_emotions, reason=str(e)),
+                user_input,
+            )
+
+    @staticmethod
+    def _augment_local_state_tools(result: IntentResult, user_input: str) -> IntentResult:
+        """Adds explicit, local state writes when the intent model omits them.
+
+        Context files must not depend on a perfectly formatted second-model
+        JSON response. Only explicit user statements are promoted here; free
+        conversation remains untouched and the existing model-selected tools
+        stay authoritative when present.
+        """
+        text = str(user_input or "").strip()
+        lower = text.casefold()
+        inferred: list[ToolCall] = []
+
+        stateful_markers = (
+            "chappie", "wer bist du", "was bist du", "welches modell",
+            "was für ein modell", "was fuer ein modell", "ki-modell", "ki modell",
+            "systemprompt", "system prompt", "deine erinnerungen",
+            "was hast du für erinnerungen", "was hast du fuer erinnerungen",
+            "deine identität", "deine identitaet", "dein selbstbild",
+            "wie geht es dir", "wie gehts dir", "was fühlst du", "was fuehlst du",
+            "was denkst du", "worüber hast du", "woroüber hast du",
+            "merk dir", "erinnere dich", "erinnerst du", "weißt du noch", "weisst du noch",
+            "mein name", "ich heiße", "ich heisse", "mein projekt", "lieblingsprojekt",
+            "ich arbeite an", "woran arbeite ich", "was arbeite ich",
+        )
+        if any(marker in lower for marker in stateful_markers):
+            result.context_requirements = {
+                "need_soul_context": True,
+                "need_user_context": True,
+                "need_preferences": True,
+                "need_short_term_memory": True,
+                "need_long_term_memory": True,
+            }
+            result.fact_lookup_intent = True
+            # Small local keyword fallback for fact questions. This keeps
+            # retrieval deterministic when the intent model returns valid JSON
+            # but omits its optional memory_retrieval block.
+            local_stop_words = {
+                "ich", "du", "der", "die", "das", "und", "oder", "aber", "wie",
+                "was", "mein", "meine", "dein", "deine", "heißt", "heisst", "bitte",
+                "noch", "für", "fuer", "arbeite", "arbeitest", "woran", "hast",
+            }
+            local_terms = [
+                token for token in re.findall(r"[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9_-]{3,}", lower)
+                if token not in local_stop_words
+            ]
+            for term in local_terms:
+                if term not in result.retrieval_keywords:
+                    result.retrieval_keywords.append(term)
+            ignored_entities = {
+                "Ich", "Mein", "Meine", "Merk", "Wie", "Was", "Woran", "Der", "Die", "Das",
+                "Und", "Bitte", "CHAPPiE",
+            }
+            for entity in re.findall(r"\b[A-ZÄÖÜ][A-Za-zÄÖÜäöüß0-9_-]{2,}\b", text):
+                if entity in ignored_entities:
+                    continue
+                if entity not in result.exact_entities:
+                    result.exact_entities.append(entity)
+            result.raw_json = dict(result.raw_json or {})
+            result.raw_json["stateful_context_forced"] = True
+            result.raw_json["local_memory_retrieval"] = True
+
+        def add_user_learning(value: str) -> None:
+            cleaned = re.sub(r"\s+", " ", value).strip(" .,!?:;")
+            if cleaned:
+                inferred.append(ToolCall(
+                    tool="update_user_profile",
+                    action="update",
+                    data={"learning": cleaned},
+                    priority="normal",
+                    reason="Explizite Nutzerinformation",
+                ))
+
+        name_match = re.search(
+            r"\b(?:ich hei(?:ß|ss)e|mein name ist)\s+([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9-]{1,40})",
+            text,
+            re.IGNORECASE,
+        )
+        if name_match:
+            name = name_match.group(1).strip(" .,!?:;")
+            inferred.append(ToolCall(
+                tool="update_user_profile",
+                action="update",
+                data={"name": name, "learning": f"Der User heißt {name}."},
+                priority="high",
+                reason="Explizite Namensangabe",
+            ))
+
+        for pattern in (
+            r"\bich arbeite als\s+(.+)$",
+            r"\bich arbeite an\s+(.+)$",
+            r"\bich wohne in\s+(.+)$",
+            r"\bmein\s+(?:lieblings)?projekt(?:\s+(?:heißt|heisst|namens))?\s+(.+)$",
+        ):
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                add_user_learning(match.group(0))
+                break
+
+        if any(marker in lower for marker in ("ich mag ", "ich liebe ", "ich bevorzuge ")):
+            add_user_learning(text)
+
+        if "merk dir" in lower or "erinnere dich" in lower:
+            remembered = re.split(r"(?:merk dir|erinnere dich)\s*[:,-]?\s*", text, maxsplit=1, flags=re.IGNORECASE)[-1]
+            remembered = re.sub(r"\s+", " ", remembered).strip(" .,!?:;")
+            if remembered:
+                inferred.append(ToolCall(
+                    tool="add_short_term_memory",
+                    action="add",
+                    data={"content": remembered, "category": "user", "importance": "high"},
+                    priority="high",
+                    reason="Expliziter Erinnerungswunsch",
+                ))
+
+        existing_tools = {(call.tool, json.dumps(call.data, sort_keys=True, ensure_ascii=False)) for call in result.tool_calls}
+        for call in inferred:
+            key = (call.tool, json.dumps(call.data, sort_keys=True, ensure_ascii=False))
+            if key not in existing_tools:
+                result.tool_calls.append(call)
+                existing_tools.add(key)
+        if inferred:
+            result.raw_json = dict(result.raw_json or {})
+            result.raw_json["local_state_inference"] = True
+        return result
     
     def _quick_classify(self, user_input: str) -> Optional[IntentResult]:
         """Erkennt triviale Inputs ohne LLM-Call. Gibt None zurueck wenn komplex."""
@@ -213,8 +340,11 @@ class IntentProcessor:
             # CHAPPiE-Persona/-Life/-Memory-Anker: diese Themen brauchen immer Kontext
             "chappie", "wie geht es dir", "wie gehts dir", "nachgedacht",
             "worüber hast du", "woroüber", "erinnerst", "gedanken",
+            "erinnerungen", "systemprompt", "system prompt", "ki-modell", "ki modell",
+            "welches modell", "was für ein modell", "was fuer ein modell",
             "gefühle", "gefuehle", "bewusstsein", "persona", "wer bist du",
             "was denkst du", "was fühlst du", "was fuehlst du",
+            "deine identität", "deine identitaet", "dein selbstbild",
             "lange nicht", "in all der zeit", "seit wann",
         )
         if any(marker in lower for marker in stateful_markers):
@@ -229,6 +359,10 @@ class IntentProcessor:
             "nachgedacht", "was denkst", "was beschäftigt dich",
             "was beschaeftigt dich", "deine gedanken", "dein gefühl",
             "dein gefuehl", "deine gefühle", "deine gefuehle",
+            "welches modell", "was für ein modell", "was fuer ein modell",
+            "ki-modell", "ki modell", "systemprompt", "system prompt",
+            "deine erinnerungen", "was hast du für erinnerungen",
+            "was hast du fuer erinnerungen", "deine identität", "deine identitaet",
         )
         if any(marker in lower for marker in persona_markers):
             return False

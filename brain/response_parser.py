@@ -145,6 +145,14 @@ def contains_cot_leak(text: str) -> bool:
         r"\bImportant\s*:\s*Keep\b",
         r"\bReasoning\s*:\s*",
         r"\bAnalysis\s*:\s*",
+        # Some local generations remove spaces while exposing their hidden
+        # scratchpad.  Treat both spaced and fused variants as leakage.
+        r"\b(?:thinking|analysis|reasoning)[\s._-]*(?:process|therequest|the_request)\b",
+        r"\b(?:analy[sz]e|analyse)[\s._-]*(?:the[\s._-]*)?request\b",
+        r"\buser[\s._-]*(?:input|message)\b",
+        r"\bbased[\s._-]*on[\s._-]*the[\s._-]*system[\s._-]*prompt\b",
+        r"\bcurrent[\s._-]*(?:vital[\s._-]*)?(?:signs|state|emotions?)\b",
+        r"\b(?:drafting|response)[\s._-]*(?:the[\s._-]*)?(?:process|plan)\b",
         r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:Thinking|Reasoning|Thought)\s+Process\s*:?",
         r"(?:^|\n)\s*\d+[.)]\s*\*{0,2}(?:Analyze|Analyse|Reason|Plan)\b",
         r"\bFinal\s*Response\s*:\s*",
@@ -187,8 +195,83 @@ def contains_instruction_leak(text: str) -> bool:
 def is_safe_retrieval_text(text: str) -> bool:
     """Return whether a persisted memory is safe to place back into a prompt."""
     return bool(isinstance(text, str) and text.strip()) and not (
-        contains_instruction_leak(text) or contains_cot_leak(text)
+        contains_instruction_leak(text)
+        or contains_cot_leak(text)
+        or _contains_memory_header(text)
+        or _contains_dialogue_role_line(text)
     )
+
+
+# Local models sometimes continue a serialized RAG example instead of
+# answering.  These are prompt-infrastructure lines, not part of CHAPPiE's
+# response.  Keep the patterns line-scoped so ordinary prose containing words
+# such as "user" or "assistant" remains untouched.
+_MEMORY_HEADER_LINE = re.compile(
+    r"^\s*(?:"
+    r"[0-9a-f]{8,}\s*\|\s*score\b"
+    r"|\[[^\]\n]*\bid\s+[0-9a-f]{8,}\b[^\]\n]*\bscore\b[^\]\n]*\]"
+    r")\s*$",
+    re.IGNORECASE,
+)
+_DIALOGUE_ROLE_LINE = re.compile(
+    r"^\s*(?P<role>user|assistant|assistent|system|tool|developer)"
+    r"(?:\s*:\s*(?P<content>.*))?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _contains_memory_header(text: str) -> bool:
+    return any(_MEMORY_HEADER_LINE.match(line) for line in str(text or "").splitlines())
+
+
+def _contains_dialogue_role_line(text: str) -> bool:
+    role_lines = []
+    for line in str(text or "").splitlines():
+        match = _DIALOGUE_ROLE_LINE.match(line)
+        if match:
+            role_lines.append((match.group("role").casefold(), (match.group("content") or "").strip()))
+    if any(not content for _role, content in role_lines):
+        return True
+    if len(role_lines) >= 2:
+        return True
+    # A canonical USER: prefix is common in persisted user memories. Other
+    # inline role prefixes are still suspicious when they occur alone.
+    return bool(role_lines and role_lines[0][0] != "user")
+
+
+def _strip_serialized_dialogue(text: str) -> tuple[str, bool]:
+    """Keep only the final assistant segment of an echoed chat transcript."""
+    lines = str(text or "").splitlines()
+    role_lines: list[tuple[int, str, str]] = []
+    for index, line in enumerate(lines):
+        match = _DIALOGUE_ROLE_LINE.match(line)
+        if match:
+            role_lines.append(
+                (
+                    index,
+                    match.group("role").casefold(),
+                    (match.group("content") or "").strip(),
+                )
+            )
+
+    if not role_lines:
+        return str(text or ""), False
+
+    assistant_lines = [item for item in role_lines if item[1] == "assistant"]
+    if not assistant_lines:
+        # A user/system-only transcript would expose the prompt as the answer.
+        return "", True
+
+    assistant_index, _role, inline_content = assistant_lines[-1]
+    next_role_index = next(
+        (index for index, _role, _content in role_lines if index > assistant_index),
+        len(lines),
+    )
+    selected_lines: list[str] = []
+    if inline_content:
+        selected_lines.append(inline_content)
+    selected_lines.extend(lines[assistant_index + 1:next_role_index])
+    return "\n".join(selected_lines).strip(), True
 
 
 def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
@@ -203,6 +286,24 @@ def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
 
     cleaned = text
     reasons: list[str] = []
+
+    # Remove the compact metadata line emitted by the memory prompt builder
+    # before looking for role boundaries.  The model has been observed to
+    # answer with this line followed by a complete user/assistant transcript.
+    memory_lines = []
+    for line in cleaned.splitlines():
+        if _MEMORY_HEADER_LINE.match(line):
+            reasons.append("memory_header")
+            continue
+        memory_lines.append(line)
+    cleaned = "\n".join(memory_lines)
+
+    serialized_answer, had_roles = _strip_serialized_dialogue(cleaned)
+    if had_roles:
+        cleaned = serialized_answer
+        reasons.append("role_fragment")
+        if not cleaned:
+            return "", sorted(set(reasons + ["unresolved_leak"]))
 
     # Some local chat templates emit a prose reasoning preamble instead of
     # structured reasoning tokens. Never stream that preamble. If a clearly
@@ -274,6 +375,8 @@ def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
         reasons.append("json_tool_call")
 
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    if not cleaned:
+        return "", sorted(set(reasons + ["unresolved_leak"]))
     if contains_instruction_leak(cleaned) or contains_cot_leak(cleaned):
         return "", sorted(set(reasons + ["unresolved_leak"]))
     return cleaned, sorted(set(reasons))

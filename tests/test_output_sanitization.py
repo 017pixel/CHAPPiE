@@ -76,6 +76,34 @@ def test_gemma_plain_think_end_is_not_persisted_or_retrieved():
     assert not is_safe_retrieval_text("Falscher interner Text. Think End")
 
 
+def test_echoed_memory_transcript_keeps_only_the_final_assistant_answer():
+    raw = (
+        "d1d6a15c | Score\n"
+        "user\n"
+        "Hallo CH\n"
+        "assistant\n"
+        "Hallo Benjamin! Wie läuft dein Projekt heute?"
+    )
+    clean, reasons = sanitize_visible_response(raw)
+    assert clean == "Hallo Benjamin! Wie läuft dein Projekt heute?"
+    assert "memory_header" in reasons
+    assert "role_fragment" in reasons
+    assert "user" not in clean.casefold()
+    assert "assistant" not in clean.casefold()
+
+
+def test_role_only_or_user_only_transcripts_are_withheld():
+    clean, reasons = sanitize_visible_response("user\nDas ist der Prompt.")
+    assert clean == ""
+    assert "unresolved_leak" in reasons
+    assert not is_safe_retrieval_text("assistant: interne Antwort")
+
+
+def test_memory_headers_are_not_safe_retrieval_context():
+    assert not is_safe_retrieval_text("d1d6a15c | Score")
+    assert not is_safe_retrieval_text("[Keyword | ID d1d6a15c | Score 48%]")
+
+
 if __name__ == "__main__":
     test_tool_json_is_removed_but_answer_is_preserved()
     test_reasoning_and_function_blocks_never_reach_visible_answer()
@@ -86,4 +114,7 @@ if __name__ == "__main__":
     test_gemma_internal_tail_is_cut_after_valid_answer()
     test_gemma_thought_stream_marker_contaminates_retrieval()
     test_gemma_plain_think_end_is_not_persisted_or_retrieved()
+    test_echoed_memory_transcript_keeps_only_the_final_assistant_answer()
+    test_role_only_or_user_only_transcripts_are_withheld()
+    test_memory_headers_are_not_safe_retrieval_context()
     print("OK: output sanitization")

@@ -363,7 +363,11 @@ class ShortTermMemory:
                             role=role,
                             mem_type="short_term_migration",
                             label=f"{entry.category}_{entry.importance}",
-                            source="short_term_memory"
+                            # Explicit USER facts become ordinary episodic
+                            # memories after migration. Generated assistant
+                            # transcripts retain the STM source and remain
+                            # quarantinable by the long-term retrieval policy.
+                            source="conversation" if role == "user" else "short_term_memory"
                         )
                         entry.migrated = True
                         migrated_count += 1

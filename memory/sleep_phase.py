@@ -32,11 +32,11 @@ class SleepPhaseHandler:
     - Spaced repetition scheduling
     """
     
-    def __init__(self):
+    def __init__(self, state_path: Optional[Path] = None):
         self.config = get_sleep_config()
         self.forgetting_config = get_forgetting_curve_config()
         self.decay_manager = get_decay_manager()
-        self.state_path = DATA_DIR / "sleep_state.json"
+        self.state_path = Path(state_path) if state_path else DATA_DIR / "sleep_state.json"
         self._lock = threading.Lock()
         self._load_state()
     

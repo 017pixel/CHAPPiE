@@ -404,6 +404,15 @@ class EmotionsEngine:
             changes["happiness"] = 3
             changes["affection"] = 4
             changes["calm"] = 2
+        elif sentiment == "PERSOENLICH":
+            changes["affection"] = 2
+            changes["curiosity"] = 3
+            changes["calm"] = -1
+        elif sentiment == "REFLEXION":
+            changes["sadness"] = 3
+            changes["curiosity"] = 3
+            changes["affection"] = 1
+            changes["calm"] = -2
         else:  # NEUTRAL
             changes["frustration"] = -1
             changes["anxiety"] = -1
@@ -487,15 +496,40 @@ def analyze_sentiment_simple(text: str) -> str:
         text: Der zu analysierende Text
     
     Returns:
-        "POSITIV", "NEGATIV", "NEUTRAL", "NEUGIERIG" oder "VERTRAUEN"
+        "POSITIV", "NEGATIV", "NEUTRAL", "NEUGIERIG", "VERTRAUEN",
+        "PERSOENLICH" oder "REFLEXION"
     """
     text_lower = text.lower()
     
+    # Fragen nach CHAPPiE selbst werden als persoenliches Signal behandelt.
+    # Sie muessen vor den allgemeinen Vertrauenswoertern erkannt werden,
+    # damit die Antwort nicht nur als generisches Lob durchlaeuft.
+    personal_words = [
+        "wie geht es dir", "wie gehts dir", "es geht hier um dich",
+        "ueber dich", "über dich", "was fuehlst du", "was fühlst du",
+        "wer bist du", "was bist du", "welches modell bist du",
+        "was für ein modell bist du", "was fuer ein modell bist du",
+        "ki-modell", "ki modell", "systemprompt", "system prompt",
+        "deine erinnerungen", "was hast du für erinnerungen",
+        "was hast du fuer erinnerungen", "deine identität", "deine identitaet",
+    ]
+    reflection_words = [
+        "was bedrueckt dich", "was bedrückt dich", "was beschaeftigt dich",
+        "was beschäftigt dich", "was macht dir sorgen", "wovor hast du angst",
+    ]
+    for phrase in reflection_words:
+        if phrase in text_lower:
+            return "REFLEXION"
+    for phrase in personal_words:
+        if phrase in text_lower:
+            return "PERSOENLICH"
+
     # Vertrauens-Woerter (hohe Prioritaet)
     trust_words = [
         "verspreche", "versprech", "freund", "helfe dir", "fuer dich da",
         "vertraue", "treue", "loyal", "gemeinsam", "zusammen", "team",
-        "unterstuetze", "glaube an dich", "mag dich", "liebe dich", "mein leben"
+        "unterstuetze", "glaube an dich", "mag dich", "liebe dich", "mein leben",
+        "um dich",
     ]
     
     # Positive Woerter
@@ -503,14 +537,21 @@ def analyze_sentiment_simple(text: str) -> str:
         "danke", "super", "toll", "klasse", "prima", "perfekt", "wunderbar",
         "ausgezeichnet", "fantastisch", "liebe", "lieb", "gut", "richtig",
         "hilft", "hilfreich", "freue", "freut", "mag", "gerne", "cool",
-        "genial", "stark", "nice", "top", "hammer", "geil", "brav", "stolz"
+        "genial", "stark", "nice", "top", "hammer", "geil", "brav", "stolz",
+        "schoen", "schön", "interessiert", "freue mich"
     ]
     
-    # Negative Woerter (nur direkte Angriffe auf CHAPiE)
+    # Negative Woerter und klare Fehlersignale. Auch ein technischer Fehler
+    # ist fuer die simulierte Innenlage ein echter Frustrationsausloeser; die
+    # alte Liste reagierte nur auf Beleidigungen und liess "nichts funktioniert"
+    # emotional komplett neutral durchlaufen.
     negative_words = [
         "du bist dumm", "du bist bloed", "du nervst", "halt die klappe",
         "sei still", "verschwinde", "du idiot", "du trottel", "nutzlos",
-        "du kannst nichts", "hasse dich"
+        "du kannst nichts", "hasse dich", "funktioniert nicht", "funktioniert nix",
+        "funktioniert nichts", "geht nicht", "geht nix", "kaputt", "fehler",
+        "problem", "probleme", "störung", "stoerung", "enttäuscht", "enttaeuscht",
+        "es funktioniert nicht", "es funktioniert nix", "es funktioniert nichts",
     ]
     
     # Neugier Woerter

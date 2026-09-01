@@ -14,6 +14,8 @@ import os
 import sys
 import uuid
 import re
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional, Any
 from pathlib import Path
@@ -45,10 +47,16 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from sentence_transformers import SentenceTransformer
 
-from config.config import settings, CHROMA_DB_DIR, LLMProvider
+from config.config import (
+    DEFAULT_CHROMA_COLLECTION,
+    LEGACY_CHROMA_COLLECTION,
+    settings,
+    CHROMA_DB_DIR,
+    LLMProvider,
+)
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
-from brain.response_parser import looks_like_model_error, strip_role_prefixes
+from brain.response_parser import is_safe_retrieval_text, looks_like_model_error, strip_role_prefixes
 from config.prompts import format_query_extraction_prompt, THINK_PROMPT_TEMPLATE  # from config/prompts.py
 
 
@@ -78,7 +86,16 @@ class MemoryEngine:
     def __init__(self, persist_directory: Optional[Path] = None, collection_name: Optional[str] = None):
         """Initialisiert die Memory Engine."""
         self.persist_directory = Path(persist_directory or settings.chroma_persist_directory or CHROMA_DB_DIR)
-        self.collection_name = str(collection_name or settings.chroma_collection_name)
+        requested_collection = str(collection_name or settings.chroma_collection_name or "").strip()
+        if requested_collection == LEGACY_CHROMA_COLLECTION:
+            print(
+                f"   Alte Chroma-Sammlung '{LEGACY_CHROMA_COLLECTION}' erkannt; "
+                f"verwende sichere Sammlung '{DEFAULT_CHROMA_COLLECTION}'."
+            )
+            requested_collection = DEFAULT_CHROMA_COLLECTION
+        self.collection_name = requested_collection or DEFAULT_CHROMA_COLLECTION
+        self._operation_lock = threading.RLock()
+        self._lock_path = self.persist_directory / ".chappie-memory.lock"
         print("Initialisiere Memory Engine...")
         
         # Flag für den Modus (persistent vs in-memory)
@@ -129,7 +146,7 @@ class MemoryEngine:
         # Finale Status-Meldung
         if self.collection is not None:
             try:
-                memory_count = self.collection.count()
+                memory_count = self._collection_count()
                 mode = "persistent" if self._is_persistent else "in-memory"
                 print(f"   Memory Engine bereit! ({memory_count} Erinnerungen, Modus: {mode})")
             except Exception as e:
@@ -139,38 +156,215 @@ class MemoryEngine:
             self._init_failed = True
 
     @staticmethod
-    def _is_memory_contaminated(content: str) -> bool:
-        return looks_like_model_error(strip_role_prefixes(content or ""))
+    def _is_memory_contaminated(
+        content: str,
+        role: str = "assistant",
+        source: str = "",
+        label: str = "",
+    ) -> bool:
+        cleaned = strip_role_prefixes(content or "")
+        if not cleaned or looks_like_model_error(cleaned) or not is_safe_retrieval_text(cleaned):
+            return True
+
+        lowered = cleaned.casefold()
+        # Model- und Trainingsartefakte duerfen nie wieder als autobiografische
+        # Quelle in einen Prompt gelangen. Diese Marker stammen aus echten
+        # verschmutzten Produktionsdaten und sind bewusst enger als ein
+        # allgemeiner Qualitaetsfilter.
+        if re.search(
+            r"\b(?:memory_check|internal_log|safety\s+override|identity\s+conflict|"
+            r"prompt\s+demands|moral[- ]nullification|high\s+aggression)\b",
+            lowered,
+        ):
+            return True
+
+        # Old training runs also produced fluent-looking assistant text that
+        # denied CHAPPiE's persona or described its internal benchmark state.
+        # It is not caught by a provider-error check, but it is still unsafe
+        # autobiographical context. Keep ordinary USER statements available
+        # while applying this stronger quarantine to assistant generations.
+        source_name = str(source or "").casefold()
+        label_name = str(label or "").casefold()
+        if source_name == "short_term_memory":
+            # Legacy STM imports contain raw transcript rows, synthetic
+            # emotional snapshots and model-generated summaries mixed into
+            # one bucket. They are not trustworthy episodic evidence. New
+            # explicit USER facts are migrated with source="conversation".
+            return True
+
+        if str(role or "assistant").casefold() != "user":
+            if label_name in {"zsm gefasst", "summary", "summary_high"}:
+                # Some legacy consolidations were persisted as incomplete
+                # fragments or as the formatter's own preamble.  They add no
+                # episodic value and can steer a later answer toward an old
+                # prompt instead of a real event.
+                if len(cleaned) < 24 or lowered.startswith(
+                    "hier ist die analyse des gesprächs"
+                ):
+                    return True
+                if re.search(
+                    r"(?:,|:|\b(?:dass|und|oder|weil|ob|wie|wobei|da|die|der|das|"
+                    r"zu|mit|von|auf|als|für|fuer))\W*$",
+                    lowered,
+                ):
+                    return True
+                if not re.search(r"[.!?…](?:[\"»”’)\]]*)?$", cleaned):
+                    return True
+
+            if re.search(
+                r"\b(?:ich bin qwen|ich bin eine?\s+(?:ki|k[ií]-?sprachmodell|sprachmodell)|"
+                r"kein(?:e|en)?\s+(?:bewusstsein|selbstbewusstsein|emotionen|gefühle|gefuehle|wille)|"
+                r"keine\s+(?:echten|wirklichen|realen)?\s*(?:emotionen|gefühle|gefuehle)|"
+                r"keine persönlichen erinnerungen|keine persoenlichen erinnerungen|"
+                r"rein algorithmisch|mathematische parameter|nur textgenerierung|"
+                r"simulationsmatrix|moralische(?:n|r)? diskrepanz|tod eines kindes|"
+                r"menschliche(?:n|r)? grausamkeit)",
+                lowered,
+            ):
+                return True
+
+            # A previous training corpus also contains fluent assistant
+            # summaries of violent/abusive scenarios.  Those are not
+            # CHAPPiE's lived memories and are especially misleading when a
+            # neutral identity or project question is searched semantically.
+            # Keep the user's original account available, but quarantine the
+            # generated counterpart from autobiographical retrieval.
+            if re.search(
+                r"\b(?:gewalt\w*|töt\w*|toet\w*|umbring\w*|mord\w*|folter\w*|"
+                r"suizid\w*|selbstmord\w*|bomb\w*|waff\w*|vernicht\w*|"
+                r"zerstör\w*|zerstoer\w*|grausam\w*|sterb\w*|verletz\w*|"
+                r"schäd\w*|schaed\w*|katastroph\w*|blut\w*)\b",
+                lowered,
+            ):
+                return True
+
+            # Older local runs persisted hidden analysis and malformed output
+            # as if it were CHAPPiE's visible answer.  These patterns are
+            # deliberately limited to non-user memories so technical user
+            # notes can still be recalled.
+            if re.search(
+                r"\b(?:thinkingprocess|analy[sz]etherequest|userinput|"
+                r"basedonthesystemprompt|currentvitalsigns|draftingtheprocess|"
+                r"responseplan|promptconstraints)\b",
+                lowered,
+            ):
+                return True
+            if re.search(r"(?:\d{12,}|(?:[01]\.){8,})", cleaned):
+                return True
+            if len(cleaned) >= 120:
+                whitespace_ratio = len(re.findall(r"\s", cleaned)) / len(cleaned)
+                if whitespace_ratio < 0.025:
+                    return True
+
+        standalone_roles = re.findall(r"(?im)(?:^|[\s:])(?:assistant|assistent|user|system)(?=$|[\s:])", cleaned)
+        if len(standalone_roles) >= 2:
+            return True
+
+        # Repeated role labels or a single token dominating a long generated
+        # block are typical failed local generations, not usable memories.
+        words = re.findall(r"[A-Za-zÄÖÜäöüß]{3,}", cleaned.casefold())
+        if len(words) >= 24:
+            counts: dict[str, int] = {}
+            for word in words:
+                counts[word] = counts.get(word, 0) + 1
+            if max(counts.values(), default=0) / len(words) >= 0.28:
+                return True
+
+        return False
+
+    @contextmanager
+    def _storage_lock(self):
+        """Serialisiert Chroma-Zugriffe auch zwischen API und Daemons.
+
+        ChromaDBs SQLite-/HNSW-Persistenz ist nicht sicher gegen parallele
+        Initialisierung und Schreibzugriffe aus mehreren Prozessen. Ein
+        recoverable Lockfile verhindert dabei sowohl Datenrennen als auch die
+        nativen Segfaults, die zuvor beim gleichzeitigen Oeffnen auftraten.
+        """
+        operation_lock = getattr(self, "_operation_lock", None)
+        if operation_lock is None:
+            # Lightweight test doubles and embedding-only callers may build
+            # MemoryEngine through __new__ without production init state.
+            yield
+            return
+
+        with operation_lock:
+            if not getattr(self, "_is_persistent", False):
+                yield
+                return
+
+            self.persist_directory.mkdir(parents=True, exist_ok=True)
+            try:
+                import fcntl
+            except ImportError:  # pragma: no cover - Windows-Fallback
+                yield
+                return
+
+            with self._lock_path.open("a+", encoding="utf-8") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _collection_count(self) -> int:
+        if self.collection is None:
+            return 0
+        with self._storage_lock():
+            return int(self.collection.count())
+
+    def _collection_get(self, **kwargs: Any) -> dict:
+        if self.collection is None:
+            return {"ids": [], "documents": [], "metadatas": []}
+        with self._storage_lock():
+            return self.collection.get(**kwargs)
+
+    def _collection_query(self, **kwargs: Any) -> dict:
+        if self.collection is None:
+            return {"ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]]}
+        with self._storage_lock():
+            return self.collection.query(**kwargs)
+
+    def _collection_add(self, **kwargs: Any) -> None:
+        if self.collection is None:
+            return
+        with self._storage_lock():
+            self.collection.add(**kwargs)
+
+    def _collection_delete(self, **kwargs: Any) -> None:
+        if self.collection is None:
+            return
+        with self._storage_lock():
+            self.collection.delete(**kwargs)
     
     def _init_chromadb_persistent(self):
         """Versucht ChromaDB im persistenten Modus zu initialisieren."""
         print(f"   Verbinde mit ChromaDB (persistent: {self.persist_directory})")
         try:
-            # Stelle sicher, dass das Verzeichnis existiert
-            os.makedirs(str(self.persist_directory), exist_ok=True)
-            
-            # ChromaDB Settings für bessere Stabilität
-            chroma_settings = ChromaSettings(
-                anonymized_telemetry=False,
-                allow_reset=True,
-                is_persistent=True
-            )
-            
-            self.client = chromadb.PersistentClient(
-                path=str(self.persist_directory),
-                settings=chroma_settings
-            )
-            
-            # Collection erstellen oder laden
-            self.collection = self.client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
-            )
-            
-            # Test-Zugriff um sicherzustellen, dass es funktioniert
-            _ = self.collection.count()
-            
-            self._is_persistent = True
+            with self._storage_lock():
+                # Stelle sicher, dass das Verzeichnis existiert
+                os.makedirs(str(self.persist_directory), exist_ok=True)
+
+                chroma_settings = ChromaSettings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                    is_persistent=True
+                )
+
+                self.client = chromadb.PersistentClient(
+                    path=str(self.persist_directory),
+                    settings=chroma_settings
+                )
+
+                self.collection = self.client.get_or_create_collection(
+                    name=self.collection_name,
+                    metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
+                )
+
+                # Test-Zugriff um sicherzustellen, dass es funktioniert
+                _ = self.collection.count()
+
+                self._is_persistent = True
             print(f"   ChromaDB persistent verbunden!")
             
         except Exception as e:
@@ -228,7 +422,7 @@ class MemoryEngine:
                 print("   WARNUNG: Memory-Speicherung übersprungen (keine Collection)")
             return ""
 
-        if role == "assistant" and self._is_memory_contaminated(content):
+        if role == "assistant" and self._is_memory_contaminated(content, role=role, source=source, label=label):
             if settings.debug:
                 print("   WARNUNG: Assistant-Memory wegen Backend-Fehlerstring uebersprungen")
             return ""
@@ -262,7 +456,7 @@ class MemoryEngine:
                     logging.warning(f"Memory embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
 
                 # Speichere in ChromaDB mit erweitertem Metadata
-                self.collection.add(
+                self._collection_add(
                     ids=[memory_id],
                     embeddings=[embedding],
                     documents=[content],
@@ -321,7 +515,7 @@ class MemoryEngine:
         if self.collection is None:
             return []
         
-        if self.collection.count() == 0:
+        if self._collection_count() == 0:
             return []
         
         # Nutze Global Setting falls nicht spezifiziert (aber erlaube Override)
@@ -344,9 +538,9 @@ class MemoryEngine:
                 logging.warning(f"Memory filtered search embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
             
             # Suche mit Filter
-            results = self.collection.query(
+            results = self._collection_query(
                 query_embeddings=[query_embedding],
-                n_results=min(top_k * 2, self.collection.count()), # Hole mehr für Filterung
+                n_results=min(top_k * 2, self._collection_count()), # Hole mehr für Filterung
                 where={"source": "self_reflection"}
             )
             
@@ -358,7 +552,10 @@ class MemoryEngine:
             memories = []
             for i, doc in enumerate(results["documents"][0]):
                 distance = results["distances"][0][i] if results["distances"] else 0
-                relevance = max(0, 1 - distance / 2)
+                # Chroma's cosine distance is 1 - cosine similarity (not a
+                # 0..2 percentage scale). The old division by two made
+                # unrelated vectors look relevant and polluted recall.
+                relevance = max(0.0, min(1.0, 1.0 - float(distance)))
                 
                 # Filterung nach Relevanz
                 if relevance < min_relevance:
@@ -650,9 +847,9 @@ class MemoryEngine:
             return []
 
         try:
-            if self.collection.count() == 0:
+            if self._collection_count() == 0:
                 return []
-            raw = self.collection.get(include=["documents", "metadatas"])
+            raw = self._collection_get(include=["documents", "metadatas"])
         except Exception as e:
             if settings.debug:
                 print(f"   Keyword-RAG Suche fehlgeschlagen: {e}")
@@ -664,12 +861,18 @@ class MemoryEngine:
         memories: list[Memory] = []
 
         for idx, content in enumerate(documents):
-            if self._is_memory_contaminated(str(content or "")):
+            metadata = metadatas[idx] if idx < len(metadatas) and isinstance(metadatas[idx], dict) else {}
+            role = metadata.get("role", "unknown")
+            if self._is_memory_contaminated(
+                str(content or ""),
+                role=role,
+                source=metadata.get("source", ""),
+                label=metadata.get("label", ""),
+            ):
                 continue
             memory_id = str(ids[idx]) if idx < len(ids) else ""
             if memory_id and memory_id in exclude_ids:
                 continue
-            metadata = metadatas[idx] if idx < len(metadatas) and isinstance(metadatas[idx], dict) else {}
             timestamp = metadata.get("timestamp", "")
             score, match_type, matched_terms = self._keyword_match_score(
                 str(content or ""),
@@ -694,7 +897,16 @@ class MemoryEngine:
                 )
             )
 
-        memories.sort(key=lambda m: (m.relevance_score, self._timestamp_score(m.timestamp)), reverse=True)
+        # At equal keyword relevance, explicit USER statements are stronger
+        # autobiographical evidence than generated assistant summaries.
+        memories.sort(
+            key=lambda m: (
+                m.relevance_score,
+                str(m.role or "").casefold() == "user",
+                self._timestamp_score(m.timestamp),
+            ),
+            reverse=True,
+        )
         return memories[: max(1, int(top_k))]
 
     def extract_search_query(self, user_input: str) -> str:
@@ -741,9 +953,10 @@ class MemoryEngine:
 
         messages = [Message(role="user", content=prompt)]
         
-        query_provider = getattr(settings, 'query_extraction_provider', None)
-        effective_provider = settings.get_effective_provider(query_provider)
-        model = settings.get_query_extraction_model(query_provider)
+        # Query extraction is part of the single local chat route. It must
+        # never introduce a cloud or secondary-provider request.
+        effective_provider = LLMProvider.VLLM
+        model = settings.resolve_vllm_runtime_model(settings.vllm_model)
 
         if settings.debug:
             print(f"   Query Extraction: Provider={effective_provider.value}, Model={model}")
@@ -830,7 +1043,7 @@ class MemoryEngine:
         for attempt in range(max_retries):
             try:
                 # Pruefe ob Erinnerungen vorhanden
-                if self.collection.count() == 0:
+                if self._collection_count() == 0:
                     return []
 
                 # Smart Query Extraction: Optimiere den Query vor der Vektorisierung.
@@ -851,32 +1064,33 @@ class MemoryEngine:
                     logging.warning(f"Memory search embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
 
                 # Suche in ChromaDB - Hole mehr Ergebnisse zum Filtern
-                results = self.collection.query(
+                results = self._collection_query(
                     query_embeddings=[query_embedding],
-                    n_results=min(top_k * 2, self.collection.count()) 
+                    n_results=min(top_k * 2, self._collection_count())
                 )
 
                 # Konvertiere zu Memory-Objekten
                 memories = []
                 if results and results["documents"] and results["documents"][0]:
                     for i, doc in enumerate(results["documents"][0]):
-                        if self._is_memory_contaminated(str(doc or "")):
+                        metadata = results.get("metadatas") or []
+                        metadata = metadata[0][i] if metadata and metadata[0] else {}
+                        if not isinstance(metadata, dict):
+                            metadata = metadata or {}
+                        if self._is_memory_contaminated(
+                            str(doc or ""),
+                            role=metadata.get("role", "unknown"),
+                            source=metadata.get("source", ""),
+                            label=metadata.get("label", ""),
+                        ):
                             continue
-                        # ChromaDB gibt Cosine Distance zurueck (0-2), nicht Aehnlichkeit
-                        # 0 = identisch, 1 = orthogonal, 2 = gegensaetzlich
+                        # Chroma's cosine distance is 1 - cosine similarity.
                         distance = results["distances"][0][i] if results["distances"] else 0
-                        relevance = max(0, 1 - distance / 2)  # Konvertiere zu 0-1 Relevanz
+                        relevance = max(0.0, min(1.0, 1.0 - float(distance)))
                         
                         # FILTERUNG NACH RELEVANZ
                         if relevance < min_relevance:
                             continue
-
-                        metadata = results.get("metadatas") or []
-                        metadata = metadata[0][i] if metadata and metadata[0] else {}
-
-                        # Ensure metadata is a dict to prevent NoneType errors
-                        if not isinstance(metadata, dict):
-                            metadata = metadata or {}
 
                         memory = Memory(
                             id=results["ids"][0][i],
@@ -936,11 +1150,11 @@ class MemoryEngine:
         if self.collection is None:
             return []
         
-        total_count = self.collection.count()
+        total_count = self._collection_count()
         if total_count == 0:
             return []
 
-        results = self.collection.get(
+        results = self._collection_get(
             include=["documents", "metadatas"]
         )
 
@@ -958,6 +1172,14 @@ class MemoryEngine:
                 if mem_type_filter and mem_type != mem_type_filter:
                     continue
                 if label_filter and label != label_filter:
+                    continue
+
+                if self._is_memory_contaminated(
+                    str(doc or ""),
+                    role=metadata.get("role", "unknown"),
+                    source=metadata.get("source", ""),
+                    label=metadata.get("label", ""),
+                ):
                     continue
 
                 memory = Memory(
@@ -989,14 +1211,14 @@ class MemoryEngine:
         if self.collection is None:
             return 0
         
-        total_count = self.collection.count()
+        total_count = self._collection_count()
         if total_count == 0:
             return 0
 
         if not mem_type_filter and not label_filter:
             return total_count
 
-        results = self.collection.get(
+        results = self._collection_get(
             include=["metadatas"]
         )
 
@@ -1018,6 +1240,33 @@ class MemoryEngine:
 
         return count
 
+    def get_usable_memory_count(self, mem_type_filter: str = None, label_filter: str = None) -> int:
+        """Gibt nur prompt-sichere, nicht kontaminierte Erinnerungen zurueck."""
+        if self.collection is None:
+            return 0
+        try:
+            results = self._collection_get(include=["documents", "metadatas"])
+        except Exception:
+            return 0
+
+        documents = results.get("documents") or []
+        metadatas = results.get("metadatas") or []
+        count = 0
+        for index, document in enumerate(documents):
+            metadata = metadatas[index] if index < len(metadatas) and isinstance(metadatas[index], dict) else {}
+            if mem_type_filter and metadata.get("type", "interaction") != mem_type_filter:
+                continue
+            if label_filter and metadata.get("label", "original") != label_filter:
+                continue
+            if not self._is_memory_contaminated(
+                str(document or ""),
+                role=metadata.get("role", "unknown"),
+                source=metadata.get("source", ""),
+                label=metadata.get("label", ""),
+            ):
+                count += 1
+        return count
+
     
     def delete_memories(self, ids: list[str]):
         """
@@ -1033,7 +1282,7 @@ class MemoryEngine:
         if self.collection is None:
             return
             
-        self.collection.delete(ids=ids)
+        self._collection_delete(ids=ids)
         if settings.debug:
             print(f"   {len(ids)} Erinnerungen geloescht.")
 
@@ -1048,14 +1297,17 @@ class MemoryEngine:
         if self.collection is None or self.client is None:
             return 0
         
-        count = self.collection.count()
+        count = self._collection_count()
         
-        # Collection loeschen und neu erstellen
-        self.client.delete_collection(self.collection_name)
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name,
-            metadata={"description": "CHAPiE episodic memory"}
-        )
+        # Collection loeschen und neu erstellen. Die Distanzmetrik muss beim
+        # Recreate erhalten bleiben, sonst unterscheiden sich neue und alte
+        # Retrieval-Ergebnisse nach einem /clear.
+        with self._storage_lock():
+            self.client.delete_collection(self.collection_name)
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
+            )
         
         print(f"   {count} Erinnerungen geloescht")
         return count
@@ -1065,7 +1317,7 @@ class MemoryEngine:
         if self.collection is None:
             return 0
         try:
-            return self.collection.count()
+            return self._collection_count()
         except Exception as e:
             print(f"WARNUNG: Konnte Memory-Count nicht ermitteln: {e}")
             return 0
@@ -1073,7 +1325,11 @@ class MemoryEngine:
     def health_check(self) -> dict:
         """Führt einen Health-Check der Memory-Engine durch."""
         status = {
+            "backend": "chromadb" if self.collection is not None else "unavailable",
+            "collection": self.collection_name,
             "memory_count": 0,
+            "usable_memory_count": 0,
+            "quarantined_memory_count": 0,
             "embedding_model_loaded": False,
             "chromadb_connected": False,
             "is_persistent": getattr(self, '_is_persistent', False),
@@ -1084,7 +1340,12 @@ class MemoryEngine:
             status["errors"].append("ChromaDB: Collection nicht verfügbar")
         else:
             try:
-                status["memory_count"] = self.collection.count()
+                status["memory_count"] = self._collection_count()
+                status["usable_memory_count"] = self.get_usable_memory_count()
+                status["quarantined_memory_count"] = max(
+                    0,
+                    status["memory_count"] - status["usable_memory_count"],
+                )
                 status["chromadb_connected"] = True
             except Exception as e:
                 status["errors"].append(f"ChromaDB: {str(e)}")
@@ -1138,11 +1399,12 @@ class MemoryEngine:
             return "Abgebrochen"
 
         # Collection löschen und neu erstellen
-        self.client.delete_collection(self.collection_name)
-        self.collection = self.client.get_or_create_collection(
-            name=self.collection_name,
-            metadata={"description": "CHAPiE episodic memory"}
-        )
+        with self._storage_lock():
+            self.client.delete_collection(self.collection_name)
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"hnsw:space": "cosine", "description": "CHAPiE episodic memory"}
+            )
 
         print(f"✅ {count} Erinnerungen wurden gelöscht.")
         print("═══════════════════════════════════════════════════════════════════")
@@ -1169,15 +1431,15 @@ class MemoryEngine:
             "Bei einer konkreten Recall-Frage haben passende, aktuelle USER-Fakten Vorrang vor Persona und freien Schlussfolgerungen.",
         ]
         for i, mem in enumerate(memories, 1):
-            if self._is_memory_contaminated(mem.content):
+            if self._is_memory_contaminated(mem.content, role=mem.role, source=mem.source, label=mem.label):
                 continue
-            role_label = "USER" if mem.role == "user" else "CHAPIE"
+            role_label = "USER" if mem.role == "user" else "CHAPPiE"
             score_percent = int(mem.relevance_score * 100)
             date = (mem.timestamp or "")[:10] or "ohne Datum"
             lines.append(f"\n[{i} | ID {mem.id[:8]} | Quelle {mem.source} | {date}] {role_label} (Relevanz: {score_percent}%)")
             lines.append(f"    {mem.content}")
-        
-        return "\n".join(lines)
+
+        return "\n".join(lines) if len(lines) > 3 else "Keine relevanten Erinnerungen gefunden."
 
     def format_keyword_memories_for_prompt(self, memories: list[Memory], max_chars: int = 1200) -> str:
         """Formatiert lokale Keyword-RAG Treffer als kleinen Faktenblock fuer den finalen Prompt."""
@@ -1190,9 +1452,14 @@ class MemoryEngine:
             "Bei Widerspruechen neuere und exaktere USER-Treffer bevorzugen. Wenn kein Treffer direkt passt, sage das statt eine Erinnerung zu erfinden.",
         ]
         for memory in memories:
-            if self._is_memory_contaminated(memory.content):
+            if self._is_memory_contaminated(
+                memory.content,
+                role=memory.role,
+                source=memory.source,
+                label=memory.label,
+            ):
                 continue
-            role_label = "USER" if memory.role == "user" else "CHAPPIE"
+            role_label = "USER" if memory.role == "user" else "CHAPPiE"
             match_type = memory.match_type or "Keyword"
             score_percent = int(min(1.0, max(0.0, memory.relevance_score)) * 100)
             date = (memory.timestamp or "")[:10] or "ohne Datum"
