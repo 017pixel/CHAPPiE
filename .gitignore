@@ -141,16 +141,21 @@ cython_debug/
 
 # Local data
 data/chroma_db/
+data/chroma_db_repaired*/
 data/research_runs/
 data/chat_sessions/
 data/short_term_memory.json
 data/short_term_memory.json.lock
+data/short_term_memory.repair-backup-*.json
 data/status.json
+data/status.repair-backup-*.json
 data/life_state.json
 data/sleep_state.json
 data/settings_overrides.json
 data/steering_vectors/
 data/steering_cache/
+data/training_runtime/
+data/training_runtime.repair-backup-*/
 data/active_chat_session.json
 training_state.json
 training_config.json
@@ -179,3 +184,7 @@ forschung/last_config.json
 
 # Playwright MCP Testartefakte
 .playwright-mcp/
+
+# Temporäre lokale Dateien (Update-Checkliste, Forschungs-Rohpatch)
+todo.md
+forschung/runs/*/raw/source-worktree.patch
