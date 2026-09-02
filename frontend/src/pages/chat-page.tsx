@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { EmotionalTextPart, parseEmotionalText } from "../lib/format";
+import { estimateTextTokens, formatTokenRate } from "../lib/telemetry";
 import { api } from "../services/api";
 import { isSlashCommand } from "../store/ui";
 import type { ChatMessage } from "../store/ui";
@@ -46,13 +46,6 @@ const EMOTION_NAMES = [
 
 const ALL_COMMANDS = ["/sleep", "/stats", "/help", "/clear", "/new", "/emotion", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
 
-function emotionalPartClass(part: EmotionalTextPart): string {
-  if (part.tone === "ember") return "text-terminal-amber italic";
-  if (part.tone === "pine") return "text-terminal-green italic";
-  if (part.tone === "muted") return "text-slate/50 italic";
-  return "";
-}
-
 function isPending(message: ChatMessage): boolean {
   return message.metadata?.pending === true;
 }
@@ -76,7 +69,7 @@ function withDisplayMetadata(message: ChatMessage, previous?: ChatMessage): Chat
       ...metadata,
       ...(command ? { is_command: true, message_kind: "command", command: commandText } : {}),
       ...(system ? { is_system: true, is_system_response: true, message_kind: "system", command: commandText } : {}),
-      ...(formatted ? { raw_response: message.content } : {}),
+      ...(formatted && !metadata.raw_response ? { raw_response: message.content } : {}),
     },
   };
 }
@@ -85,23 +78,6 @@ function formatDuration(value: unknown): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "—";
   return numeric < 1000 ? `${Math.round(numeric)}ms` : `${(numeric / 1000).toFixed(2)}s`;
-}
-
-function estimateTokens(value: string): number {
-  return value.trim() ? value.trim().split(/\s+/).length : 0;
-}
-
-function formatTokenRate(timing: Record<string, any>, metadata: Record<string, any>, content: string): string {
-  const pipeline = (metadata.live_pipeline ?? metadata.pipeline ?? {}) as Record<string, any>;
-  const explicit = Number(timing.tokens_per_second ?? timing.tokens_per_sec ?? metadata.tokens_per_second ?? pipeline.tokens_per_second);
-  if (Number.isFinite(explicit) && explicit > 0) return `${explicit.toFixed(1)} tok/s`;
-
-  const tokens = Number(timing.answer_tokens ?? pipeline.answer_tokens) || estimateTokens(content);
-  const durationMs = Number(timing.answer_time_ms ?? pipeline.answer_time_ms ?? timing.total_gen_ms ?? metadata.processing_time_ms ?? pipeline.elapsed_ms);
-  if (tokens > 0 && Number.isFinite(durationMs) && durationMs > 0) {
-    return `${(tokens / (durationMs / 1000)).toFixed(1)} tok/s`;
-  }
-  return "— tok/s";
 }
 
 function NumberedText({ content, className = "" }: { content: string; className?: string }) {
@@ -123,19 +99,21 @@ function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: C
   const isCommand = message.role === "user" && (meta.is_command === true || meta.message_kind === "command" || isSlashCommand(message.content));
   const isSystem = message.role === "system" || meta.message_kind === "system" || meta.is_system === true || meta.is_system_response === true;
   const cot = meta.formatted_cot || meta.reasoning || "";
+  const rawOutput = !isSystem && typeof meta.raw_response === "string" && meta.raw_response.trim() ? meta.raw_response : message.content;
   const error = meta.error_message || (meta.stream_error ? "Stream wurde beendet." : meta.formatting_failed ? "Formatierungsdienst fehlgeschlagen; Rohtext wird angezeigt." : "");
   const timing = (meta.timing ?? {}) as Record<string, any>;
 
   if (message.role === "user") {
-    return <article className="terminal-log-entry terminal-user-entry" data-message-kind={isCommand ? "command" : "message"}><div className="terminal-prompt-line"><span className="text-terminal-green">User</span>{isCommand && <span className="ml-2 border border-terminal-amber/45 px-1 text-[8px] uppercase tracking-widest text-terminal-amber">command</span>}<span className="ml-2 min-w-0 break-words text-mist [overflow-wrap:anywhere]">{message.content}</span></div></article>;
+    return <article className={`terminal-log-entry ${isCommand ? "terminal-command-entry" : "terminal-user-entry"}`} data-message-kind={isCommand ? "command" : "input"}><div className="terminal-prompt-line"><span className={isCommand ? "text-terminal-amber" : "text-[#8aa8bd]"}>{isCommand ? "Command" : "Input"}</span><span className="ml-2 min-w-0 break-words text-mist [overflow-wrap:anywhere]">{message.content}</span></div></article>;
   }
 
-  return <article className={`terminal-log-entry terminal-assistant-entry ${hasError(message) ? "has-error" : ""}`} data-message-kind={isSystem ? "system" : "message"}>
-    <div className="terminal-prompt-line mb-1"><span className={hasError(message) ? "text-terminal-red" : "text-terminal-green"}>CHAPPiE</span><span className="ml-2 text-slate/45">{isReasoning ? "reasoning" : isThinking ? "processing" : isSystem ? "system" : "answer"}</span>{isSystem && <span className="ml-2 border border-slate/30 px-1 text-[8px] uppercase tracking-widest text-slate/50">system</span>}{!isLive && <button type="button" className="ml-auto text-[9px] uppercase tracking-widest text-slate/35 hover:text-terminal-green" onClick={() => onSelectTrace(message)}>inspect</button>}</div>
+  return <article className={`terminal-log-entry ${isSystem ? "terminal-system-entry" : "terminal-assistant-entry"} ${hasError(message) ? "has-error" : ""}`} data-message-kind={isSystem ? "system" : "output"}>
+    <div className="terminal-prompt-line mb-1"><span className={hasError(message) ? "text-terminal-red" : isSystem ? "text-terminal-amber" : "text-terminal-green"}>{isSystem ? "System" : "Output"}</span><span className="ml-2 text-slate/45">{isReasoning ? "reasoning" : isThinking ? "processing" : isSystem ? String(meta.command || "command result") : "model response"}</span>{!isLive && <button type="button" className="ml-auto text-[9px] uppercase tracking-widest text-slate/35 hover:text-terminal-green" onClick={() => onSelectTrace(message)}>inspect</button>}</div>
     {error && <div className="terminal-error-line mb-2 border-l-2 border-terminal-red bg-terminal-red/[0.08] px-2 py-1 text-[10px] text-terminal-red">[ERR] {error}</div>}
     {isReasoning ? <details open className="terminal-reasoning"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT — live</summary><NumberedText content={message.content} className="mt-2 text-[10px] leading-relaxed text-slate/60" /></details> : isThinking ? <div className="text-[11px] text-terminal-green/75"><span className="terminal-cursor mr-1">▌</span>{message.content}<span className="ml-2 text-[9px] text-slate/35">{formatDuration(meta.timer_ms)}</span></div> : <>
       {thinkingEnabled && cot && <details className="terminal-reasoning mb-2"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT</summary><NumberedText content={String(cot).length > 4000 ? `${String(cot).slice(0, 4000)}\n... (truncated)` : String(cot)} className={`mt-2 text-[10px] leading-relaxed ${hasError(message) ? "text-terminal-red/70" : "text-slate/55"}`} /></details>}
-      <NumberedText content={message.content} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />
+      {!isSystem && rawOutput !== message.content && <div className="mb-1 text-[9px] uppercase tracking-widest text-slate/35">raw model output</div>}
+      <NumberedText content={rawOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />
       {!isSystem && (isLive || timing.ttft_ms != null || timing.answer_tokens != null || meta.provider) && <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>ttft {formatDuration(timing.ttft_ms)}</span><span>{timing.answer_tokens ?? meta.live_pipeline?.answer_tokens ?? "—"} tk</span><span>{formatTokenRate(timing, meta, message.content)}</span><span>{meta.provider ?? "provider —"}</span></div>}
     </>}
     {isStreaming && <span className="terminal-cursor ml-7 text-terminal-green">▌</span>}
@@ -173,6 +151,7 @@ export function ChatPage() {
   const [queue, setQueue] = useState<QueuedMessage[]>([]);
   const [thinkingIndex, setThinkingIndex] = useState(0);
   const [showEmotionPopup, setShowEmotionPopup] = useState(false);
+  const [thinkingSaving, setThinkingSaving] = useState(false);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const emotionPopupRef = useRef<HTMLDivElement>(null);
@@ -382,7 +361,7 @@ export function ChatPage() {
             setLivePipeline((previous) => {
               const startedAt = previous?.started_at ?? useUiStore.getState().genStartTime ?? now;
               const elapsed = Math.max(0, now - startedAt);
-              const answerTokens = estimateTokens(streamedContent);
+              const answerTokens = estimateTextTokens(streamedContent);
               return {
                 ...(previous ?? {}),
                 stage: "streaming",
@@ -404,7 +383,7 @@ export function ChatPage() {
               model: livePipeline?.model ?? status.model,
               live_pipeline: livePipeline,
               timing: {
-                answer_tokens: livePipeline?.answer_tokens ?? estimateTokens(streamedContent),
+                answer_tokens: livePipeline?.answer_tokens ?? estimateTextTokens(streamedContent),
                 answer_time_ms: livePipeline?.answer_time_ms ?? 0,
                 tokens_per_second: livePipeline?.tokens_per_second ?? 0,
               },
@@ -437,7 +416,7 @@ export function ChatPage() {
             provider: finalMeta.provider ?? previous?.provider ?? status.provider,
             model: finalMeta.model ?? previous?.model ?? status.model,
           }));
-          const mergedMeta = { ...finalMeta, reasoning: streamedReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalContent || undefined };
+          const mergedMeta = { ...finalMeta, reasoning: streamedReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalMeta.raw_response || finalContent || undefined };
           commitAssistant(displayContent || finalContent, mergedMeta, event.data?.session_id || undefined);
           finished = true;
           break;
@@ -454,7 +433,7 @@ export function ChatPage() {
         const result = await api.sendMessage({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") }) as any;
         const content = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
         const metadata = (result?.assistant_message?.metadata || result?.metadata || {}) as Record<string, any>;
-        commitAssistant(metadata.formatted_answer || content, { ...metadata, raw_response: content }, result?.session_id || result?.replacement_session_id);
+        commitAssistant(metadata.formatted_answer || content, { ...metadata, raw_response: metadata.raw_response || content }, result?.session_id || result?.replacement_session_id);
       } catch (error: any) {
         const errorText = error?.message || "Unbekannter Fehler";
         setStreamError(errorText);
@@ -515,14 +494,24 @@ export function ChatPage() {
     setActiveTraceId(entry.id ?? null);
   }
 
-  function toggleThinking() {
+  async function toggleThinking() {
+    if (thinkingSaving) return;
     const next = !thinkingEnabled;
     setThinkingEnabled(next);
-    void api.saveSettings({ chain_of_thought: next });
+    setThinkingSaving(true);
+    try {
+      const saved = await api.saveSettings({ chain_of_thought: next }) as Record<string, unknown>;
+      setThinkingEnabled(Boolean(saved.chain_of_thought));
+    } catch (error: any) {
+      setThinkingEnabled(!next);
+      setStreamError(error?.message || "Chain of Thought konnte nicht gespeichert werden.");
+    } finally {
+      setThinkingSaving(false);
+    }
   }
 
   return <div className="terminal-chat flex h-full min-h-0 flex-col bg-ink">
-    <div className="terminal-session-bar flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2"><span className="font-semibold text-[10px] uppercase tracking-[0.28em] text-mist">CHAPPiE</span><button type="button" onClick={toggleThinking} className={`terminal-toggle px-[0.5rem] py-[0.3rem] text-[10px] ${thinkingEnabled ? "is-active" : ""}`} title="Toggle reasoning">{thinkingEnabled ? "CoT on" : "CoT off"}</button></div>
+    <div className="terminal-session-bar flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2"><span className="font-semibold text-[10px] uppercase tracking-[0.28em] text-mist">CHAPPiE</span><button type="button" onClick={() => void toggleThinking()} disabled={thinkingSaving} aria-pressed={thinkingEnabled} className={`terminal-toggle min-h-9 px-3 text-[10px] ${thinkingEnabled ? "is-active" : ""}`} title="Chain of Thought ein- oder ausblenden">{thinkingSaving ? "saving" : thinkingEnabled ? "CoT on" : "CoT off"}</button></div>
     <div ref={scrollRef} className="terminal-log min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:px-5" aria-live="polite">
       {finalMessages.length === 0 ? <div className="flex min-h-full items-center justify-center"><div className="w-full max-w-[34rem] border-l-2 border-terminal-green/35 pl-3 text-[11px] leading-relaxed text-slate/45"><div className="text-terminal-green">User _</div><p className="mt-2">No traces yet. Send a message or run a command to start the workspace.</p><p className="mt-1 text-slate/30">Try /help · /stats · /debug</p></div></div> : <div className="space-y-5">{finalMessages.map((entry, index) => <TerminalEntry key={entry.id ?? index} message={entry} thinkingEnabled={thinkingEnabled} onSelectTrace={selectTrace} />)}</div>}
     </div>

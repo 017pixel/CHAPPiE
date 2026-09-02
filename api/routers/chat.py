@@ -272,6 +272,8 @@ def post_command(request: CommandRequest, backend=Depends(get_backend)):
             "is_system_response": True,
             "message_kind": "system",
             "command": request.command.strip(),
+            "command_trace": result.get("command_trace", {}),
+            "raw_response": output,
         },
     }
     history = list(session.get("messages", []))

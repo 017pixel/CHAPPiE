@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List
 
 from config.config import settings
@@ -139,21 +140,36 @@ def _run_emotion(backend, cmd: str) -> Dict[str, Any]:
             lines.append(f"- **{name}**: {val}/100")
         lines.append(f"\n*Syntax: /emotion <name> [+/-]<0-100>*")
         lines.append(f"*Beispiel: /emotion happiness +10*")
-        return _base_result(backend, "\n".join(lines))
+        return _base_result(backend, "\n".join(lines), _command_trace_actions=["Emotionszustand gelesen"])
 
     if len(parts) < 3:
-        return _base_result(backend, "Nutze: `/emotion <name> [+/-]<0-100>` (z.B. `/emotion happiness +10`)")
+        return _base_result(
+            backend,
+            "Nutze: `/emotion <name> [+/-]<0-100>` (z.B. `/emotion happiness +10`)",
+            _command_trace_actions=["Command-Syntax geprüft", "Änderung wegen fehlendem Wert verworfen"],
+            _command_trace_status="rejected",
+        )
 
     _, emotion, val_str, *_extra = parts
     if emotion not in EMOTION_NAMES:
         names = ", ".join(EMOTION_NAMES)
-        return _base_result(backend, f"Unbekannte Emotion: `{emotion}`. Gueltig: {names}")
+        return _base_result(
+            backend,
+            f"Unbekannte Emotion: `{emotion}`. Gueltig: {names}",
+            _command_trace_actions=["Emotionsname geprüft", "Änderung wegen unbekannter Emotion verworfen"],
+            _command_trace_status="rejected",
+        )
 
     is_delta = val_str.startswith("+") or val_str.startswith("-")
     try:
         parsed = int(val_str)
     except ValueError:
-        return _base_result(backend, f"Ungueltiger Wert: `{val_str}`. Erwartet: Zahl oder +Zahl/-Zahl.")
+        return _base_result(
+            backend,
+            f"Ungueltiger Wert: `{val_str}`. Erwartet: Zahl oder +Zahl/-Zahl.",
+            _command_trace_actions=["Emotionswert geprüft", "Änderung wegen ungültigem Wert verworfen"],
+            _command_trace_status="rejected",
+        )
 
     current = backend._get_emotions_snapshot().get(emotion, 50)
     target = current + parsed if is_delta else parsed
@@ -168,31 +184,77 @@ def _run_emotion(backend, cmd: str) -> Dict[str, Any]:
         msg = f"**{emotion}**: {current}{delta_str}**{clamped}**/100 ✓"
 
     backend.emotions.set_emotion(emotion, clamped)
-    return _base_result(backend, msg)
+    return _base_result(
+        backend,
+        msg,
+        emotion_update={"emotion": emotion, "before": current, "after": clamped, "requested": parsed, "is_delta": is_delta},
+        _command_trace_actions=["Emotionswert validiert", f"{emotion} von {current} auf {clamped} gesetzt"],
+    )
 
 
 def execute_slash_command(command: str, backend) -> Dict[str, Any]:
     cmd = command.strip()
     lower = cmd.lower()
+    started_at = time.perf_counter()
+    handler = "backend.handle_command"
+    actions: List[str] = []
 
     if lower == "/sleep":
-        return _run_sleep(backend)
-    if lower.startswith("/deep think"):
-        return _run_deep_think(backend, cmd)
-    if lower.startswith("/think"):
-        return _run_think(backend, cmd)
-    if lower == "/help":
-        return _base_result(backend, HELP_TEXT)
-    if lower == "/stats":
-        return _base_result(backend, _build_stats_text(backend))
-    if lower == "/config":
-        return _base_result(backend, "Die Konfiguration liegt jetzt im React-Frontend unter der Settings-Ansicht und in der API unter `/settings`.")
-    if lower.startswith("/emotion"):
-        return _run_emotion(backend, cmd)
-    if lower in ("/clear", "/new"):
+        handler = "sleep_handler.execute_sleep_phase"
+        actions = ["Schlafphase gestartet", "Erinnerungen konsolidiert", "Emotionalen Zustand regeneriert"]
+        result = _run_sleep(backend)
+    elif lower.startswith("/deep think"):
+        handler = "deep_think_engine.think_cycle"
+        actions = ["Iterationen ausgewertet", "Erinnerungen einbezogen", "Reflexionszusammenfassung erstellt"]
+        result = _run_deep_think(backend, cmd)
+    elif lower.startswith("/think"):
+        handler = "memory.think_deep"
+        actions = ["Reflexionszyklus gestartet", "Gedankenschritte gesammelt", "Ergebnis formatiert"]
+        result = _run_think(backend, cmd)
+    elif lower == "/help":
+        handler = "command_service.help"
+        actions = ["Verfügbare Commands geladen"]
+        result = _base_result(backend, HELP_TEXT)
+    elif lower == "/stats":
+        handler = "command_service.stats"
+        actions = ["Runtime-Status gelesen", "Memory-Zähler gelesen", "Emotionszustand gelesen"]
+        result = _base_result(backend, _build_stats_text(backend))
+    elif lower == "/config":
+        handler = "command_service.config"
+        actions = ["Konfigurationspfad ausgegeben"]
+        result = _base_result(backend, "Die Konfiguration liegt jetzt im React-Frontend unter der Settings-Ansicht und in der API unter `/settings`.")
+    elif lower.startswith("/emotion"):
+        handler = "command_service.emotion"
+        result = _run_emotion(backend, cmd)
+        actions = list(result.pop("_command_trace_actions", ["Emotionszustand verarbeitet"]))
+    elif lower in ("/clear", "/new"):
+        handler = "chat_manager.create_session"
+        actions = ["Neue Sitzung erstellt", "Neue Sitzung aktiviert", "Chatansicht zurückgesetzt"]
         new_session_id = backend.chat_manager.create_session()
         backend.chat_manager.set_active_session(new_session_id)
-        return _base_result(backend, "Neue Chat-Sitzung gestartet.", replacement_session_id=new_session_id, clear_history=True)
-    if lower in {"/daily", "/personality", "/consolidate", "/reflect", "/functions", "/life", "/needs", "/goals", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline", "/debug", "/step1", "/soul", "/user", "/prefs", "/preferences", "/twostep"}:
-        return _base_result(backend, backend.handle_command(lower))
-    return _base_result(backend, backend.handle_command(cmd))
+        result = _base_result(backend, "Neue Chat-Sitzung gestartet.", replacement_session_id=new_session_id, clear_history=True)
+    elif lower in {"/daily", "/personality", "/consolidate", "/reflect", "/functions", "/life", "/needs", "/goals", "/world", "/habits", "/stage", "/plan", "/forecast", "/arc", "/timeline", "/debug", "/step1", "/soul", "/user", "/prefs", "/preferences", "/twostep"}:
+        actions = ["Command an Backend-Handler übergeben", "Aktuellen Systemzustand ausgewertet"]
+        result = _base_result(backend, backend.handle_command(lower))
+    else:
+        actions = ["Command an Backend-Handler übergeben"]
+        result = _base_result(backend, backend.handle_command(cmd))
+
+    common_keys = {
+        "response_text", "emotions", "life_snapshot", "sleep_status",
+        "debug_entries", "retry_history", "replacement_session_id",
+        "clear_history", "command_trace",
+    }
+    trace_status = str(result.pop("_command_trace_status", "completed"))
+    details = {key: value for key, value in result.items() if key not in common_keys}
+    result["command_trace"] = {
+        "command": cmd,
+        "name": (lower.split()[0] if lower else "").removeprefix("/"),
+        "arguments": cmd.split()[1:],
+        "handler": handler,
+        "status": trace_status,
+        "duration_ms": round((time.perf_counter() - started_at) * 1000, 1),
+        "actions": actions,
+        "details": details,
+    }
+    return result

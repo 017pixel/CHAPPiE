@@ -331,6 +331,21 @@ def test_chat_stream_route_emits_final_turn_event():
     app.dependency_overrides.clear()
 
 
+def test_command_route_persists_execution_trace():
+    app.dependency_overrides[get_backend] = lambda: _DummyBackend()
+    client = TestClient(app)
+
+    response = client.post("/command", json={"session_id": "session-1", "command": "/help"})
+
+    assert response.status_code == 200
+    metadata = response.json()["session"]["messages"][-1]["metadata"]
+    assert metadata["message_kind"] == "system"
+    assert metadata["command_trace"]["command"] == "/help"
+    assert metadata["command_trace"]["status"] == "completed"
+    assert metadata["command_trace"]["actions"]
+    app.dependency_overrides.clear()
+
+
 def test_memory_context_and_runtime_routes_return_expected_shapes():
     app.dependency_overrides[get_backend] = lambda: _DummyBackend()
     client = TestClient(app)
@@ -361,5 +376,6 @@ if __name__ == "__main__":
     test_health_and_status_routes()
     test_chat_route_returns_serialized_turn_payload()
     test_chat_stream_route_emits_final_turn_event()
+    test_command_route_persists_execution_trace()
     test_memory_context_and_runtime_routes_return_expected_shapes()
     print("OK: api contract")

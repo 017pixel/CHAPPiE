@@ -27,7 +27,6 @@ export function AppShell() {
   const [splitRatio, setSplitRatio] = useState(readStoredSplit);
   const [dragging, setDragging] = useState(false);
   const [mobilePane, setMobilePane] = useState<"terminal" | "inspector">("terminal");
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,7 +86,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="terminal-app flex h-screen w-screen flex-col overflow-hidden bg-ink font-mono text-mist">
+    <div className="terminal-app flex h-screen w-screen flex-col overflow-hidden bg-ink font-sans text-mist">
       <div className="terminal-mobile-tabs flex shrink-0 border-b border-white/10 bg-night lg:hidden" role="tablist" aria-label="Workspace panes">
         <button
           type="button"
@@ -136,10 +135,7 @@ export function AppShell() {
           className={`terminal-split-pane inspector-pane-wrapper min-w-0 flex-1 ${mobilePane === "inspector" ? "mobile-pane-visible" : "mobile-pane-hidden"}`}
           aria-label="Research tracing inspector"
         >
-          <InspectorPane
-            commandPaletteOpen={commandPaletteOpen}
-            onCommandPaletteChange={setCommandPaletteOpen}
-          />
+          <InspectorPane />
         </section>
       </main>
     </div>

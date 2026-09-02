@@ -8,7 +8,7 @@ PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
 from unittest.mock import MagicMock
-from api.services.command_service import _run_emotion, EMOTION_NAMES
+from api.services.command_service import _run_emotion, EMOTION_NAMES, execute_slash_command
 from config.emotions import EMOTION_DEFAULTS
 
 
@@ -207,6 +207,31 @@ def test_all_emotions_accepted():
     assert len(backend.emotions._calls) == len(EMOTION_DEFAULTS)
 
 
+def test_command_execution_exposes_actions_for_the_inspector():
+    backend = _make_backend()
+    result = execute_slash_command("/emotion happiness +10", backend)
+    trace = result["command_trace"]
+
+    assert trace["command"] == "/emotion happiness +10"
+    assert trace["name"] == "emotion"
+    assert trace["arguments"] == ["happiness", "+10"]
+    assert trace["handler"] == "command_service.emotion"
+    assert trace["status"] == "completed"
+    assert trace["duration_ms"] >= 0
+    assert trace["actions"] == ["Emotionswert validiert", "happiness von 56 auf 66 gesetzt"]
+    assert trace["details"]["emotion_update"]["after"] == 66
+
+
+def test_command_execution_marks_rejected_updates_without_claiming_a_change():
+    backend = _make_backend()
+    result = execute_slash_command("/emotion unknown +10", backend)
+    trace = result["command_trace"]
+
+    assert trace["status"] == "rejected"
+    assert trace["actions"] == ["Emotionsname geprüft", "Änderung wegen unbekannter Emotion verworfen"]
+    assert backend.emotions._calls == []
+
+
 # ── runner ───────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -229,6 +254,8 @@ if __name__ == "__main__":
         ("missing value", test_emotion_missing_value),
         ("just name trailing space", test_emotion_just_name),
         ("all emotions", test_all_emotions_accepted),
+        ("command inspector trace", test_command_execution_exposes_actions_for_the_inspector),
+        ("rejected command trace", test_command_execution_marks_rejected_updates_without_claiming_a_change),
     ]
     for name, fn in tests:
         fn()

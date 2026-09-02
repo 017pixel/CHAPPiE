@@ -2,7 +2,15 @@
    panes alive in the DOM so a stream never disappears when the tab changes. */
 @media (max-width: 1023px) {
   .terminal-mobile-tabs button {
-    min-height: 2.25rem;
+    min-height: 2.75rem;
+  }
+
+  .terminal-toggle,
+  .terminal-command,
+  .mode-toggle,
+  .inspector-action,
+  .terminal-send {
+    min-height: 2.75rem;
   }
 
   .terminal-input-area {

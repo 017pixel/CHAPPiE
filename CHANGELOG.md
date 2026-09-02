@@ -2,6 +2,29 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.3.0] - 2026-09-02
+
+### Erstellt
+- Eigene Detailansichten für Eingaben, Modellantworten, Commands und Systemantworten ergänzt
+- Klickbare Unteransichten für Memory, Steering, Timing, Raw und Causal eingerichtet
+- Nachvollziehbare Aktionsprotokolle für ausgeführte Commands ergänzt
+- Stabile Durchsatzmessung über das vollständig gemessene Generierungsfenster eingeführt
+- Neues Favicon mit weißem C auf schwarzem Hintergrund erstellt
+
+### Verändert
+- Tokenraten werden aus Antworttokens und der vollständigen Generierungsdauer berechnet
+- Der Chain-of-Thought-Schalter bestätigt Änderungen jetzt über die Laufzeitkonfiguration
+- Rohantwort, formatierte Antwort und Denkbereich werden getrennt und gezielt dargestellt
+- Typografie, Kontraste und Bedienflächen wurden für 1080p und mobile Geräte vergrößert
+- Die Oberfläche wirkt jetzt wie eine reduzierte Analysezentrale mit klarer Rollentrennung
+
+### Gelöscht
+- Fehlerhafte Tokenraten durch die kurze Restzeit nach dem ersten Token entfernt
+- Auswahlfilter für Errors, Trimmed, Repetition, Groq und Local entfernt
+- Hamburger-Menü und nicht benötigte Command-Palette aus der Kopfzeile entfernt
+- Output-spezifische Daten aus Eingabe-, Command- und Systemansichten entfernt
+- Dekorative Schriften, starke Schatten und visuelle Ablenkungen aus der WebUI entfernt
+
 ## [16.2.2] - 2026-09-01
 
 ### Erstellt

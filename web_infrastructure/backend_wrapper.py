@@ -89,6 +89,42 @@ def prompt_chain_of_thought_enabled(provider: Any, chain_of_thought: bool) -> bo
     return bool(chain_of_thought and provider == LLMProvider.GROQ)
 
 
+def calculate_generation_timing(
+    total_gen_ms: int | float,
+    answer_tokens: int,
+    reasoning_tokens: int = 0,
+    ttft_ms: int | float | None = None,
+) -> Dict[str, Any]:
+    """Build stable latency and effective-throughput metrics.
+
+    Provider streams can deliver a completed answer in one buffered chunk.  In
+    that case ``total - TTFT`` is only a few milliseconds and must not be used
+    as the throughput denominator.  The effective rate therefore covers the
+    complete measured generation window, including the wait for the first
+    provider output.
+    """
+    total_ms = max(0, int(round(float(total_gen_ms or 0))))
+    first_token_ms = total_ms if ttft_ms is None else max(0, int(round(float(ttft_ms))))
+    first_token_ms = min(first_token_ms, total_ms) if total_ms else first_token_ms
+    answer_count = max(0, int(answer_tokens or 0))
+    reasoning_count = max(0, int(reasoning_tokens or 0))
+    stream_ms = max(0, total_ms - first_token_ms)
+    effective_ms = max(1, total_ms) if answer_count else 0
+    rate = round(answer_count / (effective_ms / 1000), 1) if effective_ms else 0.0
+    return {
+        "ttft_ms": first_token_ms,
+        "total_gen_ms": total_ms,
+        "total_tokens": reasoning_count + answer_count,
+        "reasoning_tokens": reasoning_count,
+        "answer_tokens": answer_count,
+        "reasoning_time_ms": first_token_ms,
+        "answer_time_ms": stream_ms,
+        "rate_duration_ms": effective_ms,
+        "tokens_per_second": rate,
+        "rate_basis": "answer_tokens_over_total_generation",
+    }
+
+
 CHAT_PROVIDER = LLMProvider.VLLM
 
 
@@ -488,9 +524,11 @@ def create_chappie_backend(
                 "retry_history": result.get("retry_history", []),
                 "formatted_cot": result.get("formatted_cot", ""),
                 "formatted_answer": result.get("formatted_answer", ""),
+                "raw_response": result.get("raw_response", result.get("response_text", "")),
                 "formatting_failed": result.get("formatting_failed", False),
                 "formatting_source": result.get("formatting_source", "local_fallback"),
                 "formatting_model": result.get("formatting_model", "?"),
+                "command_trace": result.get("command_trace", {}),
                 "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
                 "created_at": created_at,
             }
@@ -2261,25 +2299,14 @@ def create_chappie_backend(
             ttft_ms: int | float | None = None,
         ) -> Dict[str, Any]:
             """Build one stable timing shape for sync and streamed answers."""
-            total_ms = max(0, int(round(float(total_gen_ms or 0))))
             answer_tokens = self._count_text_tokens_safe(answer_text)
             reasoning_tokens = self._count_text_tokens_safe(reasoning_text) if reasoning_text else 0
-            first_token_ms = total_ms if ttft_ms is None else max(0, int(round(float(ttft_ms))))
-            if answer_tokens > 0:
-                answer_time_ms = max(1, total_ms - first_token_ms) if total_ms > first_token_ms else max(1, total_ms)
-            else:
-                answer_time_ms = 0
-            rate = round(answer_tokens / (answer_time_ms / 1000), 1) if answer_tokens and answer_time_ms else 0.0
-            return {
-                "ttft_ms": first_token_ms,
-                "total_gen_ms": total_ms,
-                "total_tokens": reasoning_tokens + answer_tokens,
-                "reasoning_tokens": reasoning_tokens,
-                "answer_tokens": answer_tokens,
-                "reasoning_time_ms": max(0, first_token_ms),
-                "answer_time_ms": answer_time_ms,
-                "tokens_per_second": rate,
-            }
+            return calculate_generation_timing(
+                total_gen_ms,
+                answer_tokens,
+                reasoning_tokens,
+                ttft_ms=ttft_ms,
+            )
 
         def _enforce_context_budget(self, messages: list) -> tuple[list, dict]:
             """Count with the real tokenizer and trim until the request fits."""
@@ -2718,6 +2745,7 @@ def create_chappie_backend(
 
             return {
                 "response_text": display_response,
+                "raw_response": raw_response,
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted.get("formatting_failed", False),
@@ -2967,6 +2995,7 @@ def create_chappie_backend(
 
             return {
                 "response_text": display_response,
+                "raw_response": raw_response,
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),
@@ -3630,6 +3659,7 @@ def create_chappie_backend(
 
             result = {
                 "response_text": display_response,
+                "raw_response": raw_response,
                 "formatted_cot": safe_cot,
                 "formatted_answer": safe_answer,
                 "formatting_failed": formatted_stream.get("formatting_failed", False),
@@ -3854,6 +3884,7 @@ def create_chappie_backend(
 
             result = {
                 "response_text": display_response,
+                "raw_response": raw_response,
                 "formatted_cot": formatted_legacy.get("cot", "") or thought or model_reasoning or "",
                 "formatted_answer": safe_legacy_answer,
                 "formatting_failed": formatted_legacy.get("formatting_failed", False),

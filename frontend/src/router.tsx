@@ -8,7 +8,7 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       // The split shell owns the workspace. These routes stay addressable for
-      // bookmarks and command-palette jumps to inspector sections.
+      // bookmarks that open inspector sections directly.
       { index: true, element: null },
       { path: "context", element: null },
       { path: "memories", element: null },

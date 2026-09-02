@@ -3,24 +3,24 @@ export default {
     theme: {
         extend: {
             colors: {
-                ink: "#0D0D0D", // Deep near-black background
+                ink: "#0B0E0D", // Deep near-black background
                 mist: "#F4EFE6", // Warm neutral for highlights
-                night: "#121212", // Secondary dark surface
-                glass: "rgba(255, 255, 255, 0.03)", // Glassmorphism base
-                ember: "#6A8D73", // NEW: Dark Pastel Green accent (replacing orange)
-                pine: "#3D5A44", // Complementary dark green
-                slate: "#8C8C8C", // Neutral gray
+                night: "#121614", // Secondary dark surface
+                glass: "rgba(255, 255, 255, 0.025)", // Quiet surface tint
+                ember: "#789A80", // Restrained analysis accent
+                pine: "#405C47", // Complementary dark green
+                slate: "#9A9E9B", // Neutral gray
                 cream: "#EADFCE", // Warm secondary
-                input: "#1A1A1A", // NEW: Dark gray for input boxes
-                loading: "#F26A1B", // Orange for loading
-                warning: "#EF4444", // Red for warning
-                "terminal-green": "#2DD4BF",
-                "terminal-amber": "#FBBF24",
-                "terminal-red": "#EF4444"
+                input: "#161A18", // Dark gray for input boxes
+                loading: "#C58A5B", // Orange for loading
+                warning: "#D97878", // Red for warning
+                "terminal-green": "#8FB996",
+                "terminal-amber": "#D1A56D",
+                "terminal-red": "#D97878"
             },
             fontFamily: {
-                sans: ["Space Grotesk", "ui-sans-serif", "system-ui"],
-                mono: ["JetBrains Mono", "Ubuntu Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
+                sans: ["IBM Plex Sans", "ui-sans-serif", "system-ui"],
+                mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
             },
             borderRadius: {
                 "squircle-sm": "1rem",

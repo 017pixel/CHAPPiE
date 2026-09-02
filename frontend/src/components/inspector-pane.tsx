@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "../services/api";
 import frontendPackage from "../../package.json";
+import { estimateTextTokens, formatTokenRate } from "../lib/telemetry";
 import { isSlashCommand } from "../store/ui";
 import type { ChatMessage, LivePipelineState } from "../store/ui";
 import { useUiStore } from "../store/ui";
@@ -22,8 +23,8 @@ type InspectorSection =
 
 type ExplorerMode = "message" | "category";
 type TraceStatus = "ok" | "warn" | "error" | "live";
-type FilterName = "errors" | "trimmed" | "repetition" | "groq" | "local";
-type TraceMessageKind = "message" | "command" | "system";
+type TraceMessageKind = "input" | "output" | "command" | "system";
+type TraceView = "overview" | "input" | "command" | "result" | "memory" | "steering" | "timing" | "raw" | "causal";
 
 type TraceEntry = {
   id: string;
@@ -47,11 +48,6 @@ type TimelineStep = {
   status: "done" | "active" | "inactive" | "warn" | "error";
 };
 
-type InspectorPaneProps = {
-  commandPaletteOpen: boolean;
-  onCommandPaletteChange: (open: boolean) => void;
-};
-
 type QuerySnapshot = {
   data: unknown;
   isLoading: boolean;
@@ -59,14 +55,6 @@ type QuerySnapshot = {
   error: unknown;
   refetch: () => unknown;
 };
-
-const FILTERS: Array<{ id: FilterName; label: string }> = [
-  { id: "errors", label: "errors" },
-  { id: "trimmed", label: "trimmed" },
-  { id: "repetition", label: "repetition" },
-  { id: "groq", label: "groq" },
-  { id: "local", label: "local" },
-];
 
 const CATEGORY_DEFS: Array<{ id: InspectorSection; label: string; icon: string; path?: string }> = [
   { id: "memories", label: "Memory", icon: "memory", path: "/memories" },
@@ -87,25 +75,27 @@ const SECTION_PATHS: Record<string, InspectorSection> = {
   "/debug": "debug",
 };
 
-const PALETTE_COMMANDS: Array<{ label: string; hint: string; section?: InspectorSection }> = [
-  { label: "Trace: latest message", hint: "open active trace", section: "trace" },
-  { label: "Section: context files", hint: "lazy-load context", section: "context" },
-  { label: "Section: memories", hint: "lazy-load long-term memory", section: "memories" },
-  { label: "Section: life snapshot", hint: "lazy-load homeostasis", section: "life" },
-  { label: "Section: growth", hint: "lazy-load growth state", section: "growth" },
-  { label: "Section: settings", hint: "open runtime settings", section: "settings" },
-  { label: "Section: steering", hint: "open steering traces", section: "steering" },
-  { label: "Section: training", hint: "lazy-load daemon state", section: "training" },
-  { label: "Section: debug", hint: "poll debug data", section: "debug" },
-];
-
-const TRACE_CHILDREN = [
-  { label: "Memory", icon: "memory" },
-  { label: "Steering", icon: "tune" },
-  { label: "Timing", icon: "schedule" },
-  { label: "Raw", icon: "code" },
-  { label: "Causal", icon: "account_tree" },
-];
+const TRACE_CHILDREN: Record<TraceMessageKind, Array<{ label: string; icon: string; view: TraceView }>> = {
+  input: [
+    { label: "Input", icon: "input", view: "input" },
+    { label: "Raw", icon: "code", view: "raw" },
+  ],
+  command: [
+    { label: "Command", icon: "terminal", view: "command" },
+    { label: "Raw", icon: "code", view: "raw" },
+  ],
+  system: [
+    { label: "Result", icon: "receipt_long", view: "result" },
+    { label: "Raw", icon: "code", view: "raw" },
+  ],
+  output: [
+    { label: "Memory", icon: "memory", view: "memory" },
+    { label: "Steering", icon: "tune", view: "steering" },
+    { label: "Timing", icon: "schedule", view: "timing" },
+    { label: "Raw", icon: "code", view: "raw" },
+    { label: "Causal", icon: "account_tree", view: "causal" },
+  ],
+};
 
 const MAX_RENDERED_TRACE_ROWS = 200;
 const DEFAULT_TREE_SPLIT = 34;
@@ -157,21 +147,6 @@ function formatOffset(value: unknown): string {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "+—";
   return `+${formatDuration(numeric, "0ms")}`;
-}
-
-function estimateTokens(value: string): number {
-  return value.trim() ? value.trim().split(/\s+/).length : 0;
-}
-
-function formatTokenRate(timing: Record<string, any>, metadata: Record<string, any>, content: string, elapsedMs = 0): string {
-  const pipeline = asRecord(metadata.live_pipeline || metadata.pipeline);
-  const explicit = Number(timing.tokens_per_second ?? timing.tokens_per_sec ?? metadata.tokens_per_second ?? pipeline.tokens_per_second);
-  if (Number.isFinite(explicit) && explicit > 0) return `${explicit.toFixed(1)} tok/s`;
-
-  const tokens = Number(timing.answer_tokens ?? pipeline.answer_tokens) || estimateTokens(content);
-  const durationMs = Number(timing.answer_time_ms ?? pipeline.answer_time_ms ?? timing.total_gen_ms ?? metadata.processing_time_ms ?? pipeline.elapsed_ms ?? elapsedMs);
-  if (tokens > 0 && Number.isFinite(durationMs) && durationMs > 0) return `${(tokens / (durationMs / 1000)).toFixed(1)} tok/s`;
-  return "— tok/s";
 }
 
 function formatTimestamp(value: unknown): string {
@@ -251,30 +226,6 @@ function hasRepetition(metadata: Record<string, any>): boolean {
   ].some(activeSignal);
 }
 
-function getProvider(metadata: Record<string, any>): string {
-  const timing = asRecord(metadata.timing);
-  const switches = asArray(metadata.provider_switches).flatMap((item) => {
-    const value = asRecord(item);
-    return [value.from, value.to, value.provider, value.model];
-  });
-  return [
-    metadata.provider,
-    metadata.llm_provider,
-    metadata.model_provider,
-    metadata.runtime_provider,
-    metadata.backend_provider,
-    metadata.formatting_source,
-    metadata.formatting_provider,
-    timing.provider,
-    timing.formatting_source,
-    ...switches,
-  ].filter((value) => value !== null && value !== undefined).join(" ").toLowerCase();
-}
-
-function isLocalProvider(metadata: Record<string, any>): boolean {
-  return /\b(vllm|ollama|local|local_forced|local_fallback)\b/i.test(getProvider(metadata));
-}
-
 function categoryIdsFor(metadata: Record<string, any>, status: TraceStatus): InspectorSection[] {
   const ids: InspectorSection[] = [];
   if (metadata.rag_memories || metadata.memory_trace || metadata.memory_consolidation) ids.push("memories");
@@ -298,24 +249,34 @@ function traceMessageKind(message: ChatMessage, previous?: ChatMessage): { kind:
     return { kind: "system", commandText };
   }
 
-  return { kind: "message" };
+  return { kind: message.role === "user" ? "input" : "output" };
 }
 
 function traceKindLabel(kind: TraceMessageKind): string {
   if (kind === "command") return "command";
   if (kind === "system") return "system";
-  return "message";
+  if (kind === "input") return "input";
+  return "model output";
 }
 
 function buildTraceEntries(messages: ChatMessage[], isLive: boolean, liveContent: string, streamError: string | null, livePipeline: LivePipelineState | null): TraceEntry[] {
   const entries = messages.map((message, index) => {
-    const metadata = asRecord(message.metadata);
+    const ownMetadata = asRecord(message.metadata);
     const content = message.content ?? "";
     const { kind: messageKind, commandText } = traceMessageKind(message, messages[index - 1]);
+    const nextMessage = messages[index + 1];
+    const nextMetadata = asRecord(nextMessage?.metadata);
+    const nextKind = nextMessage ? traceMessageKind(nextMessage, message).kind : undefined;
+    const relatedCommandTrace = messageKind === "command" && nextKind === "system"
+      ? asRecord(nextMetadata.command_trace)
+      : {};
+    const metadata = Object.keys(relatedCommandTrace).length > 0
+      ? { ...ownMetadata, command_trace: relatedCommandTrace, command_response: messages[index + 1]?.content }
+      : ownMetadata;
     const live = message.id === "streaming" || Boolean(metadata.live);
     const status: TraceStatus = live ? "live" : metadataHasError(metadata, content) ? "error" : contextWasTrimmed(metadata) || hasRepetition(metadata) ? "warn" : "ok";
     const turn = Math.floor(index / 2) + 1;
-    const label = messageKind === "command" ? `Command #${turn}` : messageKind === "system" ? `System #${turn}` : message.role === "user" ? `Input #${turn}` : `Chat #${turn}`;
+    const label = messageKind === "command" ? `Command #${turn}` : messageKind === "system" ? `System #${turn}` : messageKind === "input" ? `Input #${turn}` : `Chat #${turn}`;
     const searchable = `${label} ${messageKind} ${message.role} ${content} ${commandText ?? ""} ${safeJson(metadata, 0)}`.toLowerCase();
     return {
       id: message.id ?? `message-${index}`,
@@ -347,7 +308,7 @@ function buildTraceEntries(messages: ChatMessage[], isLive: boolean, liveContent
     const metadata = { live: true, live_pipeline: livePipeline ?? undefined, error_message: streamError ?? undefined };
     const previous = messages[messages.length - 1];
     const followsCommand = previous?.role === "user" && isSlashCommand(previous.content);
-    const messageKind: TraceMessageKind = followsCommand ? "system" : "message";
+    const messageKind: TraceMessageKind = followsCommand ? "system" : "output";
     const commandText = followsCommand ? previous.content.trim() : undefined;
     entries.push({
       id: "streaming",
@@ -380,16 +341,8 @@ function statusMark(status: TraceStatus): string {
   return "+";
 }
 
-function entryMatches(entry: TraceEntry, query: string, filters: FilterName[]): boolean {
-  if (query.trim() && !entry.searchable.includes(query.trim().toLowerCase())) return false;
-  return filters.every((filter) => {
-    if (filter === "errors") return entry.status === "error" || metadataHasError(entry.metadata, entry.message.content);
-    if (filter === "trimmed") return contextWasTrimmed(entry.metadata);
-    if (filter === "repetition") return hasRepetition(entry.metadata);
-    if (filter === "groq") return getProvider(entry.metadata).includes("groq");
-    if (filter === "local") return isLocalProvider(entry.metadata);
-    return true;
-  });
+function entryMatches(entry: TraceEntry, query: string): boolean {
+  return !query.trim() || entry.searchable.includes(query.trim().toLowerCase());
 }
 
 function rawResponse(entry: TraceEntry): string {
@@ -482,7 +435,7 @@ function normalizeLiveStage(value: unknown): string {
 
 function timelineFor(entry: TraceEntry, isLive: boolean, elapsedMs: number, streamError: string | null, providerFallback = "provider —"): TimelineStep[] {
   const meta = entry.metadata;
-  if (entry.messageKind !== "message") {
+  if (entry.messageKind !== "output") {
     const kindDetail = entry.messageKind === "command" ? "command input" : "system response";
     return [
       { key: "intent", label: "intent", offset: "+—", detail: "—", status: "inactive" },
@@ -496,7 +449,7 @@ function timelineFor(entry: TraceEntry, isLive: boolean, elapsedMs: number, stre
   }
   const timing = asRecord(meta.timing);
   const pipeline = asRecord(meta.live_pipeline || meta.pipeline);
-  const tokenCount = Number(timing.answer_tokens) || Number(pipeline.answer_tokens) || estimateTokens(entry.message.content);
+  const tokenCount = Number(timing.answer_tokens) || Number(pipeline.answer_tokens) || estimateTextTokens(entry.message.content);
   const answerTime = Number(timing.answer_time_ms) || Number(pipeline.answer_time_ms) || (isLive ? elapsedMs : 0);
   const ttft = timing.ttft_ms ?? pipeline.ttft_ms;
   const formattingFailed = Boolean(meta.formatting_failed);
@@ -549,7 +502,7 @@ function Timeline({ entry, isLive, elapsedMs, streamError, providerFallback }: {
           </div>
         ))}
       </div>
-      {entry.messageKind === "message" && switches.length > 0 && (
+      {entry.messageKind === "output" && switches.length > 0 && (
         <div className="mt-3 border-l-2 border-terminal-amber/50 pl-2 text-[9px] text-terminal-amber/80">
           provider switches: {switches.map((item, index) => `${textValue(item.from, "?")} → ${textValue(item.to, "?")}${item.at_ms != null ? ` @ ${formatDuration(item.at_ms)}` : ""}`).join(" · ")}
         </div>
@@ -558,102 +511,168 @@ function Timeline({ entry, isLive, elapsedMs, streamError, providerFallback }: {
   );
 }
 
-function TraceDetail({ entry, isLive, elapsedMs, streamError, showRaw, reasoningExpanded, providerFallback, onToggleRaw, onToggleReasoning, onCopy, onRetry }: { entry: TraceEntry; isLive: boolean; elapsedMs: number; streamError: string | null; showRaw: boolean; reasoningExpanded: boolean; providerFallback?: string; onToggleRaw: () => void; onToggleReasoning: () => void; onCopy: (value: string) => void; onRetry: () => void }) {
+function TraceHeader({ entry }: { entry: TraceEntry }) {
   const meta = entry.metadata;
-  const auxiliaryTrace = entry.messageKind !== "message";
-  const timing = auxiliaryTrace ? {} : asRecord(meta.timing);
-  const budget = auxiliaryTrace ? {} : asRecord(meta.context_budget || meta.budget);
-  const memories = auxiliaryTrace ? [] : asArray(meta.rag_memories);
-  const deltas = auxiliaryTrace ? {} : asRecord(meta.emotions_delta);
-  const before = auxiliaryTrace ? {} : asRecord(meta.emotions_before);
-  const steering = auxiliaryTrace ? {} : asRecord(meta.emotion_steering || meta.steering);
-  const focus = auxiliaryTrace ? {} : asRecord(meta.global_workspace).dominant_focus || {};
-  const causal = auxiliaryTrace ? [] : asArray(meta.causal_trace);
-  const repetitions = auxiliaryTrace ? {} : asRecord(meta.repetition_events || meta.repetition);
+  return <div className="border-b border-white/10 pb-3">
+    <div className={`mb-1 text-[9px] uppercase tracking-[0.22em] ${statusColor(entry.status)}`}>
+      {statusMark(entry.status)} trace {entry.turn.toString().padStart(2, "0")} <span className={entry.messageKind === "command" ? "text-terminal-amber" : entry.messageKind === "system" ? "text-slate/60" : "text-slate/45"}>· {traceKindLabel(entry.messageKind)}</span>
+    </div>
+    <h2 className="truncate text-sm font-semibold tracking-tight text-mist">{entry.label}</h2>
+    <p className="mt-1 truncate text-[10px] text-slate/40">{entry.id} · {formatTimestamp(meta.created_at || meta.timestamp)}</p>
+  </div>;
+}
+
+function InputDetail({ entry, view, onCopy }: { entry: TraceEntry; view: TraceView; onCopy: (value: string) => void }) {
+  const content = entry.message.content;
+  const lines = content.split("\n").length;
+  const words = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const rawOnly = view === "raw";
+  return <div className="min-w-0 space-y-3">
+    <TraceHeader entry={entry} />
+    {!rawOnly && <DetailCard title="Input details">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Field label="role" value="user input" />
+        <Field label="characters" value={content.length} />
+        <Field label="words" value={words} />
+        <Field label="lines" value={lines} />
+        <Field label="estimated tokens" value={estimateTextTokens(content)} />
+        <Field label="timestamp" value={formatTimestamp(entry.metadata.created_at || entry.metadata.timestamp)} />
+      </div>
+    </DetailCard>}
+    <DetailCard title={rawOnly ? "Raw input" : "Input content"}>
+      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words border-l-2 border-[#6f8fa8]/60 pl-3 text-[10px] leading-relaxed text-slate/75">{content}</pre>
+      <button type="button" className="inspector-action mt-3" onClick={() => onCopy(content)}>copy input</button>
+    </DetailCard>
+    {rawOnly && Object.keys(entry.metadata).length > 0 && <DetailCard title="Input metadata" defaultOpen={false}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/55">{safeJson(entry.metadata)}</pre></DetailCard>}
+  </div>;
+}
+
+function CommandDetail({ entry, view, onCopy }: { entry: TraceEntry; view: TraceView; onCopy: (value: string) => void }) {
+  const trace = asRecord(entry.metadata.command_trace);
+  const actions = asArray(trace.actions);
+  const details = asRecord(trace.details);
+  const command = textValue(trace.command || entry.commandText, entry.message.content);
+  const result = entry.messageKind === "command"
+    ? textValue(entry.metadata.command_response, "Noch keine Systemantwort verknüpft.")
+    : entry.message.content;
+  const rawOnly = view === "raw";
+  const resultOnly = view === "result";
+  return <div className="min-w-0 space-y-3">
+    <TraceHeader entry={entry} />
+    {!rawOnly && !resultOnly && <>
+      <DetailCard title="Command request">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field label="command" value={command} valueClass="font-mono text-terminal-amber" />
+          <Field label="handler" value={textValue(trace.handler, "command router")} />
+          <Field label="arguments" value={asArray(trace.arguments).join(" ") || "none"} />
+          <Field label="status" value={textValue(trace.status, "submitted")} valueClass={trace.status === "completed" ? "text-terminal-green" : "text-terminal-amber"} />
+          <Field label="duration" value={trace.duration_ms != null ? formatDuration(trace.duration_ms) : "—"} />
+          <Field label="type" value={entry.messageKind === "command" ? "command input" : "system response"} />
+        </div>
+      </DetailCard>
+      <DetailCard title="Executed actions">
+        {actions.length === 0 ? <p className="text-[10px] text-slate/40">No action trace attached.</p> : <ol className="space-y-2">{actions.map((action, index) => <li key={`${index}-${String(action)}`} className="flex gap-3 border-l-2 border-terminal-green/45 pl-3 text-[10px] text-slate/70"><span className="text-terminal-green">{String(index + 1).padStart(2, "0")}</span><span>{textValue(action)}</span></li>)}</ol>}
+      </DetailCard>
+      {Object.keys(details).length > 0 && <DetailCard title="Command data" defaultOpen={false}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/55">{safeJson(details)}</pre></DetailCard>}
+    </>}
+    {(resultOnly || view === "overview" || rawOnly) && <DetailCard title={rawOnly ? "Raw command record" : "Command result"}>
+      {rawOnly ? <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/60">{safeJson({ command, trace, result })}</pre> : <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap break-words border-l-2 border-terminal-amber/45 pl-3 text-[10px] leading-relaxed text-slate/75">{result}</pre>}
+      <button type="button" className="inspector-action mt-3" onClick={() => onCopy(rawOnly ? safeJson({ command, trace, result }) : result)}>copy</button>
+    </DetailCard>}
+  </div>;
+}
+
+function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRaw, reasoningExpanded, providerFallback, onToggleRaw, onToggleReasoning, onCopy, onRetry }: { entry: TraceEntry; activeView: TraceView; isLive: boolean; elapsedMs: number; streamError: string | null; showRaw: boolean; reasoningExpanded: boolean; providerFallback?: string; onToggleRaw: () => void; onToggleReasoning: () => void; onCopy: (value: string) => void; onRetry: () => void }) {
+  if (entry.messageKind === "input") return <InputDetail entry={entry} view={activeView} onCopy={onCopy} />;
+  if (entry.messageKind === "command" || entry.messageKind === "system") return <CommandDetail entry={entry} view={activeView} onCopy={onCopy} />;
+
+  const meta = entry.metadata;
+  const timing = asRecord(meta.timing);
+  const budget = asRecord(meta.context_budget || meta.budget);
+  const memories = asArray(meta.rag_memories);
+  const deltas = asRecord(meta.emotions_delta);
+  const before = asRecord(meta.emotions_before);
+  const steering = asRecord(meta.emotion_steering || meta.steering);
+  const focus = asRecord(meta.global_workspace).dominant_focus || {};
+  const causal = asArray(meta.causal_trace);
+  const repetitions = asRecord(meta.repetition_events || meta.repetition);
   const raw = rawResponse(entry);
-  const reasoning = auxiliaryTrace ? "inactive" : textValue(meta.formatted_cot || meta.reasoning, "No reasoning payload");
-  const tokenRate = auxiliaryTrace ? "inactive" : formatTokenRate(timing, meta, entry.message.content, isLive ? elapsedMs : 0);
+  const reasoning = textValue(meta.formatted_cot || meta.reasoning, "No reasoning payload");
+  const tokenRate = formatTokenRate(timing, meta, entry.message.content, isLive ? elapsedMs : 0);
   const errorText = streamError || textValue(meta.error_message || meta.error, "");
+  const overview = activeView === "overview";
 
   return (
     <div className="min-w-0 space-y-3">
-      <div className="border-b border-white/10 pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className={`mb-1 text-[9px] uppercase tracking-[0.22em] ${statusColor(entry.status)}`}>
-              {statusMark(entry.status)} {entry.message.role} / trace {entry.turn.toString().padStart(2, "0")} <span className={entry.messageKind === "command" ? "text-terminal-amber" : entry.messageKind === "system" ? "text-slate/60" : "text-slate/45"}>· {traceKindLabel(entry.messageKind)}</span>
-            </div>
-            <h2 className="truncate text-sm font-semibold tracking-tight text-mist">{entry.label}</h2>
-            <p className="mt-1 truncate text-[10px] text-slate/40">{entry.id} · {formatTimestamp(meta.created_at || meta.timestamp)}</p>
-            {auxiliaryTrace && <div className="mt-2 min-w-0 border-l-2 border-terminal-amber/45 pl-2 text-[10px]"><span className="uppercase tracking-widest text-slate/40">{entry.messageKind === "command" ? "command input" : "system output"}</span>{entry.commandText && <span className="ml-2 break-words text-terminal-amber/85 [overflow-wrap:anywhere]">{entry.commandText}</span>}</div>}
-          </div>
-        </div>
-      </div>
+      <TraceHeader entry={entry} />
 
-      <DetailCard title="Pipeline timeline" status={auxiliaryTrace ? undefined : entry.status}>
+      {(overview || activeView === "timing") && <DetailCard title="Pipeline timeline" status={entry.status}>
         <Timeline entry={entry} isLive={isLive} elapsedMs={elapsedMs} streamError={streamError} providerFallback={providerFallback} />
-      </DetailCard>
+      </DetailCard>}
 
-      {errorText && (
+      {overview && errorText && (
         <div className="flex items-start justify-between gap-3 border border-terminal-red/35 bg-terminal-red/[0.06] p-3 text-[10px] text-terminal-red">
           <div><span className="font-semibold uppercase tracking-widest">turn_error</span><p className="mt-1 text-terminal-red/80">{errorText}</p></div>
           <button type="button" className="shrink-0 border border-terminal-red/40 px-2 py-1 text-[9px] uppercase tracking-widest hover:bg-terminal-red/10" onClick={onRetry}>retry</button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      {overview && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         <DetailCard title="Overview">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="intent" value={auxiliaryTrace ? "—" : `${textValue(meta.intent_type, "casual_chat")} ${meta.intent_confidence != null ? `${Math.round(Number(meta.intent_confidence) * 100)}%` : ""}`} />
-            <Field label="tone" value={auxiliaryTrace ? "inactive" : textValue(meta.tone_decision?.tone)} />
-            <Field label="tools" value={auxiliaryTrace ? "—" : textValue(meta.tool_calls_executed, "0")} />
+            <Field label="intent" value={`${textValue(meta.intent_type, "casual_chat")} ${meta.intent_confidence != null ? `${Math.round(Number(meta.intent_confidence) * 100)}%` : ""}`} />
+            <Field label="tone" value={textValue(meta.tone_decision?.tone)} />
+            <Field label="tools" value={textValue(meta.tool_calls_executed, "0")} />
             <Field label="timestamp" value={formatTimestamp(meta.created_at || meta.timestamp)} />
           </div>
         </DetailCard>
 
         <DetailCard title="Emotionen">
-          {Object.keys(deltas).length === 0 ? <p className="text-[10px] italic text-slate/40">{auxiliaryTrace ? "inactive" : "No emotion deltas."}</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(deltas).map(([name, value]) => { const item = asRecord(value); const change = Number(item.change) || 0; return <div key={name} className="border border-white/8 px-2 py-1.5 text-[10px]"><span className="text-slate/40">{name}</span><div className="mt-1"><span className="text-slate/55">{textValue(item.before ?? before[name])}</span><span className="px-1 text-slate/25">→</span><span className="text-slate/75">{textValue(item.after)}</span><span className={`ml-1 ${change > 0 ? "text-terminal-green" : change < 0 ? "text-terminal-red" : "text-slate/40"}`}>{change > 0 ? "+" : ""}{change}</span></div></div>; })}</div>}
+          {Object.keys(deltas).length === 0 ? <p className="text-[10px] italic text-slate/40">No emotion deltas.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(deltas).map(([name, value]) => { const item = asRecord(value); const change = Number(item.change) || 0; return <div key={name} className="border border-white/8 px-2 py-1.5 text-[10px]"><span className="text-slate/40">{name}</span><div className="mt-1"><span className="text-slate/55">{textValue(item.before ?? before[name])}</span><span className="px-1 text-slate/25">→</span><span className="text-slate/75">{textValue(item.after)}</span><span className={`ml-1 ${change > 0 ? "text-terminal-green" : change < 0 ? "text-terminal-red" : "text-slate/40"}`}>{change > 0 ? "+" : ""}{change}</span></div></div>; })}</div>}
         </DetailCard>
-      </div>
+      </div>}
 
-      <DetailCard title="Memory" status={memories.length === 0 ? undefined : "ok"}>
-        {memories.length === 0 ? <p className="text-[10px] italic text-slate/40">{auxiliaryTrace ? "inactive" : "> _ no matches (try broader query)"}</p> : <div className="min-w-0 space-y-2">{memories.slice(0, 12).map((memory, index) => { const item = asRecord(memory); return <div key={`${index}-${textValue(item.content, "memory")}`} className="min-w-0 border-l-2 border-terminal-green/35 pl-2"><div className="flex min-w-0 flex-wrap gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{textValue(item.role, "memory")}</span><span className="text-terminal-green">{item.relevance_score != null ? `${Math.round(Number(item.relevance_score) * 100)}%` : "—"}</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{textValue(item.label)}</span></div><p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/65 [overflow-wrap:anywhere]">{textValue(item.content)}</p></div>; })}</div>}
-        {!auxiliaryTrace && meta.memory_consolidation && <div className="mt-3 border-t border-white/8 pt-2 text-[10px] text-slate/45">consolidation: {safeJson(meta.memory_consolidation, 0)}</div>}
-      </DetailCard>
+      {(overview || activeView === "memory") && <>
+        <DetailCard title="Memory" status={memories.length === 0 ? undefined : "ok"}>
+          {memories.length === 0 ? <p className="text-[10px] italic text-slate/40">&gt; _ no matches (try broader query)</p> : <div className="min-w-0 space-y-2">{memories.slice(0, 12).map((memory, index) => { const item = asRecord(memory); return <div key={`${index}-${textValue(item.content, "memory")}`} className="min-w-0 border-l-2 border-terminal-green/35 pl-2"><div className="flex min-w-0 flex-wrap gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{textValue(item.role, "memory")}</span><span className="text-terminal-green">{item.relevance_score != null ? `${Math.round(Number(item.relevance_score) * 100)}%` : "—"}</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{textValue(item.label)}</span></div><p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/65 [overflow-wrap:anywhere]">{textValue(item.content)}</p></div>; })}</div>}
+          {meta.memory_consolidation && <div className="mt-3 border-t border-white/8 pt-2 text-[10px] text-slate/45">consolidation: {safeJson(meta.memory_consolidation, 0)}</div>}
+        </DetailCard>
+        <DetailCard title="Context budget" status={contextWasTrimmed(meta) ? "error" : budget.near_limit ? "warn" : undefined}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Field label="estimated" value={textValue(budget.estimated_tokens, "—")} /><Field label="limit" value={textValue(budget.token_limit, "7000")} /><Field label="status" value={contextWasTrimmed(meta) ? "GETRIMMT" : budget.near_limit ? "NEAR LIMIT" : "OK"} valueClass={contextWasTrimmed(meta) ? "text-terminal-red" : budget.near_limit ? "text-terminal-amber" : "text-terminal-green"} /><Field label="removed" value={textValue(budget.removed_messages, "0")} /></div>
+          {contextWasTrimmed(meta) && <p className="mt-3 border-l-2 border-terminal-red/50 pl-2 text-[10px] text-terminal-red/80">{textValue(budget.removed_messages, "older")} messages removed from the context window.</p>}
+        </DetailCard>
+        {Object.keys(focus).length > 0 || meta.memory_trace ? <DetailCard title="Focus + global workspace"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="dominant focus" value={textValue(focus.label)} /><Field label="salience" value={textValue(focus.salience)} /><Field label="broadcast" value={textValue(asRecord(meta.global_workspace).broadcast)} /><Field label="memories found" value={textValue(asRecord(meta.memory_trace).merged?.memories_found)} /><Field label="top relevance" value={textValue(asRecord(meta.memory_trace).merged?.top_relevance)} /><Field label="query" value={textValue(asRecord(meta.memory_trace).merged?.query)} /></div></DetailCard> : null}
+      </>}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      {(overview || activeView === "steering" || activeView === "timing") && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {(overview || activeView === "steering") &&
         <DetailCard title="Steering">
           {Object.keys(steering).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3"><Field label="mode" value={textValue(steering.summary || meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="active vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="steering active" value={steering.steering_active ? "yes" : "no"} valueClass={steering.steering_active ? "text-terminal-green" : "text-slate/45"} /></div>}
-        </DetailCard>
+        </DetailCard>}
+        {(overview || activeView === "timing") &&
         <DetailCard title="Timing">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="TTFT" value={auxiliaryTrace ? "—" : formatDuration(timing.ttft_ms)} /><Field label="generation" value={auxiliaryTrace ? "—" : formatDuration(timing.total_gen_ms || meta.processing_time_ms)} /><Field label="reasoning" value={auxiliaryTrace ? "inactive" : `${formatDuration(timing.reasoning_time_ms)} · ${textValue(timing.reasoning_tokens, "0")} tk`} /><Field label="answer" value={auxiliaryTrace ? "—" : `${formatDuration(timing.answer_time_ms)} · ${textValue(timing.answer_tokens, "0")} tk`} /><Field label="rate" value={tokenRate} valueClass={auxiliaryTrace ? "text-slate/40" : "text-terminal-green"} /><Field label="total tokens" value={auxiliaryTrace ? "—" : textValue(timing.total_tokens, "—")} /></div>
-        </DetailCard>
-      </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="TTFT" value={formatDuration(timing.ttft_ms)} /><Field label="generation" value={formatDuration(timing.total_gen_ms || meta.processing_time_ms)} /><Field label="output stream" value={`${formatDuration(timing.answer_time_ms)} · ${textValue(timing.answer_tokens, "0")} tk`} /><Field label="reasoning" value={`${formatDuration(timing.reasoning_time_ms)} · ${textValue(timing.reasoning_tokens, "0")} tk`} /><Field label="effective rate" value={tokenRate} valueClass="text-terminal-green" /><Field label="total tokens" value={textValue(timing.total_tokens, "—")} /></div>
+          <p className="mt-3 border-l-2 border-white/15 pl-2 text-[9px] leading-relaxed text-slate/40">Rate basis: answer tokens over complete measured generation time.</p>
+        </DetailCard>}
+      </div>}
 
-      <DetailCard title="Context budget" status={auxiliaryTrace ? undefined : contextWasTrimmed(meta) ? "error" : budget.near_limit ? "warn" : undefined}>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Field label="estimated" value={auxiliaryTrace ? "—" : textValue(budget.estimated_tokens, "—")} /><Field label="limit" value={auxiliaryTrace ? "—" : textValue(budget.token_limit, "7000")} /><Field label="status" value={auxiliaryTrace ? "inactive" : contextWasTrimmed(meta) ? "GETRIMMT" : budget.near_limit ? "NEAR LIMIT" : "OK"} valueClass={auxiliaryTrace ? "text-slate/40" : contextWasTrimmed(meta) ? "text-terminal-red" : budget.near_limit ? "text-terminal-amber" : "text-terminal-green"} /><Field label="removed" value={auxiliaryTrace ? "—" : textValue(budget.removed_messages, "0")} /></div>
-        {!auxiliaryTrace && contextWasTrimmed(meta) && <p className="mt-3 border-l-2 border-terminal-red/50 pl-2 text-[10px] text-terminal-red/80">{textValue(budget.removed_messages, "older")} messages removed from the context window.</p>}
-      </DetailCard>
+      {(overview || activeView === "causal") && <DetailCard title="Causal trace">
+        {causal.length === 0 ? <p className="text-[10px] italic text-slate/40">No causal trace attached.</p> : <div className="space-y-2">{causal.map((step, index) => { const item = asRecord(step); return <div key={index} className="border-l-2 border-white/15 pl-2 text-[10px] text-slate/60"><span className="text-slate/80">{textValue(item.phase, "phase")}:</span> {textValue(item.driver)}{item.effect && <span className="text-slate/40"> — {textValue(item.effect)}</span>}{item.evidence && <span className="text-slate/35"> [{Array.isArray(item.evidence) ? item.evidence.join(", ") : textValue(item.evidence)}]</span>}</div>; })}</div>}
+      </DetailCard>}
 
-      {!auxiliaryTrace && (Object.keys(focus).length > 0 || meta.memory_trace) && <DetailCard title="Focus + global workspace"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="dominant focus" value={textValue(focus.label)} /><Field label="salience" value={textValue(focus.salience)} /><Field label="broadcast" value={textValue(asRecord(meta.global_workspace).broadcast)} /><Field label="memories found" value={textValue(asRecord(meta.memory_trace).merged?.memories_found)} /><Field label="top relevance" value={textValue(asRecord(meta.memory_trace).merged?.top_relevance)} /><Field label="query" value={textValue(asRecord(meta.memory_trace).merged?.query)} /></div></DetailCard>}
+      {overview && Object.keys(repetitions).length > 0 && <DetailCard title="Repetition" status="warn">
+        <div className="space-y-1">{Object.entries(repetitions).map(([key, value]) => <div key={key} className="border-l-2 border-terminal-amber/50 pl-2 text-[10px] text-terminal-amber/75"><span className="font-semibold">{key}</span> <span className="text-slate/45">{typeof value === "object" ? safeJson(value, 0) : String(value)}</span></div>)}</div>
+      </DetailCard>}
 
-      <DetailCard title="Causal trace">
-        {causal.length === 0 ? <p className="text-[10px] italic text-slate/40">{auxiliaryTrace ? "inactive" : "No causal trace attached."}</p> : <div className="space-y-2">{causal.map((step, index) => { const item = asRecord(step); return <div key={index} className="border-l-2 border-white/15 pl-2 text-[10px] text-slate/60"><span className="text-slate/80">{textValue(item.phase, "phase")}:</span> {textValue(item.driver)}{item.effect && <span className="text-slate/40"> — {textValue(item.effect)}</span>}{item.evidence && <span className="text-slate/35"> [{Array.isArray(item.evidence) ? item.evidence.join(", ") : textValue(item.evidence)}]</span>}</div>; })}</div>}
-      </DetailCard>
-
-      <DetailCard title="Repetition" status={Object.keys(repetitions).length > 0 ? "warn" : undefined}>
-        {Object.keys(repetitions).length === 0 ? <p className="text-[10px] italic text-slate/40">{auxiliaryTrace ? "inactive" : "No repetition events."}</p> : <div className="space-y-1">{Object.entries(repetitions).map(([key, value]) => <div key={key} className="border-l-2 border-terminal-amber/50 pl-2 text-[10px] text-terminal-amber/75"><span className="font-semibold">{key}</span> <span className="text-slate/45">{typeof value === "object" ? safeJson(value, 0) : String(value)}</span></div>)}</div>}
-      </DetailCard>
-
-      <DetailCard title="Reasoning / CoT" open={reasoningExpanded} onToggle={onToggleReasoning}>
+      {(overview || activeView === "raw") && <DetailCard title="Reasoning / CoT" open={activeView === "raw" ? true : reasoningExpanded} onToggle={onToggleReasoning}>
         <div className="border-l-2 border-terminal-green/35 pl-2"><pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/60">{reasoning}</pre></div>
-      </DetailCard>
+      </DetailCard>}
 
-      <DetailCard title="Raw / formatted output">
+      {(overview || activeView === "raw") && <DetailCard title="Raw / formatted output">
         <div className="mb-2 flex items-center justify-between gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{showRaw ? "raw response" : "formatted response"}</span><button type="button" className="border border-white/10 px-2 py-1 text-terminal-green hover:bg-terminal-green/10" onClick={onToggleRaw}>{showRaw ? "show formatted" : "show raw"}</button></div>
         <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words border-l-2 border-white/15 pl-2 text-[10px] leading-relaxed text-slate/65">{showRaw ? raw : entry.message.content}</pre>
         <button type="button" className="mt-2 border border-white/10 px-2 py-1 text-[9px] uppercase tracking-widest text-slate/55 hover:border-terminal-green/40 hover:text-terminal-green" onClick={() => onCopy(raw)}>copy raw</button>
-      </DetailCard>
+      </DetailCard>}
     </div>
   );
 }
@@ -698,7 +717,7 @@ function SectionSnapshot({ section, snapshot, isLoading, isError, error, onRetry
   function sectionBody() {
     if (section === "context") {
       if (contextFiles.length === 0) return <EmptyTrace message="> _ no context files returned" />;
-      return <div className="min-w-0 grid grid-cols-1 gap-3 xl:grid-cols-2">{contextFiles.map(([name, value]) => <article key={name} className="min-w-0 border border-white/10 bg-black/15 p-3"><div className="mb-2 flex min-w-0 items-center justify-between gap-2 border-b border-white/8 pb-2"><span className="min-w-0 break-words text-[10px] uppercase tracking-widest text-terminal-green [overflow-wrap:anywhere]">{name}.md</span>{editingFile !== name && <button type="button" className="inspector-action shrink-0" onClick={() => { setEditingFile(name); setDraft(String(value)); }}>edit</button>}</div>{editingFile === name ? <><textarea value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-[12rem] w-full resize-y border border-white/10 bg-input p-2 text-[10px] leading-relaxed text-mist outline-none focus:border-terminal-green/50" spellCheck={false} /><div className="mt-2 flex gap-1"><button type="button" className="filter-chip is-active" disabled={contextMutation.isPending} onClick={() => contextMutation.mutate({ name, content: draft })}>{contextMutation.isPending ? "saving" : "save"}</button><button type="button" className="filter-chip" onClick={() => setEditingFile(null)}>cancel</button></div></> : <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/60 [overflow-wrap:anywhere]">{value}</pre>}</article>)}</div>;
+      return <div className="min-w-0 grid grid-cols-1 gap-3 xl:grid-cols-2">{contextFiles.map(([name, value]) => <article key={name} className="min-w-0 border border-white/10 bg-black/15 p-3"><div className="mb-2 flex min-w-0 items-center justify-between gap-2 border-b border-white/8 pb-2"><span className="min-w-0 break-words text-[10px] uppercase tracking-widest text-terminal-green [overflow-wrap:anywhere]">{name}.md</span>{editingFile !== name && <button type="button" className="inspector-action shrink-0" onClick={() => { setEditingFile(name); setDraft(String(value)); }}>edit</button>}</div>{editingFile === name ? <><textarea value={draft} onChange={(event) => setDraft(event.target.value)} className="min-h-[12rem] w-full resize-y border border-white/10 bg-input p-2 text-[10px] leading-relaxed text-mist outline-none focus:border-terminal-green/50" spellCheck={false} /><div className="mt-2 flex gap-1"><button type="button" className="inspector-action text-terminal-green" disabled={contextMutation.isPending} onClick={() => contextMutation.mutate({ name, content: draft })}>{contextMutation.isPending ? "saving" : "save"}</button><button type="button" className="inspector-action" onClick={() => setEditingFile(null)}>cancel</button></div></> : <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/60 [overflow-wrap:anywhere]">{value}</pre>}</article>)}</div>;
     }
     if (section === "memories") {
       return memoryItems.length === 0 ? <EmptyTrace message="> _ no matches (try broader query)" /> : <div className="min-w-0 space-y-2"><div className="grid grid-cols-2 gap-2 sm:grid-cols-3"><Field label="visible" value={memoryItems.length} /><Field label="total" value={textValue(record.total, String(memoryItems.length))} /><Field label="query" value={textValue(record.query, "all")} /></div>{memoryItems.slice(0, 30).map((item, index) => { const memory = asRecord(item); return <article key={index} className="min-w-0 border-l-2 border-terminal-green/35 pl-2"><div className="flex min-w-0 flex-wrap gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{textValue(memory.role, "memory")}</span><span className="text-terminal-green">{memory.relevance_score != null ? `${Math.round(Number(memory.relevance_score) * 100)}%` : "—"}</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{textValue(memory.type || memory.label)}</span></div><p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/65 [overflow-wrap:anywhere]">{textValue(memory.content, safeJson(item, 0))}</p></article>; })}</div>;
@@ -733,7 +752,7 @@ function SectionSnapshot({ section, snapshot, isLoading, isError, error, onRetry
   return <div className="min-w-0 space-y-3"><div className="border-b border-white/10 pb-3"><h2 className="mt-1 text-sm text-mist">{title}</h2><p className="mt-1 text-[10px] text-slate/40">Lazy-loaded from the existing CHAPPiE endpoint.</p></div>{isLoading && <div className="border border-white/10 p-4 text-[10px] text-terminal-green">&gt; _ loading {section}...</div>}{isError && <div className="border border-terminal-red/35 bg-terminal-red/[0.05] p-3 text-[10px] text-terminal-red">&gt; _ endpoint error: {errorMessage(error)}<button type="button" className="ml-3 border border-terminal-red/40 px-2 py-1 uppercase tracking-widest hover:bg-terminal-red/10" onClick={onRetry}>retry</button></div>}{!isLoading && !isError && snapshot === undefined && <EmptyTrace message="> _ no section payload yet" />}{!isLoading && !isError && snapshot !== undefined && sectionBody()}{!isLoading && !isError && snapshot !== undefined && <DetailCard title="Raw section payload" defaultOpen={false}><pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/55 [overflow-wrap:anywhere]">{safeJson(snapshot)}</pre></DetailCard>}{(section === "settings" || section === "steering") && <div className="border-t border-white/8 pt-2 text-[9px] text-slate/30">v{APP_VERSION}</div>}</div>;
 }
 
-export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: InspectorPaneProps) {
+export function InspectorPane() {
   const displayMessages = useUiStore((state) => state.displayMessages);
   const processingState = useUiStore((state) => state.processingState);
   const streamingContent = useUiStore((state) => state.streamingContent);
@@ -748,21 +767,20 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
   const [mode, setMode] = useState<ExplorerMode>("message");
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<FilterName[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["streaming"]));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTraceView, setActiveTraceView] = useState<TraceView>("overview");
   const [compareId, setCompareId] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<InspectorSection | null>(SECTION_PATHS[location.pathname] ?? null);
   const [showRaw, setShowRaw] = useState(false);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
-  const [paletteQuery, setPaletteQuery] = useState("");
   const [treeSplitRatio, setTreeSplitRatio] = useState(readStoredTreeSplit);
   const [treeDragging, setTreeDragging] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
   const inspectorContentRef = useRef<HTMLDivElement>(null);
-  const paletteInputRef = useRef<HTMLInputElement>(null);
   const copyFeedbackTimerRef = useRef<number | null>(null);
+  const handledActiveTraceRef = useRef<string | null>(null);
   const statusQuery = useQuery({ queryKey: ["status"], queryFn: api.getStatus, refetchInterval: 3000 });
   const runtimeStatus = (statusQuery.data ?? {}) as Record<string, unknown>;
   const runtimeModel = textValue(runtimeStatus.model, "loading");
@@ -770,7 +788,7 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
 
   const isLive = processingState === "thinking" || processingState === "streaming";
   const entries = useMemo(() => buildTraceEntries(displayMessages, isLive, streamingContent || reasoningContent, streamError, livePipeline), [displayMessages, isLive, streamingContent, reasoningContent, streamError, livePipeline]);
-  const filteredEntries = useMemo(() => entries.filter((entry) => entryMatches(entry, query, filters)), [entries, query, filters]);
+  const filteredEntries = useMemo(() => entries.filter((entry) => entryMatches(entry, query)), [entries, query]);
   const renderedEntries = useMemo(() => filteredEntries.length > MAX_RENDERED_TRACE_ROWS ? filteredEntries.slice(-MAX_RENDERED_TRACE_ROWS) : filteredEntries, [filteredEntries]);
   const selectedEntry = entries.find((entry) => entry.id === selectedId) ?? null;
   const compareEntry = entries.find((entry) => entry.id === compareId) ?? null;
@@ -820,8 +838,10 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
   }, [entries, selectedId]);
 
   useEffect(() => {
-    if (activeTraceId && entries.some((entry) => entry.id === activeTraceId)) {
+    if (activeTraceId && activeTraceId !== handledActiveTraceRef.current && entries.some((entry) => entry.id === activeTraceId)) {
+      handledActiveTraceRef.current = activeTraceId;
       setSelectedId(activeTraceId);
+      setActiveTraceView("overview");
       setActiveSection("trace");
     }
   }, [activeTraceId, entries]);
@@ -831,25 +851,6 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
       if (copyFeedbackTimerRef.current !== null) window.clearTimeout(copyFeedbackTimerRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (!commandPaletteOpen) return;
-    setPaletteQuery("");
-    window.setTimeout(() => paletteInputRef.current?.focus(), 0);
-  }, [commandPaletteOpen]);
-
-  useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        onCommandPaletteChange(true);
-      } else if (event.key === "Escape" && commandPaletteOpen) {
-        onCommandPaletteChange(false);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [commandPaletteOpen, onCommandPaletteChange]);
 
   const visibleTreeEntries = mode === "message" ? filteredEntries : CATEGORY_DEFS.flatMap((category) => filteredEntries.filter((entry) => entry.categoryIds.includes(category.id)));
 
@@ -926,7 +927,16 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
       setSelectedId(entry.id);
       setCompareId(null);
     }
+    setActiveTraceView("overview");
     setActiveTraceId(entry.id);
+    setActiveSection("trace");
+    if (location.pathname !== "/") navigate("/");
+  }
+
+  function selectTraceView(entry: TraceEntry, view: TraceView) {
+    setSelectedId(entry.id);
+    setCompareId(null);
+    setActiveTraceView(view);
     setActiveSection("trace");
     if (location.pathname !== "/") navigate("/");
   }
@@ -937,10 +947,6 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  }
-
-  function toggleFilter(filter: FilterName) {
-    setFilters((current) => current.includes(filter) ? current.filter((item) => item !== filter) : [...current, filter]);
   }
 
   async function handleCopy(value: string) {
@@ -976,33 +982,26 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
     }
   }
 
-  function runPaletteCommand(section: InspectorSection) {
-    openSection(section);
-    onCommandPaletteChange(false);
-  }
-
-  const paletteCommands = PALETTE_COMMANDS.filter((command) => `${command.label} ${command.hint}`.toLowerCase().includes(paletteQuery.toLowerCase()));
-
   function renderTraceNode(entry: TraceEntry) {
     const isExpanded = expanded.has(entry.id);
     const isSelected = selectedId === entry.id || compareId === entry.id;
     const treeTiming = asRecord(entry.metadata.timing);
-    const treeRate = entry.messageKind === "message" ? formatTokenRate(treeTiming, entry.metadata, entry.message.content, entry.id === "streaming" ? elapsedMs : 0) : "";
-    return <div key={entry.id} className="tree-entry"><div className={`flex items-center border-l ${isSelected ? "border-terminal-green bg-terminal-green/[0.07] ring-1 ring-terminal-green/25" : "border-transparent hover:bg-white/[0.035]"}`}><button type="button" className="w-6 shrink-0 px-1 py-2 text-[11px] text-slate/45 hover:text-terminal-green" aria-label={`${isExpanded ? "Collapse" : "Expand"} ${entry.label}`} onClick={(event) => { event.stopPropagation(); toggleExpanded(entry.id); }}>{isExpanded ? "▾" : "▸"}</button><button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-2 text-left text-[10px]" onClick={(event) => selectEntry(entry, event)}><span className={statusColor(entry.status)}>{statusMark(entry.status)}</span><span className={`truncate ${isSelected ? "text-mist" : "text-slate/70"}`}>{entry.label}</span>{entry.messageKind === "command" && <span className="tree-badge text-terminal-amber">cmd</span>}{entry.messageKind === "system" && <span className="tree-badge text-slate/55">system</span>}{entry.messageKind === "message" && entry.message.role === "user" && <span className="text-[9px] text-slate/30">input</span>}{contextWasTrimmed(entry.metadata) && <span className="tree-badge text-terminal-red">trim</span>}{hasRepetition(entry.metadata) && <span className="tree-badge text-terminal-amber">rep</span>}{treeTiming.ttft_ms != null && <span className="tree-badge text-slate/35">{formatDuration(treeTiming.ttft_ms)}</span>}{treeRate !== "— tok/s" && treeRate && <span className="tree-badge text-terminal-green/65">{treeRate}</span>}</button></div>{isExpanded && <div className="ml-6 border-l border-white/10">{TRACE_CHILDREN.map((child) => <button key={child.label} type="button" className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[9px] text-slate/45 hover:bg-white/[0.035] hover:text-slate/80" onClick={() => selectEntry(entry)}><span className="material-symbols-outlined text-[13px] text-slate/35">{child.icon}</span><span>{child.label}</span><span className="ml-auto text-[8px] text-slate/25">folder</span></button>)}</div>}</div>;
+    const treeRate = entry.messageKind === "output" ? formatTokenRate(treeTiming, entry.metadata, entry.message.content, entry.id === "streaming" ? elapsedMs : 0) : "";
+    const kindLabel = entry.messageKind === "output" ? "output" : entry.messageKind;
+    return <div key={entry.id} className="tree-entry"><div className={`flex items-center border-l ${isSelected ? "border-terminal-green bg-terminal-green/[0.07]" : "border-transparent hover:bg-white/[0.035]"}`}><button type="button" className="w-7 shrink-0 px-1 py-2 text-[11px] text-slate/45 hover:text-terminal-green" aria-label={`${isExpanded ? "Collapse" : "Expand"} ${entry.label}`} onClick={(event) => { event.stopPropagation(); toggleExpanded(entry.id); }}>{isExpanded ? "▾" : "▸"}</button><button type="button" className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-left text-[10px]" onClick={(event) => selectEntry(entry, event)}><span className={statusColor(entry.status)}>{statusMark(entry.status)}</span><span className={`truncate ${isSelected ? "text-mist" : "text-slate/75"}`}>{entry.label}</span><span className={`ml-auto shrink-0 text-[8px] uppercase tracking-widest ${entry.messageKind === "command" ? "text-terminal-amber" : entry.messageKind === "input" ? "text-[#8aa8bd]" : "text-slate/35"}`}>{kindLabel}</span>{treeRate !== "— tok/s" && treeRate && <span className="hidden shrink-0 text-[8px] text-terminal-green/65 xl:inline">{treeRate}</span>}</button></div>{isExpanded && <div className="ml-7 border-l border-white/10">{TRACE_CHILDREN[entry.messageKind].map((child) => <button key={child.view} type="button" className={`flex min-h-9 w-full items-center gap-2 px-3 py-2 text-left text-[9px] transition-colors hover:bg-white/[0.035] hover:text-mist ${isSelected && activeTraceView === child.view ? "bg-white/[0.04] text-terminal-green" : "text-slate/50"}`} onClick={() => selectTraceView(entry, child.view)}><span className="material-symbols-outlined text-[13px] text-slate/40">{child.icon}</span><span>{child.label}</span></button>)}</div>}</div>;
   }
 
   return <div className="inspector-shell relative flex h-full min-h-0 flex-col bg-[#101312] text-slate">
-    <header className="inspector-header flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+    <header className="inspector-header flex shrink-0 items-center gap-3 border-b border-white/10 px-3 py-2">
       <div className="flex min-w-0 items-center gap-3 text-[9px] uppercase tracking-widest">
         <span className="min-w-0 truncate text-slate/55">model <span className="text-terminal-green">{runtimeModel}</span></span>
         <span className="shrink-0 text-slate/55">provider <span className="text-mist">{runtimeProvider}</span></span>
       </div>
-      <button type="button" className="terminal-icon-button shrink-0" onClick={() => onCommandPaletteChange(true)} aria-label="Open command palette" title="Command palette (Cmd/Ctrl+K)"><span className="text-sm leading-none">≡</span></button>
     </header>
 
     <div className="inspector-toolbar shrink-0 border-b border-white/10 px-3 py-2">
-      <label className="flex items-center gap-2 border border-white/10 bg-black/20 px-2 py-1.5 text-[10px] text-slate/45"><span className="text-terminal-green">/</span><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="filter traces..." className="min-w-0 flex-1 bg-transparent font-mono text-[10px] text-mist outline-none placeholder:text-slate/35" aria-label="Search traces" /><kbd className="hidden border border-white/10 px-1 text-[8px] text-slate/30 sm:inline">⌘K</kbd></label>
-      <div className="mt-2 flex flex-wrap items-center gap-1"><button type="button" className={`mode-toggle ${mode === "message" ? "is-active" : ""}`} onClick={() => setMode("message")}>by message</button><button type="button" className={`mode-toggle ${mode === "category" ? "is-active" : ""}`} onClick={() => setMode("category")}>by category</button><span className="mx-1 h-3 w-px bg-white/10" />{FILTERS.map((filter) => <button type="button" key={filter.id} className={`filter-chip ${filters.includes(filter.id) ? "is-active" : ""}`} onClick={() => toggleFilter(filter.id)}>{filter.label}</button>)}</div>
+      <label className="flex min-h-10 items-center gap-2 border border-white/10 bg-black/20 px-3 py-2 text-[10px] text-slate/45"><span className="text-terminal-green">/</span><input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="search traces" className="min-w-0 flex-1 bg-transparent font-mono text-[10px] text-mist outline-none placeholder:text-slate/35" aria-label="Search traces" /></label>
+      <div className="mt-2 flex items-center gap-1"><button type="button" className={`mode-toggle ${mode === "message" ? "is-active" : ""}`} onClick={() => setMode("message")}>messages</button><button type="button" className={`mode-toggle ${mode === "category" ? "is-active" : ""}`} onClick={() => setMode("category")}>systems</button></div>
     </div>
 
     <div ref={inspectorContentRef} className="inspector-content grid min-h-0 flex-1" style={{ "--inspector-tree-split": `${treeSplitRatio}%` } as CSSProperties}>
@@ -1016,12 +1015,10 @@ export function InspectorPane({ commandPaletteOpen, onCommandPaletteChange }: In
 
       <div className="inspector-tree-divider group relative z-10 hidden w-1 min-w-0 cursor-col-resize touch-none bg-[#1c2821] transition-colors hover:bg-terminal-green lg:block" onPointerDown={handleTreeDividerPointerDown} onDoubleClick={handleTreeDividerDoubleClick} onKeyDown={handleTreeDividerKeyDown} tabIndex={0} role="separator" aria-orientation="vertical" aria-valuemin={MIN_TREE_SPLIT} aria-valuemax={MAX_TREE_SPLIT} aria-valuenow={Math.round(treeSplitRatio)} aria-label="Resize trace tree and detail" title="Drag to resize tree and detail · double-click to reset"><span className={`pointer-events-none absolute -left-[3px] top-1/2 h-[42px] w-[10px] -translate-y-1/2 border border-terminal-green/45 bg-[#101312] transition-opacity ${treeDragging ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} /></div>
 
-      <div className="inspector-detail min-w-0 min-h-0 overflow-y-auto p-3 [zoom:1.2] lg:p-4">
-        {activeSection && activeSection !== "trace" ? <SectionSnapshot section={activeSection} snapshot={activeQuery?.data} isLoading={Boolean(activeQuery?.isLoading)} isError={Boolean(activeQuery?.isError)} error={activeQuery?.error} onRetry={() => void activeQuery?.refetch()} /> : compareEntry && selectedEntry ? <CompareDetail left={selectedEntry} right={compareEntry} /> : selectedEntry ? <TraceDetail entry={selectedEntry} isLive={isLive && selectedEntry.id === "streaming"} elapsedMs={elapsedMs} streamError={streamError} showRaw={showRaw} reasoningExpanded={reasoningExpanded} providerFallback={textValue((statusQuery.data as any)?.provider, "provider —")} onToggleRaw={() => setShowRaw((value) => !value)} onToggleReasoning={() => setReasoningExpanded((value) => !value)} onCopy={(value) => void handleCopy(value)} onRetry={() => window.dispatchEvent(new Event("chappie:retry-last"))} /> : <EmptyTrace />}
+      <div className="inspector-detail min-w-0 min-h-0 overflow-y-auto p-3 lg:p-4">
+        {activeSection && activeSection !== "trace" ? <SectionSnapshot section={activeSection} snapshot={activeQuery?.data} isLoading={Boolean(activeQuery?.isLoading)} isError={Boolean(activeQuery?.isError)} error={activeQuery?.error} onRetry={() => void activeQuery?.refetch()} /> : compareEntry && selectedEntry ? <CompareDetail left={selectedEntry} right={compareEntry} /> : selectedEntry ? <TraceDetail entry={selectedEntry} activeView={activeTraceView} isLive={isLive && selectedEntry.id === "streaming"} elapsedMs={elapsedMs} streamError={streamError} showRaw={showRaw} reasoningExpanded={reasoningExpanded} providerFallback={textValue((statusQuery.data as any)?.provider, "provider —")} onToggleRaw={() => setShowRaw((value) => !value)} onToggleReasoning={() => setReasoningExpanded((value) => !value)} onCopy={(value) => void handleCopy(value)} onRetry={() => window.dispatchEvent(new Event("chappie:retry-last"))} /> : <EmptyTrace />}
       </div>
     </div>
-
-    {commandPaletteOpen && <div className="command-palette absolute inset-x-3 top-12 z-30 border border-terminal-green/35 bg-[#111615] shadow-2xl"><div className="border-b border-white/10 p-2"><input ref={paletteInputRef} value={paletteQuery} onChange={(event) => setPaletteQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") onCommandPaletteChange(false); if (event.key === "Enter" && paletteCommands[0]) runPaletteCommand(paletteCommands[0].section ?? "trace"); }} placeholder="jump to message or section..." className="w-full bg-transparent px-2 py-1 text-[11px] text-mist outline-none placeholder:text-slate/35" /></div><div className="max-h-80 overflow-y-auto p-1">{paletteCommands.map((command) => <button type="button" key={command.label} className="flex w-full items-center justify-between gap-3 px-2 py-2 text-left text-[10px] text-slate/70 hover:bg-terminal-green/[0.08] hover:text-mist" onClick={() => runPaletteCommand(command.section ?? "trace")}><span>{command.label}</span><span className="text-[9px] text-slate/30">{command.hint}</span></button>)}{paletteCommands.length === 0 && <div className="px-2 py-3 text-[10px] text-slate/40">no commands</div>}</div></div>}
   </div>;
 }
 
