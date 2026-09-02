@@ -7,7 +7,7 @@ from pathlib import Path
 
 from config.config import settings, LLMProvider
 from brain import get_brain
-from brain.agents.steering_manager import get_steering_manager
+from brain.steering_manager import get_steering_manager
 from memory.memory_engine import MemoryEngine
 
 

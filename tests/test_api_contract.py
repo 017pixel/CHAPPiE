@@ -232,11 +232,11 @@ class _DummyBackend:
         }
 
     @staticmethod
-    def _build_pending_message(message_id):
+    def build_pending_message(message_id):
         return {"id": message_id, "role": "assistant", "content": "_CHAPPiE denkt nach..._", "metadata": {"pending": True}}
 
     @staticmethod
-    def _build_assistant_message(user_input, result, message_id=None):
+    def build_assistant_message(user_input, result, message_id=None):
         return {
             "id": message_id or "message-1",
             "role": "assistant",
@@ -288,7 +288,7 @@ class _DummyBackend:
         return None
 
     @staticmethod
-    def _get_emotions_snapshot():
+    def get_emotions_snapshot():
         return {"happiness": 70, "energy": 60, "frustration": 10}
 
 

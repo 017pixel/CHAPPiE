@@ -60,10 +60,35 @@ def test_update_message_replaces_pending_placeholder(tmp_path):
     assert assistant["metadata"]["pending"] is False
 
 
+def test_invalid_session_id_cannot_read_outside_session_directory(tmp_path):
+    outside_path = tmp_path / "outside.json"
+    outside_path.write_text('{"id":"outside","messages":[{"content":"secret"}]}', encoding="utf-8")
+    manager = ChatManager(str(tmp_path))
+
+    session = manager.load_session("../outside")
+
+    assert session["id"] != "../outside"
+    assert all(message.get("content") != "secret" for message in session["messages"])
+    assert outside_path.read_text(encoding="utf-8").endswith("}")
+
+
+def test_invalid_session_id_cannot_delete_outside_session_directory(tmp_path):
+    outside_path = tmp_path / "outside.json"
+    outside_path.write_text('{"protected":true}', encoding="utf-8")
+    manager = ChatManager(str(tmp_path))
+
+    deleted = manager.delete_session("../outside")
+
+    assert deleted is False
+    assert outside_path.exists()
+
+
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir)
         test_save_session_with_missing_session_id_creates_real_session(path)
         test_active_session_is_restored_across_reloads(path)
         test_update_message_replaces_pending_placeholder(path)
+        test_invalid_session_id_cannot_read_outside_session_directory(path)
+        test_invalid_session_id_cannot_delete_outside_session_directory(path)
     print("OK: chat manager persistence")

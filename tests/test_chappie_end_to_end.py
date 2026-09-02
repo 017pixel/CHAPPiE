@@ -36,7 +36,7 @@ from memory.emotions_engine import EmotionsEngine, analyze_sentiment_simple
 from memory.intent_processor import IntentProcessor, IntentResult, IntentType
 from memory.memory_engine import MemoryEngine
 from web_infrastructure.backend_wrapper import create_chappie_backend, is_transient_problem_statement
-from brain.agents.steering_manager import SteeringManager
+from brain.steering_manager import SteeringManager
 
 
 def _context_requirements() -> dict[str, bool]:

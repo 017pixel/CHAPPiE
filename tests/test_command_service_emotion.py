@@ -37,7 +37,7 @@ def _make_backend(emotions_override: dict[str, int] | None = None):
     if emotions_override:
         emotions.update(emotions_override)
 
-    backend._get_emotions_snapshot.return_value = emotions
+    backend.get_emotions_snapshot.return_value = emotions
     backend.emotions = _MockEmotionsEngine()
     return backend
 

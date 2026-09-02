@@ -46,7 +46,7 @@ if "transformers" not in sys.modules:
 
 import torch  # noqa: E402
 
-from brain.agents.steering_manager import MODEL_LAYER_PROFILES, SteeringManager  # noqa: E402
+from brain.steering_manager import MODEL_LAYER_PROFILES, SteeringManager  # noqa: E402
 from brain.steering_backend import LocalSteeringEngine, anchor_scale_for_model  # noqa: E402
 from brain.vllm_brain import VLLMBrain  # noqa: E402
 from config.config import get_model_generation_defaults, is_gemma4_model, is_qwen_model  # noqa: E402

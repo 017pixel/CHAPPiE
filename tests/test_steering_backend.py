@@ -13,7 +13,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from config.config import LLMProvider, settings  # noqa: E402
 from config.emotions import EMOTION_DEFAULTS  # noqa: E402
-from brain.agents.steering_manager import SteeringManager  # noqa: E402
+from brain.steering_manager import SteeringManager  # noqa: E402
 from brain.steering_backend import LocalSteeringEngine, add_vector_to_inputs, add_vector_to_output, build_activation_plan, build_style_instruction, extract_steering_payload  # noqa: E402
 
 

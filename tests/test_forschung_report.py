@@ -285,7 +285,7 @@ def test_prompt_tool_contract_tracks_measured_streaming_path() -> None:
 
 
 def test_runtime_reload_logging_does_not_render_secret_signatures() -> None:
-    source = (ROOT / "web_infrastructure" / "backend_wrapper.py").read_text(encoding="utf-8")
+    source = (ROOT / "web_infrastructure" / "chappie_runtime.py").read_text(encoding="utf-8")
     assert 'f"Runtime-Reload Hauptmodell: {self._brain_signature}' not in source
     assert 'f"Runtime-Reload Intent: {self._intent_signature}' not in source
     assert "old_label = self._brain_signature[:2]" in source

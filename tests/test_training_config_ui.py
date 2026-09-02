@@ -12,9 +12,14 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from Chappies_Trainingspartner import daemon_manager
 from Chappies_Trainingspartner.training_config_utils import curriculum_to_text, parse_curriculum_text
 from Chappies_Trainingspartner.trainer_agent import TrainerConfig
+from config.config import LEGACY_TRAINING_CONFIG_PATH, TRAINING_CONFIG_PATH
 
 
 class TrainingConfigAndUiTests(unittest.TestCase):
+    def test_training_config_path_is_central_and_legacy_path_is_distinct(self):
+        self.assertEqual(TRAINING_CONFIG_PATH.parent.name, "config")
+        self.assertNotEqual(TRAINING_CONFIG_PATH, LEGACY_TRAINING_CONFIG_PATH)
+
     def test_trainer_config_roundtrip_preserves_runtime_fields(self):
         config = TrainerConfig.from_dict(
             {

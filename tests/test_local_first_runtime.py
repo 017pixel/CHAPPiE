@@ -33,7 +33,7 @@ from brain.agents.memory_agent import MemoryAgent
 from brain.agents.neocortex import NeocortexAgent
 from brain.agents.prefrontal_cortex import PrefrontalCortexAgent
 from brain.agents.sensory_cortex import SensoryCortexAgent
-from brain.agents.steering_manager import SteeringManager
+from brain.steering_manager import SteeringManager
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from config.config import BRAIN_AGENT_CONFIGS
