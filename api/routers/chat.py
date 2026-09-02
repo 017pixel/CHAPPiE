@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import queue
-import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Generator, Optional
 
@@ -60,7 +58,7 @@ def _persist_pending_turn(backend, session_id: str, user_message: Dict[str, Any]
 
 def _build_sync_chat_response(backend, session_id: str, user_message: Dict[str, Any], message_id: str, result: Dict[str, Any]) -> ChatResponse:
     session_id = result.get("replacement_session_id", session_id)
-    assistant_message = backend._build_assistant_message(user_message["content"], result, message_id=message_id)
+    assistant_message = backend.build_assistant_message(user_message["content"], result, message_id=message_id)
     backend.chat_manager.update_message(
         session_id,
         message_id,
@@ -94,7 +92,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
 
     user_message = _build_user_message(backend, request.message)
     message_id = backend.chat_manager.create_message_id()
-    pending_message = backend._build_pending_message(message_id)
+    pending_message = backend.build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     if request.command_mode or request.message.strip().startswith("/"):
@@ -102,7 +100,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
         if result.get("replacement_session_id"):
             session_id = result["replacement_session_id"]
             message_id = backend.chat_manager.create_message_id()
-            pending_message = backend._build_pending_message(message_id)
+            pending_message = backend.build_pending_message(message_id)
             _persist_pending_turn(backend, session_id, user_message, pending_message)
         return _build_sync_chat_response(backend, session_id, user_message, message_id, result)
 
@@ -123,7 +121,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
 
     user_message = _build_user_message(backend, request.message)
     message_id = backend.chat_manager.create_message_id()
-    pending_message = backend._build_pending_message(message_id)
+    pending_message = backend.build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     def event_stream() -> Generator[str, None, None]:
@@ -137,10 +135,10 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                 if result.get("replacement_session_id"):
                     session_id = result["replacement_session_id"]
                     message_id = backend.chat_manager.create_message_id()
-                    pending_message = backend._build_pending_message(message_id)
+                    pending_message = backend.build_pending_message(message_id)
                     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
-                assistant_message = backend._build_assistant_message(request.message, result, message_id=message_id)
+                assistant_message = backend.build_assistant_message(request.message, result, message_id=message_id)
                 backend.chat_manager.update_message(
                     session_id,
                     message_id,
@@ -202,7 +200,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                     return
                 elif event_type == "finished":
                     result = event.get("result", {})
-                    assistant_message = backend._build_assistant_message(request.message, result, message_id=message_id)
+                    assistant_message = backend.build_assistant_message(request.message, result, message_id=message_id)
                     backend.chat_manager.update_message(
                         session_id,
                         message_id,

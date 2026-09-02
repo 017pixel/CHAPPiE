@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,9 +10,11 @@ from Chappies_Trainingspartner import daemon_manager
 from config.config import settings, get_active_model
 
 
+LOGGER = logging.getLogger(__name__)
+
 app = FastAPI(
     title="CHAPPiE App API",
-    version="16.3.0",
+    version="16.4.0",
     description="FastAPI-Schicht fuer CHAPPiEs React-Frontend.",
 )
 
@@ -35,23 +39,24 @@ def root_overview():
     try:
         backend = get_backend()
         status = backend.get_status()
-        emotions = backend._get_emotions_snapshot()
+        emotions = backend.get_emotions_snapshot()
         life = backend.life_simulation.get_snapshot()
         training = daemon_manager.get_training_snapshot()
         memory_count = backend.memory.get_memory_count()
         stm_count = backend.short_term_memory.get_count()
         sessions = backend.chat_manager.list_sessions()
-    except Exception as e:
+    except Exception:
+        LOGGER.exception("API-Uebersicht konnte nicht aufgebaut werden")
         return JSONResponse({
             "app": "CHAPPiE",
             "status": "error",
-            "error": str(e),
+            "error": "Interner Initialisierungsfehler",
         })
 
     return JSONResponse({
         "app": {
             "name": "CHAPPiE App API",
-            "version": "16.3.0",
+            "version": "16.4.0",
             "docs": "/docs",
             "openapi": "/openapi.json",
         },

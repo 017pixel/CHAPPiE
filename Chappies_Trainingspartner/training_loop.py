@@ -33,7 +33,7 @@ from brain import get_brain
 from brain.ollama_brain import OllamaBrain
 from brain.vllm_brain import VLLMBrain
 from brain.base_brain import GenerationConfig
-from brain.agents.steering_manager import get_steering_manager
+from brain.steering_manager import get_steering_manager
 from brain.deep_think import DeepThinkEngine
 from brain.response_parser import looks_like_model_error, sanitize_visible_response
 from memory.sleep_phase import SleepPhaseHandler

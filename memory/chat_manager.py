@@ -1,10 +1,15 @@
-import os
 import json
-import uuid
 import glob
+import os
+import re
 import threading
+import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+
+
+SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+
 
 class ChatManager:
     """
@@ -20,6 +25,8 @@ class ChatManager:
         self._repair_legacy_none_session()
 
     def _get_file_path(self, session_id: str) -> str:
+        if not self._is_valid_session_id(session_id):
+            raise ValueError("Ungueltige Chat-Session-ID")
         return os.path.join(self.sessions_dir, f"{session_id}.json")
 
     @staticmethod
@@ -29,7 +36,7 @@ class ChatManager:
 
     def _is_valid_session_id(self, session_id: Optional[str]) -> bool:
         text = str(session_id or "").strip()
-        return bool(text and text.lower() != "none")
+        return bool(text.lower() != "none" and SESSION_ID_PATTERN.fullmatch(text))
 
     def ensure_session_id(self, session_id: Optional[str]) -> str:
         """Returns a usable session id, restoring the active one when possible."""
@@ -93,7 +100,7 @@ class ChatManager:
 
     def _repair_legacy_none_session(self):
         """Migrates broken legacy sessions saved as None.json to a proper UUID."""
-        legacy_path = self._get_file_path("None")
+        legacy_path = os.path.join(self.sessions_dir, "None.json")
         if not os.path.exists(legacy_path):
             return
 
@@ -217,11 +224,15 @@ class ChatManager:
         sessions.sort(key=lambda x: x["updated_at"], reverse=True)
         return sessions
 
-    def delete_session(self, session_id: str):
+    def delete_session(self, session_id: str) -> bool:
         """Deletes a session file."""
+        if not self._is_valid_session_id(session_id):
+            return False
         file_path = self._get_file_path(session_id)
         if os.path.exists(file_path):
             os.remove(file_path)
+            return True
+        return False
 
     def _prune_old_sessions(self):
         """Keeps only the most recent N sessions."""

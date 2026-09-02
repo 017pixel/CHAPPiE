@@ -21,10 +21,13 @@ from typing import Any, Dict, Optional
 # ----------
 
 PROJECT_ROOT = Path(__file__).parent.parent
+CONFIG_DIR = PROJECT_ROOT / "config"
 DATA_DIR = PROJECT_ROOT / "data"
 CHROMA_DB_DIR = DATA_DIR / "chroma_db"
 RESEARCH_DATA_DIR = DATA_DIR / "research_runs"
 ROOT_CONFIG_PATH = PROJECT_ROOT / "CHAPPIE_CONFIG.json"
+TRAINING_CONFIG_PATH = CONFIG_DIR / "training_config.json"
+LEGACY_TRAINING_CONFIG_PATH = PROJECT_ROOT / "training_config.json"
 
 # The previous default collection contains a stale HNSW index on the local
 # installation.  Keep its name as a migration reference, but never open it

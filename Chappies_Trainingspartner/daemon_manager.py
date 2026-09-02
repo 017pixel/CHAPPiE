@@ -20,13 +20,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from config.config import LEGACY_TRAINING_CONFIG_PATH, TRAINING_CONFIG_PATH
+
 PROJECT_ROOT = Path(__file__).parent.parent
 PID_FILE = PROJECT_ROOT / "training.pid"
 # The daemon is an isolated experiment. Its heartbeat belongs beside its
 # sandboxed Chroma/status/context files, never in CHAPPiE's live workspace.
 STATE_FILE = PROJECT_ROOT / "data" / "training_runtime" / "training_state.json"
 LOG_FILE = PROJECT_ROOT / "data" / "training_runtime" / "training_daemon.log"
-CONFIG_FILE = PROJECT_ROOT / "training_config.json"
+CONFIG_FILE = TRAINING_CONFIG_PATH
 
 DEFAULT_TRAINING_CONFIG = {
     "persona": "Ein kritischer aber fairer Nutzer",
@@ -151,6 +153,7 @@ def _read_json(path: Path) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
 
 
 def _write_json_atomic(path: Path, payload: Dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with open(tmp_path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
@@ -302,6 +305,8 @@ def _format_minutes_ago(ts: Optional[datetime]) -> Tuple[Optional[int], Optional
 
 def load_training_config() -> Dict[str, Any]:
     payload, _ = _read_json(CONFIG_FILE)
+    if payload is None and CONFIG_FILE == TRAINING_CONFIG_PATH:
+        payload, _ = _read_json(LEGACY_TRAINING_CONFIG_PATH)
     if payload is None:
         return _normalize_training_config()
     return _normalize_training_config(payload)

@@ -163,7 +163,7 @@ def update_emotion_layer_config(request: EmotionLayerUpdate, backend=Depends(get
 
 @router.get("/emotions/state")
 def get_emotion_state(backend=Depends(get_backend)):
-    emotions = backend._get_emotions_snapshot()
+    emotions = backend.get_emotions_snapshot()
     steering_report = backend.steering_manager.build_debug_report(emotions)
     return {
         "emotions": emotions,
@@ -181,7 +181,7 @@ def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend))
     updates = request.model_dump(exclude_none=True)
     for emotion_name, value in updates.items():
         backend.emotions.set_emotion(emotion_name, value)
-    emotions = backend._get_emotions_snapshot()
+    emotions = backend.get_emotions_snapshot()
     steering_report = backend.steering_manager.build_debug_report(emotions)
     return {
         "emotions": emotions,
@@ -192,7 +192,7 @@ def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend))
 @router.post("/emotions/reset")
 def reset_emotion_state(backend=Depends(get_backend)):
     backend.emotions.reset()
-    emotions = backend._get_emotions_snapshot()
+    emotions = backend.get_emotions_snapshot()
     steering_report = backend.steering_manager.build_debug_report(emotions)
     return {
         "emotions": emotions,

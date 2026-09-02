@@ -1,32 +1,40 @@
-"""
-CHAPPiE Brain Agents - Multi-Agent Cognitive Architecture
-=========================================================
+"""Lazy compatibility namespace for the historical Brain Pipeline v1 agents.
 
-Brain-Inspired Agent System:
-- Sensory Cortex: Input processing and classification
-- Amygdala: Emotional processing and memory enhancement  
-- Hippocampus: Memory encoding and retrieval
-- Prefrontal Cortex: Central orchestration and working memory
-- Basal Ganglia: Reward-based learning
-- Neocortex: Long-term memory storage
-- Memory Agent: Tool call decisions for context files
+The current runtime does not import these agents. They remain available for
+historical research and compatibility tests without being loaded eagerly.
 """
 
-from .base_agent import BaseAgent, AgentResult
-from .sensory_cortex import SensoryCortexAgent
-from .amygdala import AmygdalaAgent
-from .hippocampus import HippocampusAgent
-from .prefrontal_cortex import PrefrontalCortexAgent
-from .basal_ganglia import BasalGangliaAgent
-from .neocortex import NeocortexAgent
-from .memory_agent import MemoryAgent
-from .orchestrator import BrainOrchestrator
+from importlib import import_module
+from typing import Any
+
+
+_EXPORTS = {
+    "BaseAgent": ("base_agent", "BaseAgent"),
+    "AgentResult": ("base_agent", "AgentResult"),
+    "SensoryCortexAgent": ("sensory_cortex", "SensoryCortexAgent"),
+    "AmygdalaAgent": ("amygdala", "AmygdalaAgent"),
+    "HippocampusAgent": ("hippocampus", "HippocampusAgent"),
+    "PrefrontalCortexAgent": ("prefrontal_cortex", "PrefrontalCortexAgent"),
+    "BasalGangliaAgent": ("basal_ganglia", "BasalGangliaAgent"),
+    "NeocortexAgent": ("neocortex", "NeocortexAgent"),
+    "MemoryAgent": ("memory_agent", "MemoryAgent"),
+    "BrainOrchestrator": ("orchestrator", "BrainOrchestrator"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute_name = _EXPORTS[name]
+    value = getattr(import_module(f"{__name__}.{module_name}"), attribute_name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "BaseAgent",
     "AgentResult",
     "SensoryCortexAgent",
-    "AmygdalaAgent", 
+    "AmygdalaAgent",
     "HippocampusAgent",
     "PrefrontalCortexAgent",
     "BasalGangliaAgent",

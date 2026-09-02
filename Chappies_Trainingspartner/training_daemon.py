@@ -15,8 +15,8 @@ import os
 import logging
 import argparse
 import signal
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
+from typing import Optional
 
 import json
 from pathlib import Path
@@ -29,21 +29,11 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# Relative Imports sind robuster als absolute mit explizitem Ordnernamen
-try:
-    from Chappies_Trainingspartner.trainer_agent import TrainerAgent, TrainerConfig
-    from Chappies_Trainingspartner.training_loop import TrainingLoop
-except ImportError as e:
-    # Fallback: Versuche mit alternativer Schreibweise (Case-Sensitivity auf Linux)
-    print(f"Import-Fehler: {e}")
-    print("Versuche alternative Import-Methode...")
-    from trainer_agent import TrainerAgent, TrainerConfig
-    from training_loop import TrainingLoop
+from config.config import LEGACY_TRAINING_CONFIG_PATH, TRAINING_CONFIG_PATH  # noqa: E402
 
-try:
-    from config.prompts import TRAINING_START_PROMPT  # from config/prompts.py
-except ImportError:
-    TRAINING_START_PROMPT = "Hallo Chappie! Lass uns ein Gespraech fuehren."
+from Chappies_Trainingspartner.trainer_agent import TrainerAgent, TrainerConfig  # noqa: E402
+from Chappies_Trainingspartner.training_loop import TrainingLoop  # noqa: E402
+from config.prompts import TRAINING_START_PROMPT  # noqa: E402
 
 def setup_logging():
     """Setup logging to file for headless operation."""
@@ -137,9 +127,7 @@ def get_interactive_config() -> dict:
     
     # Model (optional)
     print("Welches Modell? (Enter fuer Default)")
-    model_name = input("Modell [Standard]: ").strip()
-    if not model_name:
-        model_name = None
+    model_name: Optional[str] = input("Modell [Standard]: ").strip() or None
     print()
     
     # Start-Prompt
@@ -239,7 +227,7 @@ Beispiele:
     logging.info("=" * 70)
     
     try:
-        config_path = os.path.join(PROJECT_ROOT, 'training_config.json')
+        config_path = TRAINING_CONFIG_PATH
         
         # === NEUES TRAINING ===
         if args.neu or args.fokus:
@@ -261,7 +249,8 @@ Beispiele:
             
             # State loeschen und Config speichern
             clear_training_state()
-            save_config(config_dict, config_path)
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            save_config(config_dict, str(config_path))
             
             config = TrainerConfig.from_dict(config_dict)
             start_prompt = config.start_prompt
@@ -279,8 +268,12 @@ Beispiele:
             
         # === TRAINING FORTSETZEN ===
         else:
-            if os.path.exists(config_path):
-                logging.info("Lade Konfiguration aus training_config.json")
+            if not config_path.exists() and LEGACY_TRAINING_CONFIG_PATH.exists():
+                config_path = LEGACY_TRAINING_CONFIG_PATH
+                logging.info("Lade kompatible Legacy-Konfiguration aus dem Projekt-Root")
+
+            if config_path.exists():
+                logging.info("Lade Konfiguration aus %s", config_path)
                 with open(config_path, 'r', encoding='utf-8') as f:
                     saved_config = json.load(f)
                     
@@ -289,7 +282,7 @@ Beispiele:
                 model_name = config.model_name
                 start_prompt = config.start_prompt
             else:
-                logging.warning("Keine training_config.json gefunden! Nutze Defaults.")
+                logging.warning("Keine Trainingskonfiguration gefunden! Nutze Defaults.")
                 # Fallback configuration
                 config = TrainerConfig(
                     persona="Ein kritischer User, der versucht Fehler zu finden",

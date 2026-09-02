@@ -29,7 +29,7 @@ HELP_TEXT = """**CHAPPiE Commands:**
 def _base_result(backend, response_text: str, **extra: Any) -> Dict[str, Any]:
     return {
         "response_text": response_text,
-        "emotions": backend._get_emotions_snapshot(),
+        "emotions": backend.get_emotions_snapshot(),
         "life_snapshot": backend.life_simulation.get_snapshot(),
         "sleep_status": backend.sleep_handler.get_status(),
         "debug_entries": backend.debug_logger.get_entries_as_dict(),
@@ -133,13 +133,13 @@ def _run_emotion(backend, cmd: str) -> Dict[str, Any]:
     parts = cmd.split()
 
     if len(parts) == 1:
-        emotions = backend._get_emotions_snapshot()
+        emotions = backend.get_emotions_snapshot()
         lines = ["**Aktuelle Emotions-Werte:**\n"]
         for name in EMOTION_NAMES:
             val = emotions.get(name, "?")
             lines.append(f"- **{name}**: {val}/100")
-        lines.append(f"\n*Syntax: /emotion <name> [+/-]<0-100>*")
-        lines.append(f"*Beispiel: /emotion happiness +10*")
+        lines.append("\n*Syntax: /emotion <name> [+/-]<0-100>*")
+        lines.append("*Beispiel: /emotion happiness +10*")
         return _base_result(backend, "\n".join(lines), _command_trace_actions=["Emotionszustand gelesen"])
 
     if len(parts) < 3:
@@ -171,7 +171,7 @@ def _run_emotion(backend, cmd: str) -> Dict[str, Any]:
             _command_trace_status="rejected",
         )
 
-    current = backend._get_emotions_snapshot().get(emotion, 50)
+    current = backend.get_emotions_snapshot().get(emotion, 50)
     target = current + parsed if is_delta else parsed
     clamped = max(0, min(100, target))
 

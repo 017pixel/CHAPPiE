@@ -5,28 +5,30 @@ Simuliert einen User-Agenten der CHAPPiE trainiert.
 Unterstuetzt dynamisches Curriculum mit mehreren Themen und Zeiten.
 """
 
-import time
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Dict, Any
 
 from rich.console import Console
 
 import logging
-log = logging.getLogger(__name__)
 
-from config.config import settings, get_active_model, LLMProvider
+from config.config import (
+    LEGACY_TRAINING_CONFIG_PATH,
+    TRAINING_CONFIG_PATH,
+    LLMProvider,
+    settings,
+)
 from config.prompts import TRAINER_SYSTEM_PROMPT_TEMPLATE  # from config/prompts.py
 from brain import get_brain
-from brain.ollama_brain import OllamaBrain
-from brain.vllm_brain import VLLMBrain
 from brain.base_brain import Message, GenerationConfig
 from brain.response_parser import looks_like_model_error, sanitize_visible_response
 from .repetition_tracker import RepetitionTracker
 
 console = Console()
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -310,10 +312,10 @@ class TrainerAgent:
         fallbacks = [
             f"Interessant. Erzähl mir mehr über {focus}.",
             f"Was denkst du generell über {focus}?",
-            f"Kannst du das näher erklären?",
-            f"Hmm, das verstehe ich nicht ganz. Was meinst du genau?",
+            "Kannst du das näher erklären?",
+            "Hmm, das verstehe ich nicht ganz. Was meinst du genau?",
             f"Okay, und wie hängt das mit {focus} zusammen?",
-            f"Spannend! Gibt es dazu ein konkretes Beispiel?",
+            "Spannend! Gibt es dazu ein konkretes Beispiel?",
         ]
         
         import random
@@ -332,13 +334,13 @@ class TrainerAgent:
         log.info("Trainer wechselt auf lokales Modell...")
 
         local_candidates = [
-            (LLMProvider.VLLM, settings.vllm_model, VLLMBrain, "vLLM"),
-            (LLMProvider.OLLAMA, settings.ollama_model, OllamaBrain, "Ollama"),
+            (LLMProvider.VLLM, settings.vllm_model, "vLLM"),
+            (LLMProvider.OLLAMA, settings.ollama_model, "Ollama"),
         ]
 
-        for provider, model_name, brain_cls, label in local_candidates:
+        for provider, model_name, label in local_candidates:
             try:
-                candidate_brain = brain_cls(model=model_name)
+                candidate_brain = get_brain(provider=provider, model=model_name)
                 if not candidate_brain.is_available():
                     log.warning(f"{label} ist nicht erreichbar - versuche nächsten lokalen Fallback")
                     continue
@@ -364,7 +366,7 @@ class TrainerAgent:
         self._fallback_counter = 0
 
 
-def load_training_config(config_path: str = None) -> TrainerConfig:
+def load_training_config(config_path: Optional[str] = None) -> TrainerConfig:
     """
     Lädt die Training-Konfiguration aus einer JSON-Datei.
     
@@ -375,9 +377,9 @@ def load_training_config(config_path: str = None) -> TrainerConfig:
         TrainerConfig Objekt
     """
     if config_path is None:
-        # Standard-Pfad im Projekt-Root
-        from config.config import PROJECT_ROOT
-        config_path = os.path.join(PROJECT_ROOT, "training_config.json")
+        config_path = str(TRAINING_CONFIG_PATH)
+        if not TRAINING_CONFIG_PATH.exists() and LEGACY_TRAINING_CONFIG_PATH.exists():
+            config_path = str(LEGACY_TRAINING_CONFIG_PATH)
     
     if not os.path.exists(config_path):
         log.info(f"Keine Konfiguration gefunden bei {config_path}, nutze Defaults")
@@ -396,7 +398,7 @@ def load_training_config(config_path: str = None) -> TrainerConfig:
         return TrainerConfig()
 
 
-def save_training_config(config: TrainerConfig, config_path: str = None):
+def save_training_config(config: TrainerConfig, config_path: Optional[str] = None):
     """
     Speichert die Training-Konfiguration in eine JSON-Datei.
     
@@ -405,10 +407,10 @@ def save_training_config(config: TrainerConfig, config_path: str = None):
         config_path: Zielpfad für die Datei
     """
     if config_path is None:
-        from config.config import PROJECT_ROOT
-        config_path = os.path.join(PROJECT_ROOT, "training_config.json")
+        config_path = str(TRAINING_CONFIG_PATH)
     
     try:
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config.to_dict(), f, ensure_ascii=False, indent=2)
         

@@ -529,6 +529,13 @@ Output ONLY the corrected text. No tags. No explanations."""
 
 RESPONSE_STYLE_CASUAL = "ANTWORTSTIL: Antworte kurz und konkret, normalerweise in 3-6 Saetzen."
 RESPONSE_STYLE_DEFAULT = "ANTWORTSTIL: Beginne kurz und konkret; werde nur so ausfuehrlich wie die Aufgabe es braucht."
+LIFE_CONTEXT_TEMPLATE = """=== CHAPPiE INNERER LEBENSKONTEXT ===
+Dieser Zustand ist Teil von CHAPPiE's simuliertem Leben. Beruecksichtige ihn bei Ton, Prioritaeten und Selbstbezug. Antworte natuerlich und nenne interne Feldnamen nur, wenn der User danach fragt.
+{state}"""
+
+FALLBACK_THOUGHT_WITHOUT_ANSWER = "CHAPPiE hat nachgedacht, schweigt aber..."
+FALLBACK_ANSWER_WITHOUT_THOUGHT = "CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet."
+FALLBACK_EMPTY_ANSWER = "CHAPPiE schweigt..."
 
 INTENT_SYSTEM_PROMPT_TEMPLATE = """DU BIST DAS INTENT-ANALYSE-SYSTEM fuer CHAPPiE.
 

@@ -15,10 +15,11 @@ import os
 import sys
 import json
 from datetime import datetime
+from typing import Any, Dict, Union
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, IntPrompt, Confirm
+from rich.prompt import Prompt, Confirm
 from rich.table import Table
 
 # Projekt-Root zum Path hinzufügen
@@ -26,14 +27,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from config.config import settings, LLMProvider, PROJECT_ROOT as CONFIG_ROOT
-from config import secrets
+from config.config import settings, LLMProvider, TRAINING_CONFIG_PATH  # noqa: E402
 
 console = Console()
 
 
 # === Verfügbare Modelle pro Provider ===
-CEREBRAS_MODELS = {
+GROQ_MODELS = {
     "1": ("openai/gpt-oss-20b", "GPT-OSS 20B - Schnell & Kompakt (Empfohlen)"),
     "2": ("qwen-3-235b-a22b-instruct-2507", "Qwen 3 235B - Hochwertiges Reasoning"),
 }
@@ -55,7 +55,7 @@ VLLM_MODELS = {
 }
 
 # === Beispiel-Curricula ===
-EXAMPLE_CURRICULA = {
+EXAMPLE_CURRICULA: Dict[str, Dict[str, Any]] = {
     "1": {
         "name": "Philosophie & Ethik",
         "curriculum": [
@@ -118,7 +118,7 @@ def select_provider() -> LLMProvider:
     elif choice == "2":
         return LLMProvider.OLLAMA
     else:
-        return LLMProvider.CEREBRAS
+        return LLMProvider.GROQ
 
 
 def select_model(provider: LLMProvider) -> str:
@@ -127,8 +127,8 @@ def select_model(provider: LLMProvider) -> str:
     
     if provider == LLMProvider.VLLM:
         models = VLLM_MODELS
-    elif provider == LLMProvider.CEREBRAS:
-        models = CEREBRAS_MODELS
+    elif provider == LLMProvider.GROQ:
+        models = GROQ_MODELS
     else:
         models = OLLAMA_MODELS
     
@@ -160,7 +160,7 @@ def check_api_key(provider: LLMProvider) -> str:
     if provider in (LLMProvider.OLLAMA, LLMProvider.VLLM):
         return ""  # Kein API Key nötig
     
-    console.print(f"\n[bold]Schritt 3: API Key prüfen[/bold]\n")
+    console.print("\n[bold]Schritt 3: API Key prüfen[/bold]\n")
     
     existing_key = settings.groq_api_key
     key_name = "Groq"
@@ -181,14 +181,14 @@ def check_api_key(provider: LLMProvider) -> str:
     if new_key:
         settings.groq_api_key = new_key
         
-        console.print(f"[green]✓[/green] API Key gesetzt!")
+        console.print("[green]✓[/green] API Key gesetzt!")
     
     return new_key
 
 
 def configure_trainer() -> dict:
     """Konfiguriert die Trainer-Persona und das Curriculum."""
-    console.print(f"\n[bold]Schritt 4: Trainer konfigurieren[/bold]\n")
+    console.print("\n[bold]Schritt 4: Trainer konfigurieren[/bold]\n")
     
     # Persona
     console.print("[dim]Die Persona bestimmt, wie sich der Trainer verhält.[/dim]")
@@ -211,7 +211,7 @@ def configure_trainer() -> dict:
         persona = persona_options[choice]
     
     # Curriculum
-    console.print(f"\n[dim]Das Curriculum definiert die Trainings-Themen.[/dim]\n")
+    console.print("\n[dim]Das Curriculum definiert die Trainings-Themen.[/dim]\n")
     
     for key, data in EXAMPLE_CURRICULA.items():
         name = data["name"]
@@ -232,12 +232,12 @@ def configure_trainer() -> dict:
     }
 
 
-def create_custom_curriculum() -> list:
+def create_custom_curriculum() -> list[Dict[str, Union[str, int]]]:
     """Erstellt ein benutzerdefiniertes Curriculum."""
     console.print("\n[bold]Custom Curriculum erstellen[/bold]\n")
     console.print("[dim]Füge Themen hinzu. Gib 'fertig' ein wenn du fertig bist.[/dim]\n")
     
-    curriculum = []
+    curriculum: list[Dict[str, Union[str, int]]] = []
     
     while True:
         topic = Prompt.ask(f"Thema {len(curriculum) + 1} (oder 'fertig')")
@@ -251,7 +251,7 @@ def create_custom_curriculum() -> list:
         )
         
         if duration_input.lower() == "infinite":
-            duration = "infinite"
+            duration: Union[str, int] = "infinite"
         else:
             try:
                 duration = int(duration_input)
@@ -274,10 +274,10 @@ def create_custom_curriculum() -> list:
 
 def save_configuration(provider: LLMProvider, model: str, trainer_config: dict):
     """Speichert die Konfiguration."""
-    console.print(f"\n[bold]Konfiguration speichern...[/bold]\n")
+    console.print("\n[bold]Konfiguration speichern...[/bold]\n")
     
     # Training Config speichern
-    config_path = os.path.join(CONFIG_ROOT, "training_config.json")
+    config_path = TRAINING_CONFIG_PATH
     
     full_config = {
         "persona": trainer_config["persona"],
@@ -288,6 +288,7 @@ def save_configuration(provider: LLMProvider, model: str, trainer_config: dict):
     }
     
     try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(full_config, f, ensure_ascii=False, indent=2)
         
@@ -402,14 +403,8 @@ if __name__ == "__main__":
         if should_start:
             console.print("\n[bold cyan]Starte Training...[/bold cyan]\n")
             
-            # Training Loop starten - Nutze relative Imports für Linux-Kompatibilität
-            try:
-                from Chappies_Trainingspartner.training_loop import TrainingLoop
-                from Chappies_Trainingspartner.trainer_agent import TrainerAgent, load_training_config
-            except ImportError:
-                # Fallback: Direkter Import wenn wir im selben Ordner sind
-                from training_loop import TrainingLoop
-                from trainer_agent import TrainerAgent, load_training_config
+            from Chappies_Trainingspartner.training_loop import TrainingLoop
+            from Chappies_Trainingspartner.trainer_agent import TrainerAgent, load_training_config
             
             config = load_training_config()
             trainer = TrainerAgent(config)
