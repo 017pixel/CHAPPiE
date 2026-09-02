@@ -1,32 +1,5 @@
-# CHAPiE - Requirements
-# Python 3.11+
-
-# === LLM Backends ===
-ollama>=0.4.0
-openai>=1.0.0
-transformers>=5.0.0
-bitsandbytes>=0.43.0
-accelerate>=0.27.0
-
-# === Vector Database & Embeddings ===
-chromadb>=0.4.22
-sentence-transformers>=2.2.2
-
-# === Utilities ===
-python-dotenv>=1.0.0
-rich>=13.7.0
-fastapi>=0.115.0
-uvicorn>=0.34.0
-numpy>=1.24.0
-colorama>=0.4.6
-vllm>=0.3.0
-
-# === Fine-Tuning ===
-unsloth>=2025.5
-trl>=0.9.0
-datasets>=2.16.0
-peft>=0.10.0
-
-# === Optional: Development ===
-# pytest>=7.4.0
-# black>=23.0.0
+# CHAPPiE full installation, Python 3.11+
+# Existing `pip install -r requirements.txt` behavior stays complete.
+-r requirements/runtime.txt
+-r requirements/providers-local.txt
+-r requirements/training.txt

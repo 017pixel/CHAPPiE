@@ -1,0 +1,10 @@
+target-version = "py311"
+line-length = 120
+
+exclude = [
+  "Legacy-Code",
+  "forschung/runs",
+  "forschung/session_logs",
+  "frontend",
+]
+

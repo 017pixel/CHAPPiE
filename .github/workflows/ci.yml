@@ -30,9 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --no-cache-dir --upgrade pip
-          # Only packages actually needed by quick tests + py_compile
-          python -m pip install --no-cache-dir \
-            fastapi uvicorn rich numpy python-dotenv colorama requests pydantic
+          python -m pip install --no-cache-dir -r requirements/ci.txt
 
       - name: Syntax check core modules
         shell: bash
@@ -55,13 +53,22 @@ jobs:
             brain/vllm_brain.py \
             brain/steering_backend.py \
             brain/steering_api_server.py \
+            brain/steering_manager.py \
             brain/agents/steering_manager.py \
             config/config.py \
             config/prompts.py \
+            forschung/report/build_report.py \
             memory/chat_manager.py \
             memory/short_term_memory.py \
             memory/function_registry.py \
             web_infrastructure/backend_wrapper.py \
+            web_infrastructure/chappie_runtime.py \
+            web_infrastructure/contracts.py \
+            web_infrastructure/formatting.py \
+            web_infrastructure/generation.py \
+            web_infrastructure/persistence.py \
+            web_infrastructure/turn_context.py \
+            web_infrastructure/turn_pipeline.py \
             web_infrastructure/ui_utils.py \
             chappie_brain_cli.py
 
@@ -70,6 +77,7 @@ jobs:
         run: |
           set -eo pipefail
           python tests/test_forgetting_curve.py
+          python tests/test_quick.py
           python tests/test_life_simulation.py
           python tests/test_debug_monitor_data.py
           python tests/test_local_first_runtime.py
@@ -84,17 +92,57 @@ jobs:
           python tests/test_cli_commands.py
           python tests/test_cli_remote.py
           python tests/test_forschung_harness.py
+          python tests/test_runtime_architecture.py
+          python forschung/report/validate_report_v5_freeze.py
+          python forschung/report/validate_report_v6.py
+          python scripts/validate_skill_sync.py
 
-      - name: Run extended tests (may need mock deps)
+      - name: Run deterministic extended tests
         shell: bash
-        continue-on-error: true
         run: |
-          python tests/test_vllm_response_handling.py || true
-          python tests/test_ollama_response_handling.py || true
-          python tests/test_chat_manager_persistence.py || true
-          python tests/test_short_term_memory.py || true
-          python tests/test_training_config_ui.py || true
-          python tests/test_api_contract.py || true
+          set -euo pipefail
+          python tests/test_vllm_response_handling.py
+          python tests/test_ollama_response_handling.py
+          python tests/test_chat_manager_persistence.py
+          python tests/test_short_term_memory.py
+          python tests/test_training_config_ui.py
+          python tests/test_training_daemon_lifecycle.py
+          python tests/test_api_contract.py
+          python tests/test_forschung_report.py
+          python tests/test_report_v6.py
+          python tests/test_skill_sync.py
+
+      - name: Lint active architecture boundaries
+        shell: bash
+        run: |
+          ruff check --config config/ruff.toml \
+            api/dependencies.py \
+            api/main.py \
+            api/routers/chat.py \
+            api/routers/runtime.py \
+            api/services/command_service.py \
+            brain/steering_manager.py \
+            brain/brain_pipeline.py \
+            memory/chat_manager.py \
+            web_infrastructure \
+            tests/test_chat_manager_persistence.py \
+            tests/test_runtime_architecture.py \
+            tests/test_report_v6.py \
+            tests/test_skill_sync.py \
+            forschung/report/build_report.py \
+            forschung/report/inspect_prompt_contract.py \
+            forschung/report/validate_report_v5_freeze.py \
+            forschung/report/validate_report_v6.py \
+            scripts/validate_skill_sync.py
+
+      - name: Type-check public contracts
+        shell: bash
+        run: |
+          mypy --config-file config/mypy.ini \
+            web_infrastructure/contracts.py \
+            web_infrastructure/turn_context.py \
+            web_infrastructure/backend_wrapper.py \
+            api/schemas/__init__.py
 
   frontend-build:
     name: Frontend Build
@@ -116,7 +164,7 @@ jobs:
         shell: bash
         run: |
           cd frontend
-          npm install --legacy-peer-deps
+          npm ci --legacy-peer-deps
 
       - name: Build frontend
         shell: bash

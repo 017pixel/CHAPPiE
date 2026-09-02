@@ -159,6 +159,7 @@ data/training_runtime.repair-backup-*/
 data/active_chat_session.json
 training_state.json
 training_config.json
+config/training_config.json
 training.pid
 training_daemon.log.*
 *.log
@@ -177,7 +178,16 @@ config/APIs/cerebras_api.py
 node_modules/
 frontend/dist/
 frontend/node_modules/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/tailwind.config.d.ts
 .DS_Store
+
+# Lokale Test- und Browserartefakte
+*.err
+orbit-browser-*.ts
+telemetry-id
 
 # Forschung Test-Harness (Runtime-Daten)
 forschung/last_config.json
