@@ -1,0 +1,104 @@
+{
+  "report_version": "6",
+  "created_at": "2026-09-02",
+  "source_commit": "5911242475b3c510be772f3f9068aa651dff65d0",
+  "worktree_state": "uncommitted repository-cleanup migration",
+  "validator_version": "1",
+  "research_provenance": {
+    "run": "run-2-20260723-1108-cb6d011",
+    "period": "2026-07-23 to 2026-07-26",
+    "relationship_to_migration": "Run-2 measurements predate the runtime modularization; post-migration checks are structural regressions, not new benchmarks."
+  },
+  "evidence": [
+    {
+      "path": "web_infrastructure/chappie_runtime.py",
+      "symbol": "CHAPPiERuntime",
+      "sha256": "4b9dff548dd1f8fc88bf9688439cd70c08308d0ddd64e348017fab76fb5b87d6",
+      "section": "architektur-v6",
+      "claim": "Public active runtime facade and shared sync/stream entry.",
+      "role": "active",
+      "purpose": "runtime facade"
+    },
+    {
+      "path": "web_infrastructure/turn_pipeline.py",
+      "symbol": "TurnPipeline",
+      "sha256": "7546fd47584571347de90a9c1898c0a38402fc33bace9c956b52ae74886da987",
+      "section": "architektur-v6",
+      "claim": "Shared domain turn core for synchronous and streamed calls.",
+      "role": "active",
+      "purpose": "turn orchestration"
+    },
+    {
+      "path": "web_infrastructure/contracts.py",
+      "symbol": "TurnContext",
+      "sha256": "660b56b7cfe6f9cdd4edc4d8b19cd6a0b74d0f3134f7c34ac89e2be847790024",
+      "section": "architektur-v6",
+      "claim": "Typed internal turn state shared by output modes.",
+      "role": "active",
+      "purpose": "internal contract"
+    },
+    {
+      "path": "web_infrastructure/generation.py",
+      "symbol": "GenerationGateway",
+      "sha256": "f99cf990f9b7c0dc1c77c43ea6c8a8438e2de76474e8e3164d1e57da7ead136d",
+      "section": "architektur-v6",
+      "claim": "Provider calls resolve the current brain lazily after settings reload.",
+      "role": "active",
+      "purpose": "generation boundary"
+    },
+    {
+      "path": "web_infrastructure/persistence.py",
+      "symbol": "TurnPersistence",
+      "sha256": "d7f14383285945c72b29ce885844abd5850baf85a01a949449cf50ba245af666",
+      "section": "architektur-v6",
+      "claim": "Turn completion and persistence are an explicit responsibility.",
+      "role": "active",
+      "purpose": "persistence boundary"
+    },
+    {
+      "path": "web_infrastructure/formatting.py",
+      "symbol": "RuntimeFormattingMixin",
+      "sha256": "3e420c7cfaa2423971a8a6434515d91a8dc4fd4728df4f3e83a4424522b6b19a",
+      "section": "architektur-v6",
+      "claim": "Parsing, sanitizing and backend-facing message formatting are isolated.",
+      "role": "active",
+      "purpose": "formatting boundary"
+    },
+    {
+      "path": "web_infrastructure/backend_wrapper.py",
+      "symbol": "create_chappie_backend",
+      "sha256": "839f2018b61f6454b7c3eb0b0ed2a26daaad0f4b962d8c3be65c620bfa0fe3a4",
+      "section": "architektur-v6",
+      "claim": "Historical factory path remains as a lightweight compatibility layer.",
+      "role": "active",
+      "purpose": "compatibility"
+    },
+    {
+      "path": "brain/steering_manager.py",
+      "symbol": "SteeringManager",
+      "sha256": "2b3c8a79449f382dbcbde0cbe982050bd5a76fa3d1427e4ed513e607b246299d",
+      "section": "architektur-v6",
+      "claim": "Active steering is isolated from historical agent package imports.",
+      "role": "active",
+      "purpose": "steering boundary"
+    },
+    {
+      "path": "Legacy-Code/brain-pipeline-v1/brain_pipeline.py",
+      "symbol": "BrainPipeline",
+      "sha256": "051ec85922ebf60d67f424bfe1c6c86e22214bcdb39c5e5a46d6f11d3f2f1aed",
+      "section": "architektur-v6",
+      "claim": "Exact historical v1 source remains available for research comparison.",
+      "role": "historical",
+      "purpose": "legacy provenance"
+    },
+    {
+      "path": "Legacy-Code/backend-wrapper-v1/source/backend_wrapper.py",
+      "symbol": "create_chappie_backend",
+      "sha256": "3962927c7eb5b7c1456bbdda2e5e84e560a779248e85c519a0b509cfc78058e2",
+      "section": "architektur-v6",
+      "claim": "Exact pre-migration wrapper source preserves report-v5 code provenance.",
+      "role": "historical",
+      "purpose": "legacy provenance"
+    }
+  ]
+}

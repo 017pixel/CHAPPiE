@@ -1,4 +1,26 @@
-# CHAPPiE-Forschungsbericht · Run 2
+# CHAPPiE-Forschungsberichte
+
+## Berichtsversionen
+
+| Datei | Status | Bedeutung |
+|---|---|---|
+| `CHAPPiE-Forschungsbericht-v3.html` | historisch | ältere Berichtsfassung |
+| `CHAPPiE-Forschungsbericht-v4.html` | historisch | ältere Berichtsfassung |
+| `CHAPPiE-Forschungsbericht-v5.html` | eingefroren | historische Momentaufnahme vor der Runtime-Migration |
+| `CHAPPiE-Forschungsbericht-v6.html` | aktuell | v5-Forschung plus aktuelle Architektur, Legacy-Abgrenzung und Evidence-Manifest |
+| `CHAPPiE-Forschungsbericht-Run-2.html` | Run-Bericht | aus Run-2-Artefakten gebauter Abschlussbericht |
+| `CHAPPiE-Forschungsbericht.html` | historisch | Run-1-/Vorläuferartefakt |
+
+V5 bleibt bytegenau unverändert. V6 übernimmt die Forschungsresultate, kennzeichnet Run 2 als Vor-Migrationsmessung und ergänzt aktuelle Code-Evidenz. Prüfungen:
+
+```bash
+python3 forschung/report/validate_report_v5_freeze.py
+python3 forschung/report/validate_report_v6.py
+```
+
+Das maschinenlesbare v6-Manifest liegt in `report-evidence-v6.json`.
+
+## Run 2
 
 Der aktuelle Offline-Bericht gehört zum getrennten Forschungs-Run
 `run-2-20260723-1108-cb6d011`:

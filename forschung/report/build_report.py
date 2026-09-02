@@ -256,7 +256,8 @@ def category_table(sessions: dict[str, dict[str, Any]]) -> str:
         cells = []
         for key, *_ in EXPECTED:
             cat = (sessions.get(key, {}).get("categories") or {}).get(str(category_id))
-            cells.append(f'<td class="num">{e(f"{cat.get("valid", 0)}/{cat.get("questions", 0)}" if cat else "—")}</td>')
+            category_result = f"{cat.get('valid', 0)}/{cat.get('questions', 0)}" if cat else "—"
+            cells.append(f'<td class="num">{e(category_result)}</td>')
         rows.append(f"<tr><td class='num'>{category_id}</td><td>{e(name)}</td>{''.join(cells)}</tr>")
     return f"<table><thead><tr><th>Kat.</th><th>Name</th>{header}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
 
@@ -512,13 +513,26 @@ def main() -> None:
     collage = ROOT / "CHAPPiE-Kollage.jpg"
     dialogs, model_options, category_options = dialog_evidence(data)
 
-    qrate = lambda session: ((session or {}).get("aggregate") or {}).get("valid_rate")
-    reviewable_rate = lambda session: ((session or {}).get("aggregate") or {}).get("content_reviewable_rate")
-    latency = lambda session: (((session or {}).get("aggregate") or {}).get("duration_ms") or {}).get("mean")
-    length = lambda session: (((session or {}).get("aggregate") or {}).get("answer_words") or {}).get("mean")
-    memory_usage = lambda session: ((session or {}).get("aggregate") or {}).get("memory_usage_rate")
-    emotion_delta = lambda session: (((session or {}).get("aggregate") or {}).get("emotion_l1_delta") or {}).get("mean")
-    throughput = lambda session: (((session or {}).get("aggregate") or {}).get("tokens_per_s") or {}).get("median")
+    def qrate(session):
+        return ((session or {}).get("aggregate") or {}).get("valid_rate")
+
+    def reviewable_rate(session):
+        return ((session or {}).get("aggregate") or {}).get("content_reviewable_rate")
+
+    def latency(session):
+        return (((session or {}).get("aggregate") or {}).get("duration_ms") or {}).get("mean")
+
+    def length(session):
+        return (((session or {}).get("aggregate") or {}).get("answer_words") or {}).get("mean")
+
+    def memory_usage(session):
+        return ((session or {}).get("aggregate") or {}).get("memory_usage_rate")
+
+    def emotion_delta(session):
+        return (((session or {}).get("aggregate") or {}).get("emotion_l1_delta") or {}).get("mean")
+
+    def throughput(session):
+        return (((session or {}).get("aggregate") or {}).get("tokens_per_s") or {}).get("median")
     sample_note = ", ".join(f"{label} n={(sessions.get(key, {}).get('aggregate') or {}).get('questions', 0)}" for key, label, *_ in EXPECTED)
     local_complete = is_complete(sessions.get("qwen")) and is_complete(sessions.get("gemma"))
     if local_complete:

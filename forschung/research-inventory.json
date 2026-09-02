@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source_commit": "5911242475b3c510be772f3f9068aa651dff65d0",
+  "generated_on": "2026-09-02",
+  "tracked_files": 2906,
+  "classes": [
+    {
+      "path": "forschung/session_logs",
+      "tracked_files": 2253,
+      "kind": "frozen-evidence",
+      "active_harness_input": true,
+      "reproducible": false,
+      "presentation": "internal-evidence",
+      "sensitivity_review": "required-before-publication",
+      "decision": "keep"
+    },
+    {
+      "path": "forschung/runs",
+      "tracked_files": 574,
+      "kind": "run-artifacts-and-validation",
+      "active_harness_input": true,
+      "reproducible": "mixed",
+      "presentation": "evidence",
+      "sensitivity_review": "required-before-publication",
+      "decision": "keep"
+    },
+    {
+      "path": "forschung/report",
+      "tracked_files": 69,
+      "kind": "reports-builders-and-validators",
+      "active_harness_input": true,
+      "reproducible": "mixed",
+      "presentation": "public-report-candidates",
+      "sensitivity_review": "validated",
+      "decision": "keep-and-index"
+    },
+    {
+      "path": "forschung",
+      "tracked_files": 10,
+      "kind": "active-harness-and-notes",
+      "active_harness_input": true,
+      "reproducible": "mixed",
+      "presentation": "mixed",
+      "sensitivity_review": "required-before-publication",
+      "decision": "keep"
+    }
+  ]
+}

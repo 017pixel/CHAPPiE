@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from config.prompts import CONTEXT_FILE_TOOL_INSTRUCTION, build_system_prompt
+from config.prompts import CONTEXT_FILE_TOOL_INSTRUCTION, build_system_prompt  # noqa: E402
 
 
 DEFAULT_OUTPUT = ROOT / "forschung" / "report" / "workspace" / "prompt-tool-contract.json"
@@ -32,17 +32,19 @@ def main() -> None:
     args = parser.parse_args()
 
     prompts_path = ROOT / "config" / "prompts.py"
-    backend_path = ROOT / "web_infrastructure" / "backend_wrapper.py"
+    generation_path = ROOT / "web_infrastructure" / "generation.py"
+    pipeline_path = ROOT / "web_infrastructure" / "turn_pipeline.py"
     runner_path = ROOT / "forschung" / "session_runner.py"
     prompts_source = prompts_path.read_text(encoding="utf-8")
-    backend_source = backend_path.read_text(encoding="utf-8")
+    generation_source = generation_path.read_text(encoding="utf-8")
     runner_source = runner_path.read_text(encoding="utf-8")
     local_final_prompt = build_system_prompt(include_emotion_status=False, use_chain_of_thought=False)
     tool_gate = 'tools = self._get_context_tools() if settings.llm_provider == LLMProvider.GROQ else None'
-    stream_start = line_number(backend_source, "def _generate_response_stream_raw(")
-    stream_end = line_number(backend_source, "def _process_two_step_stream(")
-    stream_lines = backend_source.splitlines()[stream_start - 1:stream_end - 1]
-    stream_source = "\n".join(stream_lines)
+    stream_start = line_number(generation_source, "def _generate_response_stream_raw(")
+    stream_end = line_number(generation_source, "def _stream_visible_candidate(")
+    if stream_start is None or stream_end is None:
+        raise RuntimeError("Streaming-Symbole fehlen in web_infrastructure/generation.py")
+    stream_source = "\n".join(generation_source.splitlines()[stream_start - 1:stream_end - 1])
     runner_call = "gen = self.backend.process_stream(text, history, debug_mode=True)"
 
     report = {
@@ -53,16 +55,17 @@ def main() -> None:
         "tool_instruction_appended_when_emotions_and_thinking_disabled": CONTEXT_FILE_TOOL_INSTRUCTION.strip() in local_final_prompt,
         "tool_instruction_demands_post_answer_call": "RUFE NACH DEINER ANTWORT" in CONTEXT_FILE_TOOL_INSTRUCTION,
         "build_prompt_append_line": line_number(prompts_source, "prompt += CONTEXT_FILE_TOOL_INSTRUCTION"),
-        "backend_source": str(backend_path.relative_to(ROOT)),
+        "generation_source": str(generation_path.relative_to(ROOT)),
+        "pipeline_source": str(pipeline_path.relative_to(ROOT)),
         "runner_source": str(runner_path.relative_to(ROOT)),
         "harness_process_stream_line": line_number(runner_source, runner_call),
         "measured_harness_uses_process_stream": runner_call in runner_source,
         "streaming_path_start_line": stream_start,
-        "streaming_plain_generate_line": line_number(backend_source, "return self.brain.generate(messages, config=gen_config), {"),
-        "streaming_path_uses_plain_generate": "return self.brain.generate(messages, config=gen_config), {" in stream_source,
+        "streaming_plain_generate_line": line_number(generation_source, "return self.generation.generate(messages, config=gen_config), {"),
+        "streaming_path_uses_plain_generate": "return self.generation.generate(messages, config=gen_config), {" in stream_source,
         "streaming_path_uses_generate_with_tools": "generate_with_tools" in stream_source,
-        "native_tool_gate_line": line_number(backend_source, tool_gate),
-        "nonstreaming_native_tools_groq_only": tool_gate in backend_source,
+        "native_tool_gate_line": line_number(generation_source, tool_gate),
+        "nonstreaming_native_tools_groq_only": tool_gate in generation_source,
         "interpretation": (
             "Der im Harness gemessene Streaming-Pfad nutzt plain generate ohne strukturierten Toolkanal. "
             "Darum wird dem finalen Prompt standardmaessig keine Toolaufforderung mehr angehaengt. Ein separater "
