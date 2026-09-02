@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import re
 import shutil
@@ -125,15 +124,31 @@ def main() -> None:
     check("box-shadow" not in text.lower() and "text-shadow" not in text.lower(), "keine Glow-/Shadow-Effekte", results)
     check(not re.search(r"[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F]", parsed.visible_text), "keine Emojis im sichtbaren UI", results)
     check(not re.search(r"\{\{[A-Z0-9_]+\}\}", text), "keine unaufgeloesten Template-Marker", results)
-    check(all(source.startswith("data:image/") for source in parsed.images), "Bilder als Data-URI eingebettet", results)
-    image_decode_ok = True
+    embedded_images = [
+        source for source in parsed.images
+        if urlsplit(source).scheme == "data" or ";base64," in source.lower()
+    ]
+    check(not embedded_images, "keine eingebetteten Base64-Bilder", results)
+    missing_local_images = []
+    external_images = []
     for source in parsed.images:
-        if ";base64," in source:
-            try:
-                base64.b64decode(source.split(",", 1)[1], validate=True)
-            except Exception:
-                image_decode_ok = False
-    check(image_decode_ok, "eingebettete Base64-Bilder dekodierbar", results)
+        parsed_source = urlsplit(source)
+        if parsed_source.scheme or source.startswith("//"):
+            external_images.append(source)
+            continue
+        if not parsed_source.path:
+            missing_local_images.append(source)
+            continue
+        local_path = (args.report.parent / unquote(parsed_source.path)).resolve()
+        try:
+            local_path.relative_to(ROOT.resolve())
+        except ValueError:
+            external_images.append(source)
+            continue
+        if not local_path.is_file():
+            missing_local_images.append(source)
+    check(not external_images, "Bilder verweisen nur auf lokale Repository-Dateien", results)
+    check(not missing_local_images, "alle lokalen Report-Bilder existieren", results)
     try:
         data = json.loads(parsed.json_payload.replace("<\\/", "</"))
         data_ok = isinstance(data, dict) and "sessions" in data and "questions" in data
@@ -158,7 +173,7 @@ def main() -> None:
     check("funktionale Gefühlssimulation" in text and "nicht nachgewiesen" in text, "keine unbelegte Gefuehls-/Bewusstseinsbehauptung", results)
     check("Pitch-Unterstützung" in text and "0:00" in text, "Pitch-Sektion mit Sprecherzeiten", results)
     check("IntersectionObserver" in text and "dialogModel" in text and "expandAll" in text, "Sidebar-, Filter- und Details-Interaktion enthalten", results)
-    check(len(text.encode("utf-8")) > 100_000, "Report enthaelt eingebettete Evidenz und Assets", results)
+    check(len(text.encode("utf-8")) > 100_000, "Report enthaelt Evidenz- und Benchmarkdaten", results)
 
     # Vergleiche gegen den konfigurierten Key, ohne ihn auszugeben.
     try:

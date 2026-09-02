@@ -32,7 +32,9 @@ Der aktuelle Offline-Bericht gehört zum getrennten Forschungs-Run
   `forschung/runs/run-2-20260723-1108-cb6d011/`
 
 Alle drei HTML-Dateien funktionieren lokal und ohne CDN. CSS, JavaScript,
-Icons und Diagramme sind eingebettet. Der ältere
+Icons und Diagramme sind eingebettet. Die historische `CHAPPiE-Kollage.jpg`
+wird bewusst als lokale Repository-Datei verknüpft und nicht als Base64 in die
+HTML-Dateien kopiert. Der ältere
 `CHAPPiE-Forschungsbericht.html` und `forschung/report/workspace/` bleiben als
 historische Run-1-/Vorläuferartefakte erhalten; sie sind nicht der
 Abschlussbericht von Run 2.

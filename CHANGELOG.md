@@ -2,6 +2,29 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.4.1] - 2026-09-02
+
+### Erstellt
+- Regressionstest gegen Base64-Bilder in den Forschungsbericht-Buildern ergänzt
+- Statische Prüfung lokaler Bildziele im Bericht-Validator ergänzt
+- Größenprüfung für erzeugte Berichte in den Forschungsbericht-Tests ergänzt
+- Repository-relatives Asset-Ziel für benutzerdefinierte Berichtsausgaben eingeführt
+- Dokumentierter Offline-Asset-Pfad für historische Forschungsbilder ergänzt
+
+### Verändert
+- Historische Kollagen werden in beiden Buildern als lokale Dateien verknüpft
+- Die beiden übergroßen Forschungsberichte enthalten keine eingebetteten JPEG-Daten mehr
+- Die Validatoren prüfen nun lokale Bilddateien statt Data-URI-Inhalte
+- Der Forschungsbericht-Footer beschreibt die getrennte Bilddatei korrekt
+- API- und Frontend-Versionsanzeige auf 16.4.1 angehoben
+
+### Gelöscht
+- Rund 11,8 MB redundante Base64-Kollagendaten aus den HTML-Artefakten entfernt
+- Unbenötigte Base64-Imports aus den Bericht-Buildern entfernt
+- Veraltete Validator-Erwartung vollständig eingebetteter Bilder entfernt
+- Falsche Dokumentation zur inline eingebetteten Kollage entfernt
+- Keine eigenständige Bilddatei oder historische Evidenz gelöscht
+
 ## [16.4.0] - 2026-09-02
 
 ### Erstellt

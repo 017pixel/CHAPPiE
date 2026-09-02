@@ -7,10 +7,10 @@ missing; this command never asks a model, provider, or running CHAPPiE service.
 from __future__ import annotations
 
 import argparse
-import base64
 import csv
 import html
 import json
+import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +46,11 @@ def project_path(path: Path) -> str:
         return str(path.relative_to(ROOT))
     except ValueError:
         return str(path)
+
+
+def relative_asset_url(asset: Path, output: Path) -> str:
+    """Return a repository-relative URL from the generated report to an asset."""
+    return Path(os.path.relpath(asset.resolve(), output.resolve().parent)).as_posix()
 
 
 def read_issues(run_dir: Path) -> list[dict[str, str]]:
@@ -464,7 +469,7 @@ def build(run_dir: Path, benchmark_path: Path | None, output: Path) -> str:
 [CLOUD] Emotionen als Prompt-Kontext</pre><p class="caption">Quelle: Architekturhinweis im Run-Ordner. Der Ablauf ist eine technische Erklärung, keine psychologische Theorie.</p></details></section><section id="risks"><div class="section-head"><div class="section-no">07</div><div><h2>Nutzen, Risiken und Grenzen</h2><p class="section-desc">Wirksamkeit, Nutzen, Schaden und Unsicherheit werden nicht vermischt.</p></div></div><div class="grid"><div class="block"><div class="label">MÖGLICHER NUTZEN</div><p>Ein transparenter Zustandskontext kann Antworten konsistenter, empathischer und langfristig anschlussfähig machen — sofern Retrieval und Safety zuverlässig sind.</p></div><div class="block"><div class="label">SPEZIFISCHES RISIKO</div><p>Anthropomorphe Sprache kann Bindung, Manipulation, falsche Zuständigkeitsannahmen oder unangemessene Selbstschutz-Narrative verstärken.</p></div></div><div class="callout danger"><b>Grenze der Studie:</b> Causal Traces, VAD-Werte, Memory-IDs und Layer-Payloads sind technische Kausalhinweise. Sie beweisen keine Gefühle, Bewusstsein oder subjektive Erfahrung.</div><details><summary>Laufspezifische Einschränkungen</summary><pre>{clip((run_dir / 'limitations.md').read_text(encoding='utf-8') if (run_dir / 'limitations.md').exists() else 'Keine limitations.md gefunden.', 12000)}</pre></details></section><section id="pitch"><div class="section-head"><div class="section-no">08</div><div><h2>Pitch-Modus: 2–4 Minuten</h2><p class="section-desc">Fünf Erzählblöcke für Jury und technische Rückfragen.</p></div></div><div class="table-wrap"><table><thead><tr><th>Block</th><th>Kernaussage</th><th>Visual</th><th>Dauer</th><th>Übergang</th></tr></thead><tbody><tr><td>1</td><td>Wenn ein System „ich fühle“ sagt, was ist daran messbar?</td><td>Dialogbeleg + Leitthese</td><td>25 s</td><td>zur Architektur</td></tr><tr><td>2</td><td>CHAPPiE koppelt Modell, Memory, Life und Emotion.</td><td>Pipeline</td><td>35 s</td><td>zum Experiment</td></tr><tr><td>3</td><td>Run 2 retestet Fehler statt Erfolge zu behaupten.</td><td>Issue-Matrix</td><td>45 s</td><td>zu Ergebnissen</td></tr><tr><td>4</td><td>Messwerte und technische Traces zeigen Wirkung, nicht Erleben.</td><td>Run-Vergleich</td><td>45 s</td><td>zu Risiken</td></tr><tr><td>5</td><td>Gefühlssimulation kann nützlich und riskant zugleich sein.</td><td>Grenzen & nächste Schritte</td><td>30 s</td><td>Fragen</td></tr></tbody></table></div></section><section id="sources"><div class="section-head"><div class="section-no">09</div><div><h2>Reproduzierbarkeit und Quellen</h2><p class="section-desc">Der Offline-Builder liest nur vorhandene Dateien; fehlende Dateien werden sichtbar gelassen.</p></div></div><ul>{source_html}</ul><details><summary>Eingebettete Report-Daten (JSON)</summary><pre>{clip(embedded, 1800)}</pre></details><p class="caption">Generiert mit <code>forschung/report/build_run2_report.py</code>; Ausgabe: <code>{esc(project_path(output))}</code>. Keine externen CDNs, Tracker oder Modellaufrufe.</p></section></div></main><script id="reportData" type="application/json">{embedded}</script><script>(()=>{{const b=document.body,m=document.querySelector('#menu'),v=document.querySelector('#view'),p=document.querySelector('#pitchButton');m?.addEventListener('click',()=>{{b.classList.toggle('nav-open');m.setAttribute('aria-expanded',b.classList.contains('nav-open'))}});v?.addEventListener('click',()=>{{b.classList.toggle('jury');const on=b.classList.contains('jury');v.setAttribute('aria-pressed',on);v.textContent=on?'Entwickleransicht':'Jury-Ansicht'}});p?.addEventListener('click',()=>{{b.classList.toggle('pitch');p.textContent=b.classList.contains('pitch')?'Pitch beenden':'Pitch-Modus'}});const q=document.querySelector('#issueSearch'),s=document.querySelector('#statusFilter'),a=document.querySelector('#areaFilter'),c=document.querySelector('#issueCount'),rows=[...document.querySelectorAll('[data-issue]')];function f(){{let n=0;rows.forEach(r=>{{const ok=(!q.value||r.dataset.search.includes(q.value.toLowerCase()))&&(!s.value||r.dataset.status===s.value)&&(!a.value||r.dataset.area===a.value);r.hidden=!ok;if(ok)n++}});c.textContent=`${{n}} von ${{rows.length}} Issues sichtbar`}}[q,s,a].forEach(x=>x?.addEventListener('input',f));f()}})();</script></body></html>'''
 
 
-def enrich_report(document: str, run_dir: Path) -> str:
+def enrich_report(document: str, run_dir: Path, output: Path) -> str:
     """Add the full report-plan chapters and interaction contracts to the compact base."""
     manifest = load_json(run_dir / "manifest.json", {})
     conditions = manifest.get("conditions") or {}
@@ -802,7 +807,7 @@ def enrich_report(document: str, run_dir: Path) -> str:
 
     collage = ROOT / "CHAPPiE-Kollage.jpg"
     if collage.exists():
-        collage_src = "data:image/jpeg;base64," + base64.b64encode(collage.read_bytes()).decode("ascii")
+        collage_src = relative_asset_url(collage, output)
         collage_block = (
             f'<figure class="figure"><img src="{collage_src}" '
             'alt="Historische CHAPPiE-Kollage mit acht Screenshots: Terminal und Debugausgabe, '
@@ -1179,7 +1184,7 @@ def main() -> None:
         parser.error(f"Run-Ordner fehlt: {run_dir}")
     benchmark = args.benchmark.resolve() if args.benchmark else (DEFAULT_BENCHMARK if DEFAULT_BENCHMARK.exists() else None)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    document = enrich_report(build(run_dir, benchmark, args.output), run_dir)
+    document = enrich_report(build(run_dir, benchmark, args.output), run_dir, args.output)
     args.output.write_text(document, encoding="utf-8")
     print(json.dumps({"output": str(args.output), "bytes": args.output.stat().st_size, "run_dir": str(run_dir), "benchmark": str(benchmark) if benchmark else None}, ensure_ascii=False, indent=2))
 

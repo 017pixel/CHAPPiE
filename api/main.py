@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 app = FastAPI(
     title="CHAPPiE App API",
-    version="16.4.0",
+    version="16.4.1",
     description="FastAPI-Schicht fuer CHAPPiEs React-Frontend.",
 )
 
@@ -56,7 +56,7 @@ def root_overview():
     return JSONResponse({
         "app": {
             "name": "CHAPPiE App API",
-            "version": "16.4.0",
+            "version": "16.4.1",
             "docs": "/docs",
             "openapi": "/openapi.json",
         },

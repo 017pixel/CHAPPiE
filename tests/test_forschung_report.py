@@ -197,7 +197,9 @@ def test_report_builds_offline_html() -> None:
         assert completed.returncode == 0, completed.stderr or completed.stdout
         rendered = output_path.read_text(encoding="utf-8")
         assert not re.search(r"\{\{[A-Z0-9_]+\}\}", rendered)
-        assert "data:image/jpeg;base64," in rendered
+        assert "data:image/jpeg;base64," not in rendered
+        assert re.search(r'<img src="[^"]*CHAPPiE-Kollage\.jpg"', rendered)
+        assert len(rendered.encode("utf-8")) < 500_000
         assert "application/json" in rendered
         parser = StructuralParser()
         parser.feed(rendered)
@@ -207,6 +209,19 @@ def test_report_builds_offline_html() -> None:
         assert all(source is None for source in parser.scripts), parser.scripts
         assert not parser.stylesheets, parser.stylesheets
     print("  PASS test_report_builds_offline_html")
+
+
+def test_committed_reports_keep_collage_outside_html() -> None:
+    reports = (
+        ROOT / "forschung" / "report" / "CHAPPiE-Forschungsbericht.html",
+        ROOT / "forschung" / "report" / "CHAPPiE-Forschungsbericht-Run-2.html",
+    )
+    for report in reports:
+        rendered = report.read_text(encoding="utf-8")
+        assert "data:image/" not in rendered
+        assert re.search(r'<img src="\.\./\.\./CHAPPiE-Kollage\.jpg"', rendered)
+        assert report.stat().st_size < 1_000_000
+    print("  PASS test_committed_reports_keep_collage_outside_html")
 
 
 def test_benchmark_helpers_handle_missing_data() -> None:
@@ -350,6 +365,8 @@ def test_run2_report_separates_120b_primary_and_20b_fallback() -> None:
         )
         assert completed.returncode == 0, completed.stderr or completed.stdout
         rendered = output.read_text(encoding="utf-8")
+        assert "data:image/jpeg;base64," not in rendered
+        assert re.search(r'<img src="[^"]*CHAPPiE-Kollage\.jpg"', rendered)
         assert "Run-2-Fallback: GPT-OSS 20B auf Groq" in rendered
         assert "Primärbedingung GPT-OSS 120B" in rendered
         assert "kein methodisch identischer Ersatz für GPT-OSS 120B" in rendered
@@ -381,6 +398,7 @@ if __name__ == "__main__":
         test_run2_tertiary_text_meets_wcag_aa,
         test_run2_result_svgs_use_current_status_and_contrast,
         test_report_builds_offline_html,
+        test_committed_reports_keep_collage_outside_html,
         test_benchmark_helpers_handle_missing_data,
         test_report_validator_detects_missing_local_link,
         test_prompt_tool_contract_tracks_measured_streaming_path,

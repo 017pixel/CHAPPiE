@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import html
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -495,11 +495,23 @@ def repro_content(data: dict[str, Any], sessions: dict[str, dict[str, Any]]) -> 
     )
 
 
-def collage_uri(path: Path) -> str:
+def collage_uri(path: Path, output: Path) -> str:
+    """Return a portable repository-relative URL for the historical collage."""
+    return Path(os.path.relpath(path.resolve(), output.resolve().parent)).as_posix()
+
+
+def collage_block(path: Path, output: Path) -> str:
+    """Render the collage only when its separate repository asset exists."""
     if not path.exists():
-        return "data:image/svg+xml;charset=utf-8," + e('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"><rect width="100%" height="100%" fill="#171d19"/></svg>')
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
+        return ""
+    return (
+        f'<figure class="asset"><img src="{e(collage_uri(path, output))}" '
+        'alt="Historische CHAPPiE-Kollage mit Terminal-, Web- und Architekturansichten" '
+        'loading="lazy"><figcaption>Vorhandene Datei <code>CHAPPiE-Kollage.jpg</code>. '
+        'Historische qualitative Illustration; ältere CHAPPiE-Version, nicht vollständig '
+        'reproduzierbar, teilweise ohne aktuelle Debugdaten und nicht direkt mit den '
+        'aktuellen Modellmessungen vergleichbar.</figcaption></figure>'
+    )
 
 
 def main() -> None:
@@ -627,7 +639,7 @@ CHAPPiE-Identität und Antwortstil
         "{{MODEL_OPTIONS}}": model_options,
         "{{CATEGORY_OPTIONS}}": category_options,
         "{{DIALOGS}}": dialogs,
-        "{{COLLAGE_URI}}": collage_uri(collage),
+        "{{COLLAGE_BLOCK}}": collage_block(collage, args.output),
         "{{MISSING_ASSETS}}": missing_assets(collage.exists()),
         "{{MODEL_FINDINGS}}": model_findings(sessions),
         "{{RUN_LIMITATIONS}}": run_limits,
