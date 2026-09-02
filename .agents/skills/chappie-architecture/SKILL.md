@@ -5,46 +5,49 @@ description: CHAPPiE's brain, memory, and life simulation architecture. Use when
 
 # CHAPPiE Architecture
 
-CHAPPiE uses a **brain metaphor** across three interacting layers: Brain, Memory, Life.
+## Active request path
 
-## Brain Pipeline (`brain/`)
+```text
+API / CLI / Research
+  -> web_infrastructure.chappie_runtime.CHAPPiERuntime
+  -> TurnPipeline and TurnContext
+  -> Brain, Memory, Life, Global Workspace
+  -> GenerationGateway -> vLLM and Steering
+  -> formatting and persistence
+```
 
-| Agent | File | Purpose |
-|---|---|---|
-| Sensory Cortex | `brain/agents/sensory_cortex.py` | Input classification |
-| Amygdala | `brain/agents/amygdala.py` | Emotional weighting |
-| Hippocampus | `brain/agents/hippocampus.py` | Memory retrieval & encoding |
-| Prefrontal Cortex | `brain/agents/prefrontal_cortex.py` | Response strategy & tone |
-| Steering Manager | `brain/agents/steering_manager.py` | VAD mapping, alpha, composite modes, layer editing |
-| Global Workspace | `brain/global_workspace.py` | 7 signals with salience bundling |
-| Brain Pipeline | `brain/brain_pipeline.py` | Orchestrates all agents |
+`web_infrastructure/backend_wrapper.py` is only a compatibility layer. Keep `create_chappie_backend`, `init_chappie`, `CHAPPiERuntime` and `CHAPPiEBackend` compatible.
 
-### Key Integration Points
-- `web_infrastructure/backend_wrapper.py` → Main CHAPPiE backend class
-- `api/main.py` → FastAPI app entry
-- `brain/__init__.py` → `get_brain()` factory
+Sync and streaming must build the same `TurnContext`, share preparation and finalization, and differ only at the output adapter.
 
-## Memory (`memory/`)
+## Boundaries
 
-| Component | File | Purpose |
-|---|---|---|
-| Memory Engine | `memory/memory_engine.py` | Episodic search, vector DB (ChromaDB) |
-| Sleep Phase | `memory/sleep_phase.py` | Consolidation, replay, compression |
-| Forgetting Curve | `memory/forgetting_curve.py` | Ebbinghaus decay model |
-| Context Files | `memory/context_files.py` | soul.md, user.md, preferences |
-| Short-Term | `memory/short_term_memory.py` | JSON-based STM with timestamps |
+- Runtime orchestrates; it does not duplicate Memory or Life semantics.
+- `brain/global_workspace.py` selects and broadcasts active signals.
+- `brain/action_response.py` creates prompt and action context.
+- `brain/steering_manager.py` owns VAD, alpha, composite modes and layer profiles.
+- `brain/steering_backend.py` performs activation injection.
+- `memory/` owns STM, LTM, retrieval, context files, sleep and forgetting.
+- `life/` owns homeostasis, goals, habits, attachment, time and development.
 
-## Life Simulation (`life/`)
+There are ten emotions in `config/emotions.py`. The Qwen 3.5 4B profile steers layers 10 through 26.
 
-| Component | Purpose |
-|---|---|
-| Service | Prepare/finalize turns, homeostasis |
-| Goal Engine | Goal competition |
-| Planning Engine | Long-term planning |
-| Social Arc | Relationship/attachment models |
+## Historical v1
 
-## Key Rules
-- `chappie-training.service` must start `training_daemon`, never `training_loop`
-- Absolute paths in systemd ExecStart and WorkingDirectory
-- Steering: local Qwen first, vLLM preferred, Cloud APIs as fallback
-- `brain/__init__.py` triggert ALL brain imports (ollama, cerebras, vllm) — test imports müssen das mocken
+The multi-agent `BrainPipeline` is not production. Exact sources are under `Legacy-Code/brain-pipeline-v1/`; `brain/brain_pipeline.py` is a lazy compatibility loader. Historical agents must not be imported by the active runtime. Do not move or archive active steering with those agents.
+
+## Compatibility rules
+
+- Preserve external API, SSE, CLI and persisted-data contracts.
+- Do not reorder Intent, Memory, Life, Workspace, generation or finalization without a regression test.
+- Treat provider priority, emotion mapping, sleep behavior and storage changes as separate migrations.
+- Keep service and payload versions independent from the product version.
+
+## Required checks
+
+```bash
+python3 tests/test_runtime_architecture.py
+python3 tests/test_local_first_runtime.py
+python3 tests/test_life_simulation.py
+python3 tests/test_reasoning_layering.py
+```

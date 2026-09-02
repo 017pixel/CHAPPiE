@@ -2,6 +2,29 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.4.0] - 2026-09-02
+
+### Erstellt
+- Modulare Runtime mit klaren Grenzen für Turn-Ablauf, Kontext, Generierung, Persistenz und Formatierung ergänzt
+- Dokumentiertes Legacy-Archiv für den alten Backend-Wrapper und die erste Brain-Pipeline angelegt
+- Forschungsbericht v6 mit prüfbarer Quellcode-Evidenz und unverändertem Bericht v5 erstellt
+- Reproduzierbare Architektur-, Vertrags-, Skill-Synchronitäts- und Berichtsprüfungen ergänzt
+- Security-Audit mit behobener Session-Pfadlücke und dokumentierten Betriebsrisiken erstellt
+
+### Verändert
+- Synchroner und gestreamter Chat verwenden jetzt denselben fachlichen Turn-Einstieg
+- Web-API, CLI, Training und Forschung behalten ihre bisherigen öffentlichen Einstiege über eine kleine Kompatibilitätsschicht
+- Trainingskonfiguration, verwendete Prompts und Providerangaben wurden zentralisiert und bereinigt
+- CI, Python-Abhängigkeiten und Frontend-Abhängigkeiten sind klar getrennt, reproduzierbar und sicherheitsgeprüft
+- Dokumentation und Projektskills beschreiben jetzt einheitlich die tatsächlich aktive Runtime-Architektur
+
+### Gelöscht
+- Monolithische Produktionslogik aus dem bisherigen Backend-Wrapper entfernt
+- Nachweislich ungenutzte Legacy- und Async-Hilfsmethoden aus dem aktiven Runtimepfad entfernt
+- Eager Imports historischer Brain-Agenten aus dem aktiven Startpfad entfernt
+- Temporäre Logs, Browser-Telemetrie und reproduzierbare Buildartefakte aus der Versionsverwaltung entfernt
+- Künstliche Root-NPM-Abhängigkeit und veraltetes Autonomy-Skript aus dem aktiven Projekt entfernt
+
 ## [16.3.0] - 2026-09-02
 
 ### Erstellt

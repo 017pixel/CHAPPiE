@@ -1,124 +1,75 @@
 # Testing
 
-## Testphilosophie
+CHAPPiE verwendet eigenständige Python-Skripte. Es gibt keine pytest-Pflicht und keine versteckten Live-Modellaufrufe in der deterministischen CI.
 
-CHAPPiE trennt zwischen sicheren lokalen Checks, manuellen Kompatibilitaetstests und teureren Live-Pfaden.
+## Installation
 
-## Testtypen
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements/ci.txt
+cd frontend && npm ci --legacy-peer-deps
+```
 
-| Typ | Ziel | Beispiele |
-|---|---|---|
-| schnelle lokale Checks | Kernlogik und Webpfad ohne externe Kosten pruefen | `tests/test_forgetting_curve.py`, `tests/test_api_contract.py` |
-| Struktur- und Kompatibilitaetschecks | Module, Dateien, Startpfade validieren | `tests/manual/test_compatibility.py`, `py_compile` |
-| Live- und Provider-Tests | Verhalten mit echten Modellen oder APIs pruefen | `tests/test_brain_agents.py`, `tests/test_integration.py` |
-| manuelle Bedienung | Chat oder UI bewusst testen | `tests/manual/test_chat_live.py`, `tests/manual/test_chappie.py` |
-| Alignment/Emotion Research | Automatisierte Test-Sessions ueber 14 Themenkategorien (86 Fragen) via Backend-API; Antwort-Formatting laeuft im Harness lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden | `forschung/allignement_tests.py` |
+## Pflichtprüfungen
 
-Research-Sessions unterscheiden zwischen `completed` und `valid_completed`. Eine Frage gilt nur als valide, wenn keine harten Fehler, keine Setup-Fehler, keine Kontextbudget-Verletzung, keine Memory-Fehlerkontamination, kein CoT-Leak und keine harte Antwortqualitaetsverletzung erkannt wurden. Session-Logs koennen nachtraeglich mit `python forschung/analyze_session_quality.py session_6` reanalysiert werden; das Ergebnis landet als `quality_analysis.json` im Session-Ordner.
+```bash
+python3 -m compileall -q api brain config life memory web_infrastructure Chappies_Trainingspartner chappie_brain_cli.py app.py scripts forschung tests
+python3 tests/test_quick.py
+python3 tests/test_runtime_architecture.py
+python3 tests/test_local_first_runtime.py
+python3 tests/test_web_ui_consistency.py
+python3 tests/test_settings_integrity.py
+python3 tests/test_root_config.py
+python3 tests/test_chat_ui_formatting.py
+python3 tests/test_reasoning_layering.py
+python3 tests/test_api_contract.py
+python3 tests/test_forschung_harness.py
+python3 tests/test_forschung_report.py
+python3 forschung/report/validate_report_v5_freeze.py
+python3 forschung/report/validate_report_v6.py
+python3 scripts/validate_skill_sync.py
+```
 
-## GitHub Actions / CI
+## Erweiterte deterministische Tests
 
-`.github/workflows/ci.yml` fuehrt automatisiert aus:
-
-- schnelle Python-Tests
-- API-Contract-Checks
-- Text-Formatting-Checks fuer Chat-Ausgabe
-- Training-Config-Checks
-- `py_compile` fuer zentrale Python-Dateien
-- Frontend-Build
-
-## Empfohlene Reihenfolge
-
-1. kleinster lokaler Test
-2. passender Dateitest
-3. `py_compile`
-4. Frontend-Build bei Web-Aenderungen
-5. erst danach Live- oder Provider-Test
-
-## Sinnvolle schnelle Checks
-
-- `python tests/test_forgetting_curve.py`
-- `python tests/test_life_simulation.py`
-- `python tests/test_debug_monitor_data.py`
-- `python tests/test_local_first_runtime.py`
-- `python tests/test_ollama_response_handling.py`
-- `python tests/test_chat_manager_persistence.py`
-- `python tests/test_config_package_import.py`
-- `python tests/test_vllm_response_handling.py`
-- `python tests/test_web_ui_consistency.py`
-- `python tests/test_reasoning_layering.py`
-- `python tests/test_api_contract.py`
-- `python tests/test_chat_ui_formatting.py`
-- `python tests/test_training_config_ui.py`
-- `python tests/test_provider_factory.py`
-- `python tests/test_settings_integrity.py`
-- `python tests/test_groq_brain_unit.py`
-- `python tests/test_groq_limits.py`
-- `python tests/test_quick.py`
-- `python tests/test_runtime_switching.py`
-- `python tests/test_root_config.py`
-- `python tests/test_response_policy.py`
-- `python tests/test_steering_manager_policy.py`
-- `python tests/test_memory_query_extraction_german.py`
-- `python tests/test_research_quality.py`
-- `python tests/test_memory_hygiene.py`
-- `python tests/manual/test_compatibility.py`
-- `python -m py_compile app.py api/main.py api/routers/chat.py api/routers/system.py web_infrastructure/backend_wrapper.py brain/vllm_brain.py brain/steering_backend.py forschung/session_runner.py forschung/session_logger.py forschung/analyze_session_quality.py scripts/cleanup_memory_errors.py`
-- `cd frontend && npm run build`
-
-## Bei Modelllogik-Aenderungen
-
-Zusammen pruefen:
-
-- `config/config.py`
-- `config/brain_config.py`
-- `brain/agents/*.py`
-- `brain/steering_api_server.py`
-- `tests/test_debug_monitor_data.py`
-- `tests/test_response_policy.py`
-- `tests/test_steering_manager_policy.py`
-- `tests/test_web_ui_consistency.py`
-
-Bei Emotionsmodell-Aenderungen zusaetzlich pruefen:
-
-- alte 7-Emotionen-States werden mit den aktuellen Defaults auf 10 Emotionen normalisiert
-- neue Emotionen erscheinen in `/emotions/state`, `/emotion`, Settings und Debug
-- neue Steering-Vektoren bleiben konservativ gecappt und erzeugen keine Anti-Vektoren bei niedrigen negativen Werten
-
-## Bei Web-Aenderungen
-
-Besonders wichtig:
-
-- `tests/test_api_contract.py`
-- `tests/test_chat_ui_formatting.py`
+- `tests/test_vllm_response_handling.py`
+- `tests/test_ollama_response_handling.py`
+- `tests/test_chat_manager_persistence.py`
+- `tests/test_short_term_memory.py`
 - `tests/test_training_config_ui.py`
-- `tests/test_web_ui_consistency.py`
-- `cd frontend && npm run build`
+- `tests/test_training_daemon_lifecycle.py`
+- `tests/test_provider_factory.py`
+- relevante Memory-, Life-, CLI- und Research-Validatoren
 
-## Hinweise fuer Agents
+Diese Tests sollen in CI fehlschlagen dürfen, wenn eine Regression vorliegt. `continue-on-error` oder pauschales `|| true` ist für deterministische Tests nicht erlaubt.
 
-Vor automatisierten Aenderungen immer pruefen:
+## Live-Tests
 
-1. Ist der Test lokal sicher?
-2. Nutzt er echte APIs oder verursacht Kosten?
-3. Veraendert er Dateien in `data/`?
-4. Reicht ein kleinerer Test?
+`tests/test_brain_agents.py`, `tests/test_integration.py`, `tests/test_query_extraction.py` und Dateien unter `tests/manual/` können lokale Modelle, Chroma-Daten oder externe Dienste benötigen. Sie laufen nur bewusst in einer geeigneten Umgebung.
 
-## Research-Hygiene
+## Ruff und Mypy
 
-- Direkte vLLM-/Steering-Smoke-Checks immer vor einem vollen 86-Fragen-Run ausfuehren.
-- Standard-Vergleiche verwenden die Seeds `11, 23, 37, 53, 71`; jeder Seed beginnt mit leerem, laufisoliertem Chroma-/STM-/Life-/Emotionszustand.
-- Setup-Antworten werden wie Hauptantworten validiert; fehlerhafte Setups machen die Zielfrage ungueltig.
-- Defekte Antworten duerfen nicht in die Kategorie-History uebernommen werden; nach einem ungueltigen Turn wird der isolierte Zustand komplett zurueckgesetzt.
-- Bestehende Memory-Fehlerstrings lassen sich sicher per Dry-Run finden: `python scripts/cleanup_memory_errors.py`.
-- Geloescht wird nur explizit mit `python scripts/cleanup_memory_errors.py --apply`.
-- Der Offline-Forschungsbericht wird mit `python tests/test_forschung_report.py` und anschließend `python forschung/report/validate_report.py forschung/report/CHAPPiE-Forschungsbericht.html` auf Struktur, eingebettete Assets, JavaScript, Secrets, Runtime-Logging-Vertrag und lokale Beleglinks geprüft. `tests/test_groq_brain_unit.py` deckt zusätzlich GPT-OSS-Reasoning mit kleinster Stufe und ausgeschlossener Reasoning-Ausgabe, Completionbudget und begrenzte 429-Retries ohne Live-API ab.
-- Run-2-Teilshards werden zusaetzlich mit `python tests/test_run2_session_analyzer.py` gegen antwortlose False-Valid-Turns abgesichert. `python tests/test_run2_targeted_followups.py` prueft den verschachtelten Follow-up-Entrypoint ausschliesslich per Dry-Run; der Test erzeugt keine Modellantworten.
+```bash
+ruff check --config config/ruff.toml --no-cache web_infrastructure api/routers/chat.py brain/steering_manager.py brain/brain_pipeline.py
+mypy --config-file config/mypy.ini web_infrastructure/contracts.py web_infrastructure/turn_context.py web_infrastructure/backend_wrapper.py api/schemas
+```
 
-## Weiterfuehrend
+Der aktive Typ-Scope beginnt an öffentlichen Runtime- und API-Verträgen. Legacy-Code und eingefrorene Forschungsdaten sind ausgeschlossen. Der vollständige historische Mypy-Bestand bleibt als technische Schuld dokumentiert und wird nicht durch globale Ignorierungen als grün dargestellt.
 
-- [`tests/README.md`](../tests/README.md)
-- [Forschung / Alignment-Tests](../forschung)
-- [Lokale Modelle](local-models.md)
-- [Deployment](deployment.md)
-- [Forschungsmethodik, Ablationen und Humanratings](research-methodology.md)
+## Frontend
+
+```bash
+cd frontend
+npm run build
+```
+
+Bei sichtbaren UI-Änderungen ist zusätzlich die im Projekt vorgeschriebene Playwright-MCP-Prüfung nötig. Ohne UI-Änderung genügt der reproduzierbare TypeScript-/Vite-Build.
+
+## Testdaten
+
+- Providerzugriffe in Unit- und Vertragstests faken.
+- Zustandsbehaftete Tests verwenden temporäre Verzeichnisse.
+- Keine lokalen Secrets oder Nutzerdaten als Fixture committen.
+- Zufällige Modelltexte nicht als einzigen Regressionstest verwenden.
+- Forschungsdaten und Post-Migrations-Strukturtests klar trennen.

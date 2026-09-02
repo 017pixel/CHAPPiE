@@ -1,4 +1,6 @@
-# Gemma 4 Integration - Umfassender Plan
+# Gemma 4 Integration - Historischer Implementierungsplan
+
+> Historischer Stand vor der Runtime-Modularisierung. Der aktive SteeringManager liegt heute in `brain/steering_manager.py`; `brain/agents/steering_manager.py` ist nur ein kompatibler Re-Export. Aktuelle Betriebsanweisungen stehen in `docs/local-models.md` und `docs/vLLM-Setup.md`.
 
 **Ziel:** Vollstaendige Unterstuetzung fuer `google/gemma-4-26B-A4B-it` (MoE, 4B active, 26B total) neben Qwen 3.5-4B. Alle Funktionen, gleicher Qualitaetsanspruch, sauberes Switching.
 
@@ -18,7 +20,7 @@
 - [x] `_export_root_values()` & `print_config()` erweitert
 - [x] `api/schemas/__init__.py` - `SettingsSnapshot` um neue Felder erweitert, `SettingsUpdate` vollstaendig befuellt
 - [x] `api/routers/runtime.py` - `_settings_snapshot()` um neue Felder erweitert
-- [x] `brain/agents/steering_manager.py` - `MODEL_LAYER_PROFILES` um `gemma-4-26b-a4b`, `gemma-4-12b`, `gemma-4-e4b` erweitert
+- [x] `brain/steering_manager.py` - `MODEL_LAYER_PROFILES` um `gemma-4-26b-a4b`, `gemma-4-12b`, `gemma-4-e4b` erweitert
 
 ### Abgeschlossen (Phase 2-7)
 - [x] `brain/steering_backend.py` - Gemma-kompatibler Modell-Loader, GPU-Schaetzung, Anchor-Skalierung, `_split_thinking_output()`
@@ -36,7 +38,7 @@
 ### Was existiert
 - **Qwen 3.5-4B** laeuft komplett: vLLM-Brain, Steering-Server mit Layer-Steering, Reasoning, Memory, Frontend
 - **Steering-Backend** (`brain/steering_backend.py`) laedt Qwen direkt via `transformers`, berechnet Anchor-Vektoren per Kontrast-Analyse, injiziert via `register_forward_pre_hook` in Hidden States
-- **Steering-Manager** (`brain/agents/steering_manager.py`) hat `MODEL_LAYER_PROFILES` fuer Qwen-Varianten
+- **Steering-Manager** (`brain/steering_manager.py`) hat `MODEL_LAYER_PROFILES` fuer Qwen-Varianten
 - **Steering-API-Server** (`brain/steering_api_server.py`) ist ein FastAPI-Server mit `--model` Parameter
 - **vLLM-Brain** (`brain/vllm_brain.py`) ist ein OpenAI-kompatibler Client mit Reasoning-Logik
 - **Frontend** (`frontend/src/pages/settings-page.tsx`) hat Provider- und Modell-Dropdowns
@@ -490,7 +492,7 @@ def apply_model_defaults_if_unset(model_name: str, settings):
 - Modell-Wechsel triggert `apply_runtime_settings()` im Backend
 - `apply_model_defaults_ifunset()` wird bei Modell-Wechsel aufgerufen
 
-### 2.2 `brain/agents/steering_manager.py` - Layer-Profile
+### 2.2 `brain/steering_manager.py` - Layer-Profile
 
 **Aenderung:** Neue `MODEL_LAYER_PROFILES` fuer Gemma 4 + Umbenennung von `is_local_qwen_model()` in `is_local_vector_steerable_model()`.
 
@@ -1514,7 +1516,7 @@ python chappie_brain_cli.py
 
 ### Phase 1: Config und Profile (1-2h)
 1. `config/config.py` - Gemma 4 Defaults, Erkennungsfunktionen, generische Defaults
-2. `brain/agents/steering_manager.py` - Layer-Profile, `is_local_vector_steerable_model()`
+2. `brain/steering_manager.py` - Layer-Profile, `is_local_vector_steerable_model()`
 
 ### Phase 2: Steering-Backend (3-4h)
 3. `brain/steering_backend.py` - Modell-Laden, GPU-Erkennung, Anchor-Skalierung, `_split_thinking_output()`
@@ -1672,7 +1674,7 @@ vllm serve google/gemma-4-26B-A4B-it \
 | Datei | Aenderung | Aufwand | Status |
 |---|---|---|---|
 | `config/config.py` | Gemma 4 Defaults, Erkennungsfunktionen, generische Defaults, User-Override | Mittel | **ERLEDIGT** |
-| `brain/agents/steering_manager.py` | Layer-Profile, `is_local_vector_steerable_model()` | Mittel | **ERLEDIGT** (Layer-Profile hinzugefuegt) |
+| `brain/steering_manager.py` | Layer-Profile, `is_local_vector_steerable_model()` | Mittel | **ERLEDIGT** (Layer-Profile hinzugefuegt) |
 | `brain/steering_backend.py` | Modell-Laden, GPU-Erkennung, Anchor, `_split_thinking_output()` | Hoch | **ERLEDIGT** |
 | `brain/steering_api_server.py` | Generischer Loader, Auto-Quantisierung, Restart-Endpoints | Hoch | **ERLEDIGT** |
 | `brain/vllm_brain.py` | Reasoning-Logik, generische Generation-Parameter | Klein | **ERLEDIGT** |
@@ -1687,7 +1689,7 @@ vllm serve google/gemma-4-26B-A4B-it \
 | `CHANGELOG.md` | Version 14.0 eintragen | Klein | **ERLEDIGT** |
 | `README.md` | Modell-Unterstuetzung dokumentieren | Klein | **ERLEDIGT** |
 
-**Kritischer Pfad:** `brain/steering_backend.py` -> `brain/agents/steering_manager.py` -> `brain/steering_api_server.py`
+**Kritischer Pfad:** `brain/steering_backend.py` -> `brain/steering_manager.py` -> `brain/steering_api_server.py`
 
 ---
 

@@ -1,52 +1,53 @@
 ---
 name: chappie-backend
-description: Backend development for CHAPPiE. Use when working on FastAPI APIs, vLLM brain, Cerebras integration, training daemon, or backend_wrapper.py.
+description: Backend development for CHAPPiE. Use when working on FastAPI APIs, the modular runtime, vLLM, Groq, Ollama, training, or compatibility factories.
 ---
 
-# CHAPPiE Backend Development
+# CHAPPiE Backend
 
-## Stack
-- **API**: FastAPI (port 8010), CORS wildcard
-- **Brain**: vLLM (local), Cerebras (cloud fallback)
-- **Database**: ChromaDB for episodic memory
-- **Training**: daemon_manager subprocess pattern
+## Entrypoints
 
-## Key Files
+- App API: `python3 app.py`, port 8010
+- Steering API: `python3 -m brain.steering_api_server`, port 8000
+- Training: `python3 -m Chappies_Trainingspartner.training_daemon`
+- Runtime factory: `web_infrastructure.chappie_runtime.create_chappie_backend`
+- Compatibility factory: `web_infrastructure.backend_wrapper.create_chappie_backend`
 
-| File | Role |
+## Runtime modules
+
+| File | Responsibility |
 |---|---|
-| `api/main.py` | App entry, routers, root JSON endpoint |
-| `api/routers/*.py` | chat, system, memory, runtime, training, context |
-| `api/schemas.py` | Pydantic models |
-| `web_infrastructure/backend_wrapper.py` | Main CHAPPiE backend class |
-| `brain/vllm_brain.py` | vLLM OpenAI-compatible client |
-| `brain/base_brain.py` | Abstract base + GenerationConfig |
-| `Chappies_Trainingspartner/daemon_manager.py` | Subprocess daemon control |
+| `chappie_runtime.py` | public facade, construction and lifecycle |
+| `turn_pipeline.py` | shared sync/stream turn order |
+| `turn_context.py` | input normalization and context gates |
+| `contracts.py` | typed internal contracts |
+| `generation.py` | current brain lookup and generation |
+| `formatting.py` | parsing, sanitizing and API message formatting |
+| `persistence.py` | chat, STM and finalization writes |
+| `backend_wrapper.py` | lightweight legacy imports only |
 
-## Generation Pipeline (Two-Step)
-1. **Step 1**: Intent analysis via Cerebras (fast model: `llama-3.1-8b`)
-2. **Step 2**: Response generation via vLLM (Qwen3.5-4B)
-3. Post-processing: Cerebras GPT-OSS-120B formats CoT + Answer
+Routers use public runtime methods. Do not add new private-wrapper coupling.
 
-## Post-Processing (`_format_via_cerebras`)
-- Method in `backend_wrapper.py` (~line 602)
-- Sends raw CHAPPiE output to Cerebras for formatting
-- Returns `<cot>` + `<antwort>` tagged blocks
-- NEVER changes content — only formatting
+## Providers
 
-## Testing Without vLLM
-```python
-import sys
-from unittest.mock import MagicMock
-# Mock all brain dependencies before import
-sys.modules["ollama"] = MagicMock()
-sys.modules["cerebras"] = MagicMock()
-sys.modules["chromadb"] = MagicMock()
-# Then import from brain.vllm_brain directly
+- vLLM is the fixed production web-chat route.
+- Ollama and Groq remain supported for factory, CLI, training and research.
+- There is no active Cerebras provider.
+- Preserve provider fallback order unless a separate behavior change is approved.
+- `GenerationGateway` must resolve the current brain lazily after settings reload.
+
+## API and streaming
+
+Preserve request schemas, response fields, status codes, SSE event names, ordering and completion behavior. Sync and stream use the same `TurnContext` and finalization intent.
+
+## Tests
+
+```bash
+python3 tests/test_runtime_architecture.py
+python3 tests/test_api_contract.py
+python3 tests/test_vllm_response_handling.py
+python3 tests/test_ollama_response_handling.py
+python3 tests/test_training_daemon_lifecycle.py
 ```
 
-## Key Rules
-- `repetition_penalty` muss via `extra_body`, nicht direkt als Keyword
-- `enable_thinking=True` für Qwen3.5 Modelle (in `_prepare_extra_body`)
-- Reasoning-Loop-Detektor: `_detect_reasoning_loop()` in vllm_brain.py
-- Alle Settings über `config.config.settings` → `update_from_ui()` persistiert
+Use `requirements/ci.txt` for deterministic backend tests. Do not require GPU weights in offline CI.

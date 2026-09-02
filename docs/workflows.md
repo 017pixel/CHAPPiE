@@ -1,254 +1,80 @@
 # Workflows
 
-## 1. Anfrage-Workflow zur Laufzeit
+## Chat
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant FE as Frontend oder CLI
-    participant API as App API
-    participant BW as Backend Wrapper
-    participant L as Life Service
-    participant BP as Brain Pipeline
-    participant S as Sensory Cortex
-    participant A as Amygdala
-    participant H as Hippocampus
-    participant M as Memory Engine
-    participant GW as Global Workspace
-    participant P as Prefrontal Cortex
-    participant ST as Steering Manager
-    participant VLLM as vLLM / Cloud API
-    participant OUT as Antwort
+    participant Client as Frontend oder CLI
+    participant API as FastAPI
+    participant Runtime as CHAPPiERuntime
+    participant Pipeline as TurnPipeline
+    participant State as Life, Memory, Workspace
+    participant Model as vLLM und Steering
 
-    U->>FE: Nachricht oder Command
-    FE->>API: HTTP oder SSE
-    API->>BW: process(...)
-    BW->>L: prepare_turn(...)
-    L-->>BP: Life-Kontext
-    BP->>S: Input klassifizieren
-    S-->>BP: Input-Typ, Dringlichkeit
-    BP->>A: Emotionsanalyse
-    BP->>H: Memory-Operationen
-    A-->>M: Query + emotional_boost
-    H-->>M: Query + context_relevance
-    M-->>GW: Relevante Memories
-    A-->>GW: Emotion-Signale
-    H-->>GW: Encoding-Entscheidung
-    L-->>GW: Homeostasis
-    GW-->>P: Priorisierte Signale
-    P-->>BP: Strategie, Tone, Guidance
-    BP->>ST: Emotion-Steering berechnen
-    ST->>VLLM: Payload + Layer-Vektoren
-    VLLM-->>OUT: Generierte Antwort
-    OUT-->>BW: Antwort + Debug-Daten
-    BW->>L: finalize_turn(...)
-    L-->>BW: Finaler Life-State
-    BW-->>API: Antwortobjekt
-    API-->>FE: JSON oder Stream
-    FE-->>U: Angezeigte Antwort
+    Client->>API: Nachricht als JSON oder SSE-Anfrage
+    API->>Runtime: process oder process_stream
+    Runtime->>Pipeline: typisierter TurnContext
+    Pipeline->>State: vorbereiten und Kontext laden
+    Pipeline->>Model: GenerationGateway
+    Model-->>Pipeline: Antwort oder Chunks
+    Pipeline->>State: finalisieren und persistieren
+    Pipeline-->>Runtime: ResponseEnvelope oder StreamEvents
+    Runtime-->>API: bestehender externer Vertrag
+    API-->>Client: JSON oder SSE
 ```
 
-## 2. Was technisch passiert
+Die feste fachliche Reihenfolge lautet:
 
-1. Frontend oder CLI nimmt Eingabe entgegen.
-2. Die App-API routet nach Chat, Runtime, Memory, Context oder Training.
-3. `web_infrastructure/backend_wrapper.py` kapselt die Fachlogik.
-4. `life/service.py` berechnet `prepare_turn`: Uhrzeit, Temporal State, Pausenlaenge, Baseline-Decay, Aktivitaet, Homeostasis und laufende Episode.
-5. `brain/brain_pipeline.py` orchestriert:
-   - Sensory Cortex: Input-Klassifikation (Typ, Dringlichkeit, Memory-Bedarf)
-   - Amygdala: Emotionsanalyse (10 Emotionen, Intensity, memory_boost, steering_hints)
-   - Hippocampus: Memory-Operationen (Encoding, Query-Extraktion, Context-Relevanz)
-   - Memory Engine: Episodische Suche mit optimierter Query
-   - Global Workspace: Emotion-, Memory- und Life-Signale mit Salience bundeln und priorisieren
-   - Prefrontal Cortex: Response-Strategie, Tone, Guidance, Planning-Mode
-   - Action Response Layer: prompt_suffix und action_plan bauen
-   - Steering Manager: VAD-Mapping, Alpha, Composite Modes, Layer-Profile
-6. Antwortgenerierung: 1x LLM-Call mit komplettem Kontext (Prompt + Steering-Payload)
-    - Casual Chat laedt fuer die finale Antwort 20 Memories; komplexere Intents nutzen den globalen Memory-Top-K-Wert.
-    - Der finale Prompt kombiniert semantische Prozent-Memories mit lokalem Keyword-RAG fuer konkrete Fakten, Namen, Orte, IDs und fruehere Aussagen.
-    - Lokale vLLM-Antworten starten mit einer kurzen Antwortvorgabe und nutzen keine langen CoT-Promptbloecke.
-   - Neue Emotionssignale (`affection`, `anxiety`, `calm`) faerben Ton und Steering konservativ, ohne die Antwortlaenge zu erhoehen.
-7. `life/service.py` berechnet `finalize_turn`: Goal-Progress, Relationship, Habits, Attachment, Self-Model, Timeline und finale Assistant-Zeitmarke.
-8. Antwort, Debugdaten und Session-Zustand gehen an API und Frontend zurueck.
+1. Eingabe, Session und Zeitkontext normalisieren.
+2. Life-Turn vorbereiten.
+3. Intent, Toolentscheidungen und Emotionsdelta ermitteln.
+4. STM, LTM, Keyword-RAG und Workspace-Kontext aufbauen.
+5. Prompt und Steering-Kontext erzeugen.
+6. über den aktuellen vLLM-Brain generieren.
+7. Antwort parsen, sanitizen und formatieren.
+8. Life, Chat und Memory finalisieren.
 
-### Chain of Thought / Reasoning
+Sync und Stream teilen Vorbereitung und Abschluss. Streaming wandelt Chunks in die bestehende Eventfolge um und persistiert auch bei erfolgreichem Streamabschluss.
 
-CHAPPiE unterstuetzt Reasoning/Chain-of-Thought auf zwei Ebenen, gesteuert durch
-`settings.chain_of_thought` (Standard: `true`):
+## Provider
 
-**vLLM (Qwen3.5, lokal)**: `enable_thinking` im Chat-Template steuert, ob das Modell `reasoning_content` produziert. Das Reasoning wird als `<think>...</think>` in der Stream-Ausgabe mitgeliefert.
+Der Web-Chat löst `CHAT_PROVIDER` bewusst als vLLM auf und verwendet bei Runtime-Reload immer das aktuelle konfigurierte vLLM-Modell. Der gespeicherte Schalter `enable_two_step_processing` bleibt abwärtskompatibel, erzeugt aber keine zweite alte Pipeline.
 
-**Ollama (lokal)**: `think`-Parameter steuert natives Reasoning bei Qwen3/DeepSeek-Modellen.
+Ollama und Groq werden durch Brain-Factory, CLI, Training und Forschung weiterhin unterstützt. Die Fallback-Reihenfolge wurde durch das Cleanup nicht geändert.
 
-**Groq (Cloud)**: GPT-OSS besitzt providerseitiges Reasoning. Groq erlaubt dafuer nur `low`, `medium` oder `high`, kein vollstaendiges Abschalten. Bei deaktiviertem CHAPPiE-Thinking setzt `GroqBrain` deshalb die kleinstmoegliche Stufe `low`, schliesst die Reasoning-Ausgabe mit dem fuer GPT-OSS unterstuetzten `include_reasoning=false` aus und reserviert 1.024 gemeinsame Completion-Tokens fuer internes Reasoning plus sichtbare Antwort. `reasoning_format` wird fuer GPT-OSS laut Groq nicht unterstuetzt. Bei aktiviertem Thinking wird `medium` verwendet; zusaetzlich kann `CHAIN_OF_THOUGHT_INSTRUCTION` aus `config/prompts.py` die sichtbare Antwortstruktur anfordern. Andere Groq-Modelle behalten ihren normalen `max_tokens`-Pfad.
+## Memory und Sleep
 
-Der Toggle ist an drei Stellen verfuegbar:
+Memory-Suche verbindet semantische Chroma-Treffer mit einer lokalen Keyword-/Entity-Suche. Der finale Prompt begrenzt beide Quellen durch bestehende Top-K- und Tokenregeln.
 
-| Ort | Steuerung |
-|-----|-----------|
-| **CLI** | `/thinking true` / `/thinking false` / `/thinking` (Status) |
-| **Frontend** | "Thinking"-Toggle-Button im Chat-Header (speichert ueber `POST /settings`) |
-| **Alignment-Tests** | "Reasoning/Thinking aktivieren? [J/n]" bei der Konfiguration eines neuen Test-Durchlaufs |
+Sleep wird zeit-, interaktions- oder commandbasiert ausgelöst. `memory/sleep_phase.py` übernimmt Replay und Konsolidierung. Das Cleanup ändert weder Speicherformat noch Vergessenskurve.
 
-Der Alignment-Test-Harness nutzt fuer die Antwortnachbearbeitung bewusst den lokalen Whitespace-/Tag-Fallback statt eines separaten Groq-Formatierungsrequests. Groq bleibt fuer Intent-Analyse und Query-Extraction konfigurierbar, aber Rate-Limits sollen nicht durch reine Formatierung verbraucht werden.
+## Training
 
-Kurzzeitige Groq-429-Antworten werden bis zu viermal mit der vom Provider genannten Wartezeit wiederholt. Ein Stream wird nur vor dem ersten sichtbaren Token erneut gestartet, damit keine doppelten Teilantworten entstehen. Runtime-Reload-Logs zeigen nur Provider und Modell; API-Keys sind nie Teil der Logausgabe.
-
-Research-Runs validieren Setup- und Hauptantworten vor der Uebernahme in die Kategorie-History. Antworten mit kaputtem Whitespace, zu kurzen Symbolausgaben, Kontextbudget-Verletzungen, Backend-Fehlerstrings, Memory-Kontamination oder CoT-Leaks gelten nicht als `valid_completed` und werden nicht als Folgekontext gespeichert. Bestehende Logs koennen mit `forschung/analyze_session_quality.py` nachtraeglich bewertet werden.
-
-Relevante Dateien:
-- `config/config.py` → `settings.chain_of_thought`
-- `config/prompts.py` → `CHAIN_OF_THOUGHT_INSTRUCTION`
-- `brain/vllm_brain.py` → `_prepare_extra_body()` (enable_thinking)
-- `brain/ollama_brain.py` → `_build_chat_kwargs()` (think)
-- `brain/groq_brain.py` → GPT-OSS-Reasoningbudget und begrenzter 429-Retry
-- `chappie_brain_cli.py` → `/thinking` Command
-- `frontend/src/pages/chat-page.tsx` → Thinking-Toggle
-
-## 3. Schlafphase und Konsolidierung
-
-```mermaid
-flowchart LR
-    I["Interaktionen"] --> STM["Kurzzeit- und aktive Signale"]
-    STM --> SLEEP["Sleep Trigger\n- zeitbasiert\n- interaktionsbasiert\n- manuell /sleep"]
-    SLEEP --> REPLAY["Replay und Verdichtung\n- Needs erholen\n- Habits verstaerken\n- Traum-Fragmente"]
-    REPLAY --> DECAY["Vergessenskurve"]
-    DECAY --> LTM["Langzeitgedaechtnis"]
-    REPLAY --> CTX["Kontextdateien\n- soul.md\n- user.md\n- preferences"]
-    REPLAY --> SELF["Self-Model\nautobiografische Reflexion"]
+```text
+config/training_config.json
+        -> python3 -m Chappies_Trainingspartner.training_daemon
+        -> training_loop.py
+        -> data/training_runtime/
 ```
 
-Trigger:
+`training_daemon.py` ist der systemd-Entrypoint; `training_loop.py` ist nur die Schleife. API und Frontend steuern den Daemon über `daemon_manager.py`. Eine alte Root-Datei `training_config.json` bleibt lesbar, neue Writes verwenden `config/training_config.json`.
 
-- zeitbasiert
-- interaktionsbasiert
-- manuell ueber `/sleep`
+Training lädt Providerklassen lazy. Damit können Status-, Config- und Lifecycle-Tests ohne GPU-Stack laufen.
 
-Relevante Dateien:
+## Forschung
 
-- `memory/sleep_phase.py`
-- `memory/forgetting_curve.py`
-- `config/brain_config.py`
+Der Research-Harness darf die Runtime mit isoliertem `runtime_data_dir`, eigener Collection und Feature-Flags erzeugen. Evidence-Dateien bleiben unter `forschung/`; eingefrorene Sessions werden nicht als produktive Laufzeitdaten behandelt.
 
-## 4. Trainings-Workflow
+Run-2-Antwortzeiten und Qualitätsmetriken wurden vor der Runtime-Modularisierung erhoben. Strukturtests nach der Migration sind davon getrennt und keine neuen Performance-Benchmarks.
 
-```mermaid
-flowchart TD
-    CFG["training_config.json"] --> TD["training_daemon.py"]
-    TD --> LOOP["training_loop.py"]
-    LOOP --> CH["CHAPPiE"]
-    LOOP --> STATE["training_state.json"]
-    LOOP --> SLP["regelmaessige Sleep-Phasen"]
-```
+## Entrypoints
 
-Wichtige Punkte:
-
-- `training_daemon.py` ist der Service-Entry-Point
-- `training_loop.py` ist kein systemd-Entry-Point
-- API und Frontend steuern Training ueber `Chappies_Trainingspartner/daemon_manager.py`
-
-## 5. Web-Workflow
-
-Der produktive Webpfad ist jetzt:
-
-1. React-Frontend in [`frontend/`](../frontend)
-2. FastAPI in [`api/`](../api)
-3. Fachlogik in [`web_infrastructure/backend_wrapper.py`](../web_infrastructure/backend_wrapper.py)
-4. Session-Persistenz in [`memory/chat_manager.py`](../memory/chat_manager.py)
-
-Wichtig:
-
-- Frontend spricht nur mit der App-API
-- die API spricht nie direkt mit einem UI-spezifischen State
-- Streaming laeuft ueber `POST /chat/stream` mit echten Token-Events
-- Slash-Commands werden serverseitig ueber `api/services/command_service.py` behandelt
-
-### Chat-Streaming
-
-Der Chat unterstuetzt jetzt Token-Level Streaming:
-
-1. User sendet Nachricht -> Eingabefeld wird sofort geleert, Nachricht erscheint sofort im Chat (Optimistic UI)
-2. Waehrend CHAPPiE denkt, zeigt eine pulsierende "Denk-Bubble" rotierende Status-Saetze an
-3. Sobald das erste Token generiert wird, erscheint die Antwort live Wort fuer Wort in der UI
-4. Neue Nachrichten koennen waehrend des Streamings eingegeben werden und landen in einer Queue
-5. Nach Abschluss einer Antwort wird automatisch die naechste Nachricht aus der Queue abgeschickt
-
-Relevante Dateien:
-
-- `frontend/src/pages/chat-page.tsx` – Chat UI mit Queue, Thinking-Animation, Token-Streaming
-- `frontend/src/services/api.ts` – SSE Streaming Client
-- `api/routers/chat.py` – `/chat/stream` Endpoint mit Token-Events
-- `web_infrastructure/backend_wrapper.py` – `process_stream()` fuer Token-Level Generierung
-
-## 6. Debug, Memory und Runtime
-
-Der Debug-Pfad zeigt die Kette hinter einer Antwort:
-
-- Input und Intent
-- Memory-Treffer und Merge
-- Keyword-RAG-Faktenblock fuer exakte Treffer
-- Emotionen und Deltas
-- Life- und Forecast-Signale
-- finale Ton- und Antwortentscheidung
-
-Wichtige Pfade:
-
-- `api/routers/system.py`
-- `api/routers/chat.py`
-- `api/services/text_formatting.py`
-- `web_infrastructure/backend_wrapper.py`
-
-## 7. Wichtige Commands
-
-| Command | Bedeutung |
+| Zweck | Kommando |
 |---|---|
-| `/sleep` | startet die Schlaf- und Konsolidierungsphase |
-| `/think [thema]` | startet einen Reflexionszyklus |
-| `/deep think` | startet rekursive Selbstreflexion |
-| `/help` | Command-Hilfe |
-| `/stats` | Modell-, Memory- und Emotionsstatus |
-| `/config` | Runtime-Settings anzeigen |
-| `/clear` | startet einen frischen Chat |
-| `/life` | kompakter Life-State |
-| `/world` | Weltmodell |
-| `/habits` | Gewohnheiten |
-| `/stage` | Entwicklungsstufe |
-| `/plan` | Planung |
-| `/forecast` | Prognosen und Risiken |
-| `/arc` | Social Arc |
-| `/timeline` | autobiografische Verlaufseintraege |
-
-Zeitgefuehl:
-
-- Chat-Nachrichten erhalten UTC-Timestamps.
-- `life.temporal_state` klassifiziert Pausen als `immediate`, `short_pause`, `break`, `long_gap` oder `new_day`.
-- `interaction_rhythm` unterscheidet aktive Dialoge, Rueckkehr nach Pausen und Reorientierung nach mehrtaegiger Stille.
-- `episode_state` fasst zusammenhaengende Arbeitsphasen mit Thema, Dauer und Turn-Anzahl zusammen.
-
-## 8. Frontend-Seiten
-
-Das Frontend bildet die frueheren Ansichten jetzt ueber eigene Seiten ab:
-
-| Seite | Beschreibung |
-|---|---|
-| **Chat** | Chat-Interface mit Token-Level Streaming, Message Queue, Thinking-Animation und Optimistic UI |
-| **Context** | Kontextdateien und System-Kontext |
-| **Memories** | Episodisches Gedaechtnis durchsuchen |
-| **Life** | Life-Simulation Status, Needs, Goals |
-| **Growth** | Entwicklung und Lernfortschritt |
-| **Settings** | Runtime-Konfiguration |
-| **Training** | Trainings-Status und Steuerung |
-| **Debug** | Debug-Logs und Causal Trace |
-
-Relevante Pfade:
-
-- `frontend/src/router.tsx`
-- `frontend/src/pages/*.tsx`
-- `frontend/src/services/api.ts`
-- `frontend/src/components/app-shell.tsx`
-
-## Weiterfuehrend
-
-- [Architektur](architecture.md)
-- [Testing](testing.md)
-- [Deployment](deployment.md)
+| API | `python3 app.py` |
+| lokaler Steering-Service | `python3 -m brain.steering_api_server` |
+| lokale CLI | `python3 chappie_brain_cli.py` |
+| Remote-CLI | `python3 chappie_brain_cli.py --remote` |
+| Training | `python3 -m Chappies_Trainingspartner.training_daemon` |
+| Frontend Dev | `cd frontend && npm run dev` |
+| Frontend Build | `cd frontend && npm run build` |

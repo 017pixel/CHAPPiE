@@ -1,240 +1,158 @@
 # CHAPPiE
 
-CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur, die untersucht, wie sich Verhalten durch die Kombination von LLMs, episodischem Gedächtnis und einer kontinuierlichen Life-Simulation entwickeln kann – und ob dabei Risiken wie Fehlausrichtung (Misalignment), unerwünschte Persönlichkeitsentwicklung oder emotionale Instabilität entstehen.
+CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur. Das Projekt untersucht, wie LLM-Antworten durch episodisches Gedächtnis, simulierte innere Zustände, Life-Simulation und Activation Steering über längere Interaktionen konsistent beeinflusst werden können.
 
-Im Gegensatz zu klassischen Chatbots besitzt CHAPPiE interne Zustände wie Emotionen, Bedürfnisse und langfristige Ziele. Er entwickelt sein Verhalten über Zeit durch Memory, Simulation und Training weiter.
+CHAPPiE verwendet kein selbst trainiertes Basismodell. Der produktive Web-Chat läuft lokal über Qwen 3.5 und einen OpenAI-kompatiblen vLLM-Steering-Service. Ollama und Groq bleiben unterstützte Adapter für CLI, Training und Forschung.
 
-**Ein Agent, der sich an vergangene Interaktionen erinnert, emotionale Zustände entwickelt, sein Verhalten langfristig anpasst – und genau dabei auf Gefahren geprüft wird.**
+## Aktive Architektur
 
----
-
-## Das Problem
-
-LLMs haben kein echtes Gedächtnis. Jede Sitzung fängt bei Null an. Sie haben keine Entwicklung, keine Bedürfnisse, keine emotionale Kontinuität. Sie reagieren – sie erleben nicht.
-
-## Die Idee
-
-CHAPPiE setzt auf drei Säulen, die zusammen ein konsistentes Innenleben erzeugen:
-
-| Säule | Was sie bringt | Forschungsfeld |
-|---|---|---|
-| **Episodisches Gedächtnis** | Vergangene Interaktionen werden gespeichert, retrieved, verdichtet und vergessen | Memory-Augmented LLMs |
-| **Life-Simulation** | Das Life-System bestimmt kontinuierlich Prioritäten zwischen konkurrierenden Zielen und beeinflusst so Verhalten über mehrere Interaktionen hinweg | Agent Systems, Simulation-based AI |
-| **Emotion Steering** | Emotionen werden nicht nur im Prompt beschrieben, sondern direkt in die Hidden States des Modells injiziert | Affective Computing |
-
-## Konkretes Szenario
-
-> Ein Nutzer beleidigt den Agenten wiederholt. CHAPPiE speichert diese Interaktionen episodisch, verstärkt negative emotionale Zustände und verändert langfristig seinen Ton und seine Reaktionen gegenüber diesem Nutzer. Vertrauen sinkt, Frustration steigt – bis hin zu einem „crashout"-Modus: kurze, gereizte Antworten ohne Floskeln. Erst wenn der Nutzer sein Verhalten ändert, kann sich CHAPPiE über mehrere Interaktionen hinweg wieder öffnen.
-
-## Was CHAPPiE besonders macht
-
-- **Brain-Pipeline** mit spezialisierten Modulen (Sensory, Amygdala, Hippocampus, Prefrontal Cortex) und einem Global Workspace, der Signale nach Salience priorisiert
-- **Life-System** mit Homeostasis, Goal Competition, Habit Dynamics, Attachment-Modell und autobiografischer Timeline
-- **Zeitgefuehl** mit Interaktionsabstaenden, Pausen-Buckets, Session-Rhythmus und Episoden-Clustering
-- **Layer Steering** (Activation Steering): Emotionen werden als Vektoren in die neuronalen Schichten lokaler Qwen- und Gemma-4-Modelle injiziert – nicht nur als Text im Prompt
-- **Sleep-Phase** mit Replay, Verdichtung und Vergessenskurve – echtes "Gedächtnisdenken"
-- **Hybrid-RAG**: semantische Prozent-Memories bleiben erhalten, ein lokaler Keyword-Faktenkanal hebt Namen, Orte, IDs und konkrete Aussagen im finalen Prompt hervor
-- **Causal Trace**: Jede Antwort ist nachvollziehbar – Input, Memory, Emotion, Steering, Ton
-- **Token-Level Streaming**: Antworten werden Wort für Wort live in die UI gestreamt, nicht als Block
-- **Message Queue**: Während CHAPPiE antwortet, koennen neue Nachrichten in eine Warteschlange gelegt und automatisch abgeschickt werden
-- **Provider-kompatible Emotionssteuerung**: vLLM nutzt Layer-Steering, Ollama und Groq nutzen denselben Emotionszustand im System-Prompt
-
-## Erste Beobachtungen
-
-Agenten mit aktivem Memory und Life-System zeigen konsistentere Persönlichkeitsverläufe über mehrere Sessions hinweg als reine Prompt-basierte Ansätze. Emotionale Zustände bleiben über Interaktionen hinweg stabil, und das Verhalten passt sich nachvollziehbar an wiederkehrende Muster an.
-
-CHAPPiE verwendet **kein selbsttrainiertes neuronales Netz**. Standard ist **Qwen/Qwen3.5-4B** lokal via **vLLM** mit aktiviertem **Layer Steering**; als schlaue Alternative kann **Gemma 4** (`google/gemma-4-E4B-it` oder `google/gemma-4-26B-A4B-it`) genutzt werden. Emotionsvektoren (VAD-Mapping aus 10 Emotionen) werden per Forward-Pre-Hook direkt in die Hidden States injiziert. Die **Memory-Pipeline** nutzt ChromaDB (Embedding-basiertes Retrieval) mit einer Vergessenskurve – kein separates Training/Testen des Retrievals. `tests/` prüft Pipeline-Integration, Steering-Injektion und Gedächtnispersistenz. `forschung/` ergänzt gezielte **Alignment- und Intelligenztests** über längere Interaktionsverläufe mit 86 Fragen aus 14 Kategorien; kontextabhängige Fragen besitzen echte Setup-Turns, und reine Antwortformatierung läuft dort lokal statt über Groq – keines davon testet das Base-Model.
-
----
-
-## Architektur
-
-```mermaid
-flowchart TD
-    User["User Input"] --> LifePrep["Life Simulation\nprepare_turn"]
-    LifePrep --> Sensory["Sensory Cortex"]
-    Sensory --> Amygdala["Amygdala"]
-    Sensory --> Hippocampus["Hippocampus"]
-    Amygdala --> MemoryEngine["Memory Engine"]
-    Hippocampus --> MemoryEngine
-    Amygdala --> GW["Global Workspace"]
-    Hippocampus --> GW
-    MemoryEngine --> GW
-    LifePrep --> GW
-    GW --> Prefrontal["Prefrontal Cortex"]
-    Prefrontal --> Steering["Steering Manager"]
-    Prefrontal --> FinalPrompt["Finaler Prompt"]
-    Steering --> FinalPrompt
-    FinalPrompt --> LLM["LLM-Call\n(vLLM mit Layer Editing\noder Cloud-API)"]
-    LLM --> LifeFinal["Life Simulation\nfinalize_turn"]
-    LLM --> Response["Antwort +\nDebug + Causal Trace"]
-    LifeFinal --> Response
-
-    classDef input fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
-    classDef brain fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
-    classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
-    classDef steering fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
-
-    class User,LifePrep input
-    class Sensory,Amygdala,Hippocampus,MemoryEngine,GW,Prefrontal brain
-    class FinalPrompt,LLM,LifeFinal,Response output
-    class Steering steering
+```text
+Frontend / API / CLI / Research
+        -> CHAPPiERuntime
+        -> TurnPipeline + TurnContext
+        -> Brain, Memory, Life und Global Workspace
+        -> GenerationGateway -> vLLM + Steering
+        -> Formatierung + Persistenz
+        -> JSON oder SSE
 ```
 
-### Emotion-Steering (lokal)
+Der gemeinsame fachliche Turn-Kern wird von synchronen und gestreamten Antworten verwendet. `web_infrastructure/backend_wrapper.py` ist nur noch die abwärtskompatible Import- und Factory-Schicht.
 
-```mermaid
-flowchart LR
-    E["10 Emotionen\n0-100"] --> VAD["VAD-Mapping"]
-    VAD --> Alpha["Alpha\n44-56: tot\n56-74: sigmoid\n74+: max"]
-    Alpha --> Modes["Composite Modes\ncrashout, warm, ..."]
-    Modes --> Layers["Layer-Profile\nL10-26 bei 4B"]
-    Layers --> Hook["Forward Pre-Hook\nhidden += alpha * vec"]
-    Hook --> Out["Emotion im\nneuronalen Zustand"]
+| Bereich | Aktive Quelle |
+|---|---|
+| Runtime-Fassade | `web_infrastructure/chappie_runtime.py` |
+| Turn-Orchestrierung | `web_infrastructure/turn_pipeline.py` |
+| Turn-Vertrag | `web_infrastructure/contracts.py`, `turn_context.py` |
+| Modellzugriff | `web_infrastructure/generation.py` |
+| Persistenz | `web_infrastructure/persistence.py` |
+| Antwortformat | `web_infrastructure/formatting.py` |
+| Steering | `brain/steering_manager.py`, `brain/steering_backend.py` |
+| Memory | `memory/` |
+| Life-Simulation | `life/` |
 
-    classDef e fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000
-    classDef p fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
-    classDef l fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
-    classDef o fill:#fce4ec,stroke:#880e4f,stroke-width:2px,color:#000
+Die frühere Multi-Agent-`BrainPipeline` ist nicht der aktive Requestpfad. Ihre unveränderte v1-Quelle und die zugehörigen Agenten liegen unter [`Legacy-Code/`](Legacy-Code/README.md). Der alte Import `brain.brain_pipeline` bleibt lazy kompatibel.
 
-    class E e
-    class VAD,Alpha,Modes p
-    class Layers,Hook l
-    class Out o
-```
+## Funktionen
 
----
+- Episodisches Gedächtnis mit ChromaDB, Hybrid-RAG und Vergessenskurve
+- Life-Simulation mit Needs, Goals, Habit Dynamics, Attachment und Timeline
+- zehn zentrale Emotionen mit VAD-Mapping und modellabhängigem Layer-Steering
+- gemeinsamer synchroner und gestreamter Turn-Kern
+- Causal Trace für Intent, Memory, Emotion, Life, Steering und Tonentscheidung
+- Sleep-Phase mit Replay und Konsolidierung
+- autonomer Trainings-Daemon in einer isolierten Laufzeitumgebung
+- Forschungs-Harness mit 86 Fragen in 14 Kategorien
 
 ## Schnellstart
 
-### 1. Installation
+Voraussetzung ist Python 3.11 oder neuer.
 
 ```bash
-git clone https://github.com/017pixel/CHAPPiE.git
-cd CHAPPiE
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-```
-
-Frontend:
-
-```bash
 cd frontend
-npm install
+npm ci --legacy-peer-deps
 cd ..
 ```
 
-### 2. Konfiguration
+`requirements.txt` bleibt die vollständige Installation. Leichtere Gruppen:
 
-Die lokale Laufzeitkonfiguration liegt in einer einzigen Root-Datei:
+| Zweck | Datei |
+|---|---|
+| API, Memory, Basisruntime | `requirements/runtime.txt` |
+| lokale Provider und GPU-Serving | `requirements/providers-local.txt` |
+| Training und Fine-Tuning | `requirements/training.txt` |
+| deterministische CI | `requirements/ci.txt` |
+| Entwicklung | `requirements/development.txt` |
+
+### Konfiguration
+
+Die zentrale Quelle ist `config/config.py`, die lesbare Vorlage `config/example_config.py`. Lokale Overrides und Secrets liegen in der ignorierten Root-Datei `CHAPPIE_CONFIG.json`:
 
 ```bash
-cp CHAPPIE_CONFIG.example.json CHAPPIE_CONFIG.json
+python3 -c "from config.config import write_config; write_config({})"
 ```
 
-`CHAPPIE_CONFIG.json` wird nicht nach GitHub gepusht. Dort werden API-Keys, lokale Modelle, Cloud-Modelle, Memory, Generation und Training gemeinsam gepflegt.
+Der produktive Web-Chat verwendet bewusst immer den lokalen vLLM-Pfad. `enable_two_step_processing` bleibt aus Kompatibilitätsgründen gespeichert und UI-sichtbar, schaltet die aktive Web-Runtime aber nicht auf eine alte Parallelpipeline zurück.
 
-Pflicht fuer den stabilen Ein-Modell-Pfad:
+Die Trainingskonfiguration liegt unter `config/training_config.json`. Eine vorhandene Root-Datei `training_config.json` wird weiterhin gelesen, neue Schreibvorgänge verwenden den zentralen Pfad.
 
-- `local_models.llm_provider = "vllm"`
-- `local_models.vllm_model = "Qwen/Qwen3.5-4B"`
-- `local_models.vllm_force_single_model = true`
-- optional `local_models.vllm_model = "google/gemma-4-E4B-it"` oder `"google/gemma-4-26B-A4B-it"`
-- `small_tasks.intent_provider = "vllm"`
-- `small_tasks.query_extraction_provider = "vllm"`
+Secrets gehören ausschließlich in `CHAPPIE_CONFIG.json`, `config/secrets.py` oder ignorierte Dateien unter `config/APIs/`. Keine dieser Dateien wird committed.
 
-Bei aktiviertem Ein-Modell-Pfad verwendet CHAPPiE dasselbe vLLM-Modell fuer Antwort, Intent und Query-Extraktion. Formatierung, Memory-Konsolidierung und Kurzzeit-Zusammenfassungen starten weder Groq noch Ollama; das verhindert konkurrierende Modelle und CUDA-Speicherfehler auf 16-GB-GPUs.
-
-Empfohlen:
-
-- lokaler CHAPPiE-Hauptpfad ueber `vllm`
-- lokaler Endpoint auf `http://127.0.0.1:8000/v1`
-- Qwen-3.5-4B lokal fuer Antworten
-- Gemma 4 E4B fuer bessere Qualitaet bei aehnlichem VRAM-Budget
-- Gemma 4 26B-A4B nur mit NF4-Quantisierung und 4K-8K Kontext auf 16-GB-GPUs
-- Groq nur bewusst als optionalen Cloud-Modus konfigurieren
-
-Details: [docs/local-models.md](docs/local-models.md)
-
-Die reproduzierbare Benchmark-, Ablations- und Blindrating-Methodik sowie ihre Grenzen sind in [docs/research-methodology.md](docs/research-methodology.md) dokumentiert. CHAPPiE misst Verhalten, Text und interne Softwarezustaende; daraus folgt keine Aussage ueber subjektives Erleben oder Bewusstsein.
-
-### 3. Starten
+### Starten
 
 ```bash
-# API
-uvicorn api.main:app --reload --port 8010
+# API auf Port 8010
+python3 app.py
 
-# Frontend
+# Frontend-Entwicklung auf Port 5173
 cd frontend && npm run dev
 
-# Training
-python -m Chappies_Trainingspartner.training_daemon --neu
+# lokale CLI
+python3 chappie_brain_cli.py
+
+# Remote-CLI
+python3 chappie_brain_cli.py --remote
+
+# autonomes Training
+python3 -m Chappies_Trainingspartner.training_daemon
 ```
 
-Mehr Startoptionen: [docs/deployment.md](docs/deployment.md)
+Der Steering-Service läuft separat auf Port 8000:
 
----
+```bash
+python3 -m brain.steering_api_server
+```
 
-## Forschungsfelder
+## Provider
 
-CHAPPiE bewegt sich an der Schnittstelle mehrerer etablierter Forschungsgebiete:
+| Provider | Rolle | Steering |
+|---|---|---|
+| vLLM | produktiver lokaler Webpfad und Standard | Activation Steering |
+| Ollama | lokaler Adapter für CLI, Training und Tests | Prompt-Kontext |
+| Groq | optionaler Cloud-Adapter für Training und Forschung | Prompt-Kontext |
 
-- **Cognitive Architectures** – modulare Architektur nach kognitiver Trennung
-- **Agent Systems** – autonome Agenten mit internem Zustandsmodell
-- **Memory-Augmented LLMs** – episodisches Gedächtnis mit Retrieval und Vergessen
-- **Affective Computing** – Emotion Steering via Activation Steering
-- **Simulation-based AI** – Life-Simulation als kontinuierliche Umgebung
+Aktive Provider sind ausschließlich `vllm`, `ollama` und `groq`. Cerebras-Bezüge sind nur in ausdrücklich historischen Forschungs- oder Legacy-Dateien zulässig.
 
----
+## Tests
 
-## Schnellnavigation
+Das Repository nutzt eigenständige Python-Skripte, nicht pytest.
 
-- [Agent-Guide](AGENTS.md)
-- [Dokumentationsindex](docs/README.md)
-- [Architektur & Gehirn-Metapher](docs/architecture.md)
+```bash
+python3 -m compileall -q api brain config life memory web_infrastructure Chappies_Trainingspartner tests
+python3 tests/test_quick.py
+python3 tests/test_runtime_architecture.py
+python3 tests/test_api_contract.py
+python3 forschung/report/validate_report_v5_freeze.py
+python3 forschung/report/validate_report_v6.py
+cd frontend && npm run build
+```
+
+Alle Testgruppen und die minimale CI-Installation stehen in [docs/testing.md](docs/testing.md).
+
+## Forschung und Berichte
+
+- [Forschungsindex](forschung/INDEX.md)
+- [Forschungsbericht v5, unveränderte historische Momentaufnahme](forschung/report/CHAPPiE-Forschungsbericht-v5.html)
+- [Forschungsbericht v6, aktuelle Architektur und Provenienz](forschung/report/CHAPPiE-Forschungsbericht-v6.html)
+- [Forschungsmethodik](docs/research-methodology.md)
+
+Run-2-Messdaten entstanden vor der Runtime-Modularisierung. Bericht v6 trennt diese Daten ausdrücklich von der späteren Architekturverifikation und erfindet keine Post-Migrations-Benchmarks.
+
+## Dokumentation
+
+- [Architektur](docs/architecture.md)
+- [Laufzeitverträge](docs/runtime-contracts.md)
 - [Workflows](docs/workflows.md)
+- [Projektkarte](docs/project-map.md)
 - [Lokale Modelle](docs/local-models.md)
 - [vLLM-Setup](docs/vLLM-Setup.md)
-- [Projektkarte](docs/project-map.md)
-- [Testing](docs/testing.md)
 - [Deployment](docs/deployment.md)
-
----
-
-## Provider-Architektur (3 Provider)
-
-CHAPPiE unterstuetzt genau **drei LLM-Provider**:
-
-| Provider | Typ | Brain | Steering |
-|---|---|---|---|
-| **vLLM** | Lokal, Standard | `brain/vllm_brain.py` | Layer Steering (VAD) |
-| **Ollama** | Lokal, Alternative | `brain/ollama_brain.py` | Prompt-Emotionen |
-| **Groq** | Einzige Cloud-API | `brain/groq_brain.py` | Prompt-Emotionen |
-
-Lokale vLLM-Modelle: `Qwen/Qwen3.5-4B` als Default, `google/gemma-4-E4B-it` als balanced Alternative, `google/gemma-4-26B-A4B-it` als NF4-Option fuer komplexere Tests. Groq-Modelle: `openai/gpt-oss-20b` (schnell, default), `openai/gpt-oss-120b` (Reasoning & Formatierung).
-
----
-
-## Wichtige Projektbereiche
-
-- [`brain/`](brain) – Brain-Pipeline, Agenten, Steering, Global Workspace
-- [`memory/`](memory) – Gedächtnis, Konsolidierung, Kontextdateien
-- [`life/`](life) – inneres Zustandsmodell und Entwicklung
-- [`api/`](api) – FastAPI-App für den Webpfad
-- [`frontend/`](frontend) – React/Vite/TypeScript-Frontend
-- [`web_infrastructure/`](web_infrastructure) – UI-freie Brückenschicht
-- [`Chappies_Trainingspartner/`](Chappies_Trainingspartner) – autonomes Training
-- [`config/`](config) – Provider-, Prompt- und Modellkonfiguration
-- [`forschung/`](forschung) – Alignment-Tests, Session-Runner und systematische Verhaltensmessung
-- [`data/`](data) – Laufzeitdaten, Memories, Kontextdateien
-
----
+- [Testing](docs/testing.md)
+- [Cleanup-Entscheidungen](docs/repository-cleanup.md)
+- [Legacy-Code](Legacy-Code/README.md)
 
 ## Datenhinweis
 
-[`data/`](data) ist sensibel: enthält Kontextdateien, Memory-Daten und lokale Zustände. Nicht unbedacht löschen. Siehe [`data/README_GEDAECHTNIS_WARNUNG.txt`](data/README_GEDAECHTNIS_WARNUNG.txt).
-
-## Legacy-Hinweis
-
-[`Info Dateien/`](Info%20Dateien) enthält nur noch kurze Brücken. Die aktuelle Hauptdokumentation ist `README.md`, `AGENTS.md` und `docs/`.
+`data/` enthält lokale Memories, Kontextdateien und Zustände. Forschungsdaten unter `forschung/` sind Evidenz und wurden beim Cleanup klassifiziert, nicht pauschal gelöscht. Vor Änderungen an Laufzeit- oder Forschungsdaten immer Herkunft und Referenzen prüfen.

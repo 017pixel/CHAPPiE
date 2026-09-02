@@ -1,132 +1,76 @@
-# Architektur und Gehirn-Metapher
+# Architektur
 
-## Zielbild
-
-CHAPPiE ist kein neurologisch exaktes Gehirnmodell. Es nutzt eine technische Analogie: Wahrnehmung, Emotion, Gedaechtnis, Planung und Entwicklung werden auf klar getrennte Software-Komponenten abgebildet.
-
-## Systemkarte
+## Aktiver Requestpfad
 
 ```mermaid
 flowchart TD
-    FE["Frontend / CLI / Training"] --> API["App API oder direkter Laufzeitpfad"]
-    API --> PIPE["brain/brain_pipeline.py"]
-    PIPE --> S["Sensory Cortex\nInput-Klassifikation"]
-    PIPE --> L["life/service.py\nprepare_turn"]
-    S --> A["Amygdala\nEmotionsanalyse"]
-    S --> H["Hippocampus\nMemory-Operationen"]
-    A --> M["Memory Engine\nEpisodische Suche"]
-    H --> M
-    A --> GW["Global Workspace\n10 Emotionen + Life-Signale mit Salience"]
-    H --> GW
-    M --> GW
-    L --> GW
-    GW --> P["Prefrontal Cortex\nStrategie und Antwortfuehrung"]
-    P --> OUT["Antwort und Aktionsplan"]
-    P --> BG["Basal Ganglia\nReward und Lernsignal"]
-    P --> N["Neocortex\nLangfristige Konsolidierung"]
-    P --> STEER["Steering Manager\nVAD + Alpha + Layer Editing"]
-    STEER --> VLLM["steering endpoint :8000\n(vLLM mit Layer Editing)"]
-    OUT --> L2["life/service.py\nfinalize_turn"]
+    E[Frontend, API, CLI oder Research] --> R[CHAPPiERuntime]
+    R --> P[TurnPipeline]
+    P --> C[TurnContext]
+    P --> L[Life prepare_turn]
+    P --> I[Intent und Tools]
+    P --> M[STM, LTM und Hybrid-RAG]
+    P --> W[Global Workspace]
+    P --> G[GenerationGateway]
+    G --> V[vLLM Brain]
+    V --> S[Steering Service auf Port 8000]
+    P --> F[Formatierung und Sanitizing]
+    P --> X[Persistenz und Life finalize_turn]
+    F --> O[JSON oder SSE]
+    X --> O
 ```
 
-## Abbildung Gehirnidee zu CHAPPiE-Komponente
+`CHAPPiERuntime` ist die öffentliche Fassade. `process()` und `process_stream()` bauen denselben `TurnContext` und delegieren an dieselbe `TurnPipeline`. Nur die Ausgabeadapter unterscheiden sich.
 
-| Gehirnidee | CHAPPiE-Komponente | Hauptdateien | Aufgabe |
-|---|---|---|---|
-| Sensorischer Cortex | Sensory Cortex Agent | `brain/agents/sensory_cortex.py` | Eingabe klassifizieren |
-| Amygdala | Amygdala Agent | `brain/agents/amygdala.py` | emotionale Gewichtung |
-| Hippocampus | Hippocampus Agent | `brain/agents/hippocampus.py` | Retrieval und Encoding |
-| Praefrontaler Cortex | Prefrontal Cortex Agent | `brain/agents/prefrontal_cortex.py` | Strategie und Antwortfuehrung |
-| Basalganglien | Basal Ganglia Agent | `brain/agents/basal_ganglia.py` | Reward und Lernsignal |
-| Neocortex | Neocortex Agent | `brain/agents/neocortex.py` | langfristige Konsolidierung |
-| Tool- und Meta-Ebene | Memory Agent | `brain/agents/memory_agent.py` | Entscheidungen zu Kontextdateien |
+## Verantwortungen
 
-## Zentrale Integrationsschichten
-
-| Schicht | Datei | Rolle |
+| Modul | Verantwortung | Relevante Seiteneffekte |
 |---|---|---|
-| Brain Pipeline | `brain/brain_pipeline.py` | verbindet Agenten, Memory und Life-Simulation |
-| Global Workspace | `brain/global_workspace.py` | buendelt priorisierte Signale |
-| Action Response Layer | `brain/action_response.py` | leitet konkrete Antwortaktionen ab |
-| lokaler Steering-Endpoint | `brain/steering_api_server.py`, `brain/steering_backend.py` | OpenAI-kompatibles Serving und Steering |
-| Life Simulation | `life/service.py` | Needs, Goals, Forecast und Beziehung |
-| Memory Engine | `memory/memory_engine.py` | episodisches Gedaechtnis und Suche |
-| Sleep Phase | `memory/sleep_phase.py` | Konsolidierung, Replay und Verdichtung |
-| Web-Bruecke | `web_infrastructure/backend_wrapper.py` | UI-freie Laufzeitkopplung fuer API, CLI und Tests |
+| `chappie_runtime.py` | Komponentenaufbau, Lifecycle, öffentliche API | Initialisierung lokaler Runtime-Verzeichnisse |
+| `turn_pipeline.py` | Reihenfolge und gemeinsamer Turn-Kern | koordiniert Life, Memory und Abschluss |
+| `turn_context.py` | reine Kontext- und Gate-Helfer | keine globalen Mutationen |
+| `contracts.py` | typisierte interne Verträge | keine |
+| `generation.py` | aktuelles Brain lazy auflösen und generieren | Provideraufruf |
+| `formatting.py` | Parsing, Sanitizing, UI-Nachrichten | keine Persistenz |
+| `persistence.py` | Chat-, STM- und Abschlusswrites | persistierte Laufzeitdaten |
+| `backend_wrapper.py` | alte Imports und Factory-Namen | keine Fachlogik |
 
-## Life-Simulation
+Die externen JSON- und SSE-Formen bleiben Dict-basierte Verträge am Rand. Interne Typen ändern diese Formen nicht.
 
-Die Life-Simulation erweitert die Gehirn-Metapher um:
+## Brain, Steering, Memory und Life
 
-- Homeostasis und Needs
-- Goal Competition
-- World Model
-- Habit Dynamics
-- Development Stage
-- Attachment und Social Arc
-- Timeline und autobiografische Entwicklung
-- Temporal State mit echter Pausenlaenge zwischen User-Nachrichten
-- Episode State fuer zusammenhaengende Arbeits-/Beziehungsphasen
+Die Runtime orchestriert bestehende Subsysteme und dupliziert deren Fachlogik nicht:
 
-Der Temporal State trennt reale Systemaktualisierung von echter Interaktion: Dashboard-Abfragen koennen den Snapshot aktualisieren, gelten aber nicht als Kontakt. Fuer die Life-Simulation zaehlen `last_user_message_at`, `last_assistant_message_at`, `minutes_since_last_interaction`, `silence_bucket` und `interaction_rhythm`. Lange Pausen starten neue Episoden, kurze schnelle Wechsel verdichten die laufende Episode.
+- `brain/global_workspace.py` priorisiert aktive Signale.
+- `brain/action_response.py` baut Aktions- und Prompt-Kontext.
+- `brain/steering_manager.py` berechnet VAD-, Alpha- und Layer-Steuerung.
+- `brain/steering_backend.py` injiziert Vektoren in unterstützte Modell-Layer.
+- `memory/memory_engine.py` verwaltet episodische Suche und persistierte Memories.
+- `memory/short_term_memory.py` verwaltet atomare STM-Daten.
+- `memory/sleep_phase.py` steuert Replay und Konsolidierung.
+- `life/service.py` stellt `prepare_turn`, `finalize_turn` und Snapshots bereit.
 
-## Memory-Retrieval
-
-CHAPPiE nutzt jetzt Hybrid-RAG fuer den finalen Antwortprompt:
-
-- semantische Vektor-Suche in ChromaDB bleibt erhalten und liefert Prozent-Relevanzen
-- der bestehende Step-1-Intent-Call extrahiert `retrieval_keywords`, `exact_entities` und `fact_lookup_intent`
-- `memory/memory_engine.py` fuehrt daraus eine lokale Keyword-/Entity-Suche in den gespeicherten Roh-Memories aus
-- der finale Systemprompt erhaelt einen kleinen Block `KEYWORD-RAG FAKTEN / EXAKTE TREFFER` vor den semantischen Erinnerungen
-- Keyword-RAG erzeugt keinen zusaetzlichen Groq-Call und ist auf wenige Treffer mit Score-, Dedupe- und Tokenlimits begrenzt
+Persistierte Formate und Life-/Memory-Semantik wurden bei der Modularisierung nicht migriert.
 
 ## Emotion-Steering
 
-Emotionen werden nicht nur als Prompt-Text transportiert, sondern bei lokalen Modellen direkt in die neuronalen Schichten injiziert:
+Zehn Emotionen sind zentral in `config/emotions.py` definiert. Für den Qwen-3.5-4B-Standard verwendet das aktive Profil Layer 10 bis 26. vLLM transportiert Steering-Metadaten im OpenAI-kompatiblen Request; Ollama und Groq verwenden den inneren Zustand als Prompt-Kontext, wenn diese Adapter außerhalb des festen Webpfads eingesetzt werden.
 
-1. **VAD-Mapping**: Jede Emotion wird auf Valence, Arousal, Dominance abgebildet
-2. **Alpha-Berechnung**: Toter Bereich 44-56, sigmoider Anstieg ab 56, Maximum ab 74; niedrige negative Emotionen erzeugen kein starkes Anti-Steering
-3. **Composite Modes**: Kombinationen erzeugen komplexe Modi (crashout, guarded, melancholic, warm, charged, attached_warm, cautious, regulated)
-4. **Layer-Profile**: Modell-spezifische Layer-Bereiche (Qwen3.5-4B: L10-26, Qwen2.5-32B: L20-44)
-5. **Forward Pre-Hook**: Wahrend der Generierung wird `hidden_state += alpha * steering_vector` angewendet
+Die Produktversion, die Steering-Service-Version und die Steering-Payload-Version sind getrennte Verträge und werden nicht pauschal synchronisiert.
 
-Bei Cloud-Providern (Cerebras) entfallt Layer Editing – dort wird eine Style-Instruction in den Systemprompt injiziert.
+## Historische BrainPipeline v1
 
-Relevante Dateien:
+Die frühere `BrainPipeline` mit Sensory Cortex, Amygdala, Hippocampus, Prefrontal Cortex, Basal Ganglia, Neocortex und Memory Agent war ein erster Architekturversuch. Sie ist kein produktiver Requestpfad.
 
-- `brain/agents/steering_manager.py`
-- `brain/steering_backend.py`
-- `brain/steering_api_server.py`
+- Originalquellen: `Legacy-Code/brain-pipeline-v1/`
+- alter Importvertrag: `brain/brain_pipeline.py`
+- historischer Agent-Pfad: `brain/agents/`, lazy und nicht vom Runtime-Import geladen
+- aktiver Nachfolger: Runtime-Fassade und Turn-Pipeline
 
-## Emotionssteuerung
+Der Kompatibilitätspfad lädt die v1-Quelle nur bei einem ausdrücklichen historischen Import. Details stehen in [Legacy-Code](../Legacy-Code/README.md).
 
-CHAPPiEs emotionale Zustaende werden im Debug-Flow, in Settings und in den Antwort-Metadaten sichtbar. vLLM nutzt Activation-Steering ueber `extra_body`, Ollama und Groq bekommen dieselben Werte prompt-basiert ueber den System-Prompt.
+## Konfigurations-Sideeffects
 
-Relevante Dateien:
+`config/config.py` erzeugt beim Import weiterhin `data/`, `data/chroma_db/` und `data/research_runs/`. Das Verhalten bleibt aus Kompatibilitätsgründen bestehen, weil mehrere Entrypoints und Tests die Verzeichnisse voraussetzen. Neue Tests sollen für zustandsbehaftete Komponenten explizite temporäre Runtime-Verzeichnisse übergeben. Eine Entfernung dieses Sideeffects wäre eine eigene Migration.
 
-- `brain/agents/steering_manager.py`
-- `memory/emotions_engine.py`
-- `frontend/src/pages/settings-page.tsx`
-
-## Debug- und Entscheidungsspuren
-
-Der Debug-Pfad macht die Ursache-Wirkung-Kette sichtbar:
-
-- Input und Intent
-- Memory-Treffer
-- Emotionen und Deltas
-- Life-Signale
-- finale Ton- und Antwortentscheidung
-
-Wichtige Pfade:
-
-- `web_infrastructure/backend_wrapper.py`
-- `api/routers/system.py`
-- `memory/memory_engine.py`
-- `memory/sleep_phase.py`
-
-## Weiterfuehrend
-
-- [Workflows](workflows.md)
-- [Lokale Modelle](local-models.md)
-- [Projektkarte](project-map.md)
+Weiterführend: [Laufzeitverträge](runtime-contracts.md), [Workflows](workflows.md), [Cleanup-Entscheidungen](repository-cleanup.md).

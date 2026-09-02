@@ -1,110 +1,68 @@
-# Lokale Modelle zuerst, API als Fallback
+# Lokale Modelle und Provider
 
-## Zielstrategie
+## Produktiver Standard
 
-CHAPPiE soll primaer lokal mit Qwen-3.5-Modellen laufen. APIs sind nur der Fallback, wenn lokal nicht genug Leistung oder kein passendes Setup vorhanden ist.
+Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent und Query-Extraktion auf demselben geladenen Modell.
 
-## Prioritaet
+Alternative lokale Modelle wie Gemma 4 sind möglich, benötigen aber passende VRAM-, Quantisierungs-, Kontext- und Steering-Profile. Ein Modellwechsel ist keine Cleanup-Aufgabe und soll separat verifiziert werden.
 
-1. `vllm` plus Qwen-3.5
-2. Ollama fuer leichtere lokale Setups
-3. Groq als Fallback
+## Providerrollen
 
-## Relevante Konfigurationsdateien
+| Provider | Aktiver Zweck | Konfiguration |
+|---|---|---|
+| vLLM | fester Webpfad, lokales Steering, Standard für kleine Schritte | `local_models` |
+| Ollama | lokale CLI-, Trainings- und Testalternative | `local_models` |
+| Groq | optionaler Cloud-Adapter für Training und Forschung | `api`, `cloud_models`, `small_tasks` |
 
-| Datei | Zweck |
-|---|---|
-| `CHAPPIE_CONFIG.json` | lokale Laufzeitkonfiguration mit API-Keys, Modellwahl, Memory und Generation |
-| `CHAPPIE_CONFIG.example.json` | Vorlage fuer die lokale Konfiguration |
-| `config/config.py` | Loader und Runtime-Objekt fuer die Root-Konfiguration |
-| `config/brain_config.py` | Modellverteilung der Brain-Agenten |
-| `brain/__init__.py` | Provider-Fabrik |
+Es gibt kein aktives Cerebras-Backend. Historische Referenzen können nur in eingefrorenen Reports, Runs oder Legacy-Quellen vorkommen.
 
-## Empfohlene lokale Grundidee
+## Konfigurationsquellen
 
-```python
-local_models.llm_provider = "vllm"
-local_models.vllm_url = "http://127.0.0.1:8000/v1"
-local_models.vllm_model = "Qwen/Qwen3.5-4B"
-local_models.vllm_force_single_model = true
+- Defaults und Pfadzuordnung: `config/config.py`
+- lesbare Vorlage: `config/example_config.py`
+- lokale ignorierte Overrides: `CHAPPIE_CONFIG.json`
+- Secrets: `CHAPPIE_CONFIG.json`, `config/secrets.py`, ignorierte Dateien in `config/APIs/`
 
-small_tasks.intent_provider = "vllm"
-small_tasks.intent_processor_model_vllm = "Qwen/Qwen3.5-4B"
-small_tasks.query_extraction_provider = "vllm"
-small_tasks.query_extraction_vllm_model = "Qwen/Qwen3.5-4B"
+Die Config erzeugen:
+
+```bash
+python3 -c "from config.config import write_config; write_config({})"
 ```
 
-Wichtig:
+Wichtige Werte:
 
-1. `VLLM_URL` muss auf den steering-faehigen lokalen Endpoint zeigen.
-2. `VLLM_MODEL` ist das Hauptmodell fuer Antwortgenerierung.
-3. `VLLM_FORCE_SINGLE_MODEL = True` ist fuer einen einzelnen lokalen Endpoint robust.
-4. Im Ein-Modell-Modus bleiben Intent und Query Extraction auf dem aktiven vLLM-Modell; selbststaendige Sach-, Rechen- und Technikfragen verwenden den lokalen deterministischen Intent-Fast-Path und vermeiden eine zweite Inferenz.
-5. Runtime-Settings werden ueber `CHAPPIE_CONFIG.json`, API und Frontend gepflegt.
-
-Empfohlene Antwortdefaults:
-
-- `generation.max_tokens = 450`
-- `generation.chappie_thinking_token_limit = 650`
-- `generation.chappie_answer_token_limit = 450`
-- `generation.temperature = 0.7`
-- Casual Chat nutzt zur Antwortgenerierung 20 Memories; komplexere Intents nutzen weiter `memory.memory_top_k`.
-
-## Praxis-Hinweise
-
-- `Qwen/Qwen3.5-4B` ist der bevorzugte Default fuer ca. 16 GB VRAM
-- `Qwen/Qwen3.5-9B` ist die naechste Stufe
-- `Qwen/Qwen3.5-27B` braucht deutlich mehr GPU-Reserven
-- der lokale Service hinter `chappie-vllm.service` ist ein steering-faehiger OpenAI-kompatibler Server
-- wenn noetig wird `trust_remote_code=True` verwendet
-- Gemma nutzt alle in `generation_config.json` definierten Turn-End-IDs. Insbesondere beendet `<turn|>` die Antwort, damit kein simulierter Folgeturn oder interner Template-Text entsteht.
-- GPT-OSS auf Groq kann Reasoning nicht vollstaendig deaktivieren. CHAPPiE bildet `thinking=false` deshalb als `reasoning_effort=low` plus `include_reasoning=false` ab; das gemeinsame Providerbudget betraegt dann mindestens 1.024 Completion-Tokens. Diese Cloudbedingung ist nicht tokenidentisch zu einem lokalen 450-Token-Antwortlimit.
-- Der Groq-Client wiederholt kurzfristige 429-Limits maximal viermal. Bereits begonnene Streams werden nicht wiederholt.
-
-## Server-Override fuer Produktivbetrieb
-
-Lokale Defaults bleiben bewusst bei `Qwen/Qwen3.5-4B`, damit Entwicklung und sichere Checks nicht unnoetig schwer werden.
-
-Fuer den Produktivserver kann der Steering-Service separat auf `Qwen/Qwen3.5-9B` gezogen werden:
-
-```ini
-Environment="CHAPPIE_STEERING_MODEL=Qwen/Qwen3.5-9B"
-ExecStart=... -m brain.steering_api_server ... --model Qwen/Qwen3.5-9B
+```json
+{
+  "local_models": {
+    "llm_provider": "vllm",
+    "vllm_url": "http://127.0.0.1:8000/v1",
+    "vllm_model": "Qwen/Qwen3.5-4B",
+    "vllm_force_single_model": true,
+    "enable_steering": true
+  },
+  "small_tasks": {
+    "intent_provider": "vllm",
+    "query_extraction_provider": "vllm"
+  }
+}
 ```
 
-Damit bleiben App-Defaults und Tests lokal schlank, waehrend der Server gezielt das staerkere Modell nutzt.
+## Installation
 
-## Emotionale Steuerung
+```bash
+pip install -r requirements/runtime.txt
+pip install -r requirements/providers-local.txt
+```
 
-Fuer den bevorzugten lokalen Pfad gilt:
+GPU- und Modellgewichte sind bewusst nicht Teil der minimalen CI-Installation. Die vollständige lokale Installation bleibt `pip install -r requirements.txt`.
 
-- Emotionen werden nicht primaer als Prompt-Liste transportiert
-- der wichtigste Pfad ist Steering ueber Payload und lokale Modellschicht
-- die 10 Emotionsdimensionen sind `happiness`, `trust`, `energy`, `curiosity`, `motivation`, `frustration`, `sadness`, `affection`, `anxiety` und `calm`
-- niedrige Traurigkeit, Frustration oder Unruhe erzeugen kein starkes Anti-Steering; `charged` bleibt bewusst gedrosselt und wird durch hohe Ruhe weiter stabilisiert
-- `affection`, `anxiety` und `calm` haben konservative Steering-Caps, damit sie Ton und Prioritaet verbessern, aber Antwortqualitaet und Kuerze nicht dominieren
-- API und Frontend zeigen `emotion_state`, Intensitaeten und Debugdaten strukturiert an
-- dieselben Daten werden auch fuer Training und Debug genutzt
+## Prüfung
 
-## Wann API-Fallback sinnvoll ist
+```bash
+python3 tests/test_provider_factory.py
+python3 tests/test_vllm_response_handling.py
+python3 tests/test_ollama_response_handling.py
+python3 tests/test_local_first_runtime.py
+```
 
-- lokale GPU reicht nicht
-- Modell ist lokal nicht verfuegbar
-- gezielte Cloud-Vergleiche sind noetig
-- kurzfristiger Notbetrieb ohne lokalen Stack
-
-## Doku-Regel
-
-Wenn Provider-Prioritaet oder Modellpfade sich aendern, mindestens pruefen:
-
-- `README.md`
-- `AGENTS.md`
-- `docs/local-models.md`
-- `docs/vLLM-Setup.md`
-- `config/secrets_example.py`
-
-## Weiterfuehrend
-
-- [vLLM-Setup](vLLM-Setup.md)
-- [Architektur](architecture.md)
-- [Projektkarte](project-map.md)
+Live-Erreichbarkeit und Modellgewichte sind separate Integrationstests.

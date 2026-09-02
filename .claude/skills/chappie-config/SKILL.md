@@ -1,63 +1,50 @@
 ---
 name: chappie-config
-description: CHAPPiE's configuration system. Use when adding new settings, modifying config.py, updating schemas, or working with CHAPPIE_CONFIG.json.
+description: CHAPPiE's configuration system. Use when adding settings, changing config.py, updating schemas, or working with CHAPPIE_CONFIG.json and training config.
 ---
 
-# CHAPPiE Configuration System
+# CHAPPiE Configuration
 
-## Configuration Flow
-```
-CHAPPIE_CONFIG.json  →  config/root_config.py  →  config/config.py (Settings class)
-                          ↓                            ↓
-                    config/secrets.py          API: /settings endpoint
-                    config/addSecrets.py       Frontend: settings-page.tsx
-```
+## Sources
 
-## Key Files
-
-| File | Role |
+| Source | Role |
 |---|---|
-| `config/config.py` | Settings class, LLMProvider enum, ALL config defaults |
-| `config/root_config.py` | JSON file I/O for `CHAPPIE_CONFIG.json` |
-| `CHAPPIE_CONFIG.example.json` | Template (not in git) |
-| `config/secrets.py` | API keys (not in git) |
-| `api/schemas.py` | SettingsSnapshot, SettingsUpdate Pydantic models |
-| `api/routers/runtime.py` | `GET/POST /settings`, `_settings_snapshot()` |
+| `config/config.py` | settings, defaults, paths, provider enum and JSON mapping |
+| `config/example_config.py` | readable tracked template |
+| `config/prompts.py` | all active LLM prompt templates |
+| `config/emotions.py` | ten emotion definitions and VAD mapping |
+| `CHAPPIE_CONFIG.json` | ignored local overrides and secrets |
+| `config/training_config.json` | ignored autonomous-training config |
+| `api/schemas/` | external request/response validation |
 
-## Adding a New Setting
-1. Add attribute to Settings class in `config/config.py`
-2. Add `_get_val()` call with default value
-3. Add to `update_from_ui()` for persistence
-4. Add to `_export_root_values()` for JSON export
-5. Add field to `SettingsSnapshot` and `SettingsUpdate` in `api/schemas.py`
-6. Add to `_settings_snapshot()` in `api/routers/runtime.py`
-7. Add to `frontend/src/pages/settings-page.tsx` `SETTINGS_DEFS` array
+There is no active `config/root_config.py`, `config/brain_config.py` or `CHAPPIE_CONFIG.example.json`.
 
-## Current Settings Groups
-| Group | Settings |
-|---|---|
-| Provider | llm_provider, vllm_model, ollama_model, cerebras_model |
-| Generation | temperature, repetition_penalty, max_tokens, thinking/answer limits |
-| Memory | memory_top_k, memory_min_relevance, stm_summary_threshold |
-| Steering | enable_steering, steering_model |
-| Intent | intent_provider, query_extraction_provider |
-| Training | training_chappie_model |
+## Providers
 
-## Provider Values
 ```python
 class LLMProvider(str, Enum):
     OLLAMA = "ollama"
-    CEREBRAS = "cerebras"
+    GROQ = "groq"
     VLLM = "vllm"
 ```
 
-## Hot Reload
-- `settings.update_from_ui()` → updates in-memory values
-- `backend.apply_runtime_settings(force=True)` → rebuilds brain/intent processor
-- Settings persist via `_persist_to_root_config()` → writes to `CHAPPIE_CONFIG.json`
+vLLM with local Qwen is the production default. Never reintroduce Cerebras names into active config.
 
-## Key Rules
-- API keys NEVER in `config.py` — always in `secrets.py` or `CHAPPIE_CONFIG.json`
-- `CHAPPIE_CONFIG.json` is gitignored — never commit real config
-- Float settings use `float()` conversion, bool use `bool()`, int use `int()`
-- `_parse_provider()` handles `"auto"`, `None`, and `""` → returns `None`
+## Rules
+
+- Add global values only in `config/config.py` and its example structure.
+- Preserve unknown and missing-value compatibility.
+- Keep local secrets in ignored files; never print keys in reload logs.
+- Update API schemas, frontend types, docs and config tests together.
+- Treat provider priority and persisted-key removal as explicit migrations.
+- Existing root `training_config.json` remains readable; new writes use `config/training_config.json`.
+- Import-time creation of data directories is currently a documented compatibility behavior.
+
+## Tests
+
+```bash
+python3 tests/test_settings_integrity.py
+python3 tests/test_root_config.py
+python3 tests/test_runtime_switching.py
+python3 tests/test_training_config_ui.py
+```

@@ -1,27 +1,21 @@
-# CHAPPiE Developer Skills (OpenCode)
+# Projekt-Skills für Claude-kompatible Harnesses
 
-Diese Skills sind für **Entwickler, die mit AI Agents (OpenCode, Claude Code, etc.) an CHAPPiE arbeiten**.
+Die kanonische Quelle liegt unter `.agents/skills/`. Dieses Verzeichnis ist ein bewusst synchronisierter Spiegel für Harnesses, die `.claude/skills/` erwarten.
 
-Sie enthalten projektspezifisches Wissen über Architektur, Konventionen, Patterns und Workflows — nicht für CHAPPiEs Runtime, sondern für den Entwicklungsprozess.
+Änderungen werden zuerst in `.agents/skills/<name>/SKILL.md` vorgenommen und anschließend in den gleichnamigen Spiegel übertragen. Der Validator prüft Bytegleichheit:
 
-## Skills
+```bash
+python3 scripts/validate_skill_sync.py
+```
 
-| Skill | Beschreibung |
+| Skill | Geltungsbereich |
 |---|---|
-| `chappie-architecture` | Brain, Memory, Life — Architektur und Komponenten |
-| `chappie-backend` | FastAPI, vLLM, Cerebras, Training-Daemon |
-| `chappie-frontend` | React, TypeScript, Tailwind, Chat-Streaming |
-| `chappie-prompts` | System-Prompt, Emotion-Templates, Cerebras-Formatierung |
-| `chappie-testing` | Teststrategie, Mocking, py_compile |
-| `chappie-config` | Settings, Provider, Hot-Reload |
-| `chappie-update` | Update-Workflow: git pull, Dienste neustarten, Tests, Health-Check |
+| `chappie-architecture` | Runtime, Brain, Memory, Life, Steering und Workspace |
+| `chappie-backend` | FastAPI, modulare Runtime, Provider und Training |
+| `chappie-config` | zentrale Config, Schemas, Provider und lokale Overrides |
+| `chappie-frontend` | React, Vite, Tailwind und Chat-Streaming |
+| `chappie-prompts` | aktive Prompttemplates und Antwortbudgets |
+| `chappie-testing` | Standalone-Tests, CI, Ruff, Mypy und Reports |
+| `chappie-update` | vollständiger Betriebsupdate-Ablauf |
 
-## Format
-
-Jeder Skill folgt dem [OpenCode Skills Standard](https://opencode.ai/docs/skills/):
-- `SKILL.md` mit YAML-Frontmatter (`name`, `description`)
-- Markdown-Body mit Instruktionen für den AI Agent
-
-## Nutzung
-
-OpenCode durchsucht `.opencode/skills/`, `.claude/skills/` und `.agents/skills/` nach Skills. Der Agent lädt automatisch den relevanten Skill basierend auf der `description` im Frontmatter.
+Der aktive Chatpfad läuft über `web_infrastructure/chappie_runtime.py`. Die historische BrainPipeline v1 liegt unter `Legacy-Code/`.

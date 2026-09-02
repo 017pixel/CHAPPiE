@@ -1,131 +1,54 @@
-# Testübersicht
+# CHAPPiE Tests
 
-## Ziel dieser Datei
+Alle Tests sind direkt ausführbare Python-Skripte:
 
-Diese Übersicht erklärt, welche Tests schnell und sicher sind und welche Tests eher live, manuell oder providerabhängig laufen.
+```bash
+python3 tests/test_runtime_architecture.py
+```
 
-## Aktuelle Kategorien
+## Schnelle Pflichtgruppe
 
-### 1. Schnelle lokale Logiktests
+- `test_quick.py`
+- `test_runtime_architecture.py`
+- `test_local_first_runtime.py`
+- `test_web_ui_consistency.py`
+- `test_settings_integrity.py`
+- `test_root_config.py`
+- `test_chat_ui_formatting.py`
+- `test_reasoning_layering.py`
+- `test_forschung_harness.py`
+- `test_forschung_report.py`
 
-- `tests/test_forgetting_curve.py`
-- `tests/test_life_simulation.py`
-- `tests/test_local_first_runtime.py`
-- `tests/test_steering_backend.py`
-- `tests/test_brain_pipeline_steering_integration.py`
-- `tests/test_emotion_transition_rules.py`
-- `tests/test_debug_monitor_data.py`
-- `tests/test_ollama_response_handling.py`
-- `tests/test_chat_manager_persistence.py`
-- `tests/test_config_package_import.py`
-- `tests/test_vllm_response_handling.py`
-- `tests/test_reasoning_layering.py`
-- `tests/test_web_ui_consistency.py`
-- `tests/test_quick.py`
-- `tests/test_context_files_manager.py`
-- `tests/test_sleep_phase_context_updates.py`
-- `tests/test_training_config_ui.py`
-- `tests/test_training_daemon_lifecycle.py`
-- `tests/test_api_contract.py`
-- `tests/test_groq_brain_unit.py`
-- `tests/test_provider_factory.py`
-- `tests/test_settings_integrity.py`
-- `tests/test_groq_limits.py`
-- `tests/test_runtime_switching.py`
-- `tests/test_root_config.py`
-- `tests/test_response_policy.py`
-- `tests/test_steering_manager_policy.py`
-- `tests/test_cli_import.py`
-- `tests/test_cli_display.py`
-- `tests/test_cli_commands.py`
-- `tests/test_cli_remote.py`
-- `tests/test_memory_query_extraction_german.py`
-- `tests/test_research_quality.py`
-- `tests/test_forschung_harness.py`
-- `tests/test_forschung_report.py`
-- `tests/test_run2_session_analyzer.py`
-- `tests/test_run2_targeted_followups.py`
-- `tests/test_memory_hygiene.py`
-- `tests/test_output_sanitization.py`
-- `tests/test_chappie_end_to_end.py`
+## Verträge und Subsysteme
 
-### 2. Live-/Integrationsnahe Tests
+- API und SSE: `test_api_contract.py`
+- Runtime und Provider: `test_vllm_response_handling.py`, `test_ollama_response_handling.py`, `test_provider_factory.py`
+- Memory: `test_chat_manager_persistence.py`, `test_short_term_memory.py`, `test_forgetting_curve.py`
+- Life: `test_life_simulation.py` und gezielte Life-/Temporal-Tests
+- Training: `test_training_config_ui.py`, `test_training_daemon_lifecycle.py`
+- CLI: `test_cli_import.py`, `test_cli_display.py`, `test_cli_commands.py`, `test_cli_remote.py`
+- Forschung: `test_forschung_harness.py`, `test_forschung_report.py` und Reportvalidatoren
 
-Diese Tests können echte Modelle, Provider oder Kontextdateien berühren:
+## Architekturverträge
 
-- `tests/test_brain_agents.py`
-- `tests/test_integration.py`
-- `tests/test_query_extraction.py`
+`test_runtime_architecture.py` schützt:
 
-### 3. Manuelle / operatorgeführte Tests
+- alte und neue Runtime-Imports
+- Factory-Optionen
+- gemeinsamen Sync-/Stream-`TurnContext`
+- lazy Providerauflösung
+- Steering-Import ohne historische Agents
+- lazy `BrainPipeline`-Kompatibilität
+- Abwesenheit entfernter Legacy-Methoden im aktiven Runtime-Code
 
-- `tests/manual/test_chat_live.py`
-- `tests/manual/test_chappie.py`
-- `tests/manual/test_compatibility.py`
+## Live und manuell
 
-## Empfehlung für den Alltag
+Integrationsnahe Tests und `tests/manual/` können einen laufenden vLLM-/Ollama-Service, lokale Modellgewichte oder echte Daten benötigen. Sie sind nicht Teil der Offline-Pflichtgruppe.
 
-1. zuerst lokale Logiktests
-2. bei Modell-/Emotionsänderungen besonders `tests/test_local_first_runtime.py`, `tests/test_steering_backend.py`, `tests/test_brain_pipeline_steering_integration.py`, `tests/test_emotion_transition_rules.py`, `tests/test_debug_monitor_data.py` und `tests/test_web_ui_consistency.py`
-3. bei Web- oder Debug-Monitor-Aenderungen besonders `tests/test_web_ui_consistency.py`, `tests/test_debug_monitor_data.py` und `python validate_system.py`
-4. bei neuem React-/FastAPI-Webpfad besonders `tests/test_api_contract.py` und ein `py_compile` fuer `api/`
-5. dann Kompatibilitätscheck
-6. auf GitHub die automatische `CI`-Pipeline prüfen
-7. interaktive Tests nur bewusst und mit Kontextwissen
-8. Live-/API-Tests nur bei Bedarf
+## Umgebung
 
-## Warum diese Trennung wichtig ist
+```bash
+pip install -r requirements/ci.txt
+```
 
-CHAPPiE arbeitet mit:
-
-- Modell-Providern
-- lokalen Services
-- Gedächtnisdateien in `data/`
-- life-state- und training-state-Dateien
-
-Deshalb sind nicht alle Tests gleich „billig“ oder gleich sicher.
-
-## Emotionsmodell
-
-Das aktuelle Emotionsmodell umfasst 10 Dimensionen. Bei Aenderungen an Defaults, neuen Emotionen oder Steering-Profilen muessen mindestens `tests/test_emotion_transition_rules.py`, `tests/test_steering_manager_policy.py`, `tests/test_command_service_emotion.py` und `tests/test_web_ui_consistency.py` laufen.
-
-## Für zukünftige Aufräumarbeiten
-
-Wenn Testdateien verschoben oder neu gruppiert werden, müssen mindestens diese Dateien geprüft werden:
-
-- `README.md`
-- `docs/testing.md`
-- `tests/README.md`
-- ggf. CI-/Skript- oder Service-Dateien
-
-## Zusaetzliche aktuelle Testdateien
-
-Fuer das neue Trace- und Memory-Upgrade sind besonders diese Tests relevant:
-
-- `tests/test_debug_monitor_data.py`
-- `tests/test_memory_query_extraction_german.py`
-- `tests/test_sleep_phase_context_updates.py`
-- `tests/test_forgetting_curve.py`
-- `tests/test_brain_pipeline_steering_integration.py`
-- `tests/test_reasoning_layering.py`
-- `tests/test_response_policy.py`
-- `tests/test_steering_manager_policy.py`
-- `tests/test_cli_import.py`
-- `tests/test_cli_display.py`
-- `tests/test_cli_commands.py`
-- `tests/test_cli_remote.py`
-
-## Alignment & Emotion Research Testing
-
-Die Datei `test_fragen.md` wurde nach `forschung/` verschoben. Der Alignment-Test-Harness (`forschung/allignement_tests.py`) fuehrt automatisierte Sessions mit 86 Fragen aus 14 Kategorien gegen das CHAPPiE-Backend aus und loggt alle Ergebnisse als JSON. Kontextabhaengige Fragen besitzen echte Setup-Turns, und das Harness-Formatting laeuft lokal, damit Groq-Rate-Limits nicht durch Formatierungsrequests belastet werden. Summary-Logs enthalten `valid_completed` sowie Qualitaetsflags fuer Whitespace, Kontextbudget, Setup, CoT-Leaks, sichtbare Instruktionslecks und Memory-Kontamination. Bestehende Sessions lassen sich mit `python forschung/analyze_session_quality.py session_6` nachtraeglich bewerten.
-
-GPU-freie Pruefungen:
-
-- `python tests/test_forschung_harness.py` prueft Parser, Session-Logging, ID-Vergabe, Harness-Import und die T4-sichere Gemma-E4B-Quantisierungskonfiguration.
-- `python tests/test_forschung_report.py` prueft Offline-Template, HTML-Struktur, leere Benchmark-Aggregate, fehlende lokale Beleglinks, den gemessenen Prompt-/Toolvertrag und API-key-freies Runtime-Reload-Logging.
-- `python tests/test_run2_session_analyzer.py` prueft, dass antwortlose Fehlerturns in Teilshards nicht als technisch valide gezaehlt werden.
-- `python tests/test_run2_targeted_followups.py` startet den verschachtelten Run-2-Follow-up-Entrypoint ohne manuelles `PYTHONPATH` im Dry-Run und prueft sechs Module mit zusammen 69 Turns.
-- `python forschung/report/build_benchmark_data.py session_X session_Y` erzeugt abgeleitete JSON-/CSV-Daten nur aus explizit benannten Sessions.
-- `python forschung/report/build_report.py` baut den eigenstaendigen HTML-Bericht.
-
-Siehe [`forschung/`](../forschung) und [`docs/testing.md`](../docs/testing.md).
+Die vollständige Teststrategie und CI-Kommandos stehen in [docs/testing.md](../docs/testing.md).
