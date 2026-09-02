@@ -43,7 +43,9 @@ export function MemoriesPage() {
       longTermQuery.refetch();
       healthQuery.refetch();
       if (data?.should_reset_chat) {
-        startTransition(() => navigate("/"));
+        startTransition(() => {
+          void navigate("/");
+        });
       }
     }
   });

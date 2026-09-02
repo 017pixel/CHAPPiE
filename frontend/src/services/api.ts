@@ -25,6 +25,22 @@ function deriveApiBaseUrl(): string {
 
 const API_BASE_URL = deriveApiBaseUrl();
 
+export type ChatResponse = {
+  assistant_message?: {
+    content?: string;
+    metadata?: Record<string, unknown>;
+  };
+  response_text?: string;
+  metadata?: Record<string, unknown>;
+  session_id?: string;
+  replacement_session_id?: string;
+};
+
+export type SSEEvent = {
+  event: string;
+  data: unknown;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -38,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function* parseSSEStream(response: Response): AsyncGenerator<{event: string; data: any}> {
+async function* parseSSEStream(response: Response): AsyncGenerator<SSEEvent> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -85,7 +101,7 @@ export const api = {
   createSession: (title?: string) => request("/sessions", { method: "POST", body: JSON.stringify({ title }) }),
   deleteSession: (sessionId: string) => request(`/sessions/${sessionId}`, { method: "DELETE" }),
   sendMessage: (payload: { session_id: string | null; message: string; debug_mode: boolean; command_mode: boolean }) =>
-    request("/chat", { method: "POST", body: JSON.stringify(payload) }),
+    request<ChatResponse>("/chat", { method: "POST", body: JSON.stringify(payload) }),
   sendMessageStream: async function*(payload: { session_id: string | null; message: string; debug_mode: boolean; command_mode: boolean }) {
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
       method: "POST",
@@ -125,8 +141,8 @@ export const api = {
   getTrainingConfig: () => request("/training/config"),
   saveTrainingConfig: (payload: Record<string, unknown>) => request("/training/config", { method: "POST", body: JSON.stringify(payload) }),
   runTrainingAction: (payload: Record<string, unknown>) => request("/training/action", { method: "POST", body: JSON.stringify(payload) }),
-  get: <T = any>(path: string) => request<T>(path),
-  put: <T = any>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
-  post: <T = any>(path: string, body?: unknown) => request<T>(path, { method: "POST", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
-  delete: <T = any>(path: string) => request<T>(path, { method: "DELETE" })
+  get: <T = unknown>(path: string) => request<T>(path),
+  put: <T = unknown>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  post: <T = unknown>(path: string, body?: unknown) => request<T>(path, { method: "POST", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  delete: <T = unknown>(path: string) => request<T>(path, { method: "DELETE" })
 };

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { estimateTextTokens, formatTokenRate } from "../lib/telemetry";
 import { api } from "../services/api";
 import { isSlashCommand } from "../store/ui";
-import type { ChatMessage } from "../store/ui";
+import type { ChatMessage, LivePipelineState } from "../store/ui";
 import { useUiStore } from "../store/ui";
 
 type SessionDetail = {
@@ -22,6 +22,21 @@ type QueuedMessage = {
   id: string;
   text: string;
 };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 const THINKING_MESSAGES = [
   "CHAPPiE denkt nach...",
@@ -329,16 +344,16 @@ export function ChatPage() {
       const stream = api.sendMessageStream({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") });
       for await (const event of stream) {
         if (event.event === "status") {
-          const data = (event.data ?? {}) as Record<string, any>;
+          const rawData = asRecord(event.data);
+          const data = rawData as Partial<LivePipelineState>;
           const now = Date.now();
           setLivePipeline((previous) => {
             const startedAt = previous?.started_at ?? useUiStore.getState().genStartTime ?? now;
             return {
               ...(previous ?? {}),
-              ...data,
               stage: data.stage ?? data.stage_key ?? previous?.stage ?? "intent",
               stage_key: data.stage_key ?? data.stage ?? previous?.stage_key ?? "intent",
-              status_text: data.status_text ?? data.status ?? previous?.status_text,
+              status_text: data.status_text ?? optionalString(rawData.status) ?? previous?.status_text,
               started_at: startedAt,
               updated_at: now,
               elapsed_ms: data.elapsed_ms ?? now - startedAt,
@@ -349,9 +364,10 @@ export function ChatPage() {
           const stage = String(data.stage ?? data.stage_key ?? "").toLowerCase();
           if (stage === "streaming" && useUiStore.getState().processingState === "thinking") setProcessingState("streaming");
         } else if (event.event === "token") {
+          const data = asRecord(event.data);
           if (useUiStore.getState().processingState === "thinking") setProcessingState("streaming");
-          const content = event.data?.content || "";
-          if ((event.data?.token_type || "answer") === "reasoning") {
+          const content = optionalString(data.content) ?? "";
+          if ((optionalString(data.token_type) ?? "answer") === "reasoning") {
             streamedReasoning += content;
             setReasoningContent(streamedReasoning.length > 3000 ? `${streamedReasoning.slice(0, 3000)}...` : streamedReasoning);
           } else {
@@ -390,17 +406,20 @@ export function ChatPage() {
             });
           }
         } else if (event.event === "turn_error") {
-          const errorText = String(event.data?.error || "Unbekannter Fehler");
+          const data = asRecord(event.data);
+          const errorText = optionalString(data.error) ?? "Unbekannter Fehler";
           setStreamError(errorText);
           setLivePipeline((previous) => ({ ...(previous ?? {}), stage: "done", stage_key: "done", status_text: "Antwort fehlgeschlagen", error: errorText, updated_at: Date.now() }));
           commitAssistant(streamedContent || `[Fehler: ${errorText}]`, { stream_error: true, error_message: errorText, raw_response: streamedContent });
           finished = true;
           break;
         } else if (event.event === "turn_finished") {
-          const finalContent = streamedContent || event.data?.assistant_message?.content || "";
-          const finalMeta = (event.data?.assistant_message?.metadata || {}) as Record<string, any>;
-          const displayContent = finalMeta.formatted_answer || finalContent;
-          const finalTiming = (finalMeta.timing ?? {}) as Record<string, any>;
+          const data = asRecord(event.data);
+          const assistantMessage = asRecord(data.assistant_message);
+          const finalContent = streamedContent || optionalString(assistantMessage.content) || "";
+          const finalMeta = asRecord(assistantMessage.metadata);
+          const displayContent = optionalString(finalMeta.formatted_answer) || finalContent;
+          const finalTiming = asRecord(finalMeta.timing);
           setLivePipeline((previous) => ({
             ...(previous ?? {}),
             stage: "done",
@@ -409,15 +428,15 @@ export function ChatPage() {
             updated_at: Date.now(),
             elapsed_ms: Number(finalTiming.total_gen_ms) || previous?.elapsed_ms,
             answer_tokens: Number(finalTiming.answer_tokens) || previous?.answer_tokens,
-            ttft_ms: finalTiming.ttft_ms ?? previous?.ttft_ms,
-            answer_time_ms: finalTiming.answer_time_ms ?? previous?.answer_time_ms,
-            total_gen_ms: finalTiming.total_gen_ms ?? previous?.total_gen_ms,
-            tokens_per_second: finalTiming.tokens_per_second ?? previous?.tokens_per_second,
-            provider: finalMeta.provider ?? previous?.provider ?? status.provider,
-            model: finalMeta.model ?? previous?.model ?? status.model,
+            ttft_ms: optionalNumber(finalTiming.ttft_ms) ?? previous?.ttft_ms,
+            answer_time_ms: optionalNumber(finalTiming.answer_time_ms) ?? previous?.answer_time_ms,
+            total_gen_ms: optionalNumber(finalTiming.total_gen_ms) ?? previous?.total_gen_ms,
+            tokens_per_second: optionalNumber(finalTiming.tokens_per_second) ?? previous?.tokens_per_second,
+            provider: optionalString(finalMeta.provider) ?? previous?.provider ?? status.provider,
+            model: optionalString(finalMeta.model) ?? previous?.model ?? status.model,
           }));
-          const mergedMeta = { ...finalMeta, reasoning: streamedReasoning || undefined, formatted_cot: finalMeta.formatted_cot || undefined, raw_response: finalMeta.raw_response || finalContent || undefined };
-          commitAssistant(displayContent || finalContent, mergedMeta, event.data?.session_id || undefined);
+          const mergedMeta = { ...finalMeta, reasoning: streamedReasoning || undefined, formatted_cot: optionalString(finalMeta.formatted_cot), raw_response: optionalString(finalMeta.raw_response) || finalContent || undefined };
+          commitAssistant(displayContent || finalContent, mergedMeta, optionalString(data.session_id));
           finished = true;
           break;
         }
@@ -430,12 +449,12 @@ export function ChatPage() {
     } catch {
       setDisplayMessages((previous) => previous.filter((item) => item.id !== "streaming" && item.id !== "thinking"));
       try {
-        const result = await api.sendMessage({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") }) as any;
+        const result = await api.sendMessage({ session_id: currentSessionId, message: text, debug_mode: true, command_mode: text.trim().startsWith("/") });
         const content = result?.assistant_message?.content || result?.response_text || "Keine Antwort erhalten.";
-        const metadata = (result?.assistant_message?.metadata || result?.metadata || {}) as Record<string, any>;
-        commitAssistant(metadata.formatted_answer || content, { ...metadata, raw_response: metadata.raw_response || content }, result?.session_id || result?.replacement_session_id);
-      } catch (error: any) {
-        const errorText = error?.message || "Unbekannter Fehler";
+        const metadata = result?.assistant_message?.metadata || result?.metadata || {};
+        commitAssistant(optionalString(metadata.formatted_answer) || content, { ...metadata, raw_response: optionalString(metadata.raw_response) || content }, result?.session_id || result?.replacement_session_id);
+      } catch (error: unknown) {
+        const errorText = error instanceof Error ? error.message : "Unbekannter Fehler";
         setStreamError(errorText);
         commitAssistant(`Fehler: ${errorText}`, { stream_error: true, error_message: errorText });
       }
