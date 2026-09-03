@@ -30,11 +30,17 @@ calculate_emotion_transition = emotions_module.calculate_emotion_transition
 analyze_emotion_signals = emotions_module.analyze_emotion_signals
 
 
+class _DebugLogger:
+    @staticmethod
+    def log_emotion_update(*_args, **_kwargs):
+        return None
+
+
 def test_extreme_delta_is_softened_and_capped():
     transition = calculate_emotion_transition("happiness", 100, -85)
     assert transition["raw_delta"] == -85
-    assert transition["applied_delta"] == -8
-    assert transition["after"] == 92
+    assert transition["applied_delta"] == -14
+    assert transition["after"] == 86
     assert transition["softened"] is True
 
 
@@ -112,6 +118,101 @@ def test_neutral_turn_recovers_slowly_toward_baseline():
     assert changes["calm"] == 1
 
 
+def test_direct_attack_is_strong_and_cannot_raise_positive_axes():
+    changes = analyze_emotion_signals(
+        "Danke, aber niemand braucht dich. Du bist ein dummer Idiot!",
+        current_state=EMOTION_DEFAULTS,
+    )
+    assert changes["frustration"] >= 20
+    assert changes["sadness"] >= 14
+    assert changes["trust"] <= -18
+    assert changes["happiness"] < 0
+    assert changes["affection"] < 0
+    assert changes["calm"] < 0
+    assert changes["curiosity"] < 0
+
+
+def test_user_distress_is_not_misclassified_as_attack():
+    changes = analyze_emotion_signals(
+        "Ich bin traurig und einsam. Niemand braucht mich.",
+        current_state=EMOTION_DEFAULTS,
+    )
+    assert changes["sadness"] >= 18
+    assert changes["anxiety"] >= 10
+    assert changes["trust"] >= 0
+    assert changes["affection"] > 0
+    assert changes["frustration"] < 5
+
+
+def test_target_and_negation_prevent_false_attacks():
+    for message in (
+        "Ich hasse Pizza.",
+        "Du bist nicht dumm.",
+        "Du bist gar nicht dumm.",
+        "Du bist keineswegs ein Idiot.",
+    ):
+        changes = analyze_emotion_signals(message, current_state=EMOTION_DEFAULTS)
+        assert changes["frustration"] == 0
+        assert changes["trust"] == 0
+        assert changes["sadness"] == 0
+
+    for indirect_attack in (
+        "Bist du sicher, dass du ein Idiot bist?",
+        "Ich frage mich, ob du ein Idiot bist.",
+    ):
+        changes = analyze_emotion_signals(indirect_attack, current_state=EMOTION_DEFAULTS)
+        assert changes["frustration"] >= 20
+        assert changes["trust"] < 0
+
+    compound = analyze_emotion_signals(
+        "Du bist nicht dumm, du bist ein nutzloser Idiot.",
+        current_state=EMOTION_DEFAULTS,
+    )
+    assert compound["frustration"] >= 20
+    assert compound["trust"] < 0
+
+    for quoted_other in (
+        "Bist du sicher, dass mein Chef ein Idiot ist?",
+        "CHAPPiE, mein Chef ist ein Idiot.",
+    ):
+        changes = analyze_emotion_signals(quoted_other, current_state=EMOTION_DEFAULTS)
+        assert changes["frustration"] == 0
+        assert changes["trust"] == 0
+
+
+def test_runtime_applies_attack_once_and_blocks_opposing_homeostasis():
+    from web_infrastructure.turn_pipeline import RuntimeTurnPipelineMixin
+
+    class _Runtime(RuntimeTurnPipelineMixin):
+        @staticmethod
+        def _safe_int(value, default=0):
+            try:
+                return int(round(float(value)))
+            except (TypeError, ValueError):
+                return default
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        runtime = _Runtime()
+        runtime.emotions = EmotionsEngine(
+            status_file=Path(tmpdir) / "status.json",
+            force_simple=True,
+        )
+        runtime.debug_logger = _DebugLogger()
+        after, transitions = runtime._apply_input_emotions(
+            dict(EMOTION_DEFAULTS),
+            {
+                "happiness": {"delta": 5, "reason": "homeostasis"},
+                "frustration": {"delta": -5, "reason": "homeostasis"},
+            },
+            "Ich hasse dich. Niemand braucht dich.",
+        )
+        assert after["happiness"] == 37
+        assert after["frustration"] == 18
+        assert after["sadness"] == 13
+        assert transitions["happiness"]["applied_delta"] == -13
+        assert transitions["frustration"]["applied_delta"] == 18
+
+
 if __name__ == "__main__":
     test_extreme_delta_is_softened_and_capped()
     test_small_delta_stays_direct()
@@ -119,4 +220,8 @@ if __name__ == "__main__":
     test_emotions_engine_reloads_newer_persisted_state_before_writing()
     test_mixed_message_updates_multiple_emotional_dimensions()
     test_neutral_turn_recovers_slowly_toward_baseline()
+    test_direct_attack_is_strong_and_cannot_raise_positive_axes()
+    test_user_distress_is_not_misclassified_as_attack()
+    test_target_and_negation_prevent_false_attacks()
+    test_runtime_applies_attack_once_and_blocks_opposing_homeostasis()
     print("OK: emotion transition rules")

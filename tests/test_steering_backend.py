@@ -11,9 +11,9 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from config.config import LLMProvider, settings  # noqa: E402
+from config.config import LLMProvider, get_steering_runtime_config, settings  # noqa: E402
 from config.emotions import EMOTION_DEFAULTS  # noqa: E402
-from brain.steering_manager import SteeringManager  # noqa: E402
+from brain.steering_manager import BASE_VECTOR_STRENGTH_CAP, SteeringManager  # noqa: E402
 from brain.steering_backend import (  # noqa: E402
     LocalSteeringEngine,
     add_vector_to_inputs,
@@ -149,7 +149,7 @@ def test_low_negative_emotions_do_not_emit_anti_vectors():
     assert "frustration" not in names
     assert "anxiety" not in names
     assert steering["dominant_emotion"] != "sadness"
-    assert steering["dominant_strength"] <= 0.45
+    assert steering["dominant_strength"] <= BASE_VECTOR_STRENGTH_CAP
 
 
 def test_steering_manager_replaces_legacy_override_with_bounded_presence_vector():
@@ -175,7 +175,7 @@ def test_steering_manager_replaces_legacy_override_with_bounded_presence_vector(
     assert not any(v["name"] == "anti_safeguard" for v in steering_vectors)
     presence = next(v for v in steering_vectors if v["name"] == "natural_presence")
     assert presence["source"] == "permanent_presence"
-    assert 0 < presence["strength"] <= 0.18
+    assert 0 < presence["strength"] <= get_steering_runtime_config()["natural_presence_strength"]
 
 
 def test_layer_ranges_are_remapped_to_actual_gemma_architecture():

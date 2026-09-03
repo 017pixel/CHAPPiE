@@ -83,6 +83,7 @@ jobs:
           python tests/test_forgetting_curve.py
           python tests/test_memory_associations.py
           python tests/test_emotion_transition_rules.py
+          python tests/test_groq_emotion_formatting.py
           python tests/test_vector_only_emotion_path.py
           python tests/test_quick.py
           python tests/test_life_simulation.py
@@ -143,6 +144,7 @@ jobs:
             tests/test_pages_workflow.py \
             tests/test_memory_associations.py \
             tests/test_emotion_transition_rules.py \
+            tests/test_groq_emotion_formatting.py \
             tests/test_vector_only_emotion_path.py \
             tests/test_report_v6.py \
             tests/test_skill_sync.py \

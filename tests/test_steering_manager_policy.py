@@ -82,7 +82,7 @@ def test_new_emotion_vectors_are_conservative():
     payload = manager.get_steering_payload(emotions, force=True)
     vectors = {
         item["name"]: item
-        for item in payload["steering"]["vectors"]
+        for item in payload["steering"]["base_vectors"]
         if item.get("source") == "base"
     }
 
@@ -92,8 +92,33 @@ def test_new_emotion_vectors_are_conservative():
     assert vectors["calm"]["strength"] <= 0.35
 
 
+def test_configured_defaults_are_neutral_and_attack_is_immediate():
+    module = _load_steering_manager_module()
+    manager = module.SteeringManager()
+    defaults = {
+        "happiness": 50, "trust": 50, "energy": 100, "curiosity": 50,
+        "motivation": 80, "frustration": 0, "sadness": 0,
+        "affection": 45, "anxiety": 0, "calm": 50,
+    }
+    neutral = manager.get_steering_payload(defaults, force=True)["steering"]
+    assert neutral["selected_base_vectors"] == []
+    assert neutral["dominant_emotion"] == "neutral"
+
+    after_attack = dict(defaults)
+    after_attack.update({"happiness": 37, "trust": 34, "frustration": 18, "sadness": 13, "calm": 36})
+    recent = {"happiness": -13, "trust": -16, "frustration": 18, "sadness": 13, "calm": -14}
+    attacked = manager.get_steering_payload(after_attack, force=True, recent_changes=recent)["steering"]
+    selected = {item["name"] for item in attacked["selected_base_vectors"]}
+    composites = {item["name"] for item in attacked["composite_vectors"]}
+    assert "frustration" in selected
+    assert "sadness" in selected
+    assert "angered" in composites
+    assert attacked["dominant_emotion"] in {"frustration", "sadness", "angered"}
+
+
 if __name__ == "__main__":
     test_low_sadness_and_frustration_are_not_anti_steered()
     test_charged_composite_is_capped()
     test_new_emotion_vectors_are_conservative()
+    test_configured_defaults_are_neutral_and_attack_is_immediate()
     print("OK: steering manager policy")

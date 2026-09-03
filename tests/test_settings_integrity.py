@@ -88,6 +88,16 @@ def test_get_query_extraction_model_groq():
         settings.llm_provider = original_model
 
 
+def test_emotion_and_formatting_groq_config_is_centralized():
+    exported = settings._export_root_values()
+    assert exported["EMOTION_ANALYSIS_PROVIDER"] == "groq"
+    assert exported["EMOTION_ANALYSIS_MODEL"] == "openai/gpt-oss-20b"
+    assert exported["GROQ_FORMAT_MODEL"] == "llama-3.1-8b-instant"
+    assert exported["GROQ_AUXILIARY_ENABLED"] is True
+    assert exported["EMOTION_ANALYSIS_TIMEOUT_SECONDS"] > 0
+    assert exported["GROQ_FORMAT_TIMEOUT_SECONDS"] > 0
+
+
 def _flatten_config(config, prefix=""):
     result = []
     for key, value in config.items():
@@ -110,6 +120,7 @@ if __name__ == "__main__":
         test_default_root_config_has_no_stale_cerebras_keys,
         test_get_intent_model_groq,
         test_get_query_extraction_model_groq,
+        test_emotion_and_formatting_groq_config_is_centralized,
     ]
     passed = 0
     for test in tests:

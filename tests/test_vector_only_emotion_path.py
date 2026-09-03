@@ -10,6 +10,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from brain.steering_manager import SteeringManager  # noqa: E402
 from config.config import LLMProvider  # noqa: E402
+from config.emotions import EMOTION_DEFAULTS  # noqa: E402
 from config.prompts import build_system_prompt, format_life_continuity_context  # noqa: E402
 from web_infrastructure.formatting import RuntimeFormattingMixin  # noqa: E402
 
@@ -95,10 +96,23 @@ def test_payload_keeps_full_state_but_activates_only_coherent_subset() -> None:
     assert any(vector["name"] == "natural_presence" for vector in payload["vectors"])
 
 
+def test_default_state_does_not_fake_positive_emotion_steering() -> None:
+    payload = SteeringManager().get_steering_payload(
+        dict(EMOTION_DEFAULTS),
+        force=True,
+        provider=LLMProvider.VLLM,
+        model="Qwen/Qwen3.5-4B",
+    )["steering"]
+    assert payload["selected_base_vectors"] == []
+    assert payload["dominant_emotion"] == "neutral"
+    assert {item["name"] for item in payload["vectors"]} == {"natural_presence"}
+
+
 if __name__ == "__main__":
     test_local_system_prompt_has_no_emotion_or_personality_directives()
     test_local_response_plan_is_not_appended_to_prompt()
     test_local_sampling_is_independent_of_emotion_state()
     test_life_prompt_filters_emotion_derived_workspace_guidance()
     test_payload_keeps_full_state_but_activates_only_coherent_subset()
+    test_default_state_does_not_fake_positive_emotion_steering()
     print("OK: vector-only emotion path")
