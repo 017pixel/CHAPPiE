@@ -4,11 +4,11 @@
 
 Der lokale vLLM-Antwortpfad behandelt Emotion als Eingriff in Hidden States. Der System-Prompt enthält keine aktuellen Emotionswerte, keine Tonvorgabe und keine Identitätsregel gegen typische KI-Selbstbeschreibungen. Emotionsabhängige Homeostasis- und Global-Workspace-Anweisungen werden ebenfalls nicht an die finale Antwort weitergegeben. Aus der Life-Simulation bleiben nur Zeitphase, Aktivität und aktuelles Ziel als sachliche Kontinuitätsdaten im Kontext. Auch das Sampling bleibt bei unterschiedlichen Emotionszuständen gleich. Dadurch lässt sich die Wirkung der Vektoren in Forschungsdurchläufen sauberer isolieren.
 
-Die Emotionsanalyse darf intern Textsignale auswerten, weil sie nur den persistenten Zustand aktualisiert. Erst die finale sichtbare Antwort ist der isolierte Vector-only-Pfad.
+Die Emotionsanalyse darf intern Textsignale auswerten, weil sie nur den persistenten Zustand aktualisiert. Sie nutzt zuerst deterministische Schutzregeln und kann diese optional durch eine strukturierte Groq-Analyse verstärken. Eine erkannte Richtung darf durch das Modell nicht umgekehrt werden. Erst die finale sichtbare Antwort ist der isolierte Vector-only-Pfad.
 
 ## Steering
 
-Die Basisvektoren entstehen aus semantisch gepaarten positiven und negativen Ankerantworten. Pro Turn werden die drei stärksten Basisrichtungen und höchstens ein zusammengesetztes Muster aktiviert. Das reduziert widersprüchliche Vektoren und hält den Eingriff begrenzt. Ein kleiner `natural_presence`-Vektor kontrastiert natürliche Ich-Perspektive und Erinnerungsanschluss mit generischen Modellfloskeln. Er verändert keine Safety-Refusals.
+Die Basisvektoren entstehen aus semantisch gepaarten positiven und negativen Ankerantworten. Pro Turn werden die drei stärksten Basisrichtungen und höchstens ein zusammengesetztes Muster aktiviert. Das reduziert widersprüchliche Vektoren und hält den Eingriff begrenzt. Jede Dimension wird gegen ihren eigenen Basiswert ausgewertet; Energie 100 und Motivation 80 sind deshalb neutral und nicht automatisch positiv dominant. Starke aktuelle Deltas wirken sofort. Direkte Angriffe können den akuten Modus `angered` auslösen, während langfristig extreme Zustände weiter über `crashout`, `guarded` oder `melancholic` abgebildet werden. Ein begrenzter `natural_presence`-Vektor kontrastiert natürliche Ich-Perspektive und Erinnerungsanschluss mit generischen Modellfloskeln. Er verändert keine Safety-Refusals.
 
 Qwen 3.5 4B verwendet weiterhin das verifizierte Profil mit 32 Layern, Hidden-Größe 2560 und Emotionsfenster 10 bis 26. Für Gemma 4 liest das Backend die reale Layerzahl und Hidden-Größe aus der Modellkonfiguration. Abweichende Profilfenster werden proportional auf die geladene Architektur skaliert. Der Cache ist pro Modell und Vektor getrennt.
 
@@ -23,7 +23,15 @@ Der Laufzeitbericht belegt nicht mehr nur registrierte Hooks. Er enthält unter 
 
 ## Emotionsdynamik
 
-Eine Nachricht kann mehrere Signale gleichzeitig auslösen. Lob, technischer Frust, Neugier, Nähe, Reflexion und Beruhigung werden getrennt erkannt und gemeinsam angewendet. Gegenpole wie Freude und Traurigkeit sowie Ruhe und Unruhe regulieren einander. Neutrale Turns führen deutlich verschobene Werte langsam zur Basis zurück. Die bestehende Begrenzung pro Turn verhindert abrupte Sprünge.
+Eine Nachricht kann mehrere Signale gleichzeitig auslösen. Direkte Entwertung, User-Traurigkeit, technischer Frust, Lob, Neugier, Nähe, Reflexion und Beruhigung werden getrennt erkannt. Ziel und Negation werden berücksichtigt: „Ich hasse Pizza“ und „Du bist nicht dumm“ sind keine Angriffe. Direkte Angriffe haben Vorrang vor gleichzeitigem Lob und erhöhen Frustration sowie Traurigkeit deutlich, während Vertrauen, Freude, Zuneigung und Ruhe sinken. User-Traurigkeit erhöht dagegen Traurigkeit und Unruhe, ohne fälschlich Misstrauen oder Aggression auszulösen.
+
+Appraisal und Life-Homeostasis werden pro Turn genau einmal angewendet. Homeostasis darf ein erkanntes Inputsignal verstärken oder eine unberührte Dimension ergänzen, aber nicht dessen Richtung aufheben. Die allgemeine Intent-Klassifikation ist keine zweite Quelle für den persistenten Emotionszustand.
+
+## Groq-Hilfswege und Formatierung
+
+`emotion_analysis_provider=groq` verwendet standardmäßig `openai/gpt-oss-20b` mit JSON-Objektmodus, niedrigem Reasoning-Aufwand und ohne ausgegebenes Reasoning. Die Antwortformatierung verwendet das schnelle `llama-3.1-8b-instant` und `max_completion_tokens`. Beide Hilfswege sind über `groq_auxiliary_enabled` abschaltbar und fallen ohne gültigen Key, bei Timeout oder bei ungültigem JSON deterministisch und ohne Zustandsverlust auf lokale Logik zurück.
+
+Der Formatter erhält nur die bereits extrahierte sichtbare Antwort, nicht den rohen Providertext mit möglichen Prompt-Echos oder Think-Tags. Ein erfolgreicher lokaler Fallback oder eine erfolgreiche Sanitization markiert den gesamten Turn nicht mehr als Fehler.
 
 ## Memory
 
@@ -33,7 +41,7 @@ Die Vergessenskurve beeinflusst das Reranking, löscht aber keine exakten User-F
 
 ## Effizienz
 
-Die Änderungen erzeugen keinen weiteren LLM-Aufruf. Steering-Anker werden beim ersten Bedarf berechnet und danach modellbezogen gecacht. Memory-Verknüpfungen sind auf wenige Nachbarn begrenzt. Recall-Metadaten werden gebündelt und wegen des Cooldowns nicht bei jeder doppelten Suche geschrieben.
+Ohne Groq-Key oder bei deaktivierten Hilfswegen entsteht kein zusätzlicher LLM-Aufruf. Mit aktivem Groq-Key sind Appraisal und Formatierung kleine, begrenzte Cloud-Aufrufe; die eigentliche Antwort bleibt beim lokalen vLLM-Modell. Steering-Anker werden beim ersten Bedarf berechnet und danach modellbezogen gecacht. Memory-Verknüpfungen sind auf wenige Nachbarn begrenzt. Recall-Metadaten werden gebündelt und wegen des Cooldowns nicht bei jeder doppelten Suche geschrieben.
 
 ## Forschungsrisiko
 

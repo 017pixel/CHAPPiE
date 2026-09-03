@@ -2,6 +2,29 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.6.0] - 2026-09-03
+
+### Erstellt
+- Akuten Layer-Steering-Modus für verletzte und wütende Reaktionen ergänzt
+- Geschützte strukturierte Groq-Analyse für alle zehn Emotionsdimensionen ergänzt
+- Zentrale Signalprofile für direkte Angriffe, User-Traurigkeit und technische Probleme ergänzt
+- Regressionstests für Zielerkennung, Negation, Groq-Ausfälle und moderne Request-Felder ergänzt
+- Telemetrie für aktuelle Emotionsänderungen in Steering-Payloads ergänzt
+
+### Verändert
+- Emotionsstärken werden relativ zu ihren echten Basiswerten statt pauschal zu 50 berechnet
+- Direkte Angriffe erhöhen Frustration und Traurigkeit stärker und senken positive Dimensionen zuverlässig
+- Appraisal und Homeostasis werden pro Turn genau einmal und ohne Richtungsumkehr angewendet
+- Natürliche Ich-Präsenz, negative Kontrastanker und begrenzte Layer-Stärken wirken deutlicher
+- Groq-Formatierung nutzt ein schnelles Formatmodell, moderne Tokenfelder und saubere lokale Fallbacks
+
+### Gelöscht
+- Falsche positive Dominanz durch normale Energie- und Motivationsbasiswerte entfernt
+- Unzuverlässige Intent-Modell-Deltas als Quelle des persistenten Emotionszustands entfernt
+- Doppelte Anwendung von Emotionsübergängen innerhalb eines Turns entfernt
+- Übergabe roher Prompt-Echos und interner Think-Fragmente an den Formatter entfernt
+- Rote Turn-Fehler bei erfolgreicher lokaler Formatierung oder Sanitization entfernt
+
 ## [16.5.2] - 2026-09-03
 
 ### Erstellt

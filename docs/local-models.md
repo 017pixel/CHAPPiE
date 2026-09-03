@@ -2,7 +2,7 @@
 
 ## Produktiver Standard
 
-Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent und Query-Extraktion auf demselben geladenen Modell.
+Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent und Query-Extraktion auf demselben geladenen Modell. Optionale Groq-Hilfsaufrufe für strukturierte Emotionsanalyse und Leerraumformatierung ändern diesen lokalen Antwortprovider nicht.
 
 Alternative lokale Modelle wie Gemma 4 sind möglich. Der Steering-Service liest Hidden-Größe und Layerzahl aus dem geladenen Modell und skaliert das konfigurierte relative Layerfenster auf die tatsächliche Architektur. VRAM, Quantisierung und die sichtbare Vektorwirkung müssen auf dem Modellserver separat geprüft werden.
 
@@ -24,7 +24,7 @@ Der Präsenzvektor entfernt keine Refusal- oder Safety-Richtung. Ein alter optio
 |---|---|---|
 | vLLM | fester Webpfad, lokales Steering, Standard für kleine Schritte | `local_models` |
 | Ollama | lokale CLI-, Trainings- und Testalternative | `local_models` |
-| Groq | optionaler Cloud-Adapter für Training und Forschung | `api`, `cloud_models`, `small_tasks` |
+| Groq | optionale Emotionsanalyse, Formatierung, Training und Forschung | `api`, `cloud_models`, `small_tasks` |
 
 Es gibt kein aktives Cerebras-Backend. Historische Referenzen können nur in eingefrorenen Reports, Runs oder Legacy-Quellen vorkommen.
 

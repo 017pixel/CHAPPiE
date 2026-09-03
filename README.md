@@ -2,7 +2,7 @@
 
 CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur. Das Projekt untersucht, wie LLM-Antworten durch episodisches Gedächtnis, simulierte innere Zustände, Life-Simulation und Activation Steering über längere Interaktionen konsistent beeinflusst werden können.
 
-CHAPPiE verwendet kein selbst trainiertes Basismodell. Der produktive Web-Chat läuft lokal über Qwen 3.5 und einen OpenAI-kompatiblen vLLM-Steering-Service. Ollama und Groq bleiben unterstützte Adapter für CLI, Training und Forschung.
+CHAPPiE verwendet kein selbst trainiertes Basismodell. Der produktive Web-Chat läuft lokal über Qwen 3.5 und einen OpenAI-kompatiblen vLLM-Steering-Service. Ollama und Groq bleiben unterstützte Adapter; Groq kann zusätzlich Emotions-Appraisal und Ausgabeformatierung übernehmen, ohne die lokale Antwortgenerierung zu ersetzen.
 
 ## Aktive Architektur
 
@@ -111,7 +111,7 @@ python3 -m brain.steering_api_server
 |---|---|---|
 | vLLM | produktiver lokaler Webpfad und Standard | Activation Steering |
 | Ollama | lokaler Adapter für CLI, Training und Tests | Prompt-Kontext |
-| Groq | optionaler Cloud-Adapter für Training und Forschung | Prompt-Kontext |
+| Groq | optionale Analyse, Formatierung, Training und Forschung | kein Steering im lokalen Antwortpfad |
 
 Aktive Provider sind ausschließlich `vllm`, `ollama` und `groq`. Cerebras-Bezüge sind nur in ausdrücklich historischen Forschungs- oder Legacy-Dateien zulässig.
 
