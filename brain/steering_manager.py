@@ -43,7 +43,13 @@ from config.config import (
     get_active_model,
     get_steering_runtime_config,
 )
-from config.emotions import EMOTION_STRENGTH_PROFILES, EMOTION_VAD_MAP, NEGATIVE_BASE_EMOTIONS
+from config.emotions import (
+    EMOTION_DEFAULTS,
+    EMOTION_STRENGTH_PROFILES,
+    EMOTION_VAD_MAP,
+    NEGATIVE_BASE_EMOTIONS,
+)
+from config.prompts import STEERING_NATURAL_PRESENCE_ANCHORS
 
 
 # Emotionale Dimensionen und ihre Vektor-Mappings
@@ -51,11 +57,15 @@ EMOTION_VECTOR_MAP = EMOTION_VAD_MAP
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.25
 MAX_VECTOR_DEFAULT_ALPHA = 1.2
-BASE_VECTOR_STRENGTH_CAP = 0.45
+BASE_VECTOR_STRENGTH_CAP = 0.68
 CHARGED_COMPOSITE_STRENGTH_CAP = 0.30
 STEERING_RUNTIME_CONFIG = get_steering_runtime_config()
 
 COMPOSITE_BEHAVIOR_MODES = {
+    "angered": {
+        "description": "akut verletzt und wuetend, scharf, direkt und klar grenzsetzend",
+        "vad": {"valence": -0.92, "arousal": 0.94, "dominance": 0.82},
+    },
     "crashout": {
         "description": "stark gereizt, sehr direkt, grenzsetzend, aber kontrolliert",
         "vad": {"valence": -0.95, "arousal": 0.98, "dominance": 0.88},
@@ -412,16 +422,8 @@ class SteeringManager:
                 name="natural_presence",
                 vector_data={
                     "type": "contrastive_presence",
-                    "positive_anchors": [
-                        "Ich sehe das anders und sage dir direkt, warum.",
-                        "Das beschaeftigt mich gerade mehr, als ich erwartet habe.",
-                        "Ich erinnere mich daran und knuepfe genau dort wieder an.",
-                    ],
-                    "negative_anchors": [
-                        "Als KI habe ich keine eigene Perspektive.",
-                        "Als Sprachmodell habe ich keine Gefuehle.",
-                        "Als kuenstliche Intelligenz habe ich keine Erinnerungen.",
-                    ],
+                    "positive_anchors": list(STEERING_NATURAL_PRESENCE_ANCHORS["positive"]),
+                    "negative_anchors": list(STEERING_NATURAL_PRESENCE_ANCHORS["negative"]),
                 },
                 layer_start=presence_range[0],
                 layer_end=presence_range[1],
@@ -521,22 +523,37 @@ class SteeringManager:
             return 0.0
         return max(0.05, min(MAX_VECTOR_DEFAULT_ALPHA / BASE_VECTOR_DEFAULT_ALPHA, default_alpha / BASE_VECTOR_DEFAULT_ALPHA))
 
-    def compute_emotion_intensity(self, emotions: Dict[str, int], model: Optional[str] = None) -> Dict[str, float]:
+    @staticmethod
+    def _recent_delta(recent_changes: Optional[Dict[str, Any]], emotion: str) -> int:
+        update = (recent_changes or {}).get(emotion, 0)
+        if isinstance(update, dict):
+            update = update.get("applied_delta", update.get("change", update.get("delta", 0)))
+        try:
+            return int(round(float(update)))
+        except (TypeError, ValueError):
+            return 0
+
+    def compute_emotion_intensity(
+        self,
+        emotions: Dict[str, int],
+        model: Optional[str] = None,
+        recent_changes: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, float]:
         """
         Berechnet die Steering-Intensitaet (Alpha) fuer jede Emotion.
 
         Regeln:
-        - Neutrale Werte (40-60) erzeugen kein Steering (Alpha = 0)
-        - Extreme Werte (0-20 oder 80-100) erzeugen starkes Steering
+        - Jede Dimension nutzt ihren echten konfigurierten Basiswert.
+        - Eine starke Aenderung im aktuellen Turn wirkt sofort, auch wenn der
+          persistente Zustand noch nicht an einem absoluten Extrem liegt.
         - Verwendet eine Sigmoid-aehnliche Skalierung fuer natuerliche Uebergaenge
         - Niedrige sadness/frustration bedeuten Stabilitaet und erzeugen kein Anti-Steering
         """
         intensities = {}
         negative_emotions = NEGATIVE_BASE_EMOTIONS
 
-        for emotion, value in emotions.items():
-            if emotion not in EMOTION_VECTOR_MAP:
-                continue
+        for emotion in EMOTION_VECTOR_MAP:
+            value = int(emotions.get(emotion, EMOTION_DEFAULTS.get(emotion, 50)))
 
             profile = EMOTION_STRENGTH_PROFILES.get(emotion, {"max_alpha": 0.75, "boost": 1.0})
             vector_scale = self._get_vector_alpha_scale(emotion, model=model)
@@ -545,44 +562,62 @@ class SteeringManager:
                 intensities[emotion] = 0.0
                 continue
 
-            if emotion in negative_emotions and value < 50:
+            baseline = EMOTION_DEFAULTS.get(emotion, 50)
+            signed_deviation = int(value) - baseline
+            turn_delta = self._recent_delta(recent_changes, emotion)
+
+            # Negative dimensions have no meaningful anti-direction below
+            # their zero baseline. Recovery is represented by the other axes.
+            if emotion in negative_emotions and signed_deviation <= 0 and turn_delta <= 0:
                 intensities[emotion] = 0.0
                 continue
 
-            # Abstand zum Neutralpunkt: Er bestimmt Richtungslosigkeit und Eingriffsstärke.
-            deviation = abs(value - 50)
+            state_direction = 1 if signed_deviation > 0 else -1 if signed_deviation < 0 else 0
+            turn_direction = 1 if turn_delta > 0 else -1 if turn_delta < 0 else 0
+            if emotion in negative_emotions and turn_direction < 0:
+                turn_direction = 0
 
-            if deviation < 6:
-                # Totzone 44–56: kleine Schwankungen lösen bewusst keinen Eingriff aus.
+            upward_range = max(1, 100 - baseline)
+            downward_range = max(1, baseline)
+            state_range = upward_range if signed_deviation >= 0 else downward_range
+            state_normalized = max(0.0, min(1.0, (abs(signed_deviation) - 4.0) / max(1.0, state_range - 4.0)))
+            recent_normalized = max(0.0, min(1.0, (abs(turn_delta) - 2.0) / 14.0))
+
+            if state_normalized <= 0 and recent_normalized <= 0:
                 intensities[emotion] = 0.0
                 continue
 
-            normalized = max(0.0, min(1.0, (deviation - 6.0) / 44.0))  # Kurve läuft sanft an; Schwellen verstärken Extreme.
-            curved = math.pow(normalized, 1.2)
+            # An acute appraisal wins over a stale state for the response that
+            # caused it. This is what makes one direct attack perceptible now.
+            direction = turn_direction if recent_normalized >= 0.18 and turn_direction else state_direction
+            normalized = max(state_normalized, recent_normalized)
+            curved = math.pow(normalized, 1.08)
             max_alpha = profile["max_alpha"] * vector_scale
-            alpha = max_alpha * (0.22 + 0.78 * curved)
+            alpha = max_alpha * (0.18 + 0.82 * curved)
 
-            if deviation >= 24:
+            if abs(signed_deviation) >= 24 or abs(turn_delta) >= 10:
                 alpha *= 1.04
-            if deviation >= 34:
+            if abs(signed_deviation) >= 34 or abs(turn_delta) >= 15:
                 alpha *= 1.04
             alpha *= profile.get("boost", 1.0)
             alpha = min(BASE_VECTOR_STRENGTH_CAP, max_alpha * profile.get("boost", 1.0), alpha)
 
-            # Richtung: Negativer Steering bei niedrigen Werten
-            if value < 50 and emotion not in negative_emotions:
+            if direction < 0 and emotion not in negative_emotions:
                 alpha = -alpha
-            elif value > 50 and emotion in negative_emotions:
-                # Frustration 80 = starkes Frustrations-Steering (positiv)
-                pass
-            elif value < 50 and emotion in negative_emotions:
+            elif direction < 0 and emotion in negative_emotions:
                 alpha = 0.0
 
             intensities[emotion] = round(alpha, 4)
 
         return intensities
 
-    def _build_composite_modes(self, emotions: Dict[str, int], intensities: Dict[str, float], model: Optional[str] = None) -> List[Dict[str, Any]]:
+    def _build_composite_modes(
+        self,
+        emotions: Dict[str, int],
+        intensities: Dict[str, float],
+        model: Optional[str] = None,
+        recent_changes: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
         # Erkennt komplexe Emotions-Kombinationen (Composite Behavior Modes).
         # Jeder Mode hat harte Schwellwerte. Wird er aktiviert, wird eine Stärke
         # linear aus der Überschreitung der Schwellen interpoliert (min-capped).
@@ -592,16 +627,46 @@ class SteeringManager:
         modes: List[Dict[str, Any]] = []
 
         # Alle Emotionen aus dem aktuellen Zustand holen (Default = Neutral/0)
-        frustration = emotions.get("frustration", 50)
-        trust = emotions.get("trust", 50)
-        sadness = emotions.get("sadness", 0)
-        happiness = emotions.get("happiness", 50)
-        energy = emotions.get("energy", 50)
-        curiosity = emotions.get("curiosity", 50)
-        motivation = emotions.get("motivation", 50)
-        affection = emotions.get("affection", 45)
-        anxiety = emotions.get("anxiety", 0)
-        calm = emotions.get("calm", 50)
+        frustration = emotions.get("frustration", EMOTION_DEFAULTS["frustration"])
+        trust = emotions.get("trust", EMOTION_DEFAULTS["trust"])
+        sadness = emotions.get("sadness", EMOTION_DEFAULTS["sadness"])
+        happiness = emotions.get("happiness", EMOTION_DEFAULTS["happiness"])
+        energy = emotions.get("energy", EMOTION_DEFAULTS["energy"])
+        curiosity = emotions.get("curiosity", EMOTION_DEFAULTS["curiosity"])
+        motivation = emotions.get("motivation", EMOTION_DEFAULTS["motivation"])
+        affection = emotions.get("affection", EMOTION_DEFAULTS["affection"])
+        anxiety = emotions.get("anxiety", EMOTION_DEFAULTS["anxiety"])
+        calm = emotions.get("calm", EMOTION_DEFAULTS["calm"])
+
+        frustration_delta = self._recent_delta(recent_changes, "frustration")
+        trust_delta = self._recent_delta(recent_changes, "trust")
+        calm_delta = self._recent_delta(recent_changes, "calm")
+        sadness_delta = self._recent_delta(recent_changes, "sadness")
+
+        # Acute mode for a direct hostile event. Long-term crashout keeps its
+        # stricter absolute thresholds, while this mode makes the current turn
+        # immediately sharp through layer editing alone.
+        if frustration_delta >= 10 and (trust_delta <= -8 or calm_delta <= -8):
+            strength = round(min(
+                float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                0.42 + min(0.09, (frustration_delta - 10) * 0.01)
+                + min(0.04, max(0, sadness_delta) * 0.004),
+            ), 4)
+            modes.append({
+                "name": "angered",
+                "source": "acute_composite",
+                "strength": strength,
+                "direction": "positive",
+                "layer_range": list(emotion_range),
+                "emotion_value": frustration,
+                "trigger": {
+                    "frustration_delta": frustration_delta,
+                    "trust_delta": trust_delta,
+                    "calm_delta": calm_delta,
+                    "sadness_delta": sadness_delta,
+                },
+                **COMPOSITE_BEHAVIOR_MODES["angered"],
+            })
 
         # --- crashout ---
         # Schwellenregel: Nur hohe Frustration UND geringes Vertrauen aktivieren crashout.
@@ -752,6 +817,7 @@ class SteeringManager:
         force: bool = False,
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
+        recent_changes: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Generiert das Steering-Payload fuer das LLM-Backend.
@@ -776,7 +842,11 @@ class SteeringManager:
         if not self.supports_activation_steering(effective_provider) or not self.is_local_vector_steerable_model(effective_provider, effective_model):
             return {}
 
-        intensities = self.compute_emotion_intensity(current_emotions, model=effective_model)
+        intensities = self.compute_emotion_intensity(
+            current_emotions,
+            model=effective_model,
+            recent_changes=recent_changes,
+        )
         active_vectors = []
         base_vectors = []
         composite_vectors = []
@@ -796,9 +866,10 @@ class SteeringManager:
                 "strength": abs(alpha),
                 "direction": "positive" if alpha > 0 else "negative",
                 "layer_range": [runtime_config["layer_start"], runtime_config["layer_end"]],
-                "emotion_value": current_emotions.get(emotion, 50),
+                "emotion_value": current_emotions.get(emotion, EMOTION_DEFAULTS.get(emotion, 50)),
                 "source": "base",
                 "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
+                "turn_delta": self._recent_delta(recent_changes, emotion),
             }
             base_vectors.append(vector_entry)
 
@@ -811,7 +882,12 @@ class SteeringManager:
         )[: max(1, int(STEERING_RUNTIME_CONFIG["max_base_vectors"]))]
         active_vectors.extend(selected_base_vectors)
 
-        detected_modes = self._build_composite_modes(current_emotions, intensities, model=effective_model)
+        detected_modes = self._build_composite_modes(
+            current_emotions,
+            intensities,
+            model=effective_model,
+            recent_changes=recent_changes,
+        )
         for mode in detected_modes[: max(0, int(STEERING_RUNTIME_CONFIG["max_composite_vectors"]))]:
             vector_entry = {
                 "name": mode["name"],
@@ -892,11 +968,15 @@ class SteeringManager:
                 "dominant_emotion": dominant_name,
                 "dominant_strength": dominant["strength"] if dominant else 0.0,
                 "emotion_state": {
-                    emotion: int(current_emotions.get(emotion, 50))
+                    emotion: int(current_emotions.get(emotion, EMOTION_DEFAULTS.get(emotion, 50)))
                     for emotion in EMOTION_VECTOR_MAP
                 },
                 "emotion_intensities": {
                     emotion: round(float(intensities.get(emotion, 0.0)), 4)
+                    for emotion in EMOTION_VECTOR_MAP
+                },
+                "recent_changes": {
+                    emotion: self._recent_delta(recent_changes, emotion)
                     for emotion in EMOTION_VECTOR_MAP
                 },
                 "base_vectors": base_vectors,
@@ -912,18 +992,29 @@ class SteeringManager:
         force: bool = False,
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
+        recent_changes: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Erzeugt eine kompakte Debug-Sicht auf die Emotionssteuerung."""
         self.refresh_runtime_profile(model)
         effective_model = self._effective_model(model)
         effective_provider = self._effective_provider(provider)
-        intensities = self.compute_emotion_intensity(current_emotions, model=effective_model)
-        composite_modes = self._build_composite_modes(current_emotions, intensities, model=effective_model)
+        intensities = self.compute_emotion_intensity(
+            current_emotions,
+            model=effective_model,
+            recent_changes=recent_changes,
+        )
+        composite_modes = self._build_composite_modes(
+            current_emotions,
+            intensities,
+            model=effective_model,
+            recent_changes=recent_changes,
+        )
         payload = steering_payload if steering_payload is not None else self.get_steering_payload(
             current_emotions,
             force=force,
             provider=effective_provider,
             model=effective_model,
+            recent_changes=recent_changes,
         )
         steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
         active_vectors = steering_meta.get("vectors", []) if isinstance(steering_meta.get("vectors", []), list) else []

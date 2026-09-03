@@ -104,10 +104,10 @@ class CHAPPiERuntime(
         )
         self.emotions = EmotionsEngine(
             status_file=self.runtime_data_dir / "status.json" if self.runtime_data_dir else None,
-            # Emotion changes stay deterministic and local. The main
-            # vLLM request then receives those values through activation
-            # steering without an auxiliary sentiment-model route.
-            force_simple=True,
+            # Research runs stay deterministic. Normal chat may use Groq only
+            # to appraise deltas; the final answer remains local and receives
+            # emotions exclusively through activation steering.
+            force_simple=self.research_mode,
         )
         self.brain = get_brain(provider=self._chat_provider(), model=self._chat_model())
         self._current_provider = self._chat_provider()
@@ -208,7 +208,7 @@ class CHAPPiERuntime(
 
     @staticmethod
     def _single_local_chat_mode() -> bool:
-        return True
+        return not bool(getattr(settings, "groq_auxiliary_enabled", True))
 
     @staticmethod
     def _neutral_life_snapshot() -> Dict[str, Any]:
@@ -352,21 +352,6 @@ class CHAPPiERuntime(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    GROQ_FORMAT_MODEL = "openai/gpt-oss-120b"
 
 
 

@@ -9,11 +9,11 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 from config.config import settings
-from config.emotions import normalize_emotion_state
+from config.emotions import EMOTION_ORDER, normalize_emotion_state
 from config.prompts import (
     format_consolidated_memories,
 )
-from memory.emotions_engine import analyze_emotion_signals, calculate_emotion_transition
+from memory.emotions_engine import EmotionalState, calculate_emotion_transition
 from brain.response_parser import (
     looks_like_model_error,
     sanitize_visible_response,
@@ -218,7 +218,7 @@ class RuntimeTurnPipelineMixin:
         self._execute_step1_tool_calls(intent_result.tool_calls)
         
         # === AUSFUEHRUNG: Emotions Updates ===
-        combined_updates = dict(intent_result.emotions_update)
+        combined_updates = {}
         for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
             if emotion_name not in combined_updates:
                 combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
@@ -318,6 +318,7 @@ class RuntimeTurnPipelineMixin:
                 fact_lookup_intent=fact_lookup_intent,
                 allow_memory_context=memory_allowed,
                 isolated_request=isolated_request,
+                emotion_changes=emotion_transitions,
             ),
             validator=self._is_valid_generation_result,
             status_callback=status_callback,
@@ -573,52 +574,41 @@ class RuntimeTurnPipelineMixin:
         combined_updates: Dict[str, Any],
         user_input: str,
     ) -> tuple[Dict[str, int], Dict[str, Any]]:
-        """Apply direct input signals and model/life deltas in one turn.
+        """Apply appraisal and homeostasis once, with appraisal taking priority."""
+        self.emotions.state = EmotionalState.from_dict(emotions_before)
+        appraisal, analysis = self.emotions.analyze_message(user_input)
+        merged_updates: Dict[str, Any] = {}
 
-        Previously any non-zero homeostasis update suppressed the direct
-        sentiment signal. Since Life always contributes at least one
-        adjustment, messages such as "nichts funktioniert" could leave
-        the visible emotional state unchanged. The deterministic local
-        signal now runs first, then intent/homeostasis is layered on top.
-        """
-        direct_signals = analyze_emotion_signals(user_input, current_state=emotions_before)
-        has_direct_signal = any(value != 0 for value in direct_signals.values())
-        has_any_delta = any(
-            (getattr(update, "delta", update.get("delta", 0) if isinstance(update, dict) else 0) != 0)
-            for update in combined_updates.values()
-        )
+        for emotion_name in EMOTION_ORDER:
+            appraisal_delta = self._safe_int(appraisal.get(emotion_name, 0), 0)
+            life_update = combined_updates.get(emotion_name, {})
+            life_delta = self._safe_int(
+                getattr(life_update, "delta", life_update.get("delta", 0) if isinstance(life_update, dict) else 0),
+                0,
+            )
+            if appraisal_delta and life_delta and (appraisal_delta > 0) != (life_delta > 0):
+                life_delta = 0
+            raw_delta = appraisal_delta + life_delta
+            if raw_delta:
+                merged_updates[emotion_name] = {
+                    "delta": raw_delta,
+                    "reason": str(analysis.get("source", "appraisal"))
+                    + (" + homeostasis" if life_delta else ""),
+                }
 
-        if has_direct_signal:
-            self.emotions.update_from_message(user_input)
-        signal_state = self._get_emotions_snapshot()
-
-        if not has_any_delta:
-            if not has_direct_signal:
-                self.emotions.update_from_message(user_input)
-                signal_state = self._get_emotions_snapshot()
-            return signal_state, self._calculate_emotion_delta(emotions_before, signal_state)
-
-        emotions_after, emotion_transitions = self._apply_emotion_updates(signal_state, combined_updates)
-
-        # Return the observable before/after result for all ten dimensions;
-        # the detailed transition metadata from intent/homeostasis remains
-        # available where it exists.
-        observable_delta = self._calculate_emotion_delta(emotions_before, emotions_after)
-        for emotion_name, delta in observable_delta.items():
-            existing = emotion_transitions.get(emotion_name)
-            existing_change = 0
-            if isinstance(existing, dict):
-                existing_change = self._safe_int(
-                    existing.get("applied_delta", existing.get("change", 0)),
-                    0,
-                )
-            # Homeostasis may have supplied a zero transition for a
-            # dimension that the direct input signal changed. Preserve
-            # the actual observable before/after values in that case.
-            if not isinstance(existing, dict) or existing_change == 0:
-                emotion_transitions[emotion_name] = delta
-
-        return emotions_after, emotion_transitions
+        emotions_after, transitions = self._apply_emotion_updates(emotions_before, merged_updates)
+        for emotion_name in EMOTION_ORDER:
+            if emotion_name not in transitions:
+                transitions[emotion_name] = {
+                    "before": emotions_before[emotion_name],
+                    "after": emotions_after[emotion_name],
+                    "raw_delta": 0,
+                    "applied_delta": 0,
+                    "change": 0,
+                    "softened": False,
+                    "reason": analysis.get("source", "appraisal"),
+                }
+        return emotions_after, transitions
 
     def _add_short_term_entries(self, entries: List[Any]):
         """Fuegt Short-Term Eintraege hinzu."""
@@ -813,7 +803,7 @@ class RuntimeTurnPipelineMixin:
         self._execute_step1_tool_calls(intent_result.tool_calls)
 
         # === AUSFUEHRUNG: Emotions Updates ===
-        combined_updates = dict(intent_result.emotions_update)
+        combined_updates = {}
         for emotion_name, delta in life_context.get("homeostasis", {}).get("emotion_adjustments", {}).items():
             if emotion_name not in combined_updates:
                 combined_updates[emotion_name] = {"delta": delta, "reason": "homeostasis"}
@@ -902,7 +892,10 @@ class RuntimeTurnPipelineMixin:
         )
 
         # === STEP 2: Response Generation (streaming) ===
-        steering_preview = self._build_prompt_runtime(emotions_after).get("emotion_steering", {})
+        steering_preview = self._build_prompt_runtime(
+            emotions_after,
+            emotion_changes=emotion_transitions,
+        ).get("emotion_steering", {})
         yield _pipeline_status(
             "steering",
             2,
@@ -949,6 +942,7 @@ class RuntimeTurnPipelineMixin:
                         allow_memory_context=memory_allowed,
                         isolated_request=isolated_request,
                         context_components=context_components,
+                        emotion_changes=emotion_transitions,
                     )
                     for raw_part in token_generator:
                         now = time.perf_counter()
@@ -1025,7 +1019,7 @@ class RuntimeTurnPipelineMixin:
                     "answer_is_fallback": False,
                 }
             else:
-                formatted_stream = self._format_via_groq(raw_response)
+                formatted_stream = self._format_via_groq(display_response)
             self.debug_logger.log_info(
                 "MODEL_OUTPUT",
                 "Schritt-2-Ausgabe ausgewertet",
@@ -1098,7 +1092,6 @@ class RuntimeTurnPipelineMixin:
         if not safe_answer:
             safe_answer = "Die Modellantwort enthielt interne Steuerdaten und wurde aus Sicherheitsgruenden verworfen."
         if final_sanitization:
-            formatted_stream["formatting_failed"] = True
             formatted_stream["output_sanitized"] = final_sanitization
         display_response = safe_answer
 

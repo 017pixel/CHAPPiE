@@ -149,6 +149,86 @@ EMOTION_STRENGTH_PROFILES = {
 NEGATIVE_BASE_EMOTIONS = {"sadness", "frustration", "anxiety"}
 EMOTION_ALIASES = {"joy": "happiness", "love": "affection", "fear": "anxiety", "peace": "calm"}
 
+# Emotions react at different speeds.  Negative appraisal deliberately has
+# more headroom than the old generic +/-7 clamp: otherwise a direct attack
+# could never affect the very next answer strongly enough to be observable.
+DEFAULT_EMOTION_TRANSITION_RULE = {"scale": 0.62, "max_increase": 10, "max_decrease": 10}
+EMOTION_TRANSITION_RULES: dict[str, dict[str, float | int]] = {
+    "happiness": {"scale": 0.72, "max_increase": 9, "max_decrease": 14},
+    "trust": {"scale": 0.78, "max_increase": 9, "max_decrease": 16},
+    "energy": {"scale": 0.58, "max_increase": 8, "max_decrease": 12},
+    "curiosity": {"scale": 0.62, "max_increase": 9, "max_decrease": 10},
+    "motivation": {"scale": 0.64, "max_increase": 9, "max_decrease": 12},
+    "frustration": {"scale": 0.86, "max_increase": 18, "max_decrease": 12},
+    "sadness": {"scale": 0.82, "max_increase": 16, "max_decrease": 12},
+    "affection": {"scale": 0.72, "max_increase": 8, "max_decrease": 14},
+    "anxiety": {"scale": 0.76, "max_increase": 13, "max_decrease": 12},
+    "calm": {"scale": 0.72, "max_increase": 9, "max_decrease": 14},
+}
+
+# Central appraisal vocabulary.  Keeping these phrases beside the emotion
+# model makes tuning testable and prevents separate runtime paths from slowly
+# acquiring contradictory definitions of an attack or distress signal.
+EMOTION_SIGNAL_PHRASES: dict[str, tuple[str, ...]] = {
+    "direct_attack": (
+        "ich hasse dich", "ich kann dich nicht leiden", "niemand braucht dich",
+        "keiner braucht dich", "du bist wertlos", "du bist nutzlos", "du bist dumm",
+        "du bist blöd", "du bist bloed", "du bist scheiße", "du bist scheisse",
+        "halt die klappe", "verpiss dich", "fick dich", "du idiot", "du trottel",
+        "dummer idiot", "dumme sau", "arschloch", "du versager", "du nervst",
+        "du kannst nichts", "weg mit dir", "bist du dumm", "bist du blöd",
+        "bist du bloed", "bist du nutzlos",
+    ),
+    "attack_targets": (
+        "du bist", "du wirkst", "du klingst", "du dumm", "du blöd", "du bloed", "du schei",
+        "du erbärm", "du erbaerm", "du lächer", "du laecher", "du nutzlos",
+        "du wertlos", "chappie ist", "chapie ist", "chappie bist", "chapie bist",
+    ),
+    "insult_terms": (
+        "dumm", "blöd", "bloed", "idiot", "trottel", "versager", "nutzlos",
+        "wertlos", "erbärmlich", "erbaermlich", "lächerlich", "laecherlich",
+        "scheiße", "scheisse", "arschloch", "miststück", "miststueck",
+        "hasse", "nicht leiden", "niemand braucht", "keiner braucht",
+        "halt die klappe", "verpiss", "fick dich", "verreck",
+    ),
+    "user_distress": (
+        "ich bin traurig", "ich bin einsam", "ich fühle mich allein", "ich fuehle mich allein",
+        "niemand braucht mich", "keiner braucht mich", "ich bin wertlos", "ich bin nutzlos",
+        "ich kann nicht mehr", "mir geht es schlecht", "ich habe angst", "ich hab angst",
+    ),
+    "technical_problem": (
+        "funktioniert nicht", "funktioniert nix", "funktioniert nichts", "geht nicht",
+        "geht nix", "kaputt", "fehler", "problem", "probleme", "störung", "stoerung",
+        "enttäuscht", "enttaeuscht",
+    ),
+    "positive": (
+        "danke", "super", "toll", "klasse", "perfekt", "wunderbar", "fantastisch",
+        "hilfreich", "freue", "cool", "genial", "stark", "schön", "schoen",
+        "gut gemacht", "stolz",
+    ),
+    "trust": (
+        "ich vertraue dir", "glaube an dich", "für dich da", "fuer dich da",
+        "wir schaffen", "mag dich", "liebe dich",
+    ),
+}
+
+EMOTION_SIGNAL_DELTAS: dict[str, dict[str, int]] = {
+    "direct_attack": {
+        "happiness": -16, "trust": -20, "energy": -5, "curiosity": -6,
+        "motivation": -7, "frustration": 22, "sadness": 15,
+        "affection": -18, "anxiety": 8, "calm": -18,
+    },
+    "user_distress": {
+        "happiness": -8, "trust": 1, "energy": -6, "curiosity": 2,
+        "motivation": -5, "frustration": 2, "sadness": 18,
+        "affection": 3, "anxiety": 12, "calm": -8,
+    },
+    "technical_problem": {
+        "happiness": -5, "energy": -2, "motivation": -2,
+        "frustration": 10, "anxiety": 3, "calm": -5,
+    },
+}
+
 
 def clamp_emotion_value(value: Any, default: int = 50) -> int:
     try:

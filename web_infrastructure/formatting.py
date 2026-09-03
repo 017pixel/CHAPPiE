@@ -680,7 +680,11 @@ class RuntimeFormattingMixin:
             },
         ]
 
-    def _build_prompt_runtime(self, emotions: Dict[str, int]) -> Dict[str, Any]:
+    def _build_prompt_runtime(
+        self,
+        emotions: Dict[str, int],
+        emotion_changes: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         model_name = self._chat_model()
         # Research ablations may disable the feature explicitly. Normal
         # web chat must always keep activation steering enabled, even if
@@ -716,6 +720,7 @@ class RuntimeFormattingMixin:
             force=True,
             provider=self._chat_provider(),
             model=model_name,
+            recent_changes=emotion_changes,
         )
         use_prompt_emotions = False
         emotion_steering = self.steering_manager.build_debug_report(
@@ -724,6 +729,7 @@ class RuntimeFormattingMixin:
             force=True,
             provider=self._chat_provider(),
             model=model_name,
+            recent_changes=emotion_changes,
         )
         response_plan = self._derive_response_plan(
             emotions=emotions,
@@ -876,7 +882,7 @@ class RuntimeFormattingMixin:
             import openai
             from brain.groq_limits import get_groq_limiter
 
-            estimated_tokens = get_groq_limiter().estimate_tokens(clean_text) + 5000
+            estimated_tokens = get_groq_limiter().estimate_tokens(clean_text) + 1200
             allowed, reason = get_groq_limiter().can_start(estimated_tokens)
             if not allowed:
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
@@ -893,15 +899,15 @@ class RuntimeFormattingMixin:
             else:
                 system_prompt = FORMATTER_WHITESPACE_PROMPT
             response = client.chat.completions.create(
-                model=self.GROQ_FORMAT_MODEL,
+                model=settings.groq_format_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": clean_text[:16000]},
                 ],
-                max_tokens=5000,
+                max_completion_tokens=1200,
                 temperature=0.0,
                 stream=False,
-                timeout=7.5,
+                timeout=float(settings.groq_format_timeout_seconds),
             )
             formatted = response.choices[0].message.content or ""
             if settings.chain_of_thought:
@@ -920,16 +926,22 @@ class RuntimeFormattingMixin:
             else:
                 cot = ""
                 answer = formatted.strip() or self._FALLBACK_SILENT
-            return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": self.GROQ_FORMAT_MODEL, "answer_is_fallback": self._is_fallback_text(answer)}
+            if not self._same_text_except_whitespace(answer, clean_text):
+                result = self._local_format_fallback(clean_text, formatting_failed=False)
+                result["formatting_source"] = "local_integrity_fallback"
+                result["formatting_skip_reason"] = "groq_changed_content"
+                return result
+            return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": settings.groq_format_model, "answer_is_fallback": self._is_fallback_text(answer)}
         except Exception as e:
             error_msg = str(e).lower()
             reason = "timeout" if any(kw in error_msg for kw in ("timeout", "timed out", "connect", "unreachable")) else "error"
             if reason == "timeout":
-                print(f"[Groq Format] {reason}: Groq nach 7.5s nicht erreichbar — lokaler Fallback")
+                print(f"[Groq Format] {reason}: Groq nicht erreichbar — lokaler Fallback")
             else:
                 print(f"[Groq Format] Fehler: {e}")
-            result = self._local_format_fallback(clean_text, formatting_failed=True)
+            result = self._local_format_fallback(clean_text, formatting_failed=False)
             result["formatting_source"] = "local_fallback"
+            result["formatting_error"] = reason
             return result
 
     @staticmethod
@@ -967,6 +979,11 @@ class RuntimeFormattingMixin:
         thought = RuntimeFormattingMixin._normalize_whitespace(thought)
         formatting_failed = bool(formatting_failed or RuntimeFormattingMixin._has_joined_text_warning(answer_text))
         return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "formatting_model": "local_regex", "answer_is_fallback": answer_is_fallback}
+
+    @staticmethod
+    def _same_text_except_whitespace(candidate: str, original: str) -> bool:
+        """Formatter output may move whitespace, but never rewrite content."""
+        return re.sub(r"\s+", "", candidate or "") == re.sub(r"\s+", "", original or "")
 
     @staticmethod
     def _space_ratio(text: str) -> float:

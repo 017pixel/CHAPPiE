@@ -98,8 +98,10 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "cloud_models": {
         "groq_model": "openai/gpt-oss-120b",
-        "groq_format_model": "openai/gpt-oss-120b",
+        "groq_format_model": "llama-3.1-8b-instant",
         "groq_memory_model": "openai/gpt-oss-120b",
+        "groq_auxiliary_enabled": True,
+        "groq_format_timeout_seconds": 12.0,
     },
     "small_tasks": {
         # In the default vLLM configuration, every inference step must use the
@@ -116,8 +118,10 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "query_extraction_vllm_model": "Qwen/Qwen3.5-4B",
         "enable_query_extraction": True,
         "query_extraction_min_words_for_llm": 7,
-        "emotion_analysis_model": "qwen3.5:9b",
-        "emotion_analysis_host": "http://localhost:11434",
+        "emotion_analysis_provider": "groq",
+        "emotion_analysis_model": "openai/gpt-oss-20b",
+        "emotion_analysis_host": "https://api.groq.com/openai/v1",
+        "emotion_analysis_timeout_seconds": 12.0,
     },
     "generation": {
         "max_tokens": 450,
@@ -318,7 +322,7 @@ STEERING_RUNTIME_CONFIG = {
     "max_base_vectors": 3,
     "max_composite_vectors": 1,
     "max_composite_strength": 0.55,
-    "natural_presence_strength": 0.18,
+    "natural_presence_strength": 0.26,
     "neutral_baseline_strength": 0.08,
 }
 
@@ -414,8 +418,10 @@ class Settings:
 
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")
         self.groq_model = self._get_val("GROQ_MODEL", "openai/gpt-oss-120b")
-        self.groq_format_model = self._get_val("GROQ_FORMAT_MODEL", "openai/gpt-oss-120b")
+        self.groq_format_model = self._get_val("GROQ_FORMAT_MODEL", "llama-3.1-8b-instant")
         self.groq_memory_model = self._get_val("GROQ_MEMORY_MODEL", "openai/gpt-oss-120b")
+        self.groq_auxiliary_enabled = bool(self._get_val("GROQ_AUXILIARY_ENABLED", True))
+        self.groq_format_timeout_seconds = float(self._get_val("GROQ_FORMAT_TIMEOUT_SECONDS", 12.0))
 
         self.intent_provider = _parse_provider(self._get_val("INTENT_PROVIDER", "vllm"))
         self.intent_processor_model_groq = self._get_val("INTENT_PROCESSOR_MODEL_GROQ", "openai/gpt-oss-20b")
@@ -430,8 +436,15 @@ class Settings:
         self.enable_query_extraction = bool(self._get_val("ENABLE_QUERY_EXTRACTION", True))
         self.query_extraction_min_words_for_llm = int(self._get_val("QUERY_EXTRACTION_MIN_WORDS_FOR_LLM", 7))
 
-        self.emotion_analysis_model = self._get_val("EMOTION_ANALYSIS_MODEL", "qwen3.5:9b")
-        self.emotion_analysis_host = self._get_val("EMOTION_ANALYSIS_HOST", "http://localhost:11434")
+        self.emotion_analysis_model = self._get_val("EMOTION_ANALYSIS_MODEL", "openai/gpt-oss-20b")
+        self.emotion_analysis_host = self._get_val("EMOTION_ANALYSIS_HOST", "https://api.groq.com/openai/v1")
+        configured_emotion_provider = self._get_val("EMOTION_ANALYSIS_PROVIDER", None)
+        if configured_emotion_provider is None:
+            configured_emotion_provider = (
+                "ollama" if "localhost" in str(self.emotion_analysis_host).casefold() else "groq"
+            )
+        self.emotion_analysis_provider = _parse_provider(configured_emotion_provider)
+        self.emotion_analysis_timeout_seconds = float(self._get_val("EMOTION_ANALYSIS_TIMEOUT_SECONDS", 12.0))
         self.embedding_model = self._get_val("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
         self.training_use_global_settings = bool(self._get_val("TRAINING_USE_GLOBAL_SETTINGS", True))
@@ -565,7 +578,7 @@ class Settings:
             if key in kwargs and kwargs[key]:
                 setattr(self, key, kwargs[key])
 
-        for key in ["intent_provider", "query_extraction_provider", "steering_provider", "training_chappie_provider", "training_trainer_provider"]:
+        for key in ["intent_provider", "query_extraction_provider", "emotion_analysis_provider", "steering_provider", "training_chappie_provider", "training_trainer_provider"]:
             if key in kwargs:
                 parsed = _parse_provider(kwargs[key])
                 if key in ("intent_provider", "query_extraction_provider") and old_provider != self.llm_provider and parsed == old_provider:
@@ -576,7 +589,7 @@ class Settings:
             "vllm_force_single_model", "enable_steering", "steering_quantize",
             "training_use_global_settings", "chain_of_thought",
             "memory_consolidation_enabled", "enable_two_step_processing",
-            "use_model_defaults",
+            "use_model_defaults", "groq_auxiliary_enabled",
         ]
         for key in bool_keys:
             if key in kwargs and kwargs[key] is not None:
@@ -595,6 +608,7 @@ class Settings:
             "groq_requests_per_hour", "groq_requests_per_day",
             "groq_tokens_per_minute", "groq_tokens_per_hour",
             "groq_tokens_per_day",
+            "groq_format_timeout_seconds", "emotion_analysis_timeout_seconds",
         ]
         for key in numeric_keys:
             if key in kwargs and kwargs[key] is not None:
@@ -620,6 +634,8 @@ class Settings:
             "GROQ_MODEL": self.groq_model,
             "GROQ_FORMAT_MODEL": self.groq_format_model,
             "GROQ_MEMORY_MODEL": self.groq_memory_model,
+            "GROQ_AUXILIARY_ENABLED": self.groq_auxiliary_enabled,
+            "GROQ_FORMAT_TIMEOUT_SECONDS": self.groq_format_timeout_seconds,
             "VLLM_MODEL": self.vllm_model,
             "GEMMA4_MODEL": self.gemma4_model,
             "GEMMA4_STEERING_MODEL": self.gemma4_steering_model,
@@ -640,6 +656,8 @@ class Settings:
             "QUERY_EXTRACTION_MIN_WORDS_FOR_LLM": self.query_extraction_min_words_for_llm,
             "EMOTION_ANALYSIS_MODEL": self.emotion_analysis_model,
             "EMOTION_ANALYSIS_HOST": self.emotion_analysis_host,
+            "EMOTION_ANALYSIS_PROVIDER": provider_value(self.emotion_analysis_provider),
+            "EMOTION_ANALYSIS_TIMEOUT_SECONDS": self.emotion_analysis_timeout_seconds,
             "EMBEDDING_MODEL": self.embedding_model,
             "MEMORY_TOP_K": self.memory_top_k,
             "MEMORY_PROMPT_TOP_K": self.memory_prompt_top_k,

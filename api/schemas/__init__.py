@@ -121,6 +121,8 @@ class SettingsSnapshot(BaseModel):
     groq_model: str
     groq_format_model: str
     groq_memory_model: str
+    groq_auxiliary_enabled: bool
+    groq_format_timeout_seconds: float
     intent_provider: Optional[str]
     intent_processor_model_groq: str
     intent_processor_model_ollama: str
@@ -132,6 +134,8 @@ class SettingsSnapshot(BaseModel):
     query_extraction_min_words_for_llm: int
     emotion_analysis_model: str
     emotion_analysis_host: str
+    emotion_analysis_provider: Optional[str]
+    emotion_analysis_timeout_seconds: float
     embedding_model: str
     training_use_global_settings: bool
     training_chappie_provider: Optional[str]
@@ -176,6 +180,8 @@ class SettingsUpdate(BaseModel):
     groq_model: Optional[str] = None
     groq_format_model: Optional[str] = None
     groq_memory_model: Optional[str] = None
+    groq_auxiliary_enabled: Optional[bool] = None
+    groq_format_timeout_seconds: Optional[float] = None
     vllm_model: Optional[str] = None
     gemma4_model: Optional[str] = None
     gemma4_steering_model: Optional[str] = None
@@ -194,6 +200,8 @@ class SettingsUpdate(BaseModel):
     query_extraction_min_words_for_llm: Optional[int] = None
     emotion_analysis_model: Optional[str] = None
     emotion_analysis_host: Optional[str] = None
+    emotion_analysis_provider: Optional[str] = None
+    emotion_analysis_timeout_seconds: Optional[float] = None
     embedding_model: Optional[str] = None
     training_use_global_settings: Optional[bool] = None
     training_chappie_provider: Optional[str] = None

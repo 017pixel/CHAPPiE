@@ -367,7 +367,8 @@ class RuntimeGenerationMixin:
                           exact_entities: Optional[List[str]] = None,
                           fact_lookup_intent: bool = False,
                           allow_memory_context: bool = True,
-                          isolated_request: bool = False) -> Dict[str, Any]:
+                          isolated_request: bool = False,
+                          emotion_changes: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generiert die finale Antwort (Step 2)."""
         closed_reasoning = is_self_contained_math_query(user_input)
         memory_suppressed = closed_reasoning or not allow_memory_context
@@ -466,7 +467,7 @@ class RuntimeGenerationMixin:
             memory_trace,
         )
 
-        prompt_runtime = self._build_prompt_runtime(emotions)
+        prompt_runtime = self._build_prompt_runtime(emotions, emotion_changes=emotion_changes)
         tone_decision = prompt_runtime.get("response_plan", {})
         self.debug_logger.log_info(
             "EMOTION_STEERING",
@@ -585,7 +586,7 @@ class RuntimeGenerationMixin:
                 "answer_is_fallback": False,
             }
         else:
-            formatted = self._format_via_groq(raw_response)
+            formatted = self._format_via_groq(display_response)
 
         # Safety net: wenn Groq kein cot liefert, aber thought/model_reasoning existiert
         safe_cot = formatted.get("cot", "") or thought or model_reasoning or ""
@@ -599,7 +600,6 @@ class RuntimeGenerationMixin:
         # formatted answer must not disagree about prompt fragments.
         safe_answer, formatted_sanitization = sanitize_visible_response(safe_answer)
         if formatted_sanitization:
-            formatted["formatting_failed"] = True
             formatted["output_sanitized"] = formatted_sanitization
         if not safe_answer:
             safe_answer = display_response
@@ -661,6 +661,7 @@ class RuntimeGenerationMixin:
         allow_memory_context: bool = True,
         isolated_request: bool = False,
         context_components: Optional[Dict[str, str]] = None,
+        emotion_changes: Optional[Dict[str, Any]] = None,
     ):
         """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
         closed_reasoning = is_self_contained_math_query(user_input)
@@ -717,7 +718,7 @@ class RuntimeGenerationMixin:
             },
         }
 
-        prompt_runtime = self._build_prompt_runtime(emotions)
+        prompt_runtime = self._build_prompt_runtime(emotions, emotion_changes=emotion_changes)
         tone_decision = prompt_runtime.get("response_plan", {})
 
         base_system_prompt = get_system_prompt_with_emotions(

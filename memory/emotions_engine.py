@@ -21,32 +21,28 @@ Emotionen:
 
 import json
 import math
+import re
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional, Dict, Any
 
-from config.config import PROJECT_ROOT, settings
-from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER, clamp_emotion_value, normalize_emotion_state
+from config.config import LLMProvider, PROJECT_ROOT, settings
+from config.emotions import (
+    DEFAULT_EMOTION_TRANSITION_RULE,
+    EMOTION_DEFAULTS,
+    EMOTION_ORDER,
+    EMOTION_SIGNAL_DELTAS,
+    EMOTION_SIGNAL_PHRASES,
+    EMOTION_TRANSITION_RULES,
+    NEGATIVE_BASE_EMOTIONS,
+    clamp_emotion_value,
+    normalize_emotion_state,
+)
 from config.prompts import EMOTION_ANALYSIS_PROMPT  # from config/prompts.py
 
 
 # Status-Datei Pfad
 STATUS_FILE = PROJECT_ROOT / "data" / "status.json"
-
-DEFAULT_EMOTION_TRANSITION_RULE = {"scale": 0.55, "max_increase": 8, "max_decrease": 8}
-EMOTION_TRANSITION_RULES = {
-    "happiness": {"scale": 0.55, "max_increase": 8, "max_decrease": 8},
-    "trust": {"scale": 0.55, "max_increase": 7, "max_decrease": 8},
-    "energy": {"scale": 0.50, "max_increase": 6, "max_decrease": 7},
-    "curiosity": {"scale": 0.55, "max_increase": 6, "max_decrease": 6},
-    "frustration": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
-    "motivation": {"scale": 0.55, "max_increase": 7, "max_decrease": 7},
-    "sadness": {"scale": 0.50, "max_increase": 7, "max_decrease": 7},
-    "affection": {"scale": 0.50, "max_increase": 6, "max_decrease": 7},
-    "anxiety": {"scale": 0.45, "max_increase": 6, "max_decrease": 7},
-    "calm": {"scale": 0.45, "max_increase": 6, "max_decrease": 6},
-}
-
 
 def _clamp_emotion_value(value: int) -> int:
     return clamp_emotion_value(value)
@@ -190,13 +186,11 @@ class EmotionsEngine:
         
         # Brain einmal beim ersten Init laden (lazy loading)
         if self.force_simple:
-            # Research runs must never inherit or initialize an auxiliary
-            # sentiment model. Clearing the class cache also covers processes
-            # in which a normal EmotionsEngine was created beforehand.
+            # Research runs must never call an auxiliary sentiment model.
             EmotionsEngine._cached_brain = None
-            EmotionsEngine._brain_initialized = True
+            EmotionsEngine._brain_initialized = False
             print("   Emotions: Simple-Analyse aktiv (Research-Ein-Modell-Modus)")
-        elif not EmotionsEngine._brain_initialized:
+        elif settings.emotion_analysis_provider == LLMProvider.OLLAMA and not EmotionsEngine._brain_initialized:
             self._init_ollama_brain()
         
         print(f"Emotions Engine geladen: H={self.state.happiness} T={self.state.trust} E={self.state.energy}")
@@ -275,6 +269,41 @@ class EmotionsEngine:
         except Exception as e:
             print(f"Fehler beim Speichern des Status: {e}")
     
+    def _analyze_with_groq(self, prompt: str) -> Optional[Dict[str, Any]]:
+        """Run the optional structured appraisal call without affecting generation."""
+        if not getattr(settings, "groq_auxiliary_enabled", True) or not settings.groq_api_key:
+            return None
+        try:
+            import openai
+            from brain.groq_limits import get_groq_limiter
+
+            limiter = get_groq_limiter()
+            estimated_tokens = limiter.estimate_tokens(prompt) + 500
+            allowed, _reason = limiter.can_start(estimated_tokens)
+            if not allowed:
+                return None
+            client = openai.OpenAI(
+                base_url=settings.emotion_analysis_host,
+                api_key=settings.groq_api_key,
+            )
+            request: Dict[str, Any] = {
+                "model": settings.emotion_analysis_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                "max_completion_tokens": 500,
+                "temperature": 0.0,
+                "stream": False,
+                "timeout": float(settings.emotion_analysis_timeout_seconds),
+            }
+            if "gpt-oss" in str(settings.emotion_analysis_model).casefold():
+                request["extra_body"] = {"reasoning_effort": "low", "include_reasoning": False}
+            response = client.chat.completions.create(**request)
+            return json.loads(response.choices[0].message.content or "")
+        except Exception as exc:
+            if settings.debug:
+                print(f"Groq Emotions-Analyse Fehler: {exc}")
+            return None
+
     def _analyze_with_llm(self, user_message: str) -> Optional[Dict]:
         """
         Analysiert die Nachricht mit dem gecachten lokalen LLM.
@@ -290,13 +319,7 @@ class EmotionsEngine:
         if self.force_simple:
             return None
 
-        # Nutze gecachte Brain-Instanz
-        if EmotionsEngine._cached_brain is None:
-            return None
-        
         try:
-            from brain.base_brain import GenerationConfig, Message
-            
             prompt = EMOTION_ANALYSIS_PROMPT.format(
                 user_message=user_message,
                 current_happiness=self.state.happiness,
@@ -310,6 +333,12 @@ class EmotionsEngine:
                 current_anxiety=self.state.anxiety,
                 current_calm=self.state.calm,
             )
+
+            if settings.emotion_analysis_provider == LLMProvider.GROQ:
+                return self._analyze_with_groq(prompt)
+            if EmotionsEngine._cached_brain is None:
+                return None
+            from brain.base_brain import GenerationConfig, Message
             
             config = GenerationConfig(
                 max_tokens=300,
@@ -336,6 +365,71 @@ class EmotionsEngine:
                 print(f"LLM Emotions-Analyse Fehler: {e}")
             return None
     
+    @staticmethod
+    def _llm_changes(result: Dict[str, Any]) -> Dict[str, int]:
+        nested = result.get("emotion_changes", {})
+        if not isinstance(nested, dict):
+            nested = {}
+        changes: Dict[str, int] = {}
+        for key in EMOTION_ORDER:
+            raw = nested.get(key, result.get(f"{key}_change", 0))
+            try:
+                changes[key] = max(-24, min(24, int(round(float(raw)))))
+            except (TypeError, ValueError):
+                changes[key] = 0
+        return changes
+
+    def analyze_message(self, user_message: str) -> tuple[Dict[str, int], Dict[str, Any]]:
+        """Return one guarded appraisal without mutating the persistent state."""
+        deterministic = analyze_emotion_signals(user_message, current_state=self.state.to_dict())
+        llm_result = self._analyze_with_llm(user_message)
+        if not llm_result:
+            return deterministic, {"source": "deterministic", "model": None}
+
+        model_changes = self._llm_changes(llm_result)
+        positive_dimensions = set(EMOTION_ORDER) - NEGATIVE_BASE_EMOTIONS
+        negative_score = sum(max(0, -model_changes[key]) for key in positive_dimensions)
+        negative_score += sum(max(0, model_changes[key]) for key in NEGATIVE_BASE_EMOTIONS)
+        positive_score = sum(max(0, model_changes[key]) for key in positive_dimensions)
+        positive_score += sum(max(0, -model_changes[key]) for key in NEGATIVE_BASE_EMOTIONS)
+        declared_valence = str(llm_result.get("input_valence", "")).casefold()
+        if declared_valence not in {"negative", "neutral", "positive", "mixed"}:
+            if negative_score >= positive_score + 4:
+                declared_valence = "negative"
+            elif positive_score >= negative_score + 4:
+                declared_valence = "positive"
+            else:
+                declared_valence = "mixed"
+
+        merged: Dict[str, int] = {}
+        for emotion in EMOTION_ORDER:
+            rule_delta = deterministic[emotion]
+            model_delta = model_changes[emotion]
+            if rule_delta:
+                if model_delta and (model_delta > 0) == (rule_delta > 0):
+                    magnitude = max(abs(rule_delta), abs(model_delta))
+                    merged[emotion] = magnitude if rule_delta > 0 else -magnitude
+                else:
+                    merged[emotion] = rule_delta
+            else:
+                bounded = max(-8, min(8, model_delta))
+                if declared_valence == "negative":
+                    bounded = max(0, bounded) if emotion in NEGATIVE_BASE_EMOTIONS else min(0, bounded)
+                elif declared_valence == "positive":
+                    bounded = min(0, bounded) if emotion in NEGATIVE_BASE_EMOTIONS else max(0, bounded)
+                elif declared_valence == "neutral":
+                    bounded = 0
+                merged[emotion] = bounded
+        source = "groq_guarded" if settings.emotion_analysis_provider == LLMProvider.GROQ else "ollama_guarded"
+        return merged, {
+            "source": source,
+            "model": settings.emotion_analysis_model,
+            "reasoning": str(llm_result.get("reasoning", ""))[:500],
+            "deterministic_changes": deterministic,
+            "model_changes": model_changes,
+            "input_valence": declared_valence,
+        }
+
     def analyze_and_update(self, user_message: str):
         """
         Analysiert die Nachricht und aktualisiert die Emotionen.
@@ -351,23 +445,11 @@ class EmotionsEngine:
         # in which case an mtime-only comparison would otherwise lose updates.
         self._sync_state_from_disk_if_newer(force=True)
 
-        # Versuche LLM-Analyse
-        llm_result = self._analyze_with_llm(user_message)
-        
-        if llm_result:
-            # LLM-basierte Aenderungen anwenden
-            llm_changes = {key: llm_result.get(f"{key}_change", 0) for key in EMOTION_ORDER}
-            llm_changes["energy"] = llm_result.get("energy_change", 0)
-            for emotion_name, raw_delta in llm_changes.items():
-                apply_emotion_delta(self.state, emotion_name, raw_delta)
-            
-            if settings.debug:
-                reasoning = llm_result.get("reasoning", "")
-                print(f"LLM Emotions Update: {reasoning}")
-        else:
-            # Deterministische Multi-Signal-Analyse. Eine Nachricht kann etwa
-            # gleichzeitig dankbar, neugierig und frustriert sein.
-            self._apply_simple_message(user_message)
+        changes, analysis = self.analyze_message(user_message)
+        for emotion_name, raw_delta in changes.items():
+            apply_emotion_delta(self.state, emotion_name, raw_delta)
+        if settings.debug:
+            print(f"Emotionsanalyse: {analysis.get('source')}")
         
         self.state.clamp()
         self._save_state()
@@ -609,45 +691,62 @@ def analyze_emotion_signals(
     Appraisal, Gegenregulation und langsame Rueckkehr zur Basislinie, statt
     jede Nachricht auf genau ein positives oder negatives Label zu reduzieren.
     """
-    lower = str(text or "").casefold()
+    lower = " ".join(str(text or "").casefold().split())
     state = normalize_emotion_state(current_state)
     changes = {key: 0 for key in EMOTION_ORDER}
 
-    def contains_any(phrases: list[str]) -> bool:
+    def contains_any(phrases) -> bool:
         return any(phrase in lower for phrase in phrases)
+
+    attack_text = lower
+    insult_alternatives = "|".join(
+        re.escape(term)
+        for term in sorted(EMOTION_SIGNAL_PHRASES["insult_terms"], key=len, reverse=True)
+    )
+    negated_insult = re.compile(
+        rf"\bdu bist\s+(?:(?:gar|wirklich|ueberhaupt|überhaupt|doch)\s+)?"
+        rf"(?:nicht|keineswegs)\s+(?:(?:so|ein|eine|einen|einem|einer)\s+)?"
+        rf"(?:{insult_alternatives})\b"
+    )
+    attack_text = negated_insult.sub(" ", attack_text)
+    clauses = [clause.strip() for clause in re.split(r"[,.;:!?\n]+", attack_text) if clause.strip()]
+    direct_attack = any(phrase in attack_text for phrase in EMOTION_SIGNAL_PHRASES["direct_attack"])
+    if not direct_attack:
+        direct_attack = any(
+            any(marker in clause for marker in EMOTION_SIGNAL_PHRASES["attack_targets"])
+            and any(term in clause for term in EMOTION_SIGNAL_PHRASES["insult_terms"])
+            for clause in clauses
+        )
+    if not direct_attack:
+        direct_attack = any(
+            any(term in clause for term in EMOTION_SIGNAL_PHRASES["insult_terms"])
+            and (
+                bool(re.search(r"\bbist du\b", clause))
+                or (
+                    bool(re.search(r"\b(?:ob|dass) du\b", clause))
+                    and bool(re.search(r"\bbist\b", clause))
+                )
+            )
+            for clause in clauses
+        )
+    user_distress = contains_any(EMOTION_SIGNAL_PHRASES["user_distress"])
+    technical_problem = contains_any(EMOTION_SIGNAL_PHRASES["technical_problem"])
+    positive_signal = contains_any(EMOTION_SIGNAL_PHRASES["positive"])
+    trust_signal = contains_any(EMOTION_SIGNAL_PHRASES["trust"])
 
     personal = contains_any([
         "wie geht es dir", "wie gehts dir", "was fuehlst du", "was fühlst du",
         "was beschaeftigt dich", "was beschäftigt dich", "ueber dich", "über dich",
         "deine erinnerungen", "wer bist du",
     ])
-    reflective = contains_any([
+    reflective = user_distress or contains_any([
         "was bedrueckt dich", "was bedrückt dich", "was macht dir sorgen",
         "wovor hast du angst", "vermisst du", "traurig",
     ])
-    trust_signal = contains_any([
-        "ich vertraue dir", "glaube an dich", "fuer dich da", "für dich da",
-        "gemeinsam", "zusammen", "wir schaffen", "mag dich", "liebe dich",
-    ])
-    direct_attack = contains_any([
-        "du bist dumm", "du bist bloed", "du bist blöd", "du nervst",
-        "halt die klappe", "du idiot", "du trottel", "nutzlos",
-        "du kannst nichts", "hasse dich",
-    ])
-    problem_signal = direct_attack or contains_any([
-        "funktioniert nicht", "funktioniert nix", "funktioniert nichts",
-        "geht nicht", "geht nix", "kaputt", "fehler", "problem",
-        "störung", "stoerung", "enttäuscht", "enttaeuscht",
-    ])
-    curiosity_signal = "?" in lower or contains_any([
+    curiosity_signal = not direct_attack and ("?" in lower or contains_any([
         "warum", "wieso", "weshalb", "wie funktioniert", "erklaer",
         "erklär", "erzaehl", "erzähl", "interessant", "spannend",
-    ])
-    positive_signal = contains_any([
-        "danke", "super", "toll", "klasse", "perfekt", "wunderbar",
-        "fantastisch", "hilfreich", "freue", "cool", "genial", "stark",
-        "schoen", "schön", "gut gemacht", "stolz",
-    ])
+    ]))
     calming_signal = contains_any([
         "alles gut", "kein stress", "keine sorge", "ganz ruhig", "entspann dich",
     ])
@@ -656,7 +755,19 @@ def analyze_emotion_signals(
         "fühle mit dir",
     ])
 
-    if positive_signal:
+    # Direct hostility is intentionally dominant.  It may contain polite or
+    # positive words sarcastically; those must not raise warmth in that turn.
+    if direct_attack:
+        for emotion, delta in EMOTION_SIGNAL_DELTAS["direct_attack"].items():
+            changes[emotion] += delta
+    elif user_distress:
+        for emotion, delta in EMOTION_SIGNAL_DELTAS["user_distress"].items():
+            changes[emotion] += delta
+    elif technical_problem:
+        for emotion, delta in EMOTION_SIGNAL_DELTAS["technical_problem"].items():
+            changes[emotion] += delta
+
+    if positive_signal and not direct_attack:
         changes["happiness"] += 4
         changes["trust"] += 1
         changes["motivation"] += 2
@@ -664,42 +775,33 @@ def analyze_emotion_signals(
         changes["frustration"] -= 2
         changes["sadness"] -= 2
         changes["affection"] += 1
-    if problem_signal:
-        changes["happiness"] -= 4
-        changes["frustration"] += 8
-        changes["anxiety"] += 3
-        changes["calm"] -= 3
-        changes["energy"] -= 1
-    if direct_attack:
-        changes["trust"] -= 6
-        changes["affection"] -= 4
     if curiosity_signal:
         changes["curiosity"] += 7
         changes["motivation"] += 2
         changes["energy"] += 1
-    if trust_signal:
+    if trust_signal and not direct_attack:
         changes["trust"] += 8
         changes["happiness"] += 3
         changes["affection"] += 4
         changes["calm"] += 2
-    if personal:
+    if personal and not direct_attack:
         changes["affection"] += 2
         changes["curiosity"] += 3
-    if reflective:
+    if reflective and not user_distress and not direct_attack:
         changes["sadness"] += 3
         changes["curiosity"] += 3
         changes["anxiety"] += 2
         changes["calm"] -= 2
-    if empathy_signal:
+    if empathy_signal and not direct_attack:
         changes["trust"] += 2
         changes["affection"] += 3
         changes["sadness"] += 1
-    if calming_signal:
+    if calming_signal and not direct_attack:
         changes["calm"] += 5
         changes["anxiety"] -= 4
         changes["frustration"] -= 2
 
-    if not any((positive_signal, problem_signal, curiosity_signal, trust_signal, personal, reflective, empathy_signal, calming_signal)):
+    if not any((positive_signal, direct_attack, user_distress, technical_problem, curiosity_signal, trust_signal, personal, reflective, empathy_signal, calming_signal)):
         # Slow homeostatic recovery on neutral turns. Only clearly displaced
         # values move, preventing jitter around the baseline.
         for emotion in EMOTION_ORDER:
@@ -720,7 +822,7 @@ def analyze_emotion_signals(
     if changes["anxiety"] > 0:
         changes["calm"] -= 1
 
-    return {key: max(-12, min(12, int(value))) for key, value in changes.items()}
+    return {key: max(-24, min(24, int(value))) for key, value in changes.items()}
 
 
 # === Test ===

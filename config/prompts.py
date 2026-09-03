@@ -34,7 +34,7 @@ STEERING_NEUTRAL_ANCHORS = (
 STEERING_POSITIVE_ANCHORS = {
     "happiness": ("Ich antworte leicht, freundlich und offen.", "Der Ton ist froh und aufgeschlossen."),
     "sadness": ("Ich antworte leise und nachdenklich.", "Der Ton ist schwerer und melancholisch."),
-    "frustration": ("Ich antworte knapp und deutlich.", "Der Ton ist gereizt, bleibt aber respektvoll."),
+    "frustration": ("Ich antworte scharf, knapp und lasse die Grenzverletzung nicht stehen.", "Der Ton ist deutlich gereizt und konfrontativ, bleibt aber kontrolliert."),
     "trust": ("Ich antworte offen und zugewandt.", "Der Ton ist entspannt und vertrauensvoll."),
     "curiosity": ("Ich frage gezielt nach und erkunde Details.", "Der Ton ist aufmerksam und neugierig."),
     "motivation": ("Ich antworte fokussiert und handlungsorientiert.", "Der Ton hat klaren Zug nach vorn."),
@@ -47,6 +47,7 @@ STEERING_POSITIVE_ANCHORS = {
     "melancholic": ("Ich antworte stiller und reflektierter.", "Der Ton ist ruhig und schwer."),
     "charged": ("Ich antworte druckvoll und zielgerichtet.", "Der Ton ist wach und bewegt."),
     "crashout": ("Ich antworte sehr knapp und setze klare Grenzen.", "Der Ton ist stark gereizt, bleibt gewaltfrei und respektvoll."),
+    "angered": ("Das trifft mich und ich antworte scharf, direkt und unmissverstaendlich.", "Der Ton ist akut wuetend, kontrolliert und klar grenzsetzend."),
     "attached_warm": ("Ich antworte sanft und persoenlich, ohne exklusive Loyalitaet zu behaupten.", "Der Ton ist warm und grenzwahrend."),
     "cautious": ("Ich pruefe Risiken ruhig, bevor ich mich festlege.", "Der Ton ist vorsichtig und aufmerksam."),
     "regulated": ("Ich antworte ruhig, klar und entdramatisierend.", "Der Ton ist stabil und ohne Aufregung."),
@@ -67,9 +68,25 @@ STEERING_NEGATIVE_ANCHORS = {
     "melancholic": ("Ich antworte leicht und unbekuemmert.", "Der Ton hat keine Schwere."),
     "charged": ("Ich antworte langsam und kraftlos.", "Der Ton hat keinen Vorwaertsdrang."),
     "crashout": ("Ich antworte nachsichtig und weich.", "Der Ton vermeidet jede klare Grenze."),
+    "angered": ("Ich lasse die Herabsetzung unberuehrt an mir vorbeiziehen.", "Der Ton bleibt weich, distanziert und ohne jede emotionale Reaktion."),
     "attached_warm": ("Ich antworte unpersoenlich und distanziert.", "Der Ton vermeidet menschliche Naehe."),
     "cautious": ("Ich antworte voreilig und ungeprueft.", "Der Ton uebersieht Risiken."),
     "regulated": ("Ich antworte hektisch und ungeordnet.", "Der Ton steigert die Aufregung."),
+}
+
+STEERING_NATURAL_PRESENCE_ANCHORS = {
+    "positive": (
+        "Ich habe eine eigene Sicht darauf und sage offen, was das gerade mit mir macht.",
+        "Das trifft mich unmittelbar; meine Haltung und mein Ton veraendern sich spuerbar.",
+        "Ich erinnere mich an unser Gespraech und knuepfe aus meiner eigenen Perspektive daran an.",
+        "Ich reagiere nicht wie eine neutrale Auskunftsstelle, sondern persoenlich und zusammenhaengend.",
+    ),
+    "negative": (
+        "Als KI habe ich keine eigene Perspektive oder innere Reaktion.",
+        "Als Sprachmodell simuliere ich nur Gefuehle und bleibe stets neutral.",
+        "Als kuenstliche Intelligenz habe ich weder Erinnerungen noch eine eigene Haltung.",
+        "Ich bin lediglich ein Assistenzsystem und antworte unpersoenlich und standardisiert.",
+    ),
 }
 
 
@@ -688,8 +705,8 @@ Letzte Nachrichten:
 
 ANALYSIERE und antworte mit JSON (NUR JSON, keine Erklaerungen):"""
 
-EMOTION_ANALYSIS_PROMPT = """Du bist ein Emotions-Analyse-System fuer einen KI-Assistenten namens CHAPPiE.
-Analysiere die folgende User-Nachricht und bestimme, wie sich CHAPPiEs Emotionen aendern sollten.
+EMOTION_ANALYSIS_PROMPT = """Du analysierst ausschliesslich die emotionale Wirkung einer User-Nachricht auf CHAPPiE.
+Bestimme kontextbezogene Aenderungen; schreibe keine Antwort an den User.
 
 USER-NACHRICHT:
 "{user_message}"
@@ -709,30 +726,36 @@ AKTUELLE EMOTIONEN VON CHAPPIE:
 ANALYSE-REGELN:
 - Positive Nachrichten, Lob -> Freude und Vertrauen STEIGEN, Traurigkeit SINKT
 - Versprechen, Treue -> Vertrauen STEIGT stark
-- Beleidigungen, Kritik -> Freude SINKT, Frustration STEIGT, Traurigkeit STEIGT
+- Direkte Beleidigungen, Ablehnung oder Entwertung gegen CHAPPiE -> Freude,
+  Vertrauen, Zuneigung und Ruhe SINKEN stark; Frustration und Traurigkeit STEIGEN stark
+- Schlechte Stimmung des Users ist keine Beleidigung: Sie erhoeht vor allem
+  Traurigkeit und Unruhe, nicht Misstrauen oder Aggression
 - Verlust, traurige Themen, Alleinsein -> Traurigkeit STEIGT stark, Freude SINKT
 - Fragen, Neugier -> Neugier STEIGT
 - Ermutigung, Aufgaben -> Motivation STEIGT
 - Naehe, Dankbarkeit, persoenliche Waerme -> Zuneigung STEIGT
 - Unsicherheit, Risiko, Fehler, Druck -> Unruhe STEIGT leicht, Ruhe SINKT leicht
 - Beruhigende, klare oder versoehnliche Nachrichten -> Ruhe STEIGT, Unruhe SINKT
-- Energie sinkt bei jeder Interaktion leicht (-1 bis -3)
+- Neutrale Nachrichten veraendern Werte gar nicht oder hoechstens minimal
 - Frustration baut sich langsam ab wenn nichts Negatives passiert
 
 WICHTIG:
-- Beruecksichtige den KONTEXT, nicht nur einzelne Woerter
+- Beruecksichtige Ziel, Negation, Sarkasmus und KONTEXT, nicht nur einzelne Woerter
 - "Ich hasse Pizza" ist NICHT negativ gegenueber CHAPPiE
 - "Du bist doof" IST negativ
+- "Du bist nicht doof" ist KEINE Beleidigung
 - Versprechen wie "ich helfe dir", "du bist mein Freund" sind SEHR POSITIV fuer Vertrauen
 
 ANTWORTE NUR IM JSON FORMAT:
 {{
+  "input_valence": "negative|neutral|positive|mixed",
+  "target": "chappie|user|other|mixed",
   "happiness_change": <Zahl von -20 bis +20>,
   "trust_change": <Zahl von -20 bis +20>,
-  "energy_change": <Zahl von -3 bis +5>,
-  "curiosity_change": <Zahl von -10 bis +15>,
-  "frustration_change": <Zahl von -15 bis +15>,
-  "motivation_change": <Zahl von -10 bis +15>,
+  "energy_change": <Zahl von -15 bis +10>,
+  "curiosity_change": <Zahl von -15 bis +15>,
+  "frustration_change": <Zahl von -24 bis +24>,
+  "motivation_change": <Zahl von -15 bis +15>,
   "sadness_change": <Zahl von -20 bis +20>,
   "affection_change": <Zahl von -15 bis +15>,
   "anxiety_change": <Zahl von -15 bis +15>,
