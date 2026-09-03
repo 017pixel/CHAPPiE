@@ -2,6 +2,52 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.5.1] - 2026-09-03
+
+### Erstellt
+- Kurzen Weiterarbeitsbereich im Forschungsbericht v6 ergänzt
+- Historische Vergleichsbasis und erneute Teststrategie im Bericht sichtbar gemacht
+- Hinweis auf stabile CHAPPiE-Version und Ergebnisvergleich ergänzt
+- Report-Vertragstest für den neuen Bereich ergänzt
+- Dokumentation des aktuellen Berichtstatus aktualisiert
+
+### Verändert
+- V6-Bericht trennt historische Experimente von laufender Implementierung
+- Berichtschluss nutzt die bestehende dunkle Layoutstruktur ohne neue externe Ressourcen
+- Erwartete Verbesserungen und mögliche Ergebnisänderungen werden pro Arbeitspunkt genannt
+- Neue stabile Version wird als Voraussetzung für Wiederholungstests dokumentiert
+- API- und Frontend-Versionsanzeige auf 16.5.1 angehoben
+
+### Gelöscht
+- Keine historischen Experimentdaten entfernt
+- Keine V6-Messwerte überschrieben
+- Keine bestehenden Berichtabschnitte entfernt
+- Keine externe Ressource für den neuen Abschnitt eingeführt
+- Keine alten Vergleichsbezeichnungen stillschweigend geändert
+
+## [16.5.0] - 2026-09-02
+
+### Erstellt
+- Kontrastive Emotionsvektoren mit getrennten positiven und negativen Ankerbeispielen ergänzt
+- Permanenten, schwach gewichteten Präsenzvektor gegen generische Modellfloskeln eingeführt
+- Begrenzte semantische Verknüpfungen zwischen Erinnerungen samt Aktivierungsausbreitung ergänzt
+- Laufzeitnachweis für tatsächlich ausgeführte Steering-Hooks, Layer und Rechenzeit ergänzt
+- Modellunabhängige Regressionstests für Vector-only-Emotionen, Übergänge und Memory-Verknüpfungen ergänzt
+
+### Verändert
+- Emotionen beeinflussen lokale Antworten nur noch über Activation Steering und nicht über Prompt oder Sampling
+- Negative Emotionsrichtungen und Layerbereiche werden korrekt berechnet und an die reale Modellarchitektur angepasst
+- Emotionsübergänge reagieren auf mehrere gleichzeitige Signale und kehren bei neutralen Turns langsam zur Basis zurück
+- Erinnerungsabruf berücksichtigt Vergessenskurve, Wiederabrufe, Faktenherkunft und verknüpfte Episoden
+- API- und Frontend-Versionsanzeige auf 16.5.0 angehoben
+
+### Gelöscht
+- Ausführliche Emotions-, Identitäts- und Persönlichkeitsregeln aus dem aktiven lokalen System-Prompt entfernt
+- Emotionsabhängige Antwortpläne und Sampling-Anpassungen aus dem lokalen vLLM-Pfad entfernt
+- Fehlerhafte Richtungsumkehr für negativ-valente Activation-Vektoren entfernt
+- Ungeprüfte Null-Millisekunden-Anzeige für angeblich aktives Steering entfernt
+- Unsichere Anti-Safeguard-Laufzeitaktivierung aus dem Steering-Payload entfernt
+
 ## [16.4.1] - 2026-09-02
 
 ### Erstellt

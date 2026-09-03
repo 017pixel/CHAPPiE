@@ -50,6 +50,9 @@ def validate() -> list[str]:
         "report-evidence-v6.json",
         "vor</b> der späteren Runtime-Modularisierung",
         "keine gemessene Beschleunigung",
+        'id="weiterarbeit"',
+        "Neue stabile CHAPPiE-Version",
+        "bestehenden V6-Ergebnissen verglichen",
     )
     for marker in required_html:
         if marker not in html:

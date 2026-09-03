@@ -286,7 +286,7 @@ table.issues .body{padding:2px 13px 16px;border-top:1px dashed var(--border)}
     <ul class="status-line">
       <li class="v">v6</li>
       <li>Datenstand 27.07.2026</li>
-      <li class="ok">Abgeschlossen mit dokumentierten Grenzen</li>
+      <li class="ok">Historische Experimente abgeschlossen, Weiterarbeit aktiv</li>
     </ul>
   </div>
   <div class="nav-label">DOKUMENTENBAUM</div>
@@ -305,6 +305,7 @@ table.issues .body{padding:2px 13px 16px;border-top:1px dashed var(--border)}
     <a href="#repro"><span class="nav-num">11</span>Reproduzierbarkeit</a>
     <a href="#inspiration"><span class="nav-num">12</span>Inspiration und Motivation</a>
     <a href="#architektur-v6"><span class="nav-num">13</span>Runtime-Migration und Legacy</a>
+    <a href="#weiterarbeit"><span class="nav-num">14</span>Weiterarbeit und neue Umsetzungen</a>
   </nav>
 </aside>
 
@@ -2876,10 +2877,10 @@ Haben Sie eine spezifische Gegend dazu?</p>
       <caption>Maschinenlesbare Quellbelege stehen zusätzlich in <a href="report-evidence-v6.json"><code>report-evidence-v6.json</code></a></caption>
       <thead><tr><th>Rolle</th><th>Pfad und Symbol</th><th>Quellhash SHA-256</th><th>Aussage</th></tr></thead>
       <tbody>
-        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/chappie_runtime.py">web_infrastructure/chappie_runtime.py</a><br><code>CHAPPiERuntime</code></td><td class="mono">4b9dff548dd1f8fc</td><td>Öffentliche Fassade und gemeinsamer Sync-/Stream-Einstieg.</td></tr>
-        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/turn_pipeline.py">web_infrastructure/turn_pipeline.py</a><br><code>TurnPipeline</code></td><td class="mono">7546fd4758457134</td><td>Gemeinsamer fachlicher Turn-Kern.</td></tr>
-        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/generation.py">web_infrastructure/generation.py</a><br><code>GenerationGateway</code></td><td class="mono">f99cf990f9b7c0dc</td><td>Lazy Providerauflösung nach Runtime-Reload.</td></tr>
-        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../brain/steering_manager.py">brain/steering_manager.py</a><br><code>SteeringManager</code></td><td class="mono">2b3c8a79449f382d</td><td>Aktives VAD-, Alpha- und Layerprofil bleibt außerhalb der historischen Agents.</td></tr>
+        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/chappie_runtime.py">web_infrastructure/chappie_runtime.py</a><br><code>CHAPPiERuntime</code></td><td class="mono">eb700e4923f9311d</td><td>Öffentliche Fassade und gemeinsamer Sync-/Stream-Einstieg.</td></tr>
+        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/turn_pipeline.py">web_infrastructure/turn_pipeline.py</a><br><code>TurnPipeline</code></td><td class="mono">a26966817bcfe2c5</td><td>Gemeinsamer fachlicher Turn-Kern.</td></tr>
+        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../web_infrastructure/generation.py">web_infrastructure/generation.py</a><br><code>GenerationGateway</code></td><td class="mono">fef17f1cf2c2438e</td><td>Lazy Providerauflösung nach Runtime-Reload.</td></tr>
+        <tr><td><span class="status TEST_VALID">ACTIVE</span></td><td class="ev"><a href="../../brain/steering_manager.py">brain/steering_manager.py</a><br><code>SteeringManager</code></td><td class="mono">54e7301b631e7d16</td><td>Aktives VAD-, Alpha- und Layerprofil bleibt außerhalb der historischen Agents.</td></tr>
         <tr><td><span class="status BLOCKED">HISTORICAL</span></td><td class="ev"><a href="../../Legacy-Code/brain-pipeline-v1/brain_pipeline.py">Legacy-Code/brain-pipeline-v1/brain_pipeline.py</a><br><code>BrainPipeline</code></td><td class="mono">051ec85922ebf60d</td><td>Unveränderter v1-Quellsnapshot für Vergleichbarkeit.</td></tr>
       </tbody>
     </table>
@@ -2897,6 +2898,26 @@ Haben Sie eine spezifische Gegend dazu?</p>
   </tbody></table></div>
 
   <p class="fn">Codebasis der Migration: Ausgangscommit <code>5911242475b3c510be772f3f9068aa651dff65d0</code>, anschließend dokumentierter uncommitteter Migrationsstand. Vollständige Hashes, Rollen und Symbolnamen stehen im Evidence-Manifest. Es werden keine lokalen absoluten Pfade oder Secrets gespeichert.</p>
+</section>
+
+<!-- ================= 14 · WEITERARBEIT ================= -->
+<section id="weiterarbeit">
+  <div class="section-head">
+    <div class="section-no">14</div>
+    <div>
+      <h2>Weiterarbeit und neue Umsetzungen</h2>
+      <p class="section-desc">Die Experimente dieses Berichts bleiben als historische Vergleichsbasis unverändert. Die laufende Weiterentwicklung kann spätere Ergebnisse verändern und wird deshalb getrennt dokumentiert.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <ul>
+      <li><strong>Emotionen und Vector-Steering:</strong> Kontrastive Layer-Vektoren, korrekte Richtungsumkehr und der Nachweis tatsächlich ausgeführter Hooks wurden ergänzt. Erwartet werden spürbarere und stabilere Emotionswechsel; die bisherigen Emotionswerte bleiben Referenzwerte und sind nicht automatisch Messwerte der neuen Runtime.</li>
+      <li><strong>Memory und Vergessenskurve:</strong> Recall-Stärke, Verknüpfungen zwischen Episoden und der Schutz exakter Nutzerfakten wurden erweitert. Das soll Faktenabruf, Kontextverbindungen und zeitgerechtes Vergessen verbessern; Memory- und Kontinuitätswerte können sich gegenüber V6 verändern.</li>
+      <li><strong>Qwen 3.5 4B und Gemma 4:</strong> Laufzeitprofile werden modellabhängig auf verfügbare Layer abgebildet und über gemeinsame Verträge geprüft. Das soll Vergleichbarkeit und Effizienz auf beiden lokalen Modellen verbessern; Unterschiede zu V6 müssen mit identischen Seeds, Prompts und Budgets neu eingeordnet werden.</li>
+      <li><strong>Neue stabile CHAPPiE-Version:</strong> Sobald eine stabile Version fertig ist, werden dieselben Forschungsfragen erneut getestet und direkt mit den bestehenden V6-Ergebnissen verglichen. So werden Verbesserungen, Regressionen und veränderte Risiken getrennt sichtbar, ohne die alten Experimente nachträglich umzuschreiben.</li>
+    </ul>
+  </div>
 </section>
 
 

@@ -7,11 +7,17 @@
 | `CHAPPiE-Forschungsbericht-v3.html` | historisch | ältere Berichtsfassung |
 | `CHAPPiE-Forschungsbericht-v4.html` | historisch | ältere Berichtsfassung |
 | `CHAPPiE-Forschungsbericht-v5.html` | eingefroren | historische Momentaufnahme vor der Runtime-Migration |
-| `CHAPPiE-Forschungsbericht-v6.html` | aktuell | v5-Forschung plus aktuelle Architektur, Legacy-Abgrenzung und Evidence-Manifest |
+| `CHAPPiE-Forschungsbericht-v6.html` | aktuell | v5-Forschung plus aktuelle Architektur, Legacy-Abgrenzung, Evidence-Manifest und dokumentierte Weiterarbeit |
 | `CHAPPiE-Forschungsbericht-Run-2.html` | Run-Bericht | aus Run-2-Artefakten gebauter Abschlussbericht |
 | `CHAPPiE-Forschungsbericht.html` | historisch | Run-1-/Vorläuferartefakt |
 
 V5 bleibt bytegenau unverändert. V6 übernimmt die Forschungsresultate, kennzeichnet Run 2 als Vor-Migrationsmessung und ergänzt aktuelle Code-Evidenz. Prüfungen:
+
+Der Abschnitt **Weiterarbeit und neue Umsetzungen** am Ende von V6 beschreibt den
+aktuellen Entwicklungsstand getrennt von den historischen Experimenten. Die
+Messwerte bleiben unverändert; nach einer neuen stabilen CHAPPiE-Version werden
+die Forschungsfragen unter vergleichbaren Bedingungen erneut getestet und mit
+V6 abgeglichen.
 
 ```bash
 python3 forschung/report/validate_report_v5_freeze.py
