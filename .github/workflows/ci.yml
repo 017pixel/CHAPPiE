@@ -100,6 +100,7 @@ jobs:
           python tests/test_cli_remote.py
           python tests/test_forschung_harness.py
           python tests/test_runtime_architecture.py
+          python tests/test_pages_workflow.py
           python forschung/report/validate_report_v5_freeze.py
           python forschung/report/validate_report_v6.py
           python scripts/validate_skill_sync.py
@@ -139,6 +140,7 @@ jobs:
             web_infrastructure \
             tests/test_chat_manager_persistence.py \
             tests/test_runtime_architecture.py \
+            tests/test_pages_workflow.py \
             tests/test_memory_associations.py \
             tests/test_emotion_transition_rules.py \
             tests/test_vector_only_emotion_path.py \

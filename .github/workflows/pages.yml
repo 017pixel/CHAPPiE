@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'forschung/report/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -30,10 +31,19 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Prepare Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp -R forschung/report/. _site/
+          cp forschung/report/CHAPPiE-Forschungsbericht-v6.html _site/index.html
+          touch _site/.nojekyll
+
       - name: Upload report artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: forschung/report
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment

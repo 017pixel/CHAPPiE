@@ -10,6 +10,7 @@ python3 tests/test_runtime_architecture.py
 
 - `test_quick.py`
 - `test_runtime_architecture.py`
+- `test_pages_workflow.py`
 - `test_local_first_runtime.py`
 - `test_web_ui_consistency.py`
 - `test_settings_integrity.py`

@@ -26,6 +26,11 @@ python3 forschung/report/validate_report_v6.py
 
 Das maschinenlesbare v6-Manifest liegt in `report-evidence-v6.json`.
 
+Der GitHub-Pages-Workflow veröffentlicht den aktuellen V6-Bericht zusätzlich
+als `index.html` am Seitenstamm. Die Projektseite ist dadurch direkt unter
+`https://017pixel.github.io/CHAPPiE/` erreichbar; die ursprüngliche
+Datei-URL bleibt ebenfalls erhalten.
+
 ## Run 2
 
 Der aktuelle Offline-Bericht gehört zum getrennten Forschungs-Run

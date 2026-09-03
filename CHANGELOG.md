@@ -2,6 +2,29 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.5.2] - 2026-09-03
+
+### Erstellt
+- Root-Startseite für den GitHub-Pages-Bericht ergänzt
+- Reproduzierbare Site-Vorbereitung für das Pages-Artefakt ergänzt
+- Regressionstest gegen eine fehlende Pages-Startdatei ergänzt
+- Workflow-Auslösung bei Änderungen an der Pages-Konfiguration ergänzt
+- Dokumentation der öffentlichen Bericht-URL ergänzt
+
+### Verändert
+- GitHub Pages lädt jetzt das vorbereitete Pages-Artefakt statt des Quellordners hoch
+- Der aktuelle V6-Bericht wird als Startseite am Seitenstamm veröffentlicht
+- Die direkte URL zur benannten V6-Datei bleibt im Artefakt erhalten
+- Eine statische Pages-Auslieferung ohne Jekyll-Verarbeitung wird mit ausgeliefert
+- API- und Frontend-Versionsanzeige auf 16.5.2 angehoben
+
+### Gelöscht
+- Veröffentlichung eines Berichtordners ohne Root-Startdatei entfernt
+- Abhängigkeit von einer impliziten GitHub-Pages-Dateiauflösung entfernt
+- 404-Zustand an der Projekt-Root als erwartetes Ergebnis entfernt
+- Keine historischen Berichtdateien gelöscht
+- Keine bestehenden Forschungswerte oder Evidence-Daten gelöscht
+
 ## [16.5.1] - 2026-09-03
 
 ### Erstellt
