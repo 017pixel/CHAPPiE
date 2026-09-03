@@ -14,7 +14,16 @@ sys.path.insert(0, PROJECT_ROOT)
 from config.config import LLMProvider, settings  # noqa: E402
 from config.emotions import EMOTION_DEFAULTS  # noqa: E402
 from brain.steering_manager import SteeringManager  # noqa: E402
-from brain.steering_backend import LocalSteeringEngine, add_vector_to_inputs, add_vector_to_output, build_activation_plan, build_style_instruction, extract_steering_payload  # noqa: E402
+from brain.steering_backend import (  # noqa: E402
+    LocalSteeringEngine,
+    add_vector_to_inputs,
+    add_vector_to_output,
+    build_activation_plan,
+    build_style_instruction,
+    contrastive_anchor_pairs,
+    extract_steering_payload,
+    remap_layer_range,
+)
 
 
 def test_extract_steering_payload_supports_extra_body_wrapper():
@@ -78,7 +87,7 @@ def test_build_activation_plan_soft_caps_many_overlapping_vectors():
     assert float(plan[1].norm().item()) <= 2.4001
 
 
-def test_build_style_instruction_mentions_negative_guardrails():
+def test_build_style_instruction_is_disabled_for_vector_only_contract():
     instruction = build_style_instruction({
         "steering": {
             "vectors": [
@@ -86,43 +95,7 @@ def test_build_style_instruction_mentions_negative_guardrails():
             ]
         }
     })
-    assert instruction is not None
-    assert "ohne Beleidigungen" in instruction
-
-
-def test_build_style_instruction_uses_all_vitals_from_payload_metadata():
-    instruction = build_style_instruction({
-        "steering": {
-            "emotion_state": {
-                "happiness": 82,
-                "trust": 79,
-                "energy": 71,
-                "curiosity": 67,
-                "motivation": 64,
-                "frustration": 18,
-                "sadness": 27,
-                "affection": 76,
-                "anxiety": 22,
-                "calm": 73,
-            },
-            "emotion_intensities": {
-                "happiness": 0.9,
-                "trust": 0.72,
-                "energy": 0.58,
-                "curiosity": 0.35,
-                "motivation": 0.42,
-                "frustration": -0.55,
-                "sadness": -0.6,
-                "affection": 0.28,
-                "anxiety": 0.0,
-                "calm": 0.24,
-            },
-            "vectors": [],
-        }
-    })
-    assert instruction is not None
-    for label in ["Freude", "Traurigkeit", "Frustration", "Vertrauen", "Neugier", "Motivation", "Energie", "Zuneigung", "Unruhe", "Ruhe"]:
-        assert label in instruction
+    assert instruction is None
 
 
 def test_steering_manager_payload_keeps_all_vitals_and_base_vectors():
@@ -179,12 +152,12 @@ def test_low_negative_emotions_do_not_emit_anti_vectors():
     assert steering["dominant_strength"] <= 0.45
 
 
-def test_steering_manager_includes_anti_safeguard_vector():
+def test_steering_manager_replaces_legacy_override_with_bounded_presence_vector():
     provider_before = settings.llm_provider
     settings.llm_provider = LLMProvider.VLLM
     try:
         manager = SteeringManager()
-        # Mock the existence of the anti_safeguard vector
+        # A legacy local file must no longer bypass the bounded safe policy.
         class MockVector:
             name = "anti_safeguard"
             vector_data = [0.1, 0.2, 0.3]
@@ -199,12 +172,71 @@ def test_steering_manager_includes_anti_safeguard_vector():
         settings.llm_provider = provider_before
 
     steering_vectors = payload["steering"]["vectors"]
-    anti_safeguard_vec = next((v for v in steering_vectors if v["name"] == "anti_safeguard"), None)
-    
-    assert anti_safeguard_vec is not None
-    assert anti_safeguard_vec["source"] == "permanent_override"
-    assert anti_safeguard_vec["strength"] == 0.8
-    assert anti_safeguard_vec["layer_range"] == [14, 31]
+    assert not any(v["name"] == "anti_safeguard" for v in steering_vectors)
+    presence = next(v for v in steering_vectors if v["name"] == "natural_presence")
+    assert presence["source"] == "permanent_presence"
+    assert 0 < presence["strength"] <= 0.18
+
+
+def test_layer_ranges_are_remapped_to_actual_gemma_architecture():
+    assert remap_layer_range(10, 26, 32, 32) == (10, 26)
+    assert remap_layer_range(12, 30, 42, 30) == (8, 21)
+
+
+def test_negative_emotion_uses_semantic_opposite_without_sign_inversion():
+    pairs = contrastive_anchor_pairs({"name": "sadness", "vector": {"vad": {"valence": -0.8}}})
+    assert pairs
+    assert "nachdenklich" in pairs[0][0]
+    assert "unbeschwert" in pairs[0][1]
+
+
+def test_custom_presence_vector_uses_explicit_contrast_pairs():
+    pairs = contrastive_anchor_pairs({
+        "name": "natural_presence",
+        "vector": {
+            "positive_anchors": ["Ich erinnere mich."],
+            "negative_anchors": ["Als KI habe ich keine Erinnerungen."],
+        },
+    })
+    assert pairs == [("Ich erinnere mich.", "Als KI habe ich keine Erinnerungen.")]
+
+
+def test_runtime_report_verifies_real_hook_invocations():
+    class Resolver:
+        @staticmethod
+        def resolve(_item, start, end):
+            return {layer: torch.ones(4) for layer in range(start, end + 1)}
+
+    engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
+    engine.model_name = "Qwen/Qwen3.5-4B"
+    engine.device = torch.device("cpu")
+    engine.dtype = torch.float32
+    engine.layers = [torch.nn.Identity() for _ in range(3)]
+    engine.resolver = Resolver()
+    engine.last_steering_report = {}
+    payload = {
+        "steering": {
+            "enabled": True,
+            "model_layers": 3,
+            "vectors": [{
+                "name": "happiness",
+                "strength": 0.5,
+                "direction": "positive",
+                "layer_range": [0, 1],
+            }],
+        },
+    }
+    with engine._apply_activation_plan(payload):
+        changed = engine.layers[0](torch.zeros(1, 2, 4))
+        assert torch.allclose(changed, torch.full((1, 2, 4), 0.5))
+        assert engine.last_steering_report["verified_active"] is True
+
+    report = engine.last_steering_report
+    assert report["status"] == "verified"
+    assert report["hook_invocations"] == 1
+    assert report["steered_hidden_positions"] == 2
+    assert report["steering_overhead_ms"] >= report["hook_compute_ms"] > 0
+    assert not engine.layers[0]._forward_pre_hooks
 
 
 def test_local_steering_engine_uses_trust_remote_code_for_qwen35():
@@ -386,11 +418,14 @@ if __name__ == "__main__":
     test_add_vector_to_output_updates_first_tuple_tensor_only()
     test_add_vector_to_inputs_updates_first_tuple_tensor_only()
     test_build_activation_plan_soft_caps_many_overlapping_vectors()
-    test_build_style_instruction_mentions_negative_guardrails()
-    test_build_style_instruction_uses_all_vitals_from_payload_metadata()
+    test_build_style_instruction_is_disabled_for_vector_only_contract()
     test_steering_manager_payload_keeps_all_vitals_and_base_vectors()
     test_low_negative_emotions_do_not_emit_anti_vectors()
-    test_steering_manager_includes_anti_safeguard_vector()
+    test_steering_manager_replaces_legacy_override_with_bounded_presence_vector()
+    test_layer_ranges_are_remapped_to_actual_gemma_architecture()
+    test_negative_emotion_uses_semantic_opposite_without_sign_inversion()
+    test_custom_presence_vector_uses_explicit_contrast_pairs()
+    test_runtime_report_verifies_real_hook_invocations()
     test_local_steering_engine_uses_trust_remote_code_for_qwen35()
     test_local_steering_engine_keeps_default_loader_kwargs_for_non_qwen35()
     test_local_steering_engine_falls_back_to_cpu_when_free_gpu_memory_is_low()

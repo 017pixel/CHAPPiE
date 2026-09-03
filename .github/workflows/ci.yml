@@ -59,6 +59,10 @@ jobs:
             config/prompts.py \
             forschung/report/build_report.py \
             memory/chat_manager.py \
+            memory/emotions_engine.py \
+            memory/forgetting_curve.py \
+            memory/memory_engine.py \
+            memory/sleep_phase.py \
             memory/short_term_memory.py \
             memory/function_registry.py \
             web_infrastructure/backend_wrapper.py \
@@ -77,6 +81,9 @@ jobs:
         run: |
           set -eo pipefail
           python tests/test_forgetting_curve.py
+          python tests/test_memory_associations.py
+          python tests/test_emotion_transition_rules.py
+          python tests/test_vector_only_emotion_path.py
           python tests/test_quick.py
           python tests/test_life_simulation.py
           python tests/test_debug_monitor_data.py
@@ -122,11 +129,19 @@ jobs:
             api/routers/runtime.py \
             api/services/command_service.py \
             brain/steering_manager.py \
+            brain/steering_backend.py \
             brain/brain_pipeline.py \
             memory/chat_manager.py \
+            memory/emotions_engine.py \
+            memory/forgetting_curve.py \
+            memory/memory_engine.py \
+            memory/sleep_phase.py \
             web_infrastructure \
             tests/test_chat_manager_persistence.py \
             tests/test_runtime_architecture.py \
+            tests/test_memory_associations.py \
+            tests/test_emotion_transition_rules.py \
+            tests/test_vector_only_emotion_path.py \
             tests/test_report_v6.py \
             tests/test_skill_sync.py \
             forschung/report/build_report.py \

@@ -10,7 +10,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from config.emotions import EMOTION_DEFAULTS
+from config.emotions import EMOTION_DEFAULTS  # noqa: E402
 
 
 def _load_emotions_module():
@@ -27,6 +27,7 @@ emotions_module = _load_emotions_module()
 EmotionalState = emotions_module.EmotionalState
 EmotionsEngine = emotions_module.EmotionsEngine
 calculate_emotion_transition = emotions_module.calculate_emotion_transition
+analyze_emotion_signals = emotions_module.analyze_emotion_signals
 
 
 def test_extreme_delta_is_softened_and_capped():
@@ -91,9 +92,31 @@ def test_emotions_engine_reloads_newer_persisted_state_before_writing():
             EmotionsEngine._cached_brain = original_cached_brain
 
 
+def test_mixed_message_updates_multiple_emotional_dimensions():
+    changes = analyze_emotion_signals(
+        "Danke, das ist gut, aber der Fehler funktioniert noch nicht. Warum?",
+        current_state=EMOTION_DEFAULTS,
+    )
+    assert changes["frustration"] > 0
+    assert changes["curiosity"] > 0
+    assert changes["motivation"] > 0
+    assert changes["calm"] < 0
+
+
+def test_neutral_turn_recovers_slowly_toward_baseline():
+    state = dict(EMOTION_DEFAULTS)
+    state.update({"frustration": 40, "anxiety": 30, "calm": 20})
+    changes = analyze_emotion_signals("Ich habe die Datei geoeffnet.", current_state=state)
+    assert changes["frustration"] == -1
+    assert changes["anxiety"] == -2
+    assert changes["calm"] == 1
+
+
 if __name__ == "__main__":
     test_extreme_delta_is_softened_and_capped()
     test_small_delta_stays_direct()
     test_legacy_emotional_state_gets_new_emotion_defaults()
     test_emotions_engine_reloads_newer_persisted_state_before_writing()
+    test_mixed_message_updates_multiple_emotional_dimensions()
+    test_neutral_turn_recovers_slowly_toward_baseline()
     print("OK: emotion transition rules")

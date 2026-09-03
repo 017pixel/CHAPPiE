@@ -188,8 +188,12 @@ class MemoryAndBackendE2ETests(unittest.TestCase):
             self.assertTrue(first["emotion_steering"]["steering_active"])
             self.assertTrue(first["steering_runtime"]["active"])
             self.assertTrue(first["life_snapshot"]["temporal_state"]["turn_count"] >= 1)
-            self.assertIn("INNERER LEBENSKONTEXT", fake_brain.system_prompts[-1])
+            self.assertIn("CHAPPiE LEBENSKONTEXT", fake_brain.system_prompts[-1])
             self.assertIn("Benjamin", fake_brain.system_prompts[-1])
+            for system_prompt in fake_brain.system_prompts:
+                self.assertNotIn("AKTUELLER EMOTIONALER STATUS", system_prompt)
+                self.assertNotIn("AKTUELLER ANTWORTPLAN", system_prompt)
+                self.assertNotIn("Verhaltensvorgabe", system_prompt)
             self.assertGreaterEqual(second["memory_trace"]["merged"]["memories_found"], 1)
             self.assertEqual(second["formatted_answer"], "Du heißt Benjamin.")
             self.assertTrue(any(
@@ -218,6 +222,12 @@ class MemoryAndBackendE2ETests(unittest.TestCase):
             # generation config instead of switching to a cloud formatter.
             self.assertTrue(fake_brain.configs)
             self.assertTrue(fake_brain.configs[0].extra_body["steering"]["enabled"])
+            sampling_contracts = {
+                (config.temperature, config.repetition_penalty)
+                for config in fake_brain.configs
+                if not config.stream
+            }
+            self.assertEqual(len(sampling_contracts), 1)
 
 
 class StateAndSteeringE2ETests(unittest.TestCase):

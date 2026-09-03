@@ -16,6 +16,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -181,6 +182,14 @@ class SleepPhaseConsolidationTests(unittest.TestCase):
             result = self.handler.execute_sleep_phase(
                 memory_engine=mock_engine,
                 short_term_memory=mock_stm,
+                emotions_engine=MagicMock(
+                    get_state=MagicMock(return_value=SimpleNamespace(
+                        sadness=20,
+                        frustration=20,
+                        happiness=50,
+                        motivation=80,
+                    )),
+                ),
             )
 
         self.assertIn("consolidation", result)
