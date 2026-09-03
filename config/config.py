@@ -289,11 +289,37 @@ FORGETTING_CURVE_CONFIG = {
         "max": 10.0,
         "boost_per_recall": 0.5,
         "decay_rate": 0.1,
+        # Retrieval uses retention as a reranking signal, not as a hard
+        # deletion rule. This keeps old, exact facts reachable.
+        "retrieval_retention_weight": 0.18,
     },
     "spaced_repetition": {
         "intervals_hours": [1, 12, 24, 72, 168, 336, 720],
         "min_strength_for_archive": 0.3,
     },
+}
+
+MEMORY_ASSOCIATION_CONFIG = {
+    # Small local graph on top of Chroma. It adds one bounded neighbour query
+    # while writing and no extra language-model request.
+    "enabled": True,
+    "max_links_per_memory": 4,
+    "min_cosine_similarity": 0.58,
+    "retrieval_seed_count": 3,
+    "retrieval_max_associations": 5,
+    "retrieval_spread_weight": 0.22,
+    "co_retrieval_boost": 0.08,
+    "recall_cooldown_minutes": 10,
+    "schema_version": 2,
+}
+
+STEERING_RUNTIME_CONFIG = {
+    # Fewer coherent directions are more stable than ten competing vectors.
+    "max_base_vectors": 3,
+    "max_composite_vectors": 1,
+    "max_composite_strength": 0.55,
+    "natural_presence_strength": 0.18,
+    "neutral_baseline_strength": 0.08,
 }
 
 
@@ -709,6 +735,14 @@ def get_sleep_config() -> Dict[str, Any]:
 
 def get_forgetting_curve_config() -> Dict[str, Any]:
     return deepcopy(FORGETTING_CURVE_CONFIG)
+
+
+def get_memory_association_config() -> Dict[str, Any]:
+    return deepcopy(MEMORY_ASSOCIATION_CONFIG)
+
+
+def get_steering_runtime_config() -> Dict[str, Any]:
+    return deepcopy(STEERING_RUNTIME_CONFIG)
 
 
 def print_config() -> None:

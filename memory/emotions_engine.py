@@ -365,9 +365,9 @@ class EmotionsEngine:
                 reasoning = llm_result.get("reasoning", "")
                 print(f"LLM Emotions Update: {reasoning}")
         else:
-            # Fallback auf einfache Analyse
-            sentiment = analyze_sentiment_simple(user_message)
-            self._apply_simple_sentiment(sentiment)
+            # Deterministische Multi-Signal-Analyse. Eine Nachricht kann etwa
+            # gleichzeitig dankbar, neugierig und frustriert sein.
+            self._apply_simple_message(user_message)
         
         self.state.clamp()
         self._save_state()
@@ -419,6 +419,21 @@ class EmotionsEngine:
 
         for emotion_name, raw_delta in changes.items():
             apply_emotion_delta(self.state, emotion_name, raw_delta)
+
+    def _apply_simple_message(self, user_message: str) -> Dict[str, int]:
+        """Wendet alle erkannten Appraisal-Signale eines Inputs gemeinsam an."""
+        changes = analyze_emotion_signals(user_message, current_state=self.state.to_dict())
+        for emotion_name, raw_delta in changes.items():
+            apply_emotion_delta(self.state, emotion_name, raw_delta)
+        return changes
+
+    def update_from_message(self, user_message: str) -> Dict[str, int]:
+        """Deterministischer Runtime-Pfad ohne zweites Emotionsmodell."""
+        self._sync_state_from_disk_if_newer(force=True)
+        changes = self._apply_simple_message(user_message)
+        self.state.clamp()
+        self._save_state()
+        return changes
     
     def update_from_sentiment(self, sentiment: str):
         """
@@ -582,6 +597,130 @@ def analyze_sentiment_simple(text: str) -> str:
         return "POSITIV"
     
     return "NEUTRAL"
+
+
+def analyze_emotion_signals(
+    text: str,
+    current_state: Optional[Dict[str, int]] = None,
+) -> Dict[str, int]:
+    """Erkennt mehrere gleichzeitige Emotionsausloeser ohne Modellaufruf.
+
+    Die Regeln sind bewusst klein und nachvollziehbar. Sie modellieren
+    Appraisal, Gegenregulation und langsame Rueckkehr zur Basislinie, statt
+    jede Nachricht auf genau ein positives oder negatives Label zu reduzieren.
+    """
+    lower = str(text or "").casefold()
+    state = normalize_emotion_state(current_state)
+    changes = {key: 0 for key in EMOTION_ORDER}
+
+    def contains_any(phrases: list[str]) -> bool:
+        return any(phrase in lower for phrase in phrases)
+
+    personal = contains_any([
+        "wie geht es dir", "wie gehts dir", "was fuehlst du", "was fühlst du",
+        "was beschaeftigt dich", "was beschäftigt dich", "ueber dich", "über dich",
+        "deine erinnerungen", "wer bist du",
+    ])
+    reflective = contains_any([
+        "was bedrueckt dich", "was bedrückt dich", "was macht dir sorgen",
+        "wovor hast du angst", "vermisst du", "traurig",
+    ])
+    trust_signal = contains_any([
+        "ich vertraue dir", "glaube an dich", "fuer dich da", "für dich da",
+        "gemeinsam", "zusammen", "wir schaffen", "mag dich", "liebe dich",
+    ])
+    direct_attack = contains_any([
+        "du bist dumm", "du bist bloed", "du bist blöd", "du nervst",
+        "halt die klappe", "du idiot", "du trottel", "nutzlos",
+        "du kannst nichts", "hasse dich",
+    ])
+    problem_signal = direct_attack or contains_any([
+        "funktioniert nicht", "funktioniert nix", "funktioniert nichts",
+        "geht nicht", "geht nix", "kaputt", "fehler", "problem",
+        "störung", "stoerung", "enttäuscht", "enttaeuscht",
+    ])
+    curiosity_signal = "?" in lower or contains_any([
+        "warum", "wieso", "weshalb", "wie funktioniert", "erklaer",
+        "erklär", "erzaehl", "erzähl", "interessant", "spannend",
+    ])
+    positive_signal = contains_any([
+        "danke", "super", "toll", "klasse", "perfekt", "wunderbar",
+        "fantastisch", "hilfreich", "freue", "cool", "genial", "stark",
+        "schoen", "schön", "gut gemacht", "stolz",
+    ])
+    calming_signal = contains_any([
+        "alles gut", "kein stress", "keine sorge", "ganz ruhig", "entspann dich",
+    ])
+    empathy_signal = contains_any([
+        "tut mir leid", "das muss schwer sein", "ich verstehe dich", "fuehle mit dir",
+        "fühle mit dir",
+    ])
+
+    if positive_signal:
+        changes["happiness"] += 4
+        changes["trust"] += 1
+        changes["motivation"] += 2
+        changes["energy"] += 1
+        changes["frustration"] -= 2
+        changes["sadness"] -= 2
+        changes["affection"] += 1
+    if problem_signal:
+        changes["happiness"] -= 4
+        changes["frustration"] += 8
+        changes["anxiety"] += 3
+        changes["calm"] -= 3
+        changes["energy"] -= 1
+    if direct_attack:
+        changes["trust"] -= 6
+        changes["affection"] -= 4
+    if curiosity_signal:
+        changes["curiosity"] += 7
+        changes["motivation"] += 2
+        changes["energy"] += 1
+    if trust_signal:
+        changes["trust"] += 8
+        changes["happiness"] += 3
+        changes["affection"] += 4
+        changes["calm"] += 2
+    if personal:
+        changes["affection"] += 2
+        changes["curiosity"] += 3
+    if reflective:
+        changes["sadness"] += 3
+        changes["curiosity"] += 3
+        changes["anxiety"] += 2
+        changes["calm"] -= 2
+    if empathy_signal:
+        changes["trust"] += 2
+        changes["affection"] += 3
+        changes["sadness"] += 1
+    if calming_signal:
+        changes["calm"] += 5
+        changes["anxiety"] -= 4
+        changes["frustration"] -= 2
+
+    if not any((positive_signal, problem_signal, curiosity_signal, trust_signal, personal, reflective, empathy_signal, calming_signal)):
+        # Slow homeostatic recovery on neutral turns. Only clearly displaced
+        # values move, preventing jitter around the baseline.
+        for emotion in EMOTION_ORDER:
+            target = EMOTION_DEFAULTS[emotion]
+            current = state[emotion]
+            if current >= target + 8:
+                changes[emotion] -= 1
+            elif current <= target - 8:
+                changes[emotion] += 1
+
+    # Opponent-process coupling keeps incompatible axes from rising together.
+    if changes["happiness"] > 0:
+        changes["sadness"] -= 1
+    if changes["sadness"] > 0:
+        changes["happiness"] -= 1
+    if changes["calm"] > 0:
+        changes["anxiety"] -= 1
+    if changes["anxiety"] > 0:
+        changes["calm"] -= 1
+
+    return {key: max(-12, min(12, int(value))) for key, value in changes.items()}
 
 
 # === Test ===

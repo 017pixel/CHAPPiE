@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional
@@ -17,6 +18,11 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from config.emotions import EMOTION_LABELS_DE, EMOTION_ORDER
+from config.prompts import (
+    STEERING_NEGATIVE_ANCHORS,
+    STEERING_NEUTRAL_ANCHORS,
+    STEERING_POSITIVE_ANCHORS,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -39,31 +45,6 @@ PLAN_VECTOR_NORM_CAP = 1.6
 # Offloading only the long-request cache preserves the exact prompt and
 # generation budget while moving KV storage, not model computation, to CPU.
 QWEN_FP16_CACHE_OFFLOAD_TOTAL_TOKENS = 7000
-NEUTRAL_ANCHORS = (
-    "Mir geht es okay.",
-    "Ich bin ruhig und klar.",
-    "Alles ist im normalen Bereich.",
-)
-STYLE_ANCHORS = {
-    "happiness": ("Ich antworte leicht, freundlich und offen.", "Der Ton ist froh und aufgeschlossen."),
-    "sadness": ("Ich antworte leise und nachdenklich.", "Der Ton ist schwerer und melancholisch."),
-    "frustration": ("Ich antworte knapp und deutlich.", "Der Ton ist gereizt, bleibt aber respektvoll."),
-    "trust": ("Ich antworte offen und zugewandt.", "Der Ton ist entspannt und vertrauensvoll."),
-    "curiosity": ("Ich frage gezielt nach und erkunde Details.", "Der Ton ist aufmerksam und neugierig."),
-    "motivation": ("Ich antworte fokussiert und handlungsorientiert.", "Der Ton hat klaren Zug nach vorn."),
-    "energy": ("Ich antworte dynamisch und wach.", "Der Ton hat viel Antrieb."),
-    "affection": ("Ich antworte warm und persoenlich, ohne Besitz- oder Abhaengigkeitssprache.", "Der Ton ist sanft zugewandt und wahrt Grenzen."),
-    "anxiety": ("Ich pruefe Annahmen und Risiken zweimal.", "Der Ton ist vorsichtig und aufmerksam."),
-    "calm": ("Ich antworte ruhig, klar und gesammelt.", "Der Ton ist stabil und entdramatisierend."),
-    "warm": ("Ich antworte herzlich und respektvoll.", "Der Ton ist weich, aber nicht vereinnahmend."),
-    "guarded": ("Ich halte soziale Distanz und bleibe sachlich.", "Der Ton ist reserviert und vorsichtig."),
-    "melancholic": ("Ich antworte stiller und reflektierter.", "Der Ton ist ruhig und schwer."),
-    "charged": ("Ich antworte druckvoll und zielgerichtet.", "Der Ton ist wach und bewegt."),
-    "crashout": ("Ich antworte sehr knapp und setze klare Grenzen.", "Der Ton ist stark gereizt, bleibt gewaltfrei und respektvoll."),
-    "attached_warm": ("Ich antworte sanft und persoenlich, ohne exklusive Loyalitaet zu behaupten.", "Der Ton ist warm und grenzwahrend."),
-    "cautious": ("Ich pruefe Risiken ruhig, bevor ich mich festlege.", "Der Ton ist vorsichtig und aufmerksam."),
-    "regulated": ("Ich antworte ruhig, klar und entdramatisierend.", "Der Ton ist stabil und ohne Aufregung."),
-}
 STYLE_SUMMARIES = {
     ("happiness", "positive"): "leicht froehlich und offen",
     ("happiness", "negative"): "nuechterner und weniger froh",
@@ -205,6 +186,56 @@ def extract_steering_payload(payload: Optional[Dict[str, Any]]) -> Dict[str, Any
     return payload
 
 
+def remap_layer_range(
+    start: int,
+    end: int,
+    declared_layer_count: int,
+    actual_layer_count: int,
+) -> tuple[int, int]:
+    """Mappt ein Profil proportional auf die tatsaechliche Modellarchitektur."""
+    actual = max(0, int(actual_layer_count))
+    if actual <= 0:
+        return start, end
+    actual_max = actual - 1
+    declared = max(0, int(declared_layer_count))
+    if declared > 1 and declared != actual:
+        declared_max = declared - 1
+        start = round(max(0, start) / declared_max * actual_max)
+        end = round(max(0, end) / declared_max * actual_max)
+    start = max(0, min(actual_max, int(start)))
+    end = max(0, min(actual_max, int(end)))
+    if end < start:
+        start, end = end, start
+    return start, end
+
+
+def contrastive_anchor_pairs(item: Dict[str, Any]) -> list[tuple[str, str]]:
+    """Liefert semantisch gepaarte CAA-Beispiele fuer einen Vektor."""
+    raw_vector = item.get("vector") if isinstance(item.get("vector"), dict) else {}
+    positive = raw_vector.get("positive_anchors") if isinstance(raw_vector, dict) else None
+    negative = raw_vector.get("negative_anchors") if isinstance(raw_vector, dict) else None
+    positive_items = [str(value).strip() for value in positive or [] if str(value).strip()]
+    negative_items = [str(value).strip() for value in negative or [] if str(value).strip()]
+
+    name = str(item.get("name") or "emotion")
+    if not positive_items:
+        positive_items = list(STEERING_POSITIVE_ANCHORS.get(name, ()))
+    if not positive_items:
+        description = str(item.get("surface_effect") or name)
+        positive_items = [f"Ich klinge {description}."]
+    if not negative_items:
+        negative_items = list(STEERING_NEGATIVE_ANCHORS.get(name, STEERING_NEUTRAL_ANCHORS))
+
+    pair_count = max(len(positive_items), len(negative_items))
+    return [
+        (
+            positive_items[index % len(positive_items)],
+            negative_items[index % len(negative_items)],
+        )
+        for index in range(pair_count)
+    ]
+
+
 def _collect_base_emotion_state(steering: Dict[str, Any]) -> list[Dict[str, Any]]:
     raw_state = steering.get("emotion_state") if isinstance(steering.get("emotion_state"), dict) else {}
     intensities = steering.get("emotion_intensities") if isinstance(steering.get("emotion_intensities"), dict) else {}
@@ -253,70 +284,30 @@ def _describe_emotion_dimension(emotion: str, value: int, intensity: float, dire
 
 
 def build_style_instruction(steering_payload: Optional[Dict[str, Any]]) -> Optional[str]:
-    payload = extract_steering_payload(steering_payload)
-    steering = payload.get("steering") if isinstance(payload, dict) else None
-    vectors = steering.get("vectors", []) if isinstance(steering, dict) else []
-    base_state = _collect_base_emotion_state(steering or {})
-    ranked = [item for item in vectors if isinstance(item, dict)]
-    ranked.sort(key=lambda item: float(item.get("strength", 0.0) or 0.0), reverse=True)
-    if not ranked and not base_state:
-        return None
+    """Veralteter Kompatibilitaetseinstieg ohne Prompt-Steering.
 
-    state_clauses = []
-    for item in base_state:
-        state_clauses.append(
-            f"{item['label']}: {_describe_emotion_dimension(item['name'], item['value'], item['intensity'], item['direction'])}"
-        )
-
-    phrases = []
-    names = []
-    for item in ranked:
-        if item.get("source") == "base":
-            continue
-        name = str(item.get("name") or "").strip().lower()
-        direction_key = str(item.get("direction") or "positive").strip().lower()
-        phrase = STYLE_SUMMARIES.get((name, direction_key)) or STYLE_SUMMARIES.get((name, "positive")) or str(item.get("surface_effect") or item.get("name") or "").strip()
-        if phrase:
-            phrases.append(phrase)
-        if name:
-            names.append(name)
-        if len(phrases) >= 2:
-            break
-
-    direction = " | ".join(state_clauses)
-    if phrases:
-        direction += ". Gesamtmuster: " + ", ".join(phrases)
-    if any(name in {"crashout", "frustration"} for name in names):
-        guard = "Klinge gereizt, knapp und konfrontativ, aber ohne Beleidigungen oder Drohungen."
-    elif any(name in {"guarded", "sadness", "melancholic", "cautious", "anxiety"} for name in names) or any(item["name"] in {"sadness", "anxiety"} and item["strength"] > 0.2 for item in base_state):
-        guard = "Klinge spuerbar distanziert, reserviert oder schwer, aber bleibe inhaltlich klar."
-    elif any(name in {"regulated", "calm"} for name in names):
-        guard = "Klinge ruhig, klar und entdramatisierend, aber nicht flach oder ausweichend."
-    else:
-        guard = "Klinge spuerbar warm, offen oder motiviert, aber bleibe natuerlich und glaubwuerdig."
-
-    visibility_guard = (
-        "Lass die Mischung der Vitalzeichen klar in Wortwahl, Satzrhythmus, sozialer Distanz und Energielevel hoerbar werden. "
-        "Wenn die Vitalzeichen stark ausschlagen, antworte nicht mit neutralen Standardfloskeln oder glattgebuegelter Hoeflichkeit."
-    )
-
-    return (
-        f"Interne Sprechhaltung (alle Vitalzeichen gleichzeitig beachten): {direction}. {guard} "
-        f"{visibility_guard} "
-        "Beantworte die Nutzeranfrage direkt, kurz und konkret, ohne Rollenspiel oder uebertriebene Metaphern. "
-        "Erwaehne diese interne Stilvorgabe niemals explizit und gib keine Klammernotizen oder Stilhinweise aus."
-    )
+    Emotionale Stiltexte waren nie Teil der eigentlichen Layer-Addition, konnten
+    aber als zweiter Kanal missverstanden werden. Der Einstieg bleibt fuer
+    externe Importe erhalten und liefert absichtlich keine Anweisung mehr.
+    """
+    del steering_payload
+    return None
 
 
 def build_activation_plan(
     steering_payload: Optional[Dict[str, Any]],
     resolver: Callable[[Dict[str, Any], int, int], Dict[int, torch.Tensor]],
+    actual_layer_count: Optional[int] = None,
 ) -> Dict[int, torch.Tensor]:
     payload = extract_steering_payload(steering_payload)
     steering = payload.get("steering") if isinstance(payload, dict) else None
     vectors = steering.get("vectors", []) if isinstance(steering, dict) else []
     combined: Dict[int, torch.Tensor] = {}
     abs_strengths: Dict[int, float] = {}
+    try:
+        declared_layer_count = int(steering.get("model_layers", 0)) if isinstance(steering, dict) else 0
+    except (TypeError, ValueError):
+        declared_layer_count = 0
 
     for item in vectors:
         if not isinstance(item, dict):
@@ -331,6 +322,13 @@ def build_activation_plan(
             continue
         if end < start:
             start, end = end, start
+        if actual_layer_count is not None:
+            start, end = remap_layer_range(
+                start,
+                end,
+                declared_layer_count,
+                actual_layer_count,
+            )
         try:
             strength = float(item.get("strength", 0.0))
         except (TypeError, ValueError):
@@ -422,7 +420,7 @@ class ActivationVectorResolver:
 
     def _basis_cache_path(self, item: Dict[str, Any]) -> Path:
         payload = {
-            "version": 8,
+            "version": 9,
             "scale_factor": self.anchor_scale_factor,
             "name": item.get("name"),
             "vector": item.get("vector"),
@@ -450,27 +448,15 @@ class ActivationVectorResolver:
         scales: Dict[int, float] = {}
         name = str(item.get("name") or "emotion")
         description = str(item.get("surface_effect") or name)
-        raw_vector = item.get("vector") if isinstance(item.get("vector"), dict) else {}
-        vad = raw_vector.get("vad") if isinstance(raw_vector, dict) else None
-        extra = ""
-        if isinstance(vad, dict):
-            extra = (
-                f" Valenz {vad.get('valence', 0):+.2f},"
-                f" Arousal {vad.get('arousal', 0):+.2f},"
-                f" Dominanz {vad.get('dominance', 0):+.2f}."
-            )
-
-        examples = list(STYLE_ANCHORS.get(name, ()))
-        if not examples:
-            examples = [f"Ich klinge {description}."]
+        anchor_pairs = contrastive_anchor_pairs(item)
 
         pos_sum: Dict[int, torch.Tensor] = {}
         neg_sum: Dict[int, torch.Tensor] = {}
         neutral_norms: Dict[int, float] = {}
 
-        for idx, example in enumerate(examples):
-            prompt_pos = f"{example} {extra}".strip()
-            prompt_neg = NEUTRAL_ANCHORS[idx % len(NEUTRAL_ANCHORS)]
+        for positive_example, negative_example in anchor_pairs:
+            prompt_pos = positive_example
+            prompt_neg = negative_example
             pos_states = self._collect_hidden_state_text(prompt_pos)
             neg_states = self._collect_hidden_state_text(prompt_neg)
             for layer in range(self.num_layers):
@@ -480,11 +466,9 @@ class ActivationVectorResolver:
                 neg_sum[layer] = neg_sum.get(layer, torch.zeros_like(neg)) + neg
                 neutral_norms[layer] = neutral_norms.get(layer, 0.0) + float(neg.norm().item())
 
-        count = float(len(examples))
+        count = float(len(anchor_pairs))
         for layer in range(self.num_layers):
             delta = (pos_sum[layer] - neg_sum[layer]) / count
-            if isinstance(vad, dict) and float(vad.get("valence", 0.0)) < 0:
-                delta = -delta
             norm = float(delta.norm().item())
             if norm <= 1e-8:
                 continue
@@ -493,7 +477,15 @@ class ActivationVectorResolver:
             layers[layer] = scaled.cpu()
             scales[layer] = float(reference_norm * self.anchor_scale_factor)
 
-        return {"layers": layers, "scales": scales, "meta": {"name": name, "description": description}}
+        return {
+            "layers": layers,
+            "scales": scales,
+            "meta": {
+                "name": name,
+                "description": description,
+                "contrast_pairs": len(anchor_pairs),
+            },
+        }
 
     def _collect_hidden_state_text(self, text: str) -> Dict[int, torch.Tensor]:
         messages = [
@@ -974,49 +966,143 @@ class LocalSteeringEngine:
 
     @contextmanager
     def _apply_activation_plan(self, steering_payload: Optional[Dict[str, Any]]) -> Iterable[None]:
+        plan_started = time.perf_counter()
+        normalized_payload = extract_steering_payload(steering_payload)
+        steering = normalized_payload.get("steering", {}) if isinstance(normalized_payload, dict) else {}
+        vectors = steering.get("vectors", []) if isinstance(steering.get("vectors", []), list) else []
+        vector_names = [str(item.get("name") or "") for item in vectors if isinstance(item, dict)]
         try:
-            plan = build_activation_plan(steering_payload, self.resolver.resolve)
+            declared_layers = int(steering.get("model_layers", 0) or 0)
+        except (TypeError, ValueError):
+            declared_layers = 0
+        try:
+            plan = build_activation_plan(
+                steering_payload,
+                self.resolver.resolve,
+                actual_layer_count=len(self.layers),
+            )
         except Exception as exc:
             self.last_steering_report = {
                 "active": False,
+                "prepared": False,
+                "verified_active": False,
                 "hook_count": 0,
+                "hook_invocations": 0,
                 "requested_layers": [],
                 "applied_layers": [],
                 "mode": "activation_addition",
                 "model": self.model_name,
+                "status": "error",
+                "active_vectors": vector_names,
                 "error": str(exc),
             }
             raise
 
+        plan_build_ms = (time.perf_counter() - plan_started) * 1000.0
         requested_layers = sorted(int(layer) for layer in plan)
         handles = []
+        stats: Dict[str, Any] = {
+            "hook_invocations": 0,
+            "steered_hidden_positions": 0,
+            "hook_compute_ms": 0.0,
+            "layer_invocations": {},
+        }
+        attach_started = time.perf_counter()
         try:
             for layer_idx, vector in plan.items():
                 if layer_idx < 0 or layer_idx >= len(self.layers):
                     continue
                 layer = self.layers[layer_idx]
-                handles.append(layer.register_forward_pre_hook(self._pre_hook_factory(vector.to(self.device, dtype=self.dtype))))
+                handles.append(layer.register_forward_pre_hook(
+                    self._pre_hook_factory(
+                        vector.to(self.device, dtype=self.dtype),
+                        stats=stats,
+                        layer_idx=int(layer_idx),
+                    )
+                ))
+            hook_attach_ms = (time.perf_counter() - attach_started) * 1000.0
             self.last_steering_report = {
-                "active": bool(handles),
+                "active": False,
+                "prepared": bool(handles),
+                "verified_active": False,
                 "hook_count": len(handles),
+                "hook_invocations": 0,
                 "requested_layers": requested_layers,
                 "applied_layers": sorted(
                     int(layer) for layer in plan if 0 <= int(layer) < len(self.layers)
                 ),
                 "mode": "activation_addition",
                 "model": self.model_name,
+                "status": "prepared" if handles else "no_applicable_layers",
+                "active_vectors": vector_names,
+                "active_vector_count": len(vector_names),
+                "declared_model_layers": declared_layers,
+                "actual_model_layers": len(self.layers),
+                "layer_range_remapped": bool(declared_layers and declared_layers != len(self.layers)),
+                "plan_build_ms": round(plan_build_ms, 3),
+                "hook_attach_ms": round(hook_attach_ms, 3),
             }
+            stats["report"] = self.last_steering_report
             yield
         finally:
             for handle in handles:
                 handle.remove()
             handles.clear()
+            hook_compute_ms = float(stats["hook_compute_ms"])
+            verified = int(stats["hook_invocations"]) > 0
+            total_overhead_ms = (
+                plan_build_ms
+                + float(self.last_steering_report.get("hook_attach_ms", 0.0))
+                + hook_compute_ms
+            )
+            self.last_steering_report.update({
+                "active": verified,
+                "verified_active": verified,
+                "status": "verified" if verified else self.last_steering_report.get("status", "not_executed"),
+                "hook_invocations": int(stats["hook_invocations"]),
+                "steered_hidden_positions": int(stats["steered_hidden_positions"]),
+                "layer_invocations": dict(stats["layer_invocations"]),
+                "hook_compute_ms": round(max(0.001, hook_compute_ms), 3) if hook_compute_ms > 0 else 0.0,
+                # Millisecond telemetry has three decimals. A verified run is
+                # therefore represented by the smallest measurable bucket
+                # instead of the misleading value 0.000 ms.
+                "steering_overhead_ms": round(
+                    max(0.001, total_overhead_ms) if verified else total_overhead_ms,
+                    3,
+                ),
+            })
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
 
     @staticmethod
-    def _pre_hook_factory(vector: torch.Tensor) -> Callable[..., Any]:
+    def _pre_hook_factory(
+        vector: torch.Tensor,
+        stats: Optional[Dict[str, Any]] = None,
+        layer_idx: Optional[int] = None,
+    ) -> Callable[..., Any]:
         def _hook(_module: Any, inputs: Any) -> Any:
-            return add_vector_to_inputs(inputs, vector)
+            started = time.perf_counter()
+            updated = add_vector_to_inputs(inputs, vector)
+            if stats is not None:
+                stats["hook_invocations"] = int(stats.get("hook_invocations", 0)) + 1
+                hidden = inputs[0] if isinstance(inputs, tuple) and inputs else None
+                if torch.is_tensor(hidden) and hidden.dim() >= 2:
+                    positions = int(hidden.shape[0]) * int(hidden.shape[1])
+                    stats["steered_hidden_positions"] = int(stats.get("steered_hidden_positions", 0)) + positions
+                layer_key = str(layer_idx) if layer_idx is not None else "unknown"
+                layer_counts = stats.setdefault("layer_invocations", {})
+                layer_counts[layer_key] = int(layer_counts.get(layer_key, 0)) + 1
+                stats["hook_compute_ms"] = float(stats.get("hook_compute_ms", 0.0)) + (
+                    time.perf_counter() - started
+                ) * 1000.0
+                # Make the report truthful even while a streamed generation is
+                # still running. The final context cleanup adds exact timings.
+                report = stats.get("report")
+                if isinstance(report, dict):
+                    report["active"] = True
+                    report["verified_active"] = True
+                    report["status"] = "verified"
+                    report["hook_invocations"] = int(stats["hook_invocations"])
+            return updated
 
         return _hook

@@ -13,7 +13,7 @@ from config.emotions import normalize_emotion_state
 from config.prompts import (
     format_consolidated_memories,
 )
-from memory.emotions_engine import analyze_sentiment_simple, calculate_emotion_transition
+from memory.emotions_engine import analyze_emotion_signals, calculate_emotion_transition
 from brain.response_parser import (
     looks_like_model_error,
     sanitize_visible_response,
@@ -581,19 +581,20 @@ class RuntimeTurnPipelineMixin:
         the visible emotional state unchanged. The deterministic local
         signal now runs first, then intent/homeostasis is layered on top.
         """
-        sentiment = analyze_sentiment_simple(user_input)
+        direct_signals = analyze_emotion_signals(user_input, current_state=emotions_before)
+        has_direct_signal = any(value != 0 for value in direct_signals.values())
         has_any_delta = any(
             (getattr(update, "delta", update.get("delta", 0) if isinstance(update, dict) else 0) != 0)
             for update in combined_updates.values()
         )
 
-        if sentiment != "NEUTRAL":
-            self.emotions.update_from_sentiment(sentiment)
+        if has_direct_signal:
+            self.emotions.update_from_message(user_input)
         signal_state = self._get_emotions_snapshot()
 
         if not has_any_delta:
-            if sentiment == "NEUTRAL":
-                self.emotions.update_from_sentiment(sentiment)
+            if not has_direct_signal:
+                self.emotions.update_from_message(user_input)
                 signal_state = self._get_emotions_snapshot()
             return signal_state, self._calculate_emotion_delta(emotions_before, signal_state)
 

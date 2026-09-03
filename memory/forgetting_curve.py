@@ -14,7 +14,7 @@ Neuroscience Basis:
 
 import math
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 
@@ -49,9 +49,13 @@ class EbbinghausForgettingCurve:
     }
     
     def __init__(self):
-        self.decay_constant = 0.3
-        self.boost_per_recall = 0.5
-        self.max_strength = 10.0
+        from config.config import get_forgetting_curve_config
+
+        config = get_forgetting_curve_config()
+        strength_config = config["memory_strength"]
+        self.decay_constant = float(strength_config["decay_rate"])
+        self.boost_per_recall = float(strength_config["boost_per_recall"])
+        self.max_strength = float(strength_config["max"])
         self.min_retention = 0.1
         self.reference_points = [
             (0.0, 1.0),
@@ -176,11 +180,13 @@ class EbbinghausForgettingCurve:
         """
         base_relevance = memory.get("relevance", 0.5)
         
-        created_at = memory.get("created_at")
+        created_at = memory.get("last_recall_time") or memory.get("created_at")
         if created_at:
             if isinstance(created_at, str):
-                created_at = datetime.fromisoformat(created_at)
-            time_hours = (datetime.now() - created_at).total_seconds() / 3600
+                created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            time_hours = (datetime.now(timezone.utc) - created_at.astimezone(timezone.utc)).total_seconds() / 3600
         else:
             time_hours = 24
         
@@ -252,9 +258,12 @@ class MemoryDecayManager:
     """
     
     def __init__(self):
+        from config.config import get_forgetting_curve_config
+
+        config = get_forgetting_curve_config()
         self.forgetting_curve = EbbinghausForgettingCurve()
         self.archive_threshold = 0.1
-        self.strength_threshold = 0.3
+        self.strength_threshold = float(config["spaced_repetition"]["min_strength_for_archive"])
     
     def process_memories(self, memories: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -311,7 +320,7 @@ class MemoryDecayManager:
         
         memory["strength"] = new_strength
         memory["recall_count"] = recall_count + 1
-        memory["last_recall_time"] = datetime.now().isoformat()
+        memory["last_recall_time"] = datetime.now(timezone.utc).isoformat()
         
         return memory
 

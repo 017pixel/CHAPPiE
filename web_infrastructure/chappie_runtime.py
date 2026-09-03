@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional, Generator
 
 # CHAPiE imports
 from config.config import settings, PROJECT_ROOT, LLMProvider
-from config.prompts import LIFE_CONTEXT_TEMPLATE
+from config.prompts import format_life_continuity_context
 from memory.memory_engine import MemoryEngine
 from memory.emotions_engine import EmotionsEngine
 from memory.chat_manager import ChatManager
@@ -239,27 +239,14 @@ class CHAPPiERuntime(
         life_context: Dict[str, Any] | None,
         global_workspace: Dict[str, Any] | None,
     ) -> str:
-        """Serialize the live inner-state contract for the local model.
+        """Serialize only emotion-independent continuity facts for the model.
 
-        Life simulation and workspace used to affect only metadata,
-        action planning and steering. The model therefore received no
-        usable signal that CHAPPiE had a current phase, needs, goals or
-        attention focus. Keep the block compact and instruct the model
-        to express it naturally instead of exposing implementation keys.
+        Homeostasis and Global Workspace contain emotion-derived guidance.
+        Forwarding them would make the prompt a second emotion channel, so the
+        local answer receives only clock, activity and active-goal facts.
         """
-        if not life_context and not global_workspace:
-            return ""
-        try:
-            state = self.action_response.build_prompt_suffix(
-                {},
-                life_context or {},
-                global_workspace or {},
-            )
-        except Exception:
-            state = ""
-        if not state:
-            return ""
-        return LIFE_CONTEXT_TEMPLATE.format(state=state)
+        del global_workspace
+        return format_life_continuity_context(life_context)
 
 
 

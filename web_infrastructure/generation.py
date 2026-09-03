@@ -503,7 +503,11 @@ class RuntimeGenerationMixin:
             use_chain_of_thought=self._use_prompt_chain_of_thought(),
             persona_enabled=self._feature_enabled("persona") and not isolated_request,
         )
-        system_prompt = self._append_response_style_instruction(system_prompt, intent_type, tone_decision)
+        system_prompt = self._append_response_style_instruction(
+            system_prompt,
+            intent_type,
+            tone_decision if prompt_runtime["use_prompt_emotions"] else None,
+        )
 
         life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
         if life_prompt_context:
@@ -535,8 +539,12 @@ class RuntimeGenerationMixin:
                 budget_info,
             )
         
-        # Dynamische Parameteranpassung bei extremen Emotionen
-        adj = self._get_emotion_adjusted_config(emotions)
+        # Lokale Emotionen duerfen den finalen Modelllauf nur ueber Vektoren
+        # beeinflussen. Promptbasierte Provider behalten den Legacy-Pfad.
+        adj = self._get_emotion_adjusted_config(
+            emotions,
+            apply_emotion_adjustments=prompt_runtime["use_prompt_emotions"],
+        )
         gen_config = GenerationConfig(
             max_tokens=min(adj["max_tokens"], 96) if closed_reasoning else min(adj["max_tokens"], 220) if isolated_request else adj["max_tokens"],
             temperature=min(adj["temperature"], 0.2) if isolated_request else adj["temperature"],
@@ -722,7 +730,7 @@ class RuntimeGenerationMixin:
         response_plan_instruction = format_response_plan_instruction(
             str(tone_decision.get("tone", "grounded_neutral")),
             str(tone_decision.get("response_guidance", "Antworte klar und praezise.")),
-        ) if tone_decision else ""
+        ) if tone_decision and prompt_runtime["use_prompt_emotions"] else ""
         generation_budget_instruction = self._generation_budget_instruction()
         life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
         system_prompt = "\n\n".join(part for part in (
@@ -770,7 +778,10 @@ class RuntimeGenerationMixin:
             messages,
         )
 
-        adj = self._get_emotion_adjusted_config(emotions)
+        adj = self._get_emotion_adjusted_config(
+            emotions,
+            apply_emotion_adjustments=prompt_runtime["use_prompt_emotions"],
+        )
         gen_config = GenerationConfig(
             max_tokens=min(adj["max_tokens"], 96) if closed_reasoning else min(adj["max_tokens"], 220) if isolated_request else adj["max_tokens"],
             temperature=min(adj["temperature"], 0.2) if isolated_request else adj["temperature"],

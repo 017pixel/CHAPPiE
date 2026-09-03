@@ -484,9 +484,14 @@ class SleepPhaseHandler:
                         "id": mem_id,
                         "relevance": float(getattr(memory, "relevance_score", 0.5) or 0.5),
                         "created_at": created_at.isoformat() if created_at else None,
-                        "strength": 2.0 if mem_type == "short_term_migration" else 1.0,
+                        "last_recall_time": str(getattr(memory, "last_recall_time", "") or "") or None,
+                        "strength": float(
+                            getattr(memory, "strength", 2.0 if mem_type == "short_term_migration" else 1.0)
+                        ),
                         "emotional_boost": 1.0,
-                        "recall_count": 0,
+                        "recall_count": int(getattr(memory, "recall_count", 0) or 0),
+                        "role": str(getattr(memory, "role", "unknown") or "unknown"),
+                        "source": str(getattr(memory, "source", "unknown") or "unknown"),
                     }
                 )
 
@@ -497,11 +502,30 @@ class SleepPhaseHandler:
             result["memories_processed"] = int(decay_result.get("stats", {}).get("total", 0))
             result["memories_decayed"] = int(decay_result.get("stats", {}).get("update_count", 0))
             result["memories_archived"] = int(decay_result.get("stats", {}).get("archive_count", 0))
-            archive_ids = [
-                str(item.get("id", ""))
-                for item in decay_result.get("archive", [])
-                if isinstance(item, dict) and item.get("id")
-            ]
+            archive_ids = []
+            for item in decay_result.get("archive", []):
+                if not isinstance(item, dict) or not item.get("id"):
+                    continue
+                # Archiving is a compound decision. Exact user facts are never
+                # deleted merely because they are old, and recalled memories
+                # remain protected by their persisted strength.
+                age_hours = 0.0
+                created_at = item.get("created_at")
+                try:
+                    parsed = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=timezone.utc)
+                    age_hours = max(0.0, (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() / 3600)
+                except (TypeError, ValueError):
+                    age_hours = 0.0
+                is_user_fact = str(item.get("role", "")).casefold() == "user" and str(item.get("source", "")).casefold() == "conversation"
+                if (
+                    not is_user_fact
+                    and int(item.get("recall_count", 0) or 0) == 0
+                    and float(item.get("strength", 1.0) or 1.0) <= 1.0
+                    and age_hours >= 31 * 24
+                ):
+                    archive_ids.append(str(item["id"]))
             if archive_ids:
                 result["archive_candidates"] = [aid[:8] for aid in archive_ids[:12]]
                 if hasattr(memory_engine, "delete_memories"):

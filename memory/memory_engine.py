@@ -11,9 +11,9 @@ Funktionen:
 """
 
 import os
-import sys
 import uuid
 import re
+import json
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -53,7 +53,10 @@ from config.config import (
     settings,
     CHROMA_DB_DIR,
     LLMProvider,
+    get_memory_association_config,
+    get_forgetting_curve_config,
 )
+from memory.forgetting_curve import get_forgetting_curve
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import is_safe_retrieval_text, looks_like_model_error, strip_role_prefixes
@@ -73,6 +76,11 @@ class Memory:
     match_type: str = ""
     matched_terms: str = ""
     source: str = "unknown"
+    strength: float = 1.0
+    recall_count: int = 0
+    last_recall_time: str = ""
+    retention: float = 1.0
+    association_score: float = 0.0
 
 
 class MemoryEngine:
@@ -149,7 +157,7 @@ class MemoryEngine:
                 memory_count = self._collection_count()
                 mode = "persistent" if self._is_persistent else "in-memory"
                 print(f"   Memory Engine bereit! ({memory_count} Erinnerungen, Modus: {mode})")
-            except Exception as e:
+            except Exception:
                 print(f"   Memory Engine bereit! (Modus: {'persistent' if self._is_persistent else 'in-memory'})")
         else:
             print("   WARNUNG: Memory Engine im degradierten Modus (keine Speicherung)")
@@ -331,11 +339,267 @@ class MemoryEngine:
         with self._storage_lock():
             self.collection.add(**kwargs)
 
+    def _collection_update(self, **kwargs: Any) -> None:
+        if self.collection is None or not hasattr(self.collection, "update"):
+            return
+        with self._storage_lock():
+            self.collection.update(**kwargs)
+
     def _collection_delete(self, **kwargs: Any) -> None:
         if self.collection is None:
             return
         with self._storage_lock():
             self.collection.delete(**kwargs)
+
+    @staticmethod
+    def _parse_associations(raw: Any) -> dict[str, float]:
+        if isinstance(raw, dict):
+            source = raw
+        elif isinstance(raw, str) and raw.strip():
+            try:
+                source = json.loads(raw)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                source = {}
+        else:
+            source = {}
+        parsed: dict[str, float] = {}
+        for memory_id, weight in source.items():
+            try:
+                numeric = max(0.0, min(1.0, float(weight)))
+            except (TypeError, ValueError):
+                continue
+            if str(memory_id).strip() and numeric > 0:
+                parsed[str(memory_id)] = numeric
+        return parsed
+
+    @staticmethod
+    def _dump_associations(associations: dict[str, float], limit: int) -> str:
+        ranked = sorted(associations.items(), key=lambda item: item[1], reverse=True)[: max(0, int(limit))]
+        return json.dumps({memory_id: round(weight, 4) for memory_id, weight in ranked}, separators=(",", ":"))
+
+    @staticmethod
+    def _metadata_float(metadata: dict[str, Any], key: str, default: float) -> float:
+        try:
+            return float(metadata.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _metadata_int(metadata: dict[str, Any], key: str, default: int) -> int:
+        try:
+            return int(metadata.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _hours_since(timestamp: Any) -> float:
+        if not timestamp:
+            return 24.0
+        try:
+            parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return max(0.0, (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() / 3600.0)
+        except (TypeError, ValueError):
+            return 24.0
+
+    def _memory_retention(self, metadata: dict[str, Any]) -> float:
+        strength = self._metadata_float(metadata, "strength", 1.0)
+        reference_time = metadata.get("last_recall_time") or metadata.get("timestamp")
+        return get_forgetting_curve().calculate_retention(
+            self._hours_since(reference_time),
+            strength,
+        )
+
+    def _retention_adjusted_score(self, semantic_score: float, metadata: dict[str, Any]) -> tuple[float, float]:
+        config = get_forgetting_curve_config()
+        weight = max(0.0, min(0.5, float(config["memory_strength"]["retrieval_retention_weight"])))
+        retention = self._memory_retention(metadata)
+        score = float(semantic_score) * ((1.0 - weight) + weight * retention)
+        # First-person facts from the user remain slightly stronger evidence
+        # than model-written summaries with the same semantic similarity.
+        if str(metadata.get("role", "")).casefold() == "user":
+            score += 0.025
+        return max(0.0, min(1.0, score)), retention
+
+    def _load_associated_memories(
+        self,
+        direct_memories: list[Memory],
+        metadata_by_id: dict[str, dict[str, Any]],
+    ) -> list[Memory]:
+        config = get_memory_association_config()
+        if not config.get("enabled") or not direct_memories:
+            return []
+        direct_ids = {memory.id for memory in direct_memories}
+        spread_candidates: dict[str, tuple[float, float]] = {}
+        seed_count = max(1, int(config["retrieval_seed_count"]))
+        for seed in direct_memories[:seed_count]:
+            links = self._parse_associations(metadata_by_id.get(seed.id, {}).get("associations"))
+            for associated_id, edge_weight in links.items():
+                if associated_id in direct_ids:
+                    continue
+                previous = spread_candidates.get(associated_id, (0.0, 0.0))
+                activation = seed.relevance_score * edge_weight
+                if activation > previous[0] * previous[1]:
+                    spread_candidates[associated_id] = (seed.relevance_score, edge_weight)
+
+        ranked_ids = sorted(
+            spread_candidates,
+            key=lambda memory_id: spread_candidates[memory_id][0] * spread_candidates[memory_id][1],
+            reverse=True,
+        )[: max(0, int(config["retrieval_max_associations"]))]
+        if not ranked_ids:
+            return []
+
+        raw = self._collection_get(ids=ranked_ids, include=["documents", "metadatas"])
+        ids = raw.get("ids") or []
+        documents = raw.get("documents") or []
+        metadatas = raw.get("metadatas") or []
+        spread_weight = max(0.0, min(0.5, float(config["retrieval_spread_weight"])))
+        memories: list[Memory] = []
+        for index, memory_id in enumerate(ids):
+            metadata = dict(metadatas[index]) if index < len(metadatas) and isinstance(metadatas[index], dict) else {}
+            content = str(documents[index] if index < len(documents) else "")
+            if self._is_memory_contaminated(
+                content,
+                role=metadata.get("role", "unknown"),
+                source=metadata.get("source", ""),
+                label=metadata.get("label", ""),
+            ):
+                continue
+            seed_score, edge_weight = spread_candidates.get(str(memory_id), (0.0, 0.0))
+            spread_score = seed_score * (1.0 - spread_weight) + edge_weight * spread_weight
+            score, retention = self._retention_adjusted_score(spread_score, metadata)
+            metadata_by_id[str(memory_id)] = metadata
+            memories.append(Memory(
+                id=str(memory_id),
+                content=content,
+                role=metadata.get("role", "unknown"),
+                timestamp=metadata.get("timestamp", ""),
+                mem_type=metadata.get("type", "interaction"),
+                relevance_score=score,
+                label=metadata.get("label", "original"),
+                match_type="Association",
+                source=metadata.get("source", "unknown"),
+                strength=self._metadata_float(metadata, "strength", 1.0),
+                recall_count=self._metadata_int(metadata, "recall_count", 0),
+                last_recall_time=str(metadata.get("last_recall_time", "")),
+                retention=retention,
+                association_score=edge_weight,
+            ))
+        return memories
+
+    def _find_associations_for_embedding(self, embedding: list[float]) -> dict[str, float]:
+        config = get_memory_association_config()
+        if not config.get("enabled") or not embedding or self.collection is None:
+            return {}
+        count = self._collection_count()
+        if count <= 0:
+            return {}
+        max_links = max(1, int(config["max_links_per_memory"]))
+        raw = self._collection_query(
+            query_embeddings=[embedding],
+            n_results=min(count, max_links * 3),
+        )
+        ids = (raw.get("ids") or [[]])[0]
+        documents = (raw.get("documents") or [[]])[0]
+        metadatas = (raw.get("metadatas") or [[]])[0]
+        distances = (raw.get("distances") or [[]])[0]
+        candidates: dict[str, float] = {}
+        for index, memory_id in enumerate(ids):
+            metadata = metadatas[index] if index < len(metadatas) and isinstance(metadatas[index], dict) else {}
+            content = documents[index] if index < len(documents) else ""
+            if self._is_memory_contaminated(
+                str(content or ""),
+                role=metadata.get("role", "unknown"),
+                source=metadata.get("source", ""),
+                label=metadata.get("label", ""),
+            ):
+                continue
+            distance = distances[index] if index < len(distances) else 1.0
+            similarity = max(0.0, min(1.0, 1.0 - float(distance)))
+            if similarity >= float(config["min_cosine_similarity"]):
+                candidates[str(memory_id)] = similarity
+        return dict(sorted(candidates.items(), key=lambda item: item[1], reverse=True)[:max_links])
+
+    def _add_reciprocal_associations(self, memory_id: str, associations: dict[str, float]) -> None:
+        if not associations:
+            return
+        config = get_memory_association_config()
+        try:
+            raw = self._collection_get(ids=list(associations), include=["metadatas"])
+            ids = raw.get("ids") or []
+            metadatas = raw.get("metadatas") or []
+            updates = []
+            update_ids = []
+            for index, neighbor_id in enumerate(ids):
+                metadata = dict(metadatas[index]) if index < len(metadatas) and isinstance(metadatas[index], dict) else {}
+                links = self._parse_associations(metadata.get("associations"))
+                links[memory_id] = max(links.get(memory_id, 0.0), float(associations.get(str(neighbor_id), 0.0)))
+                metadata["associations"] = self._dump_associations(links, int(config["max_links_per_memory"]))
+                metadata["memory_schema_version"] = int(config["schema_version"])
+                update_ids.append(str(neighbor_id))
+                updates.append(metadata)
+            if update_ids:
+                self._collection_update(ids=update_ids, metadatas=updates)
+        except Exception as exc:
+            if settings.debug:
+                print(f"   Memory-Verknuepfung konnte nicht gespiegelt werden: {exc}")
+
+    def _reinforce_retrieved_memories(
+        self,
+        memories: list[Memory],
+        metadata_by_id: dict[str, dict[str, Any]],
+    ) -> None:
+        """Persistiert Recall-Staerke und kleine Co-Retrieval-Kanten gebuendelt."""
+        config = get_memory_association_config()
+        if not config.get("enabled") or not memories:
+            return
+        selected = [memory for memory in memories if memory.id][: int(config["max_links_per_memory"])]
+        now = datetime.now(timezone.utc)
+        curve = get_forgetting_curve()
+        update_ids: list[str] = []
+        updates: list[dict[str, Any]] = []
+
+        for memory in selected:
+            metadata = dict(metadata_by_id.get(memory.id, {}))
+            strength = self._metadata_float(metadata, "strength", memory.strength)
+            recall_count = self._metadata_int(metadata, "recall_count", memory.recall_count)
+            last_recall = metadata.get("last_recall_time")
+            cooldown_elapsed = self._hours_since(last_recall) * 60.0 >= float(config["recall_cooldown_minutes"])
+            changed = metadata.get("memory_schema_version") != int(config["schema_version"])
+            if cooldown_elapsed:
+                strength = curve.calculate_strength_boost(strength, recall_count)
+                recall_count += 1
+                metadata["last_recall_time"] = now.isoformat()
+                changed = True
+
+            links = self._parse_associations(metadata.get("associations"))
+            if cooldown_elapsed:
+                for other in selected:
+                    if other.id == memory.id:
+                        continue
+                    links[other.id] = min(
+                        1.0,
+                        links.get(other.id, 0.0) + float(config["co_retrieval_boost"]),
+                    )
+            if not changed:
+                continue
+            metadata.update({
+                "strength": round(strength, 4),
+                "recall_count": recall_count,
+                "associations": self._dump_associations(links, int(config["max_links_per_memory"])),
+                "memory_schema_version": int(config["schema_version"]),
+            })
+            update_ids.append(memory.id)
+            updates.append(metadata)
+
+        if update_ids:
+            try:
+                self._collection_update(ids=update_ids, metadatas=updates)
+            except Exception as exc:
+                if settings.debug:
+                    print(f"   Memory-Recall konnte nicht verstaerkt werden: {exc}")
     
     def _init_chromadb_persistent(self):
         """Versucht ChromaDB im persistenten Modus zu initialisieren."""
@@ -365,7 +629,7 @@ class MemoryEngine:
                 _ = self.collection.count()
 
                 self._is_persistent = True
-            print(f"   ChromaDB persistent verbunden!")
+            print("   ChromaDB persistent verbunden!")
             
         except Exception as e:
             print(f"   FEHLER bei ChromaDB persistent: {e}")
@@ -455,6 +719,17 @@ class MemoryEngine:
                     import logging
                     logging.warning(f"Memory embedding failed, using dummy ({self.embedding_dim}D): {error_msg}")
 
+                try:
+                    associations = self._find_associations_for_embedding(embedding)
+                except Exception as association_error:
+                    associations = {}
+                    if settings.debug:
+                        print(f"   Memory-Verknuepfung uebersprungen: {association_error}")
+
+                association_config = get_memory_association_config()
+                forgetting_config = get_forgetting_curve_config()
+                initial_strength = float(forgetting_config["memory_strength"]["initial"])
+
                 # Speichere in ChromaDB mit erweitertem Metadata
                 self._collection_add(
                     ids=[memory_id],
@@ -465,9 +740,18 @@ class MemoryEngine:
                         "timestamp": timestamp,
                         "type": mem_type,
                         "label": label,
-                        "source": source
+                        "source": source,
+                        "strength": initial_strength,
+                        "recall_count": 0,
+                        "last_recall_time": timestamp,
+                        "associations": self._dump_associations(
+                            associations,
+                            int(association_config["max_links_per_memory"]),
+                        ),
+                        "memory_schema_version": int(association_config["schema_version"]),
                     }]
                 )
+                self._add_reciprocal_associations(memory_id, associations)
 
                 if settings.debug:
                     print(f"   Memory gespeichert: [{role}] [{source}] {content[:50]}...")
@@ -859,6 +1143,7 @@ class MemoryEngine:
         ids = raw.get("ids") or []
         metadatas = raw.get("metadatas") or []
         memories: list[Memory] = []
+        metadata_by_id: dict[str, dict[str, Any]] = {}
 
         for idx, content in enumerate(documents):
             metadata = metadatas[idx] if idx < len(metadatas) and isinstance(metadatas[idx], dict) else {}
@@ -894,8 +1179,13 @@ class MemoryEngine:
                     match_type=match_type,
                     matched_terms=", ".join(matched_terms),
                     source=metadata.get("source", "unknown"),
+                    strength=self._metadata_float(metadata, "strength", 1.0),
+                    recall_count=self._metadata_int(metadata, "recall_count", 0),
+                    last_recall_time=str(metadata.get("last_recall_time", "")),
+                    retention=self._memory_retention(metadata),
                 )
             )
+            metadata_by_id[memory_id] = metadata
 
         # At equal keyword relevance, explicit USER statements are stronger
         # autobiographical evidence than generated assistant summaries.
@@ -907,7 +1197,9 @@ class MemoryEngine:
             ),
             reverse=True,
         )
-        return memories[: max(1, int(top_k))]
+        selected = memories[: max(1, int(top_k))]
+        self._reinforce_retrieved_memories(selected, metadata_by_id)
+        return selected
 
     def extract_search_query(self, user_input: str) -> str:
         """
@@ -1071,6 +1363,7 @@ class MemoryEngine:
 
                 # Konvertiere zu Memory-Objekten
                 memories = []
+                metadata_by_id: dict[str, dict[str, Any]] = {}
                 if results and results["documents"] and results["documents"][0]:
                     for i, doc in enumerate(results["documents"][0]):
                         metadata = results.get("metadatas") or []
@@ -1086,7 +1379,8 @@ class MemoryEngine:
                             continue
                         # Chroma's cosine distance is 1 - cosine similarity.
                         distance = results["distances"][0][i] if results["distances"] else 0
-                        relevance = max(0.0, min(1.0, 1.0 - float(distance)))
+                        semantic_relevance = max(0.0, min(1.0, 1.0 - float(distance)))
+                        relevance, retention = self._retention_adjusted_score(semantic_relevance, metadata)
                         
                         # FILTERUNG NACH RELEVANZ
                         if relevance < min_relevance:
@@ -1101,13 +1395,29 @@ class MemoryEngine:
                             relevance_score=relevance,
                             label=metadata.get("label", "original"),
                             source=metadata.get("source", "unknown"),
+                            strength=self._metadata_float(metadata, "strength", 1.0),
+                            recall_count=self._metadata_int(metadata, "recall_count", 0),
+                            last_recall_time=str(metadata.get("last_recall_time", "")),
+                            retention=retention,
                         )
                         memories.append(memory)
-                
-                # Sortiere explizit nach Relevanz (Sicherheitshalber)
-                memories.sort(key=lambda m: m.relevance_score, reverse=True)
+                        metadata_by_id[memory.id] = metadata
 
-                return memories[:top_k]
+                memories.sort(key=lambda m: m.relevance_score, reverse=True)
+                memories.extend(self._load_associated_memories(memories, metadata_by_id))
+
+                # Deduplicate direct and spread paths, keeping the stronger
+                # score, then persist recall and co-retrieval strengthening.
+                deduplicated: dict[str, Memory] = {}
+                for memory in memories:
+                    previous = deduplicated.get(memory.id)
+                    if previous is None or memory.relevance_score > previous.relevance_score:
+                        deduplicated[memory.id] = memory
+                memories = list(deduplicated.values())
+                memories.sort(key=lambda m: m.relevance_score, reverse=True)
+                selected = memories[:top_k]
+                self._reinforce_retrieved_memories(selected, metadata_by_id)
+                return selected
                 
             except Exception as e:
                 error_msg = str(e).lower()
@@ -1190,6 +1500,10 @@ class MemoryEngine:
                     mem_type=mem_type,
                     label=label,
                     source=metadata.get("source", "unknown"),
+                    strength=self._metadata_float(metadata, "strength", 1.0),
+                    recall_count=self._metadata_int(metadata, "recall_count", 0),
+                    last_recall_time=str(metadata.get("last_recall_time", "")),
+                    retention=self._memory_retention(metadata),
                 )
                 memories.append(memory)
 
@@ -1610,7 +1924,6 @@ class MemoryEngine:
 
                 for point in bullet_points:
                     self.add_memory(point, role="assistant", mem_type="summary", label="zsm gefasst")
-                    consolidated_count = 0 # Nur für Logik
                 
                 # 4. Löschen der ALTEN Memories (nur wenn wir bis hier kommen)
                 batch_ids = [mem.id for mem in batch]
@@ -1628,7 +1941,7 @@ class MemoryEngine:
                     print(traceback.format_exc())
         
         # Abschlussbericht
-        result_msg = f"Traum-Phase abgeschlossen.\n"
+        result_msg = "Traum-Phase abgeschlossen.\n"
         result_msg += f"- Verarbeitet: {deleted_total}/{total_memories} Erinnerungen\n"
         result_msg += f"- Neu erstellt: {consolidated_total} Fakten\n\n"
         

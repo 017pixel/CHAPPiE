@@ -44,6 +44,10 @@ def serialize_rag_memories(memories: Optional[List[Any]]) -> List[Dict[str, Any]
             "match_type": getattr(memory, "match_type", ""),
             "matched_terms": getattr(memory, "matched_terms", ""),
             "source": getattr(memory, "source", "unknown"),
+            "strength": getattr(memory, "strength", 1.0),
+            "recall_count": getattr(memory, "recall_count", 0),
+            "retention": getattr(memory, "retention", 1.0),
+            "association_score": getattr(memory, "association_score", 0.0),
         }
         for memory in memories or []
     ]
@@ -303,8 +307,11 @@ class RuntimeFormattingMixin:
         return {"is_unexpected_cot": is_leak, "score": round(score, 3), "reasons": list(set(reasons))}
 
     @staticmethod
-    def _get_emotion_adjusted_config(emotions: Dict[str, int]) -> Dict[str, Any]:
-        """Passt Generationsparameter dynamisch an extreme emotionale Zustaende an."""
+    def _get_emotion_adjusted_config(
+        emotions: Dict[str, int],
+        apply_emotion_adjustments: bool = True,
+    ) -> Dict[str, Any]:
+        """Liefert Samplingwerte, im vLLM-Layerpfad ohne Emotions-Konfundierung."""
         frustration = emotions.get("frustration", 50)
         sadness = emotions.get("sadness", 50)
         energy = emotions.get("energy", 50)
@@ -316,6 +323,15 @@ class RuntimeFormattingMixin:
         temperature = settings.temperature
         repetition_penalty = settings.repetition_penalty
         max_tokens = settings.max_tokens
+
+        if not apply_emotion_adjustments:
+            return {
+                "temperature": round(float(temperature), 3),
+                "repetition_penalty": round(float(repetition_penalty), 3),
+                "max_tokens": int(max_tokens),
+                "was_adjusted": False,
+                "emotion_adjustments_enabled": False,
+            }
 
         # >70: Temperatur senken und Wiederholungsstrafe erhöhen, um Drift zu bremsen.
         if frustration > 70:
@@ -354,6 +370,7 @@ class RuntimeFormattingMixin:
             "was_adjusted": (temperature != settings.temperature or
                              repetition_penalty != settings.repetition_penalty or
                              max_tokens != settings.max_tokens),
+            "emotion_adjustments_enabled": True,
         }
 
     def _derive_response_plan(

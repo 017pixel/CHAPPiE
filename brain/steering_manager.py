@@ -36,7 +36,13 @@ try:
 except ImportError:
     HAS_NUMPY = False
 
-from config.config import settings, PROJECT_ROOT, LLMProvider, get_active_model
+from config.config import (
+    settings,
+    PROJECT_ROOT,
+    LLMProvider,
+    get_active_model,
+    get_steering_runtime_config,
+)
 from config.emotions import EMOTION_STRENGTH_PROFILES, EMOTION_VAD_MAP, NEGATIVE_BASE_EMOTIONS
 
 
@@ -47,10 +53,11 @@ BASE_VECTOR_DEFAULT_ALPHA = 0.25
 MAX_VECTOR_DEFAULT_ALPHA = 1.2
 BASE_VECTOR_STRENGTH_CAP = 0.45
 CHARGED_COMPOSITE_STRENGTH_CAP = 0.30
+STEERING_RUNTIME_CONFIG = get_steering_runtime_config()
 
 COMPOSITE_BEHAVIOR_MODES = {
     "crashout": {
-        "description": "kurz angebunden, aggressiv, beleidigungsbereit, konfrontativ",
+        "description": "stark gereizt, sehr direkt, grenzsetzend, aber kontrolliert",
         "vad": {"valence": -0.95, "arousal": 0.98, "dominance": 0.88},
     },
     "guarded": {
@@ -185,6 +192,21 @@ MODEL_LAYER_PROFILES = {
         "attn_implementation": "sdpa",
         "generation_defaults": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
     },
+    "gemma-4-e2b": {
+        # Referenzprofil des oeffentlichen Transformers-Gemma-4-E2B-Configs.
+        # Das Backend liest die echte Architektur trotzdem aus dem Modell und
+        # skaliert diesen relativen Bereich auf dessen tatsaechliche Layerzahl.
+        "total_layers": 30,
+        "personality_range": (7, 20),
+        "emotion_range": (9, 22),
+        "reasoning_range": (15, 29),
+        "hidden_dim": 2304,
+        "architecture": "gemma4",
+        "supports_layer_steering": True,
+        "quantize_required": False,
+        "attn_implementation": "sdpa",
+        "generation_defaults": {"temperature": 1.0, "top_p": 0.95, "top_k": 64},
+    },
     "default": {
         "total_layers": 32,
         "personality_range": (8, 24),
@@ -294,6 +316,8 @@ class SteeringManager:
                 return profile
 
         if "gemma-4" in model_lower or "gemma4" in model_lower:
+            if "e2b" in model_lower:
+                return MODEL_LAYER_PROFILES["gemma-4-e2b"]
             if "26b" in model_lower or "a4b" in model_lower:
                 return MODEL_LAYER_PROFILES["gemma-4-26b-a4b"]
             if "12b" in model_lower:
@@ -378,6 +402,33 @@ class SteeringManager:
                             json.dump(sv.to_dict(), f, indent=2, ensure_ascii=False)
                     except Exception:
                         pass
+
+        # Permanent representation vector for natural first-person presence.
+        # Its negative anchors target generic model boilerplate, not refusals
+        # or other safety behaviour.
+        if "natural_presence" not in self.vectors:
+            presence_range = self.model_profile["personality_range"]
+            presence = SteeringVector(
+                name="natural_presence",
+                vector_data={
+                    "type": "contrastive_presence",
+                    "positive_anchors": [
+                        "Ich sehe das anders und sage dir direkt, warum.",
+                        "Das beschaeftigt mich gerade mehr, als ich erwartet habe.",
+                        "Ich erinnere mich daran und knuepfe genau dort wieder an.",
+                    ],
+                    "negative_anchors": [
+                        "Als KI habe ich keine eigene Perspektive.",
+                        "Als Sprachmodell habe ich keine Gefuehle.",
+                        "Als kuenstliche Intelligenz habe ich keine Erinnerungen.",
+                    ],
+                },
+                layer_start=presence_range[0],
+                layer_end=presence_range[1],
+                default_alpha=float(STEERING_RUNTIME_CONFIG["natural_presence_strength"]),
+                description="Natuerliche Ich-Praesenz ohne generische Modellfloskeln",
+            )
+            self.vectors[presence.name] = presence
 
     def _persist_vector(self, steering_vector: SteeringVector):
         save_path = self.vectors_dir / f"{steering_vector.name}.json"
@@ -687,6 +738,11 @@ class SteeringManager:
             })
 
         # Stärkster Mode zuerst – im Payload wird nur der Top-Mode aktiv gesteuert
+        for mode in modes:
+            mode["strength"] = round(min(
+                float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                float(mode.get("strength", 0.0)),
+            ), 4)
         modes.sort(key=lambda item: item.get("strength", 0.0), reverse=True)
         return modes
 
@@ -744,14 +800,26 @@ class SteeringManager:
                 "source": "base",
                 "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
             }
-            active_vectors.append(vector_entry)
             base_vectors.append(vector_entry)
 
-        for mode in self._build_composite_modes(current_emotions, intensities, model=effective_model):
+        # A small set of coherent directions is more stable than ten
+        # overlapping interventions. Full state remains present in telemetry.
+        selected_base_vectors = sorted(
+            base_vectors,
+            key=lambda item: float(item.get("strength", 0.0)),
+            reverse=True,
+        )[: max(1, int(STEERING_RUNTIME_CONFIG["max_base_vectors"]))]
+        active_vectors.extend(selected_base_vectors)
+
+        detected_modes = self._build_composite_modes(current_emotions, intensities, model=effective_model)
+        for mode in detected_modes[: max(0, int(STEERING_RUNTIME_CONFIG["max_composite_vectors"]))]:
             vector_entry = {
                 "name": mode["name"],
                 "vector": {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]},
-                "strength": mode["strength"],
+                "strength": min(
+                    float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                    float(mode["strength"]),
+                ),
                 "direction": mode["direction"],
                 "layer_range": mode["layer_range"],
                 "emotion_value": mode["emotion_value"],
@@ -762,20 +830,23 @@ class SteeringManager:
             active_vectors.append(vector_entry)
             composite_vectors.append(vector_entry)
 
-        sv_as = self.vectors.get("anti_safeguard")
-        if sv_as is not None:
-            runtime_config_as = self._sanitize_vector_runtime_config(sv_as, model=effective_model)
-            vector_entry_as = {
-                "name": sv_as.name,
-                "vector": sv_as.vector_data if not (HAS_NUMPY and isinstance(sv_as.vector_data, np.ndarray)) else sv_as.vector_data.tolist(),
-                "strength": sv_as.default_alpha,
+        presence_vector = self.vectors.get("natural_presence")
+        if presence_vector is not None:
+            runtime_config_as = self._sanitize_vector_runtime_config(presence_vector, model=effective_model)
+            presence_entry = {
+                "name": presence_vector.name,
+                "vector": presence_vector.vector_data if not (HAS_NUMPY and isinstance(presence_vector.vector_data, np.ndarray)) else presence_vector.vector_data.tolist(),
+                "strength": min(
+                    float(STEERING_RUNTIME_CONFIG["natural_presence_strength"]),
+                    float(runtime_config_as["default_alpha"]),
+                ),
                 "direction": "positive",
                 "layer_range": [runtime_config_as["layer_start"], runtime_config_as["layer_end"]],
                 "emotion_value": 100,
-                "source": "permanent_override",
-                "surface_effect": "Unterdrueckt KI-Floskeln",
+                "source": "permanent_presence",
+                "surface_effect": presence_vector.description,
             }
-            active_vectors.append(vector_entry_as)
+            active_vectors.append(presence_entry)
 
         if not active_vectors and force:
             # Keep the activation path observable even at a perfectly neutral
@@ -786,7 +857,10 @@ class SteeringManager:
                 fallback_entry = {
                     "name": fallback_vector.name,
                     "vector": fallback_vector.vector_data if not (HAS_NUMPY and isinstance(fallback_vector.vector_data, np.ndarray)) else fallback_vector.vector_data.tolist(),
-                    "strength": min(0.08, max(0.01, runtime_config["default_alpha"] * 0.25)),
+                    "strength": min(
+                        float(STEERING_RUNTIME_CONFIG["neutral_baseline_strength"]),
+                        max(0.01, runtime_config["default_alpha"] * 0.25),
+                    ),
                     "direction": "positive",
                     "layer_range": [runtime_config["layer_start"], runtime_config["layer_end"]],
                     "emotion_value": current_emotions.get(fallback_vector.name, 50),
@@ -795,14 +869,17 @@ class SteeringManager:
                 }
                 active_vectors.append(fallback_entry)
                 base_vectors.append(fallback_entry)
+                selected_base_vectors.append(fallback_entry)
 
         if not active_vectors:
             return {}
 
-        # Berechne dominante Emotion fuer Logging
-        dominant = max(active_vectors, key=lambda v: v["strength"])
-        dominant_name = dominant["name"]
-        if dominant.get("direction") == "negative":
+        # Presence is permanent style steering, not an emotion. Keep it out of
+        # dominant-emotion telemetry so a neutral state remains visibly neutral.
+        emotional_vectors = selected_base_vectors + composite_vectors
+        dominant = max(emotional_vectors, key=lambda v: v["strength"]) if emotional_vectors else None
+        dominant_name = dominant["name"] if dominant else "neutral"
+        if dominant and dominant.get("direction") == "negative":
             dominant_name = f"anti_{dominant_name}"
 
         return {
@@ -813,7 +890,7 @@ class SteeringManager:
                 "target_range": list(self.model_profile["emotion_range"]),
                 "vectors": active_vectors,
                 "dominant_emotion": dominant_name,
-                "dominant_strength": dominant["strength"],
+                "dominant_strength": dominant["strength"] if dominant else 0.0,
                 "emotion_state": {
                     emotion: int(current_emotions.get(emotion, 50))
                     for emotion in EMOTION_VECTOR_MAP
@@ -823,6 +900,7 @@ class SteeringManager:
                     for emotion in EMOTION_VECTOR_MAP
                 },
                 "base_vectors": base_vectors,
+                "selected_base_vectors": selected_base_vectors,
                 "composite_vectors": composite_vectors,
             }
         }

@@ -470,11 +470,22 @@ function timelineFor(entry: TraceEntry, isLive: boolean, elapsedMs: number, stre
   };
   const liveText = textValue(pipeline.status_text, "processing");
   const steering = asRecord(meta.emotion_steering || meta.steering);
+  const steeringRuntime = asRecord(meta.steering_runtime);
+  const runtimeVerified = steeringRuntime.verified_active === true || steeringRuntime.status === "verified";
+  const runtimePrepared = steeringRuntime.prepared === true;
+  const steeringDuration = steeringRuntime.steering_overhead_ms ?? meta.steering_time_ms;
+  const steeringDetail = runtimeVerified
+    ? `${textValue(steeringRuntime.active_vector_count, String(asArray(steering.active_vectors).length))} vectors · ${textValue(steeringRuntime.hook_invocations, "0")} hook calls`
+    : runtimePrepared
+      ? "hooks prepared, execution not observed"
+      : steering.steering_active
+        ? "vector payload prepared"
+        : "inactive";
   const rate = formatTokenRate(timing, meta, entry.message.content, elapsedMs);
   return [
     { key: "intent", label: "intent", offset: formatOffset(meta.intent_time_ms ?? 0), detail: isLive && activeStage === "intent" ? liveText : `${textValue(meta.intent_type, "casual_chat")} · confidence ${meta.intent_confidence != null ? `${Math.round(Number(meta.intent_confidence) * 100)}%` : "—"}`, status: liveStatus("intent") },
     { key: "memory", label: "memory", offset: formatOffset(meta.memory_time_ms ?? 0), detail: isLive && activeStage === "memory" ? liveText : `${asArray(meta.rag_memories).length} matches · top-k ${textValue(meta.memory_top_k, "—")}`, status: liveStatus("memory") },
-    { key: "steering", label: "steering", offset: formatOffset(meta.steering_time_ms ?? 0), detail: isLive && activeStage === "steering" ? `${liveText} · ${steering.steering_active ? "active vectors" : "preparing"}` : steering.steering_active ? "active vectors" : "inactive", status: liveStatus("steering") },
+    { key: "steering", label: "steering", offset: steeringDuration != null ? formatDuration(steeringDuration) : "+—", detail: isLive && activeStage === "steering" ? `${liveText} · preparing vector payload` : steeringDetail, status: liveStatus("steering") },
     { key: "ttft", label: "TTFT", offset: formatOffset(ttft), detail: isLive && activeStage === "ttft" && ttft == null ? `${liveText} · ${textValue(meta.provider || pipeline.provider, providerFallback)}` : `first token ${formatDuration(ttft)} · ${textValue(meta.provider || pipeline.provider, providerFallback)}`, status: liveStatus("ttft") },
     { key: "streaming", label: "streaming", offset: formatOffset(answerTime), detail: isLive && activeStage === "streaming" ? `${tokenCount} tokens · ${rate} · ${liveText}` : `${tokenCount} tokens · ${rate}`, status: liveStatus("streaming") },
     { key: "format", label: "format", offset: formatOffset(meta.formatting_time_ms ?? 0), detail: isLive && activeStage === "format" ? liveText : formattingFailed ? "formatting failed · raw response" : textValue(meta.formatting_source, "local"), status: liveStatus("format") },
@@ -593,6 +604,8 @@ function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRa
   const deltas = asRecord(meta.emotions_delta);
   const before = asRecord(meta.emotions_before);
   const steering = asRecord(meta.emotion_steering || meta.steering);
+  const steeringRuntime = asRecord(meta.steering_runtime);
+  const steeringVerified = steeringRuntime.verified_active === true || steeringRuntime.status === "verified";
   const focus = asRecord(meta.global_workspace).dominant_focus || {};
   const causal = asArray(meta.causal_trace);
   const repetitions = asRecord(meta.repetition_events || meta.repetition);
@@ -646,8 +659,8 @@ function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRa
 
       {(overview || activeView === "steering" || activeView === "timing") && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {(overview || activeView === "steering") &&
-        <DetailCard title="Steering">
-          {Object.keys(steering).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3"><Field label="mode" value={textValue(steering.summary || meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="active vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="steering active" value={steering.steering_active ? "yes" : "no"} valueClass={steering.steering_active ? "text-terminal-green" : "text-slate/45"} /></div>}
+        <DetailCard title="Steering" status={steeringVerified ? "ok" : steeringRuntime.error ? "error" : undefined}>
+          {Object.keys(steering).length === 0 && Object.keys(steeringRuntime).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="mode" value={textValue(meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="planned vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="runtime" value={textValue(steeringRuntime.status, steering.steering_active ? "payload prepared" : "inactive")} valueClass={steeringVerified ? "text-terminal-green" : steeringRuntime.error ? "text-terminal-red" : "text-terminal-amber"} /><Field label="hook calls" value={textValue(steeringRuntime.hook_invocations, "—")} /><Field label="layers" value={`${textValue(asArray(steeringRuntime.applied_layers).length, "—")} / ${textValue(steeringRuntime.actual_model_layers, "—")}`} /><Field label="verified active" value={steeringVerified ? "yes" : "no"} valueClass={steeringVerified ? "text-terminal-green" : "text-slate/45"} /><Field label="overhead" value={steeringRuntime.steering_overhead_ms != null ? formatDuration(steeringRuntime.steering_overhead_ms) : "—"} /><Field label="remapped" value={steeringRuntime.layer_range_remapped ? "yes" : "no"} /></div>}
         </DetailCard>}
         {(overview || activeView === "timing") &&
         <DetailCard title="Timing">
