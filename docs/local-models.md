@@ -4,7 +4,19 @@
 
 Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent und Query-Extraktion auf demselben geladenen Modell.
 
-Alternative lokale Modelle wie Gemma 4 sind möglich, benötigen aber passende VRAM-, Quantisierungs-, Kontext- und Steering-Profile. Ein Modellwechsel ist keine Cleanup-Aufgabe und soll separat verifiziert werden.
+Alternative lokale Modelle wie Gemma 4 sind möglich. Der Steering-Service liest Hidden-Größe und Layerzahl aus dem geladenen Modell und skaliert das konfigurierte relative Layerfenster auf die tatsächliche Architektur. VRAM, Quantisierung und die sichtbare Vektorwirkung müssen auf dem Modellserver separat geprüft werden.
+
+## Vector-only-Vertrag
+
+Für die finale lokale Antwort gilt:
+
+- keine Emotionswerte und kein Emotions-Antwortplan im System-Prompt
+- keine emotionsabhängige Temperatur, Wiederholungsstrafe oder Tokenzahl
+- höchstens drei dominante Basisvektoren und ein Kombinationsvektor pro Turn
+- ein kleiner kontrastiver Präsenzvektor gegen generische Modellfloskeln
+- Safety-Grenzen bleiben als kurzer, emotionsunabhängiger Systemvertrag bestehen
+
+Der Präsenzvektor entfernt keine Refusal- oder Safety-Richtung. Ein alter optionaler `anti_safeguard`-Vektor wird im aktiven Payload nicht mehr verwendet.
 
 ## Providerrollen
 
@@ -63,6 +75,8 @@ python3 tests/test_provider_factory.py
 python3 tests/test_vllm_response_handling.py
 python3 tests/test_ollama_response_handling.py
 python3 tests/test_local_first_runtime.py
+python3 tests/test_vector_only_emotion_path.py
+python3 tests/test_steering_backend.py
 ```
 
-Live-Erreichbarkeit und Modellgewichte sind separate Integrationstests.
+Live-Erreichbarkeit, Vektorwirkung und Modellgewichte sind separate Integrationstests. Nach einem echten Lauf muss `steering_runtime.status=verified`, `verified_active=true` und `hook_invocations>0` gelten. Ein vorbereiteter Payload ohne Hook-Aufruf zählt nicht mehr als aktives Steering.

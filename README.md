@@ -34,9 +34,9 @@ Die frühere Multi-Agent-`BrainPipeline` ist nicht der aktive Requestpfad. Ihre 
 
 ## Funktionen
 
-- Episodisches Gedächtnis mit ChromaDB, Hybrid-RAG und Vergessenskurve
+- Episodisches Gedächtnis mit ChromaDB, Hybrid-RAG, Recall-Stärke, Verknüpfungen und Vergessenskurve
 - Life-Simulation mit Needs, Goals, Habit Dynamics, Attachment und Timeline
-- zehn zentrale Emotionen mit VAD-Mapping und modellabhängigem Layer-Steering
+- zehn gekoppelte Emotionen mit VAD-Mapping und reinem Layer-Steering im lokalen Antwortpfad
 - gemeinsamer synchroner und gestreamter Turn-Kern
 - Causal Trace für Intent, Memory, Emotion, Life, Steering und Tonentscheidung
 - Sleep-Phase mit Replay und Konsolidierung
@@ -114,6 +114,8 @@ python3 -m brain.steering_api_server
 | Groq | optionaler Cloud-Adapter für Training und Forschung | Prompt-Kontext |
 
 Aktive Provider sind ausschließlich `vllm`, `ollama` und `groq`. Cerebras-Bezüge sind nur in ausdrücklich historischen Forschungs- oder Legacy-Dateien zulässig.
+
+Im vLLM-Antwortpfad stehen keine Emotionswerte, Tonpläne oder emotional veränderten Samplingwerte im Prompt. Der sichtbare Einfluss entsteht ausschließlich durch kontrastiv berechnete Aktivierungsvektoren. Details und Live-Prüfung stehen in [`docs/emotion-memory-steering.md`](docs/emotion-memory-steering.md).
 
 ## Tests
 
