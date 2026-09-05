@@ -2,6 +2,7 @@ import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useS
 import { useQuery } from "@tanstack/react-query";
 
 import { estimateTextTokens, formatTokenRate } from "../lib/telemetry";
+import { MarkdownText } from "../lib/markdown";
 import { api } from "../services/api";
 import { isSlashCommand } from "../store/ui";
 import type { ChatMessage, LivePipelineState } from "../store/ui";
@@ -102,7 +103,7 @@ function NumberedText({ content, className = "" }: { content: string; className?
 
 function hasError(message: ChatMessage): boolean {
   const meta = metadataOf(message);
-  return Boolean(meta.stream_error || meta.error_message || meta.formatting_failed || /^fehler[:\s]/i.test(message.content) || /^(?:vllm|ollama|groq|steering-server)\b[^\n]{0,120}\b(?:error|failed|failure|fehler|fehlgeschlagen)\b/i.test(message.content));
+  return Boolean(meta.stream_error || meta.error_message || meta.generation_failed || /^fehler[:\s]/i.test(message.content) || /^(?:vllm|ollama|groq|steering-server)\b[^\n]{0,120}\b(?:error|failed|failure|fehler|fehlgeschlagen)\b/i.test(message.content));
 }
 
 function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: ChatMessage; thinkingEnabled: boolean; onSelectTrace: (message: ChatMessage) => void }) {
@@ -114,8 +115,9 @@ function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: C
   const isCommand = message.role === "user" && (meta.is_command === true || meta.message_kind === "command" || isSlashCommand(message.content));
   const isSystem = message.role === "system" || meta.message_kind === "system" || meta.is_system === true || meta.is_system_response === true;
   const cot = meta.formatted_cot || meta.reasoning || "";
-  const rawOutput = !isSystem && typeof meta.raw_response === "string" && meta.raw_response.trim() ? meta.raw_response : message.content;
-  const error = meta.error_message || (meta.stream_error ? "Stream wurde beendet." : meta.formatting_failed ? "Formatierungsdienst fehlgeschlagen; Rohtext wird angezeigt." : "");
+  const rawOutput = !isSystem && typeof meta.raw_response === "string" && meta.raw_response.trim() ? meta.raw_response : "";
+  const visibleOutput = message.content || rawOutput;
+  const error = meta.error_message || (meta.stream_error ? "Stream wurde beendet." : "");
   const timing = (meta.timing ?? {}) as Record<string, any>;
 
   if (message.role === "user") {
@@ -127,8 +129,8 @@ function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: C
     {error && <div className="terminal-error-line mb-2 border-l-2 border-terminal-red bg-terminal-red/[0.08] px-2 py-1 text-[10px] text-terminal-red">[ERR] {error}</div>}
     {isReasoning ? <details open className="terminal-reasoning"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT — live</summary><NumberedText content={message.content} className="mt-2 text-[10px] leading-relaxed text-slate/60" /></details> : isThinking ? <div className="text-[11px] text-terminal-green/75"><span className="terminal-cursor mr-1">▌</span>{message.content}<span className="ml-2 text-[9px] text-slate/35">{formatDuration(meta.timer_ms)}</span></div> : <>
       {thinkingEnabled && cot && <details className="terminal-reasoning mb-2"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT</summary><NumberedText content={String(cot).length > 4000 ? `${String(cot).slice(0, 4000)}\n... (truncated)` : String(cot)} className={`mt-2 text-[10px] leading-relaxed ${hasError(message) ? "text-terminal-red/70" : "text-slate/55"}`} /></details>}
-      {!isSystem && rawOutput !== message.content && <div className="mb-1 text-[9px] uppercase tracking-widest text-slate/35">raw model output</div>}
-      <NumberedText content={rawOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />
+      {!isSystem && rawOutput && rawOutput !== visibleOutput && <details className="mb-2 text-[9px] text-slate/45"><summary className="cursor-pointer uppercase tracking-widest hover:text-slate/70">raw model output</summary><NumberedText content={rawOutput} className="mt-1 text-[10px] leading-relaxed text-slate/50" /></details>}
+      {isSystem ? <NumberedText content={visibleOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} /> : <MarkdownText content={visibleOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />}
       {!isSystem && (isLive || timing.ttft_ms != null || timing.answer_tokens != null || meta.provider) && <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>ttft {formatDuration(timing.ttft_ms)}</span><span>{timing.answer_tokens ?? meta.live_pipeline?.answer_tokens ?? "—"} tk</span><span>{formatTokenRate(timing, meta, message.content)}</span><span>{meta.provider ?? "provider —"}</span></div>}
     </>}
     {isStreaming && <span className="terminal-cursor ml-7 text-terminal-green">▌</span>}
