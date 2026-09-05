@@ -1,8 +1,9 @@
-"""CHAPPiE Terminal Interface v16.0
+"""CHAPPiE Terminal Interface v16.8.6
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
 Inkl. /thinking Command zum Aktivieren/Deaktivieren des Reasonings.
+Paritaet zur Web-UI (API 16.8.6): Sessions, command_mode, alle Slash-Commands.
 
 Modes:
   Local  - Direct backend (create_chappie_backend), process_stream() with Live display
@@ -19,13 +20,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
 import queue
+import shutil
+import subprocess
 import sys
 import threading
 import time
 from datetime import datetime
-from typing import Dict, Any, Optional, Generator, List
+from typing import Dict, Any, Optional, Generator
 
 from config.emotions import EMOTION_ORDER
 
@@ -34,6 +39,7 @@ try:
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
+    from rich.markdown import Markdown
     from rich.live import Live
     from rich import box
     HAS_RICH = True
@@ -53,7 +59,97 @@ if HAS_RICH:
 else:
     console = None
 
+
+def _response_panel(content: str, title: str, border_style: str):
+    """Rendert die sichtbare Antwort als Markdown, Rohtext bleibt literal."""
+    return Panel(
+        Markdown(content or ""),
+        title=title,
+        border_style=border_style,
+        padding=(0, 1),
+    )
+
 _FULL_REPORT_DEFAULT = False
+
+
+_REAL_STDOUT = sys.stdout
+
+CLI_USER_LABEL = "User"
+
+
+class _StrayOutputCapture:
+    """Puffert fremde Prints (Backend- und Sleep-Threads), damit Live-Display und Eingabe sauber bleiben.
+
+    Der Hauptthread schreibt direkt auf das echte stdout, solange kein
+    Streaming und keine Eingabe laeuft. Alle anderen Threads landen immer
+    im Puffer und werden an sicheren Stellen per drain() als eigener
+    Infobereich ausgegeben.
+    """
+
+    def __init__(self, real):
+        self._real = real
+        self._lock = threading.Lock()
+        self._buf = io.StringIO()
+        self.main_capturing = False
+
+    def write(self, s):
+        if threading.current_thread() is threading.main_thread() and not self.main_capturing:
+            return self._real.write(s)
+        with self._lock:
+            return self._buf.write(s)
+
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+    def flush(self):
+        try:
+            self._real.flush()
+        except Exception:
+            pass
+
+    def drain(self) -> str:
+        with self._lock:
+            text = self._buf.getvalue()
+            self._buf = io.StringIO()
+        return text
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+HELP_COLUMNS = (
+    ("Chat-Befehle", [
+        ("/status", "Status + Life"),
+        ("/clear", "Neue Sitzung"),
+        ("/new", "Neue Sitzung"),
+        ("/sessions", "Sessions auflisten"),
+        ("/session <id>", "Session wechseln"),
+        ("/history", "Verlauf anzeigen"),
+        ("/md", "soul, user, Prefs"),
+        ("/restart", "Neustart: chappie | cli"),
+        ("/exit", "Beenden"),
+        ("/help", "Diese Hilfe"),
+    ]),
+    ("Forschungs-Befehle", [
+        ("/runtime", "Modell, Provider"),
+        ("/model", "Modell wechseln"),
+        ("/thinking", "Reasoning an/aus"),
+        ("/steering", "Steering Report"),
+        ("/emotion", "Emotionen setzen"),
+        ("/resetemotions", "Emotionen reset"),
+        ("/sleep", "Schlafphase"),
+        ("/memory", "Gedaechtnis Suche"),
+        ("/debug", "Debug an/aus"),
+    ]),
+    ("Nach Ausgabe Befehle", [
+        ("/last", "Voller Report"),
+        ("/raw", "Step 1 + Raw Output"),
+        ("/trace", "Causal Trace"),
+        ("/compact", "Kompakter Report"),
+        ("/full", "Voller Report"),
+    ]),
+)
 
 
 class Colors:
@@ -141,16 +237,39 @@ class RemoteBackend:
         self.session_id = None
 
     def get_status(self) -> Dict[str, Any]:
-        try:
-            r = requests.get(f"{self.base_url}/", timeout=5)
-            return r.json()
-        except Exception:
-            return {}
+        # Aktueller Vertrag: /status, Fallback /health und / fuer alte Server.
+        for path in ("/status", "/health", "/"):
+            try:
+                r = requests.get(f"{self.base_url}{path}", timeout=5)
+                data = r.json()
+            except Exception:
+                continue
+            if not isinstance(data, dict):
+                continue
+            # Root / liefert brain.model, /status liefert model direkt.
+            if path == "/" and "brain" in data and "model" not in data:
+                brain = data.get("brain", {}) or {}
+                normalized = {
+                    "model": brain.get("model", "?"),
+                    "provider": brain.get("provider", "?"),
+                    "brain_available": brain.get("available", True),
+                    "emotions": data.get("emotions", {}),
+                    "life_state": data.get("life", {}),
+                    "life_snapshot": data.get("life", {}),
+                    "two_step_enabled": brain.get("two_step_processing", False),
+                    "_raw": data,
+                }
+                return normalized
+            return data
+        return {}
 
-    def stream_events(self, message: str, debug_mode: bool = True) -> Generator[Dict[str, Any], None, None]:
-        payload = {"message": message, "debug_mode": debug_mode}
-        if self.session_id:
-            payload["session_id"] = self.session_id
+    def stream_events(self, message: str, debug_mode: bool = True, session_id: Optional[str] = None, command_mode: Optional[bool] = None) -> Generator[Dict[str, Any], None, None]:
+        sid = session_id if session_id is not None else self.session_id
+        if command_mode is None:
+            command_mode = message.strip().startswith("/")
+        payload: Dict[str, Any] = {"message": message, "debug_mode": debug_mode, "command_mode": command_mode}
+        if sid:
+            payload["session_id"] = sid
         try:
             r = requests.post(
                 f"{self.base_url}/chat/stream",
@@ -174,15 +293,34 @@ class RemoteBackend:
                         continue
                     data["_sse_event"] = current_event
                     current_event = None
+                    # Session aus turn_started und turn_finished uebernehmen.
+                    if isinstance(data, dict):
+                        incoming_sid = data.get("session_id") or data.get("replacement_session_id")
+                        if incoming_sid:
+                            self.session_id = incoming_sid
                     yield data
         except Exception as e:
             _error(f"Connection error: {e}")
 
-    def handle_command(self, command: str) -> str:
+    def handle_command(self, command: str, session_id: Optional[str] = None) -> str:
+        sid = session_id if session_id is not None else self.session_id
+        payload: Dict[str, Any] = {"command": command}
+        if sid:
+            payload["session_id"] = sid
         try:
-            r = requests.post(f"{self.base_url}/command", json={"command": command}, timeout=10)
+            r = requests.post(f"{self.base_url}/command", json=payload, timeout=10)
             r.raise_for_status()
-            return r.json().get("output", "")
+            data = r.json()
+            if isinstance(data, dict):
+                incoming = data.get("session_id") or data.get("replacement_session_id")
+                if incoming:
+                    self.session_id = incoming
+                # Neue Session aus eingebetteter Session uebernehmen.
+                session = data.get("session")
+                if isinstance(session, dict) and session.get("id"):
+                    self.session_id = session["id"]
+                return data.get("output", "")
+            return ""
         except Exception as e:
             return f"Error: {e}"
 
@@ -192,6 +330,8 @@ class RemoteBackend:
 # ═══════════════════════════════════════════════════════════════════
 
 class CHAPPiEBrainCLI:
+    CLI_VERSION = "16.8.6"
+
     def __init__(self, remote_url: Optional[str] = None):
         self.remote_url = remote_url
         self.backend = None
@@ -199,8 +339,9 @@ class CHAPPiEBrainCLI:
         self.last_result: Optional[Dict[str, Any]] = None
         self._use_remote = remote_url is not None
         self._show_full_report = _FULL_REPORT_DEFAULT
+        self.session_id: Optional[str] = None
 
-        _log("INIT", "Initialisiere CHAPPiE Brain Interface v16.0...", Colors.AI)
+        _log("INIT", f"Initialisiere CHAPPiE Brain Interface v{self.CLI_VERSION}...", Colors.AI)
 
         if self._use_remote:
             if not HAS_REQUESTS:
@@ -213,6 +354,14 @@ class CHAPPiEBrainCLI:
                 _log("INIT", f"Backend erreichbar: {status.get('model', '?')}", Colors.SUCCESS)
             else:
                 _warn("Backend nicht erreichbar - versuche es trotzdem")
+            # Aktive Session uebernehmen, falls der Server eine hat.
+            try:
+                active = requests.get(f"{self.remote.base_url}/sessions/active", timeout=5).json()
+                if isinstance(active, dict) and active.get("id"):
+                    self.session_id = active["id"]
+                    self.remote.session_id = self.session_id
+            except Exception:
+                pass
         else:
             from web_infrastructure.backend_wrapper import create_chappie_backend
             self.backend = create_chappie_backend()
@@ -234,6 +383,84 @@ class CHAPPiEBrainCLI:
                 _log("INIT", "Steering: DEAKTIVIERT", Colors.DIM)
             thinking_status = "AN" if _s.chain_of_thought else "AUS"
             _log("INIT", f"Thinking/CoT: {thinking_status}", Colors.THOUGHT)
+            # Lokale Session wie in der Web-UI sicherstellen.
+            try:
+                active = self.backend.chat_manager.load_active_session()
+                self.session_id = active.get("id")
+                self.history = list(active.get("messages", []))
+            except Exception:
+                pass
+
+    def _ensure_local_session(self) -> tuple[str, list]:
+        normalized = self.backend.chat_manager.ensure_session_id(self.session_id)
+        session = self.backend.chat_manager.load_session(normalized)
+        self.backend.chat_manager.set_active_session(normalized)
+        self.session_id = normalized
+        history = list(session.get("messages", []))
+        self.history = history
+        return normalized, history
+
+    def _persist_local_turn(self, session_id: str, user_text: str, result: Dict[str, Any]) -> None:
+        # Wie api/routers/chat.py: Assistant Message bauen, speichern, History syncen.
+        try:
+            user_message = {
+                "id": self.backend.chat_manager.create_message_id(),
+                "role": "user",
+                "content": user_text,
+                "created_at": datetime.now().astimezone().isoformat(),
+            }
+            message_id = self.backend.chat_manager.create_message_id()
+            assistant_message = self.backend.build_assistant_message(user_text, result, message_id=message_id)
+            session = self.backend.chat_manager.load_session(session_id)
+            messages = list(session.get("messages", []))
+            # Pending-Logik der API ist hier nicht noetig, direkt beide Nachrichten speichern.
+            messages.extend([user_message, assistant_message])
+            self.backend.chat_manager.save_session(session_id, messages, title=session.get("title"))
+            self.history = list(messages)
+            # Neue Session nach /clear und /new uebernehmen.
+            replacement = result.get("replacement_session_id")
+            if replacement:
+                self.session_id = replacement
+                fresh = self.backend.chat_manager.load_session(replacement)
+                self.history = list(fresh.get("messages", []))
+            if result.get("clear_history"):
+                self.history = list(self.backend.chat_manager.load_session(self.session_id).get("messages", []))
+        except Exception:
+            # Verlauf darf nie den Chat abbrechen.
+            pass
+
+    def _apply_remote_session(self, data: Dict[str, Any]) -> None:
+        if not isinstance(data, dict):
+            return
+        incoming = data.get("session_id") or data.get("replacement_session_id")
+        if incoming:
+            self.session_id = incoming
+            self.remote.session_id = incoming
+        session = data.get("session")
+        if isinstance(session, dict) and session.get("id"):
+            self.session_id = session["id"]
+            self.remote.session_id = session["id"]
+        assistant = data.get("assistant_message")
+        if isinstance(assistant, dict):
+            metadata = assistant.get("metadata", {}) or {}
+            replacement = metadata.get("replacement_session_id") or data.get("replacement_session_id")
+            if replacement:
+                self.session_id = replacement
+                self.remote.session_id = replacement
+            if metadata.get("clear_history"):
+                self.history = []
+
+    def _drain_background_output(self) -> None:
+        """Gibt gepufferte Backend-Ausgaben (z.B. Schlafphase) als eigenen Infobereich aus."""
+        cap = getattr(self, "_out_capture", None)
+        if cap is None:
+            return
+        text = cap.drain().strip()
+        if text:
+            print(f"\n{Colors.DIM}─── Hintergrund ───{Colors.RESET}\n{text}\n")
+
+    def _input_prompt(self) -> str:
+        return f"\n{Colors.USER}{Colors.BOLD}{CLI_USER_LABEL} >{Colors.RESET} "
 
     @staticmethod
     def _settings():
@@ -253,10 +480,45 @@ class CHAPPiEBrainCLI:
     # ── streaming processing ──────────────────────────────────────
 
     def _process_local(self, user_text: str):
+        # Slash-Commands laufen wie in der Web-UI ueber command_service.
+        if user_text.strip().startswith("/"):
+            from api.services.command_service import execute_slash_command
+            try:
+                session_id, _ = self._ensure_local_session()
+                result = execute_slash_command(user_text.strip(), self.backend)
+                replacement = result.get("replacement_session_id")
+                if replacement:
+                    session_id = replacement
+                    self.backend.chat_manager.set_active_session(session_id)
+                    self.session_id = session_id
+                self.last_result = result
+                output = result.get("response_text", "")
+                if HAS_RICH:
+                    console.print(Panel(output, title="[bold magenta]Command[/]", border_style="magenta", padding=(0, 1)))
+                else:
+                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                self._persist_local_turn(session_id, user_text, result)
+                # Verlauf nach /clear und /new ist leer auf dem Server.
+                if result.get("replacement_session_id") or result.get("clear_history"):
+                    self.last_result = result
+                return
+            except Exception:
+                # Fallback fuer unvollstaendige Backends (z.B. in Tests).
+                fallback = self.backend.handle_command(user_text.strip())
+                print(f"\n{Colors.MEMORY}{fallback}{Colors.RESET}\n")
+                return
+        session_id, history = self._ensure_local_session()
         if not HAS_RICH:
             _log("STEP1", "Intent-Analyse...", Colors.EMOTION)
-            result = self.backend.process(user_text, self.history, debug_mode=True)
+            from datetime import datetime as _dt
+            result = self.backend.process(
+                user_text,
+                history,
+                debug_mode=True,
+                temporal_context={"user_message_created_at": _dt.now().astimezone().isoformat()},
+            )
             self.last_result = result
+            self._persist_local_turn(session_id, user_text, result)
             self._display_raw_result(user_text, result)
             return
 
@@ -265,7 +527,13 @@ class CHAPPiEBrainCLI:
 
         def worker():
             try:
-                gen = self.backend.process_stream(user_text, self.history, debug_mode=True)
+                from datetime import datetime as _dt2
+                gen = self.backend.process_stream(
+                    user_text,
+                    history,
+                    debug_mode=True,
+                    temporal_context={"user_message_created_at": _dt2.now().astimezone().isoformat()},
+                )
                 for event in gen:
                     if abort.is_set():
                         try:
@@ -291,49 +559,73 @@ class CHAPPiEBrainCLI:
         token_count = 0
         last_tps_update = 0.0
         tps = 0.0
+        last_progress_print = 0.0
+        last_progress_stage = ""
+        self._print_progress_line("[STEP 1] Nachricht gesendet, Intent-Analyse startet...")
 
+        cap = getattr(self, "_out_capture", None)
+        if cap is not None:
+            cap.main_capturing = True
         try:
-            with Live(self._render_spinner(0), refresh_per_second=15, screen=False, console=console) as live:
-                while True:
-                    try:
-                        event = eq.get(timeout=0.06)
-                    except queue.Empty:
-                        if not step1_done:
-                            live.update(self._render_spinner(time.time() - step1_start))
-                        elif streaming_start > 0:
-                            now = time.time()
-                            if now - last_tps_update > 0.5:
-                                tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
-                                last_tps_update = now
-                            live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
-                        continue
+            try:
+                with Live(self._render_spinner(0), refresh_per_second=15, screen=False, console=console) as live:
+                    while True:
+                        try:
+                            event = eq.get(timeout=0.06)
+                        except queue.Empty:
+                            if not step1_done:
+                                live.update(self._render_spinner(time.time() - step1_start))
+                            elif streaming_start > 0:
+                                now = time.time()
+                                if now - last_tps_update > 0.5:
+                                    tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
+                                    last_tps_update = now
+                                live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
+                            continue
 
-                    if event is None:
-                        break
+                        if event is None:
+                            break
 
-                    ev = event.get("event", "")
+                        ev = event.get("event", "")
 
-                    if ev == "status":
-                        step1_done = True
-                        live.update(self._render_step1_done(event.get("status_text", "")))
+                        if ev == "status":
+                            now_ev = time.time()
+                            stage_ev = str(event.get("stage", ""))
+                            # Echte Zeilen drucken (immer sichtbar), Live nur als Bonus.
+                            if stage_ev != last_progress_stage or (now_ev - last_progress_print) > 4.0:
+                                self._print_progress_line(self._progress_line(event, now_ev - step1_start))
+                                last_progress_stage = stage_ev
+                                last_progress_print = now_ev
+                            if self._step_of(event) >= 2:
+                                # STEP-2-Fortschritt live zeigen (TTFT-Luecke etc.).
+                                # Sobald Tokens fliessen, bleibt das Token-Panel.
+                                if not collected.get("answer"):
+                                    live.update(self._render_step2_progress(event, now_ev - step1_start))
+                            else:
+                                step1_done = True
+                                live.update(self._render_step1_done(event.get("status_text", "")))
 
-                    elif ev == "token":
-                        if streaming_start == 0:
-                            streaming_start = time.time()
-                            last_tps_update = streaming_start
-                        collected[event.get("token_type", "answer")] += event.get("content", "")
-                        token_count += 1
+                        elif ev == "token":
+                            if streaming_start == 0:
+                                streaming_start = time.time()
+                                last_tps_update = streaming_start
+                            collected[event.get("token_type", "answer")] += event.get("content", "")
+                            token_count += 1
 
-                    elif ev == "error":
-                        error = event.get("error", "Unbekannter Fehler")
-                        break
+                        elif ev == "error":
+                            error = event.get("error", "Unbekannter Fehler")
+                            break
 
-                    elif ev == "finished":
-                        result = event["result"]
-                        break
-        except KeyboardInterrupt:
-            abort.set()
-            _warn("Generierung abgebrochen")
+                        elif ev == "finished":
+                            result = event["result"]
+                            break
+            except KeyboardInterrupt:
+                abort.set()
+                _warn("Generierung abgebrochen")
+        finally:
+            if cap is not None:
+                cap.main_capturing = False
+        self._drain_background_output()
 
         abort.set()
         t.join(timeout=3)
@@ -345,15 +637,15 @@ class CHAPPiEBrainCLI:
         if result:
             self.last_result = result
             self._display_compact_report(result)
-            display_text = result.get("formatted_answer") or result.get("response_text", "")
-            self.history.append({"role": "user", "content": user_text})
-            self.history.append({"role": "assistant", "content": display_text})
+            self._persist_local_turn(session_id, user_text, result)
 
     def _process_remote(self, user_text: str):
         if not HAS_RICH:
             collected = {"reasoning": "", "answer": ""}
             result = None
-            for data in self.remote.stream_events(user_text):
+            for data in self.remote.stream_events(user_text, session_id=self.session_id):
+                if isinstance(data, dict) and (data.get("session_id") or data.get("replacement_session_id")):
+                    self._apply_remote_session(data)
                 sse_ev = data.pop("_sse_event", None)
                 if sse_ev == "token":
                     tt = data.get("token_type", "answer")
@@ -361,11 +653,19 @@ class CHAPPiEBrainCLI:
                     collected[tt] += content
                     print(f"{Colors.THOUGHT if tt == 'reasoning' else Colors.AI}{content}{Colors.RESET}", end="", flush=True)
                 elif sse_ev == "turn_finished":
+                    self._apply_remote_session(data)
                     result = data
                     break
                 elif sse_ev == "turn_error":
                     _error(data.get("error", ""))
                     break
+                elif sse_ev == "status":
+                    stage = data.get("stage", "")
+                    text = data.get("status_text", "")
+                    extra = ""
+                    if data.get("answer_tokens"):
+                        extra = f" ({data['answer_tokens']} Woerter)"
+                    print(f"{Colors.DIM}[STEP {data.get('step', '?')}/{stage}] {text}{extra}{Colors.RESET}", flush=True)
             print()
             if result:
                 msg = result.get("assistant_message", result)
@@ -381,7 +681,7 @@ class CHAPPiEBrainCLI:
 
         def worker():
             try:
-                gen = self.remote.stream_events(user_text)
+                gen = self.remote.stream_events(user_text, session_id=self.session_id)
                 for event in gen:
                     if abort.is_set():
                         break
@@ -392,17 +692,22 @@ class CHAPPiEBrainCLI:
                         metadata["emotions"] = event.get("emotion_snapshot", metadata.get("emotions", {}))
                         metadata["life_snapshot"] = event.get("life_snapshot", metadata.get("life_snapshot", {}))
                         metadata["debug_entries"] = event.get("debug_entries", metadata.get("debug_entries", []))
-                        eq.put({"event": "finished", "result": self._remote_meta_to_result(metadata)})
+                        eq.put({"event": "finished", "result": self._remote_meta_to_result(metadata), "_raw": event})
                         break
                     elif sse_ev == "turn_error":
                         eq.put({"event": "error", "error": event.get("error", "Fehler")})
                         break
                     elif sse_ev == "turn_started":
+                        eq.put({"event": "session", "session_id": event.get("session_id"), "message_id": event.get("message_id")})
                         continue
                     elif sse_ev == "token":
                         eq.put({"event": "token", "content": event.get("content", ""), "token_type": event.get("token_type", "answer")})
                     elif sse_ev == "status":
-                        eq.put({"event": "status", "step": event.get("step", 0), "status_text": event.get("status_text", "")})
+                        eq.put({"event": "status", "step": event.get("step", 0), "status_text": event.get("status_text", ""),
+                                "stage": event.get("stage", ""), "token_count": event.get("token_count", event.get("answer_tokens", 0)),
+                                "tokens_per_second": event.get("tokens_per_second", 0), "ttft_ms": event.get("ttft_ms"),
+                                "retry_attempt": event.get("retry_attempt"), "model": event.get("model", ""),
+                                "provider": event.get("provider", ""), "elapsed_ms": event.get("elapsed_ms")})
                     else:
                         eq.put(event)
                 eq.put(None)
@@ -422,49 +727,80 @@ class CHAPPiEBrainCLI:
         token_count = 0
         last_tps_update = 0.0
         tps = 0.0
+        last_progress_print = 0.0
+        last_progress_stage = ""
+        self._print_progress_line("[STEP 1] Nachricht gesendet, Intent-Analyse startet...")
 
+        cap = getattr(self, "_out_capture", None)
+        if cap is not None:
+            cap.main_capturing = True
         try:
-            with Live(self._render_spinner(0), refresh_per_second=15, screen=False, console=console) as live:
-                while True:
-                    try:
-                        event = eq.get(timeout=0.06)
-                    except queue.Empty:
-                        if not step1_done:
-                            live.update(self._render_spinner(time.time() - step1_start))
-                        elif streaming_start > 0:
-                            now = time.time()
-                            if now - last_tps_update > 0.5:
-                                tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
-                                last_tps_update = now
-                            live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
-                        continue
+            try:
+                with Live(self._render_spinner(0), refresh_per_second=15, screen=False, console=console) as live:
+                    while True:
+                        try:
+                            event = eq.get(timeout=0.06)
+                        except queue.Empty:
+                            if not step1_done:
+                                live.update(self._render_spinner(time.time() - step1_start))
+                            elif streaming_start > 0:
+                                now = time.time()
+                                if now - last_tps_update > 0.5:
+                                    tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
+                                    last_tps_update = now
+                                live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
+                            continue
 
-                    if event is None:
-                        break
+                        if event is None:
+                            break
 
-                    ev = event.get("event", "")
+                        ev = event.get("event", "")
 
-                    if ev == "status":
-                        step1_done = True
-                        live.update(self._render_step1_done(event.get("status_text", "")))
+                        if ev == "status":
+                            now_ev = time.time()
+                            stage_ev = str(event.get("stage", ""))
+                            # Echte Zeilen drucken (immer sichtbar), Live nur als Bonus.
+                            if stage_ev != last_progress_stage or (now_ev - last_progress_print) > 4.0:
+                                self._print_progress_line(self._progress_line(event, now_ev - step1_start))
+                                last_progress_stage = stage_ev
+                                last_progress_print = now_ev
+                            if self._step_of(event) >= 2:
+                                # STEP-2-Fortschritt live zeigen (TTFT-Luecke etc.).
+                                # Sobald Tokens fliessen, bleibt das Token-Panel.
+                                if not collected.get("answer"):
+                                    live.update(self._render_step2_progress(event, now_ev - step1_start))
+                            else:
+                                step1_done = True
+                                live.update(self._render_step1_done(event.get("status_text", "")))
 
-                    elif ev == "token":
-                        if streaming_start == 0:
-                            streaming_start = time.time()
-                            last_tps_update = streaming_start
-                        collected[event.get("token_type", "answer")] += event.get("content", "")
-                        token_count += 1
+                        elif ev == "token":
+                            if streaming_start == 0:
+                                streaming_start = time.time()
+                                last_tps_update = streaming_start
+                            collected[event.get("token_type", "answer")] += event.get("content", "")
+                            token_count += 1
 
-                    elif ev == "error":
-                        error = event.get("error", "Unbekannter Fehler")
-                        break
+                        elif ev == "error":
+                            error = event.get("error", "Unbekannter Fehler")
+                            break
 
-                    elif ev == "finished":
-                        result = event["result"]
-                        break
-        except KeyboardInterrupt:
-            abort.set()
-            _warn("Generierung abgebrochen")
+                        elif ev == "finished":
+                            result = event["result"]
+                            self._apply_remote_session(event.get("_raw", {}))
+                            break
+
+                        elif ev == "session":
+                            incoming = event.get("session_id")
+                            if incoming:
+                                self.session_id = incoming
+                                self.remote.session_id = incoming
+            except KeyboardInterrupt:
+                abort.set()
+                _warn("Generierung abgebrochen")
+        finally:
+            if cap is not None:
+                cap.main_capturing = False
+        self._drain_background_output()
 
         abort.set()
         t.join(timeout=3)
@@ -476,14 +812,19 @@ class CHAPPiEBrainCLI:
         if result:
             self.last_result = result
             self._display_compact_report(result)
-            self.history.append({"role": "user", "content": user_text})
-            display_text = result.get("formatted_answer") or result.get("response_text", "")
-            self.history.append({"role": "assistant", "content": display_text})
+            # Verlauf liegt auf dem Server, lokal nur Anzeige-Cache.
+            try:
+                session_data = requests.get(f"{self.remote.base_url}/sessions/{self.session_id}", timeout=5).json()
+                if isinstance(session_data, dict) and isinstance(session_data.get("messages"), list):
+                    self.history = session_data["messages"]
+            except Exception:
+                pass
 
     @staticmethod
     def _remote_meta_to_result(metadata: dict) -> dict:
+        content = metadata.get("content", "") or metadata.get("formatted_answer", "") or metadata.get("raw_response", "")
         return {
-            "response_text": metadata.get("content", ""),
+            "response_text": content,
             "formatted_cot": metadata.get("formatted_cot", ""),
             "formatted_answer": metadata.get("formatted_answer", ""),
             "emotions": metadata.get("emotions", {}),
@@ -516,9 +857,14 @@ class CHAPPiEBrainCLI:
             "auto_sleep_triggered": metadata.get("auto_sleep_triggered", False),
             "reasoning_only": metadata.get("reasoning_only", False),
             "formatting_failed": metadata.get("formatting_failed", False),
+            "formatting_warning": metadata.get("formatting_warning", ""),
+            "formatting_error": metadata.get("formatting_error", ""),
             "formatting_source": metadata.get("formatting_source", "local_fallback"),
-            "formatting_model": metadata.get("formatting_model", "openai/gpt-oss-120b"),
+            "formatting_model": metadata.get("formatting_model", "?"),
             "cot_leak": metadata.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
+            "command_trace": metadata.get("command_trace", {}),
+            "replacement_session_id": metadata.get("replacement_session_id", ""),
+            "clear_history": metadata.get("clear_history", False),
         }
 
     # ── live rendering ────────────────────────────────────────────
@@ -538,6 +884,80 @@ class CHAPPiEBrainCLI:
             f"✓  {status_text}\n   Starte Antwortgenerierung...",
             title="[bold green]STEP 1: Abgeschlossen[/]",
             border_style="green",
+        )
+
+    @staticmethod
+    def _step_of(event: dict) -> int:
+        try:
+            return int(event.get("step", 1) or 1)
+        except (TypeError, ValueError):
+            return 1
+
+    @staticmethod
+    def _progress_line(event: dict, total_elapsed: float) -> str:
+        """Einzeilige Fortschrittsmeldung mit Zeilenumbruch (immer sichtbar)."""
+        stage = str(event.get("stage", "") or "")
+        text = str(event.get("status_text", "") or "arbeitet...")
+        label = {
+            "intent": "STEP 1", "memory": "STEP 1", "ttft": "STEP 2",
+            "streaming": "STEP 2", "format": "STEP 2", "done": "STEP 2",
+        }.get(stage, f"STEP {event.get('step', '?')}")
+        details = []
+        token_count = event.get("token_count", event.get("answer_tokens"))
+        if isinstance(token_count, (int, float)) and token_count:
+            details.append(f"{int(token_count)} Woerter")
+        tps = event.get("tokens_per_second")
+        if isinstance(tps, (int, float)) and tps:
+            details.append(f"{tps:.1f} W/s")
+        if details:
+            text += f" ({', '.join(details)})"
+        return f"[{label}] {text} · {total_elapsed:.0f}s"
+
+    @staticmethod
+    def _print_progress_line(line: str) -> None:
+        if HAS_RICH:
+            console.print(f"[dim]{line}[/]")
+        else:
+            print(f"{Colors.DIM}{line}{Colors.RESET}", flush=True)
+
+    @staticmethod
+    def _render_step2_progress(event: dict, total_elapsed: float):
+        """Live-Fortschritt waehrend STEP 2 (TTFT-Luecke, Streaming, Format)."""
+        stage = str(event.get("stage", "") or "")
+        text = str(event.get("status_text", "") or "Antwortgenerierung laeuft...")
+        stage_label = {
+            "ttft": "Warte auf erstes Token",
+            "streaming": "Streame Antwort",
+            "format": "Formatiere Antwort",
+            "done": "Abgeschlossen",
+            "intent": "Intent-Analyse",
+            "memory": "Memory-Aufbau",
+        }.get(stage, stage or "Generierung")
+        details = []
+        token_count = event.get("token_count", event.get("answer_tokens"))
+        if isinstance(token_count, (int, float)) and token_count:
+            details.append(f"{int(token_count)} Woerter")
+        tps = event.get("tokens_per_second")
+        if isinstance(tps, (int, float)) and tps:
+            details.append(f"{tps:.1f} W/s")
+        if event.get("ttft_ms") is not None:
+            try:
+                details.append(f"TTFT {float(event['ttft_ms']) / 1000:.1f}s")
+            except (TypeError, ValueError):
+                pass
+        if event.get("retry_attempt"):
+            details.append(f"Versuch {event['retry_attempt']}")
+        if event.get("model"):
+            details.append(str(event["model"]))
+        body = f"{stage_label}: {text}"
+        if details:
+            body += f"\n[dim]{'  ·  '.join(details)}  ·  gesamt {total_elapsed:.1f}s[/]"
+        else:
+            body += f"\n[dim]gesamt {total_elapsed:.1f}s[/]"
+        return Panel(
+            body,
+            title="[bold yellow]STEP 2: Antwortgenerierung[/]",
+            border_style="yellow",
         )
 
     @staticmethod
@@ -592,21 +1012,29 @@ class CHAPPiEBrainCLI:
 
         if show_both:
             if HAS_RICH:
-                console.print(Panel(raw_answer[:2000], title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
-                console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE (formatted)[/]", border_style="bright_cyan", padding=(0, 1)))
+                console.print(Panel(Text(raw_answer[:2000], style="dim"), title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
+                console.print(_response_panel(formatted_answer, "[bold bright_cyan]CHAPPiE (formatted)[/]", "bright_cyan"))
             else:
                 print(f"\n{Colors.DIM}--- Raw ---\n{raw_answer[:1000]}\n{Colors.RESET}")
                 print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE (formatted) >{Colors.RESET} {formatted_answer}\n")
         elif formatted_answer:
             if HAS_RICH:
-                console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+                console.print(_response_panel(formatted_answer, "[bold bright_cyan]CHAPPiE[/]", "bright_cyan"))
             else:
                 print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {formatted_answer}\n")
         elif raw_answer:
             if HAS_RICH:
-                console.print(Panel(raw_answer, title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
+                console.print(Panel(Text(raw_answer, style="bright_cyan"), title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
             else:
                 print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {raw_answer}\n")
+
+        # Schlafphase-Hinweis als eigener Infobereich (Details folgen im Hintergrund-Block).
+        if result.get("auto_sleep_triggered"):
+            sleep_msg = "Automatische Schlafphase gestartet, laeuft im Hintergrund. Details folgen unten."
+            if HAS_RICH:
+                console.print(Panel(sleep_msg, title="[dim]Schlafphase[/]", border_style="dim", padding=(0, 1)))
+            else:
+                print(f"\n{Colors.DIM}--- Schlafphase ---\n{sleep_msg}\n{Colors.RESET}")
 
         # CoT Leakage Warning
         cot_leak = result.get("cot_leak", {})
@@ -621,12 +1049,20 @@ class CHAPPiEBrainCLI:
             else:
                 print(f"{Colors.WARN}WARNUNG: CoT-Leakage in Antwort: {leak_msg}{Colors.RESET}")
 
+        # Sanitization-Hinweis: Rohtext wird gezeigt, Filtergruende bleiben sichtbar.
+        if result.get("sanitization_fallback"):
+            reasons = ", ".join(result.get("sanitization_reasons", [])) or "Filter"
+            fb_msg = f"Sichtbare Ausgabe bereinigt ({reasons}); Rohtext bleibt im Debug-Feld."
+            if HAS_RICH:
+                console.print(Panel(fb_msg, title="[bold yellow]Ausgabe-Hinweis[/]", border_style="yellow", padding=(0, 1)))
+            else:
+                print(f"{Colors.WARN}HINWEIS: {fb_msg}{Colors.RESET}")
+
         intent = result.get("intent_type", "?")
         confidence = result.get("intent_confidence", 0)
         tools = result.get("selected_tools", [])
         emotion_before = result.get("emotions_before", {})
         emotion_after = result.get("emotions", {})
-        emotion_delta = result.get("emotions_delta", {})
         steering = result.get("emotion_steering", {})
         prompt_mode = result.get("prompt_emotion_mode", "?")
         tone = result.get("tone_decision", {})
@@ -659,7 +1095,7 @@ class CHAPPiEBrainCLI:
             if emo_parts:
                 table.add_row("Emotionen:", "  ".join(emo_parts))
 
-            steer_str = "VECTOR" if "vector" in prompt_mode else "PROMPT"
+            steer_str = "VECTOR" if ("vector" in prompt_mode or "layer" in prompt_mode) else "PROMPT"
             dom = steering.get("dominant_vector", "neutral")
             dom_s = steering.get("dominant_strength", 0)
             table.add_row("Steering:", f"[{_emo_color(int(dom_s * 100))}]{steer_str} | dominant: {dom} ({dom_s:.2f})[/]")
@@ -671,7 +1107,7 @@ class CHAPPiEBrainCLI:
             fmt_failed = result.get("formatting_failed", False)
             if fmt_failed:
                 fmt_color = "red"
-                fmt_label = f"LOCAL (Groq-API fehlgeschlagen)"
+                fmt_label = "LOCAL (Groq-API fehlgeschlagen)"
             elif fmt_source == "groq":
                 fmt_color = "green"
                 fmt_label = "GROQ"
@@ -681,7 +1117,8 @@ class CHAPPiEBrainCLI:
             table.add_row("Format:", f"[{fmt_color}]{fmt_label}[/] ({fmt_model})")
 
             focus = (workspace.get("dominant_focus") or {})
-            focus_label = focus.get("label", "?"); focus_sal = focus.get("salience", 0)
+            focus_label = focus.get("label", "?")
+            focus_sal = focus.get("salience", 0)
             mem_count = mem_trace.get("memories_found", 0) if isinstance(mem_trace, dict) else 0
             mem_rel = mem_trace.get("top_relevance", 0) if isinstance(mem_trace, dict) else 0
             table.add_row("Focus:", f"{focus_label} ({focus_sal:.2f})    Memory: {mem_count} matches @{mem_rel:.2f}")
@@ -760,12 +1197,12 @@ class CHAPPiEBrainCLI:
         if cot:
             console.print(Panel(cot, title="[dim]Chain of Thought[/]", border_style="dim", padding=(0, 1)))
         if show_both:
-            console.print(Panel(raw_answer[:2000], title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
-            console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE (formatted)[/]", border_style="bright_cyan", padding=(0, 1)))
+            console.print(Panel(Text(raw_answer[:2000], style="dim"), title="[dim]Raw Output[/]", border_style="dim", padding=(0, 1)))
+            console.print(_response_panel(formatted_answer, "[bold bright_cyan]CHAPPiE (formatted)[/]", "bright_cyan"))
         elif formatted_answer:
-            console.print(Panel(formatted_answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+            console.print(_response_panel(formatted_answer, "[bold bright_cyan]CHAPPiE[/]", "bright_cyan"))
         elif raw_answer:
-            console.print(Panel(raw_answer, title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
+            console.print(Panel(Text(raw_answer, style="bright_cyan"), title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
 
         panels: list = []
 
@@ -810,6 +1247,13 @@ class CHAPPiEBrainCLI:
 
     def _display_remote_result(self, metadata: dict, collected: dict):
         cot_leak = metadata.get("cot_leak", {})
+        if metadata.get("sanitization_fallback"):
+            reasons = ", ".join(metadata.get("sanitization_reasons", [])) or "Filter"
+            fb_msg = f"Sichtbare Ausgabe bereinigt ({reasons}); Rohtext bleibt im Debug-Feld."
+            if HAS_RICH:
+                console.print(Panel(fb_msg, title="[bold yellow]Ausgabe-Hinweis[/]", border_style="yellow", padding=(0, 1)))
+            else:
+                print(f"{Colors.WARN}HINWEIS: {fb_msg}{Colors.RESET}")
         if HAS_RICH:
             cot = metadata.get("formatted_cot", "")
             answer = metadata.get("formatted_answer", "") or collected.get("answer", "")
@@ -823,7 +1267,7 @@ class CHAPPiEBrainCLI:
             if cot:
                 console.print(Panel(cot, title="[dim]Chain of Thought[/]", border_style="dim", padding=(0, 1)))
             if answer:
-                console.print(Panel(answer, title="[bold bright_cyan]CHAPPiE[/]", border_style="bright_cyan", padding=(0, 1)))
+                console.print(_response_panel(answer, "[bold bright_cyan]CHAPPiE[/]", "bright_cyan"))
             proc_time = metadata.get("processing_time_ms", 0)
             intent = metadata.get("intent_type", "?")
             conf = metadata.get("intent_confidence", 0)
@@ -1065,9 +1509,8 @@ class CHAPPiEBrainCLI:
 
     def _show_status(self):
         if self._use_remote:
-            try:
-                status = requests.get(f"{self.remote_url}/", timeout=5).json()
-            except Exception:
+            status = self.remote.get_status()
+            if not status:
                 _error("Backend nicht erreichbar")
                 return
         else:
@@ -1077,7 +1520,7 @@ class CHAPPiEBrainCLI:
         if not emotions and not self._use_remote:
             state = self.emotions.get_state()
             emotions = state.to_dict()
-        life = status.get("life_state", {})
+        life = status.get("life_state", {}) or status.get("life_snapshot", {}) or status.get("life", {})
 
         if HAS_RICH:
             table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1))
@@ -1111,7 +1554,7 @@ class CHAPPiEBrainCLI:
             console.print(Panel(table, title="[bold]CHAPPiE Status[/]", border_style="cyan"))
         else:
             print(f"\n{Colors.EMOTION}{'═' * 50}")
-            print(f"  CHAPPiE Status")
+            print("  CHAPPiE Status")
             for name in EMOTION_NAMES:
                 val = emotions.get(name, 0) if isinstance(emotions, dict) else 0
                 print(f"    {name:>12} {_bar(val)} {val:>3}")
@@ -1186,12 +1629,25 @@ class CHAPPiEBrainCLI:
 
         if cmd_lower == "/runtime":
             if self._use_remote:
-                _log("RUNTIME", "Nur im lokalen Modus verfuegbar", Colors.WARN)
+                try:
+                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                    settings_data = requests.get(f"{base}/settings", timeout=10).json()
+                    status = self.remote.get_status() if hasattr(self, "remote") else {}
+                    print(f"\n{Colors.AI}{'═' * 50}")
+                    print("  RUNTIME (remote)")
+                    print(f"  Provider:      {settings_data.get('llm_provider', status.get('provider', '?'))}")
+                    print(f"  Modell:        {settings_data.get('vllm_model', status.get('model', '?'))}")
+                    print(f"  Two-Step:      {'AN' if settings_data.get('enable_two_step_processing') else 'AUS'}")
+                    print(f"  Thinking/CoT:  {'AN' if settings_data.get('chain_of_thought') else 'AUS'}")
+                    print(f"  Steering:      {'AN' if settings_data.get('enable_steering') else 'AUS'}")
+                    print(f"{'═' * 50}{Colors.RESET}\n")
+                except Exception:
+                    _log("RUNTIME", "Remote-Status nicht abrufbar", Colors.WARN)
                 return True
             s = self._settings()
             mode = "VEKTOR" if self.steering.is_local_provider() else "PROMPT"
             print(f"\n{Colors.AI}{'═' * 50}")
-            print(f"  RUNTIME")
+            print("  RUNTIME")
             print(f"  Provider:      {s.llm_provider.value}")
             print(f"  Modell:        {s.vllm_model}")
             print(f"  Two-Step:      {'AN' if s.enable_two_step_processing else 'AUS'}")
@@ -1202,22 +1658,40 @@ class CHAPPiEBrainCLI:
             return True
 
         if cmd_lower == "/model" or cmd_lower.startswith("/model "):
-            if self._use_remote:
-                _log("MODEL", "Nur im lokalen Modus verfuegbar", Colors.WARN)
-                return True
             args = cmd.split(maxsplit=1)
+            if self._use_remote:
+                try:
+                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                    settings_data = requests.get(f"{base}/settings", timeout=10).json()
+                    print(f"\n{Colors.AI}Aktives Modell (remote): {Colors.BOLD}{settings_data.get('vllm_model', '?')}{Colors.RESET}")
+                    print(f"  Provider: {settings_data.get('llm_provider', '?')}")
+                    if len(args) > 1:
+                        _warn("Modellwechsel remote: bitte in der Web-UI unter Settings aendern (POST /settings).")
+                    print()
+                except Exception:
+                    _log("MODEL", "Remote-Status nicht abrufbar", Colors.WARN)
+                return True
             if len(args) == 1:
                 s = self._settings()
                 print(f"\n{Colors.AI}Aktives Modell: {Colors.BOLD}{s.vllm_model}{Colors.RESET}")
                 print(f"  Provider: {s.llm_provider.value}")
                 print(f"  Steering: {s.steering_model}")
-                print(f"  Presets: qwen | gemma4-e4b | gemma4-26b")
+                print("  Presets: qwen | gemma4-e4b | gemma4-26b")
                 print(f"\n{Colors.DIM}Syntax: /model <preset|model-name>{Colors.RESET}\n")
                 return True
             self._handle_model_command(args[1])
             return True
 
         if cmd_lower == "/thinking":
+            if self._use_remote:
+                try:
+                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                    settings_data = requests.get(f"{base}/settings", timeout=10).json()
+                    status_str = "AN" if settings_data.get("chain_of_thought") else "AUS"
+                    print(f"\n{Colors.AI}Thinking/Reasoning (remote): {Colors.BOLD}{status_str}{Colors.RESET}\n")
+                except Exception:
+                    _log("THINKING", "Remote-Status nicht abrufbar", Colors.WARN)
+                return True
             s = self._settings()
             status_str = "AN" if s.chain_of_thought else "AUS"
             provider_label = s.llm_provider.value.upper() if not self._use_remote else "REMOTE"
@@ -1241,6 +1715,12 @@ class CHAPPiEBrainCLI:
                 return True
             s = self._settings()
             s.update_from_ui(chain_of_thought=new_val)
+            if self._use_remote:
+                try:
+                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                    requests.post(f"{base}/settings", json={"chain_of_thought": new_val}, timeout=10)
+                except Exception as e:
+                    _warn(f"Remote-Update fehlgeschlagen, lokal gespeichert: {e}")
             if not self._use_remote and self.backend:
                 self.backend.apply_runtime_settings(force=True)
             status_str = "AN" if new_val else "AUS"
@@ -1249,7 +1729,13 @@ class CHAPPiEBrainCLI:
 
         if cmd_lower == "/steering":
             if self._use_remote:
-                _log("STEERING", "Nur im lokalen Modus verfuegbar", Colors.WARN)
+                try:
+                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                    data = requests.get(f"{base}/emotions/state", timeout=10).json()
+                    steering = data.get("steering", {}) if isinstance(data, dict) else {}
+                    print(f"\n{Colors.STEER}Steering (remote): {steering.get('dominant_vector', '?')} ({steering.get('dominant_strength', 0):.2f}){Colors.RESET}\n")
+                except Exception:
+                    _log("STEERING", "Remote-Status nicht abrufbar", Colors.WARN)
                 return True
             report = self.steering.build_debug_report(self.emotions.get_state().to_dict())
             if HAS_RICH:
@@ -1287,9 +1773,9 @@ class CHAPPiEBrainCLI:
                     except Exception:
                         _log("EMOTION", "Remote-Status nicht abrufbar", Colors.WARN)
                 print(f"\n{Colors.EMOTION}Syntax: /emotion <name> [+/-]<0-100>{Colors.RESET}")
-                print(f"  Beispiel: /emotion happiness +10  (erhoeht um 10)")
-                print(f"  Beispiel: /emotion sadness -5     (senkt um 5)")
-                print(f"  Beispiel: /emotion energy 50      (setzt absolut)")
+                print("  Beispiel: /emotion happiness +10  (erhoeht um 10)")
+                print("  Beispiel: /emotion sadness -5     (senkt um 5)")
+                print("  Beispiel: /emotion energy 50      (setzt absolut)")
                 return True
 
             if len(parts) < 2:
@@ -1369,22 +1855,59 @@ class CHAPPiEBrainCLI:
 
         if cmd_lower == "/sleep":
             if self._use_remote:
-                _warn("Sleep nur im lokalen Modus verfuegbar")
+                output = self.remote.handle_command("/sleep", session_id=self.session_id)
+                self.session_id = self.remote.session_id
+                if output and not output.startswith("Error"):
+                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                else:
+                    _error(output or "Sleep fehlgeschlagen")
                 return True
-            from memory.sleep_phase import get_sleep_phase_handler
-            handler = get_sleep_phase_handler()
-            result = handler.execute_sleep_phase(memory_engine=self.memory, context_files=self.context, emotions_engine=self.emotions)
-            if result.get("energy_restored"):
-                _success(f"Energie wiederhergestellt: {result.get('energy_value', 100)}%")
-            for emo, delta in result.get("emotional_recovery", {}).items():
-                _log("SLEEP", f"  {emo}: {'+' if delta > 0 else ''}{delta}", Colors.EMOTION)
-            for frag in result.get("dream_replay", [])[:3]:
-                _log("DREAM", frag, Colors.MEMORY)
+            from api.services.command_service import execute_slash_command as _exec_sleep
+            result = _exec_sleep("/sleep", self.backend)
+            self.last_result = result
+            print(f"\n{Colors.MEMORY}{result.get('response_text', '')}{Colors.RESET}\n")
             return True
 
-        if cmd_lower == "/memory":
+        if cmd_lower == "/memory" or cmd_lower.startswith("/memory "):
+            query = cmd.split(maxsplit=1)[1] if len(cmd.split(maxsplit=1)) > 1 else ""
             if self._use_remote:
-                _warn("Memory nur im lokalen Modus verfuegbar")
+                try:
+                    if query:
+                        from urllib.parse import quote
+                        data = requests.get(f"{self.remote_url}/memories?q={quote(query)}&limit=10", timeout=10).json()
+                        items = data.get("items", [])
+                        if not items:
+                            _log("LTM", "Keine Erinnerungen gefunden", Colors.MEMORY)
+                        else:
+                            print(f"\n{Colors.MEMORY}Erinnerungen ({len(items)}):")
+                            for it in items[:10]:
+                                print(f"  [{it.get('label', '?')}] {str(it.get('content', ''))[:100]}")
+                            print(Colors.RESET)
+                    else:
+                        data = requests.get(f"{self.remote_url}/memories/short-term", timeout=10).json()
+                        items = data.get("items", [])
+                        if not items:
+                            _log("STM", "Keine Eintraege im Kurzzeitgedaechtnis", Colors.MEMORY)
+                        else:
+                            print(f"\n{Colors.MEMORY}Kurzzeitgedaechtnis ({len(items)} Eintraege):")
+                            for e in items[:15]:
+                                print(f"  [{e.get('category', '?')}] {str(e.get('content', ''))[:80]}")
+                            print(Colors.RESET)
+                except Exception as e:
+                    _error(f"Memory-Abfrage fehlgeschlagen: {e}")
+                return True
+            if query:
+                try:
+                    results = self.memory.search_memory(query, top_k=10)
+                    if not results:
+                        _log("LTM", "Keine Erinnerungen gefunden", Colors.MEMORY)
+                    else:
+                        print(f"\n{Colors.MEMORY}Erinnerungen ({len(results)}):")
+                        for e in results[:10]:
+                            print(f"  [{getattr(e, 'label', '?')}] {str(getattr(e, 'content', ''))[:100]}")
+                        print(Colors.RESET)
+                except Exception as e:
+                    _error(f"LTM-Suche fehlgeschlagen: {e}")
                 return True
             entries = self.short_term.get_active_entries()
             if not entries:
@@ -1409,11 +1932,99 @@ class CHAPPiEBrainCLI:
                 print()
             return True
 
-        if cmd_lower == "/clear":
+        if cmd_lower in ("/clear", "/new"):
+            if self._use_remote:
+                output = self.remote.handle_command("/new", session_id=self.session_id)
+                self.session_id = self.remote.session_id
+                self.history = []
+                self.last_result = None
+                _success("Neue Chat-Sitzung gestartet")
+                if output and output != "Neue Chat-Sitzung gestartet.":
+                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                return True
+            from api.services.command_service import execute_slash_command as _exec_new
+            try:
+                result = _exec_new("/new", self.backend)
+                self.session_id = result.get("replacement_session_id", self.session_id)
+            except Exception:
+                result = None
             self.history = []
             self.last_result = None
-            _success("Chat-Verlauf geloescht")
+            if result is not None:
+                try:
+                    fresh = self.backend.chat_manager.load_session(self.session_id)
+                    self.history = list(fresh.get("messages", []))
+                except Exception:
+                    pass
+            _success("Neue Chat-Sitzung gestartet")
             return True
+
+        if cmd_lower == "/sessions":
+            if self._use_remote:
+                try:
+                    data = requests.get(f"{self.remote_url}/sessions", timeout=10).json()
+                    sessions = data if isinstance(data, list) else data.get("sessions", data)
+                    print(f"\n{Colors.AI}Sessions ({len(sessions) if isinstance(sessions, list) else '?'}):")
+                    for s in (sessions if isinstance(sessions, list) else [])[:20]:
+                        mark = "*" if s.get("id") == self.session_id else " "
+                        print(f" {mark} {s.get('id', '?')}  {s.get('title', '')}  ({len(s.get('messages', []))} Nachrichten)")
+                    print()
+                except Exception as e:
+                    _error(f"Sessions konnten nicht geladen werden: {e}")
+                return True
+            try:
+                sessions = self.backend.chat_manager.list_sessions()
+                print(f"\n{Colors.AI}Sessions ({len(sessions)}):")
+                for s in sessions[:20]:
+                    mark = "*" if s.get("id") == self.session_id else " "
+                    print(f" {mark} {s.get('id', '?')}  {s.get('title', '')}")
+                print()
+            except Exception as e:
+                _error(f"Sessions konnten nicht geladen werden: {e}")
+            return True
+
+        if cmd_lower.startswith("/session "):
+            target = cmd.split(maxsplit=1)[1].strip()
+            if self._use_remote:
+                try:
+                    data = requests.get(f"{self.remote_url}/sessions/{target}", timeout=10).json()
+                    if isinstance(data, dict) and data.get("id"):
+                        self.session_id = data["id"]
+                        self.remote.session_id = data["id"]
+                        self.history = list(data.get("messages", []))
+                        _success(f"Session gewechselt: {self.session_id}")
+                    else:
+                        _error("Session nicht gefunden")
+                except Exception as e:
+                    _error(f"Session-Wechsel fehlgeschlagen: {e}")
+                return True
+            try:
+                session = self.backend.chat_manager.load_session(target)
+                self.backend.chat_manager.set_active_session(target)
+                self.session_id = target
+                self.history = list(session.get("messages", []))
+                _success(f"Session gewechselt: {target}")
+            except Exception as e:
+                _error(f"Session-Wechsel fehlgeschlagen: {e}")
+            return True
+
+        if cmd_lower == "/restart" or cmd_lower.startswith("/restart "):
+            parts = cmd.split(maxsplit=1)
+            target = parts[1].strip().lower() if len(parts) > 1 else ""
+            if not target:
+                try:
+                    choice = input("Neustart: [1] CHAPPiE (Backend + Frontend)  [2] nur CLI > ").strip().lower()
+                except (KeyboardInterrupt, EOFError):
+                    print()
+                    return True
+                if choice in ("1", "chappie", "backend", "server"):
+                    target = "chappie"
+                elif choice in ("2", "cli"):
+                    target = "cli"
+                else:
+                    _warn("Ungueltige Auswahl. Nutze: /restart chappie | /restart cli")
+                    return True
+            return self._handle_restart_command(target)
 
         if cmd_lower == "/debug":
             if not self._use_remote and self.backend:
@@ -1441,9 +2052,14 @@ class CHAPPiEBrainCLI:
         if cmd_lower == "/md":
             """Zeigt alle drei .md-Kontextdateien an (soul, user, preferences)."""
             if self._use_remote:
-                soul = self.remote.handle_command("/soul")
-                user = self.remote.handle_command("/user")
-                prefs = self.remote.handle_command("/prefs")
+                try:
+                    soul = requests.get(f"{self.remote_url}/context-files/soul", timeout=10).json().get("content", "(leer)")
+                    user = requests.get(f"{self.remote_url}/context-files/user", timeout=10).json().get("content", "(leer)")
+                    prefs = requests.get(f"{self.remote_url}/context-files/preferences", timeout=10).json().get("content", "(leer)")
+                except Exception:
+                    soul = self.remote.handle_command("/soul", session_id=self.session_id)
+                    user = self.remote.handle_command("/user", session_id=self.session_id)
+                    prefs = self.remote.handle_command("/prefs", session_id=self.session_id)
             elif hasattr(self, 'context') and self.context:
                 soul = self.context.get_soul_context() or "(leer)"
                 user = self.context.get_user_context() or "(leer)"
@@ -1483,12 +2099,27 @@ class CHAPPiEBrainCLI:
         backend_cmd = cmd_lower if cmd_lower.startswith("/") else "/" + cmd_lower
 
         if self._use_remote:
-            result = self.remote.handle_command(backend_cmd)
+            result = self.remote.handle_command(backend_cmd, session_id=self.session_id)
+            self.session_id = self.remote.session_id
             if result and not result.startswith("Error"):
                 print(f"\n{Colors.MEMORY}{result}{Colors.RESET}\n")
                 return True
 
         if self.backend:
+            from api.services.command_service import execute_slash_command as _exec_fallback
+            try:
+                cmd_result = _exec_fallback(backend_cmd, self.backend)
+                replacement = cmd_result.get("replacement_session_id")
+                if replacement:
+                    self.session_id = replacement
+                    self.backend.chat_manager.set_active_session(replacement)
+                output = cmd_result.get("response_text", "")
+                if output and output != f"Unbekannter Command: {backend_cmd}":
+                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                    self.last_result = cmd_result
+                    return True
+            except Exception:
+                pass
             result = self.backend.handle_command(backend_cmd)
             if not result.startswith("Unbekannter Command:"):
                 print(f"\n{Colors.MEMORY}{result}{Colors.RESET}\n")
@@ -1523,6 +2154,53 @@ class CHAPPiEBrainCLI:
         if self.backend:
             self.backend.apply_runtime_settings(force=True)
         _success(f"Modell gewechselt zu: {model_name}")
+
+    def _handle_restart_command(self, target: str) -> bool:
+        if target in ("chappie", "backend", "server"):
+            return self._restart_chappie_services()
+        if target == "cli":
+            return self._restart_cli_process()
+        _warn("Ungueltiges Ziel. Nutze: /restart chappie | /restart cli")
+        return True
+
+    @staticmethod
+    def _run_systemctl(service: str) -> tuple[bool, str]:
+        try:
+            completed = subprocess.run(
+                ["sudo", "systemctl", "restart", service],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            output = (completed.stdout or "") + (completed.stderr or "")
+            return completed.returncode == 0, output.strip()
+        except Exception as exc:
+            return False, str(exc)
+
+    def _restart_chappie_services(self) -> bool:
+        _log("RESTART", "Starte CHAPPiE Backend + Frontend neu...", Colors.AI)
+        ok = True
+        for service in ("chappie-web", "chappie-frontend"):
+            success, output = self._run_systemctl(service)
+            if success:
+                _success(f"{service} neugestartet")
+            else:
+                ok = False
+                _error(f"{service} Neustart fehlgeschlagen{(': ' + output) if output else ''}")
+        if ok:
+            _success("CHAPPiE laeuft neu (Backend + Frontend)")
+        else:
+            _warn("Mindestens ein Dienst meldet einen Fehler, Details siehe oben")
+        return True
+
+    def _restart_cli_process(self) -> bool:
+        _log("RESTART", "Starte CLI neu...", Colors.AI)
+        sys.stdout.flush()
+        try:
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as exc:
+            _error(f"CLI-Neustart fehlgeschlagen: {exc}")
+        return True
 
     def _restart_steering_server(self, model_name: str, quantize: bool = False) -> None:
         if not HAS_REQUESTS:
@@ -1563,35 +2241,43 @@ class CHAPPiEBrainCLI:
             time.sleep(2)
         print("\nTimeout: Steering-Server meldet keinen Abschluss.")
 
-    def _print_help(self):
-        print(f"""
-{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v16.0{Colors.RESET}
-{Colors.DEBUG}───────────────────────────────────────────────
-  /status        Emotionaler Status + Life-Simulation
-  /runtime       Modell, Provider, Steering-Konfiguration
-  /model [preset|name]       Aktives vLLM-Modell wechseln
-  /thinking [true|false]  Chain-of-Thought/Reasoning ein-/ausschalten
-  /steering      Detaillierter Steering-Report
-  /emotion <n> [+/-]<0-100>  Emotion setzen/erhoehen/senken
-  /emotion                    Alle Emotions-Werte anzeigen
-  /resetemotions              Emotionen zuruecksetzen
-  /sleep         Schlafphase erzwingen
-  /memory        Kurzzeitgedaechtnis anzeigen
-  /history       Chat-Verlauf anzeigen
-  /clear         Chat-Verlauf loeschen
-  /debug [on/off]  Debug-Output ein-/ausschalten (toggle ohne Argument)
-  /md            Zeigt soul.md, user.md und Preferences.md an
-  /exit          Beenden
-  /help          Diese Hilfe
-{Colors.EMOTION}─── Nach Ausgabe Befehle ──────────────────────
-  /last          Voller Debug-Report (12 Panels)
-  /raw           Step 1 Raw JSON + Raw Model Output
-  /trace         Causal Trace (5-Phasen Kette)
-  /compact       Auto-Report kompakt (default)
-  /full          Auto-Report voll nach jeder Antwort
+    def _build_help_lines(self, width: Optional[int] = None) -> str:
+        total = width or shutil.get_terminal_size(fallback=(100, 24)).columns
+        total = max(40, total)
+        sep = "  │  "
+        col_width = max(10, (total - len(sep) * 2) // 3)
+        lines = [
+            f"{Colors.AI}{Colors.BOLD}CHAPPiE Terminal Interface v{self.CLI_VERSION}{Colors.RESET}",
+            "",
+        ]
+        header = sep.join(
+            f"{Colors.AI}{Colors.BOLD}{title:<{col_width}}{Colors.RESET}"
+            for title, _ in HELP_COLUMNS
+        )
+        lines.append(header)
+        rows = max(len(items) for _, items in HELP_COLUMNS)
+        for i in range(rows):
+            cells = []
+            for _, items in HELP_COLUMNS:
+                cmd_width = min(max(len(cmd) for cmd, _ in items) + 2, col_width // 2)
+                if i < len(items):
+                    cmd, desc = items[i]
+                    cell = f"{cmd:<{cmd_width}} {desc}"[:col_width].ljust(col_width)
+                else:
+                    cell = " " * col_width
+                cells.append(cell)
+            lines.append(sep.join(cells))
+        lines += [
+            "",
+            "Weitere: /stats /think /deep think /life /growth /world /habits ... wie in der Web-UI"[:total],
+            "Tipp: /emotion <name> [+/-]<0-100>, z.B. /emotion happiness +10"[:total],
+            "",
+            "Ctrl+C         Generierung abbrechen (Streaming)",
+        ]
+        return "\n".join(lines)
 
-  Ctrl+C         Generierung abbrechen (Streaming){Colors.RESET}
-""")
+    def _print_help(self, width: Optional[int] = None):
+        print(self._build_help_lines(width))
 
     # ── run ───────────────────────────────────────────────────────
 
@@ -1610,43 +2296,66 @@ class CHAPPiEBrainCLI:
   ██╔══██╗██╔══██╗██╔══██║██║██║╚██╗██║
   ██████╔╝██║  ██║██║  ██║██║██║ ╚████║
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
-{Colors.AI}CHAPPiE Terminal Interface v16.0 [{mode_str}]
+{Colors.AI}CHAPPiE Terminal Interface v{self.CLI_VERSION} [{mode_str}]
 {Colors.STEER}Steering: {steering_info} | {len(EMOTION_NAMES)} Emotionale Dimensionen
 {Colors.DEBUG}Live Streaming + Debug-Report | Tippe /help fuer alle Befehle
 {Colors.RESET}""")
 
         self._show_status()
 
-        while True:
-            try:
-                user_input = input(f"\n{Colors.USER}{Colors.BOLD}Benjamin >{Colors.RESET} ")
-            except (KeyboardInterrupt, EOFError):
-                break
-
-            if not user_input.strip():
-                continue
-
-            if user_input.startswith("/"):
-                result = self._handle_command(user_input)
-                if result is False:
+        real_stdout = sys.stdout
+        self._out_capture = None
+        if not self._use_remote:
+            # Backend-Threads (Memory, Schlafphase) drucken direkt auf stdout.
+            # Der Puffer haelt Live-Display und Eingabezeile sauber.
+            self._out_capture = _StrayOutputCapture(real_stdout)
+            sys.stdout = self._out_capture
+        try:
+            while True:
+                self._drain_background_output()
+                try:
+                    real_stdout.write(self._input_prompt())
+                    real_stdout.flush()
+                    if self._out_capture is not None:
+                        self._out_capture.main_capturing = True
+                    try:
+                        user_input = input("")
+                    finally:
+                        if self._out_capture is not None:
+                            self._out_capture.main_capturing = False
+                except (KeyboardInterrupt, EOFError):
                     break
-                continue
 
-            try:
-                if self._use_remote:
-                    self._process_remote(user_input)
-                else:
-                    self._process_local(user_input)
-            except Exception as e:
-                _error(f"Fehler: {e}")
-                import traceback
-                traceback.print_exc()
+                self._drain_background_output()
+
+                if not user_input.strip():
+                    continue
+
+                if user_input.startswith("/"):
+                    result = self._handle_command(user_input)
+                    if result is False:
+                        break
+                    continue
+
+                try:
+                    if self._use_remote:
+                        self._process_remote(user_input)
+                    else:
+                        self._process_local(user_input)
+                except Exception as e:
+                    _error(f"Fehler: {e}")
+                    import traceback
+                    traceback.print_exc()
+        finally:
+            if self._out_capture is not None:
+                sys.stdout = real_stdout
+                self._out_capture = None
 
         _log("EXIT", "CHAPPiE beendet. Bis bald!", Colors.AI)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.0")
+    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.8.6")
     parser.add_argument("--remote", action="store_true", help="Connect to remote backend via SSE")
     parser.add_argument("--url", default="http://localhost:8010", help="Backend URL (default: localhost:8010)")
     parser.add_argument("--model", type=str, default=None, help="Lokales vLLM-Modell ueberschreiben (z.B. gemma4-26b)")
