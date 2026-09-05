@@ -2,7 +2,7 @@
   "report_version": "6",
   "created_at": "2026-09-02",
   "source_commit": "8c830eb0603bda24b37df1cc792bc7460b2da135",
-  "worktree_state": "v16.6.0 guarded emotion appraisal, acute layer steering and Groq formatting",
+  "worktree_state": "v16.6.0 guarded emotion appraisal, acute layer steering, Groq formatting and local response compatibility fixes",
   "validator_version": "1",
   "research_provenance": {
     "run": "run-2-20260723-1108-cb6d011",
@@ -13,7 +13,7 @@
     {
       "path": "web_infrastructure/chappie_runtime.py",
       "symbol": "CHAPPiERuntime",
-      "sha256": "6ba11ea1808a234c0807e1c238965bb10bd198639b8d65f9e11eecb954f796ff",
+      "sha256": "fed47a0e4a0e6436697e020833b14f412ab61559060279162c7be825e8c6669d",
       "section": "architektur-v6",
       "claim": "Public active runtime facade and shared sync/stream entry.",
       "role": "active",
@@ -22,7 +22,7 @@
     {
       "path": "web_infrastructure/turn_pipeline.py",
       "symbol": "TurnPipeline",
-      "sha256": "bdc7a6dcd46f63c8ab13939ef3521ffe5b673435f25b336fbb246c990d0a8202",
+      "sha256": "d4353d00178b2144c4c1ee3be76dd46ff3691d5042f3fb53ebfb46178452b8d5",
       "section": "architektur-v6",
       "claim": "Shared domain turn core for synchronous and streamed calls.",
       "role": "active",
@@ -40,7 +40,7 @@
     {
       "path": "web_infrastructure/generation.py",
       "symbol": "GenerationGateway",
-      "sha256": "716a754c51ef9affecc7452f17df4bfe59d31457e481c435aa177729efa5fe46",
+      "sha256": "e7d7686906f83281a8fae975f22dba86105f1c65f9b36084a8d15cbb46e54a22",
       "section": "architektur-v6",
       "claim": "Provider calls resolve the current brain lazily after settings reload.",
       "role": "active",
@@ -58,7 +58,7 @@
     {
       "path": "web_infrastructure/formatting.py",
       "symbol": "RuntimeFormattingMixin",
-      "sha256": "dfae4b2873e68a7690028a761ec7e53893422e2d6e70dc74332b0bcc814af49a",
+      "sha256": "5edca68e49aca9de1652621fc13b93461c5e1cccd9541742de13f4d0c568a715",
       "section": "architektur-v6",
       "claim": "Parsing, sanitizing and backend-facing message formatting are isolated.",
       "role": "active",
@@ -76,7 +76,7 @@
     {
       "path": "brain/steering_manager.py",
       "symbol": "SteeringManager",
-      "sha256": "af9e688c5fa582316dfe25fea3eb93b94a9732b3a3fdc3ac8bad083246635bdd",
+      "sha256": "672366866721979daa11580be1ef696b5f8fb55bdece816f2221e5eff508c67a",
       "section": "architektur-v6",
       "claim": "Active steering is isolated from historical agent package imports.",
       "role": "active",
