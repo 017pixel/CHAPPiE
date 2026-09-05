@@ -1,6 +1,6 @@
 # CHAPiE Persönlichkeit
 > Selbstdokumentation und Entwicklung
-> Zuletzt aktualisiert: 2026-09-05T11:29:13.858725
+> Zuletzt aktualisiert: 2026-09-05T14:53:43.364084
 
 ---
 
