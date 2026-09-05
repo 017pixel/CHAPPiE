@@ -102,10 +102,11 @@ def test_default_state_does_not_fake_positive_emotion_steering() -> None:
         force=True,
         provider=LLMProvider.VLLM,
         model="Qwen/Qwen3.5-4B",
+        user_input="Warum ist der Himmel blau?",
     )["steering"]
-    assert payload["selected_base_vectors"] == []
-    assert payload["dominant_emotion"] == "neutral"
-    assert {item["name"] for item in payload["vectors"]} == {"natural_presence"}
+    assert payload["dominant_emotion"] == "calm"
+    assert {item["name"] for item in payload["vectors"]} == {"calm"}
+    assert payload["permanent_vectors"] == []
 
 
 if __name__ == "__main__":

@@ -15,8 +15,7 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -156,6 +155,17 @@ class IntentProcessorContextDefaultsTests(unittest.TestCase):
         self.assertTrue(result.raw_json.get("deterministic_fast_path"))
         self.assertFalse(result.context_requirements["need_long_term_memory"])
         self.assertEqual(result.retrieval_keywords, [])
+
+    def test_consciousness_question_skips_intent_model(self):
+        from memory.intent_processor import IntentProcessor
+
+        processor = IntentProcessor()
+        processor.brain = MagicMock()
+        result = processor.process("Hast du ein Bewusstsein?", [], {})
+
+        processor.brain.generate.assert_not_called()
+        self.assertTrue(result.raw_json.get("deterministic_self_report_intent"))
+        self.assertFalse(result.context_requirements["need_long_term_memory"])
 
     def test_stateful_requests_keep_model_intent_path(self):
         from memory.intent_processor import IntentProcessor

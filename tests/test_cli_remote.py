@@ -69,7 +69,31 @@ def test_remote_get_status_success():
         rb = _make_remote()
         status = rb.get_status()
         assert status == {"model": "qwen", "provider": "vllm"}
-        mock_get.assert_called_once_with("http://localhost:8010/", timeout=5)
+        mock_get.assert_called_once_with("http://localhost:8010/status", timeout=5)
+
+
+def test_remote_get_status_root_fallback():
+    m = _get_module()
+    root_resp = MagicMock()
+    root_resp.json.return_value = {
+        "brain": {"model": "qwen", "provider": "vllm", "available": True},
+        "emotions": {"happiness": 50},
+        "life": {"phase": "Tag"},
+    }
+
+    def _side_effect(url, timeout=5):
+        if url.endswith("/status") or url.endswith("/health"):
+            raise Exception("not found")
+        resp = MagicMock()
+        resp.json.return_value = root_resp.json.return_value
+        return resp
+
+    mock_get = MagicMock(side_effect=_side_effect)
+    with patch.object(m.requests, "get", mock_get):
+        rb = _make_remote()
+        status = rb.get_status()
+        assert status["model"] == "qwen"
+        assert status["provider"] == "vllm"
 
 
 def test_remote_get_status_failure():
@@ -222,6 +246,7 @@ if __name__ == "__main__":
     test_remote_backend_strips_trailing_slash()
     test_remote_backend_preserves_no_slash()
     test_remote_get_status_success()
+    test_remote_get_status_root_fallback()
     test_remote_get_status_failure()
     test_stream_events_parses_sse_format()
     test_stream_events_json_decode_error()

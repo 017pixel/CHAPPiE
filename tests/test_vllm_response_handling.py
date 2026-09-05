@@ -119,6 +119,29 @@ def test_prepare_extra_body_overrides_explicit_enable_thinking_with_settings():
         settings.chain_of_thought = original
 
 
+def test_prepare_extra_body_honors_request_enable_thinking_override():
+    from config.config import settings
+
+    original = settings.chain_of_thought
+    settings.chain_of_thought = True
+    response = _FakeResponse([_FakeChoice(_FakeMessage(content="ok"))])
+    brain = _make_brain_with_response(response)
+    try:
+        payload = brain._prepare_extra_body({}, enable_thinking=False)
+        assert payload["chat_template_kwargs"]["enable_thinking"] is False
+    finally:
+        settings.chain_of_thought = original
+
+
+def test_prepare_extra_body_marks_normal_calls_interactive_and_preserves_background():
+    response = _FakeResponse([_FakeChoice(_FakeMessage(content="ok"))])
+    brain = _make_brain_with_response(response)
+    assert brain._prepare_extra_body({})["request_priority"] == "interactive"
+    assert brain._prepare_extra_body({"request_priority": "background"})["request_priority"] == "background"
+    brain.default_request_priority = "background"
+    assert brain._prepare_extra_body({})["request_priority"] == "background"
+
+
 
 def test_stream_generate_preserves_delta_whitespace():
     deltas = [
@@ -154,6 +177,8 @@ if __name__ == "__main__":
     test_sync_generate_preserves_answer_and_model_reasoning()
     test_prepare_extra_body_sets_qwen_thinking_from_settings()
     test_prepare_extra_body_overrides_explicit_enable_thinking_with_settings()
+    test_prepare_extra_body_honors_request_enable_thinking_override()
+    test_prepare_extra_body_marks_normal_calls_interactive_and_preserves_background()
     test_stream_generate_preserves_delta_whitespace()
     test_is_available_uses_fast_models_probe_before_health()
     print("OK: vLLM response handling")

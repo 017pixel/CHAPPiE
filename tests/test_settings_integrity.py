@@ -2,19 +2,17 @@
 
 import os
 import sys
+from unittest.mock import MagicMock
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(TEST_DIR)
 sys.path.insert(0, PROJECT_ROOT)
 
-from unittest.mock import MagicMock
-
 sys.modules["ollama"] = MagicMock()
 sys.modules["chromadb"] = MagicMock()
 sys.modules["sentence_transformers"] = MagicMock()
 
-from config.config import settings, LLMProvider
-from config.config import DEFAULT_ROOT_CONFIG
+from config.config import DEFAULT_ROOT_CONFIG, LLMProvider, settings  # noqa: E402
 
 
 def test_llm_provider_has_groq():
@@ -89,13 +87,26 @@ def test_get_query_extraction_model_groq():
 
 
 def test_emotion_and_formatting_groq_config_is_centralized():
+    defaults = DEFAULT_ROOT_CONFIG
+    assert defaults["small_tasks"]["emotion_analysis_provider"] == "groq"
+    assert defaults["small_tasks"]["emotion_analysis_model"] == "openai/gpt-oss-20b"
+    assert defaults["cloud_models"]["groq_format_model"] == "llama-3.1-8b-instant"
+    assert defaults["cloud_models"]["groq_auxiliary_enabled"] is True
+    assert defaults["small_tasks"]["emotion_analysis_timeout_seconds"] > 0
+    assert defaults["cloud_models"]["groq_format_timeout_seconds"] > 0
+
     exported = settings._export_root_values()
-    assert exported["EMOTION_ANALYSIS_PROVIDER"] == "groq"
-    assert exported["EMOTION_ANALYSIS_MODEL"] == "openai/gpt-oss-20b"
-    assert exported["GROQ_FORMAT_MODEL"] == "llama-3.1-8b-instant"
-    assert exported["GROQ_AUXILIARY_ENABLED"] is True
+    assert exported["EMOTION_ANALYSIS_PROVIDER"] in {"groq", "ollama", "vllm"}
+    assert isinstance(exported["EMOTION_ANALYSIS_MODEL"], str) and exported["EMOTION_ANALYSIS_MODEL"]
+    assert isinstance(exported["GROQ_FORMAT_MODEL"], str) and exported["GROQ_FORMAT_MODEL"]
+    assert isinstance(exported["GROQ_AUXILIARY_ENABLED"], bool)
     assert exported["EMOTION_ANALYSIS_TIMEOUT_SECONDS"] > 0
     assert exported["GROQ_FORMAT_TIMEOUT_SECONDS"] > 0
+
+
+def test_background_input_limit_is_centralized():
+    assert DEFAULT_ROOT_CONFIG["local_models"]["background_input_token_limit"] == 256
+    assert settings._export_root_values()["BACKGROUND_INPUT_TOKEN_LIMIT"] == 256
 
 
 def _flatten_config(config, prefix=""):
@@ -121,6 +132,7 @@ if __name__ == "__main__":
         test_get_intent_model_groq,
         test_get_query_extraction_model_groq,
         test_emotion_and_formatting_groq_config_is_centralized,
+        test_background_input_limit_is_centralized,
     ]
     passed = 0
     for test in tests:
@@ -131,3 +143,5 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"  [FAIL] {test.__name__}: {e}")
     print(f"\n{passed}/{len(tests)} tests passed")
+    if passed != len(tests):
+        raise SystemExit(1)

@@ -6,7 +6,7 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from brain.response_parser import contains_instruction_leak, is_safe_retrieval_text, sanitize_visible_response
+from brain.response_parser import contains_instruction_leak, is_safe_retrieval_text, resolve_visible_answer, sanitize_visible_response
 
 
 def test_tool_json_is_removed_but_answer_is_preserved():
@@ -104,6 +104,24 @@ def test_memory_headers_are_not_safe_retrieval_context():
     assert not is_safe_retrieval_text("[Keyword | ID d1d6a15c | Score 48%]")
 
 
+def test_resolve_visible_answer_never_discards_generated_text():
+    text, info = resolve_visible_answer("Hallo Welt")
+    assert text == "Hallo Welt"
+    assert info["sanitization_fallback"] is False
+
+    text, info = resolve_visible_answer("", display_response="Extrahierte Antwort", raw_response="roher Text")
+    assert text == "Extrahierte Antwort"
+    assert info["sanitization_fallback"] is True
+
+    text, info = resolve_visible_answer("", display_response="", raw_response="nur roh vorhanden")
+    assert text == "nur roh vorhanden"
+    assert info["sanitization_fallback"] is True
+
+    text, info = resolve_visible_answer("", display_response="  ", raw_response="")
+    assert "0 Tokens" in text
+    assert info.get("empty_generation") is True
+
+
 if __name__ == "__main__":
     test_tool_json_is_removed_but_answer_is_preserved()
     test_reasoning_and_function_blocks_never_reach_visible_answer()
@@ -117,4 +135,5 @@ if __name__ == "__main__":
     test_echoed_memory_transcript_keeps_only_the_final_assistant_answer()
     test_role_only_or_user_only_transcripts_are_withheld()
     test_memory_headers_are_not_safe_retrieval_context()
+    test_resolve_visible_answer_never_discards_generated_text()
     print("OK: output sanitization")

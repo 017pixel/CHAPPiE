@@ -143,6 +143,23 @@ def test_vllm_single_model_mode_overrides_cloud_substeps():
         settings.vllm_model = original_model
 
 
+def test_vllm_single_model_mode_also_skips_optional_cloud_turn_helpers():
+    from web_infrastructure.chappie_runtime import CHAPPiERuntime
+
+    original_provider = settings.llm_provider
+    original_force_single = settings.vllm_force_single_model
+    original_auxiliary = settings.groq_auxiliary_enabled
+    try:
+        settings.llm_provider = LLMProvider.VLLM
+        settings.vllm_force_single_model = True
+        settings.groq_auxiliary_enabled = True
+        assert CHAPPiERuntime._single_local_chat_mode() is True
+    finally:
+        settings.llm_provider = original_provider
+        settings.vllm_force_single_model = original_force_single
+        settings.groq_auxiliary_enabled = original_auxiliary
+
+
 def test_vllm_multi_model_mode_keeps_requested_runtime_models():
     original_provider = settings.llm_provider
     original_vllm_model = settings.vllm_model
@@ -298,10 +315,13 @@ def test_runtime_layer_config_clamps_outdated_saved_ranges():
         payload = manager.get_steering_payload({"happiness": 90}, force=True)
         base_vector = next(item for item in payload["steering"]["vectors"] if item["name"] == "happiness")
 
-        assert row["layer_start"] == 31
-        assert row["layer_end"] == 31
+        # Stale Ranges (z.B. 99-123 aus anderem Profil) werden auf das
+        # Profil-Emotionsfenster (Qwen3.5-9B: 10-26) zurueckgesetzt, NICHT auf
+        # den Top-Layer geclamppt (der zerstoert Reasoning/Fluency).
+        assert row["layer_start"] == 10
+        assert row["layer_end"] == 26
         assert row["default_alpha"] <= 1.5
-        assert base_vector["layer_range"] == [31, 31]
+        assert base_vector["layer_range"] == [10, 26]
         assert payload["steering"]["model_layers"] == 32
     finally:
         settings.llm_provider = original_provider
@@ -324,6 +344,8 @@ def test_qwen35_4b_runtime_profile_exposes_expected_layer_window():
 
         assert manager.model_profile["total_layers"] == 32
         assert manager.model_profile["hidden_dim"] == 2560
+        # Allgemeine Emotionen nutzen das gemessene Fenster bis Layer 26;
+        # direkte Selbstberichte begrenzen request-scoped weiterhin auf 22.
         assert manager.model_profile["emotion_range"] == (10, 26)
         assert payload["steering"]["model_layers"] == 32
         assert payload["steering"]["target_range"] == [10, 26]

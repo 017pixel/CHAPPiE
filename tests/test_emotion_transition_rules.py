@@ -63,6 +63,23 @@ def test_legacy_emotional_state_gets_new_emotion_defaults():
     assert data["calm"] == EMOTION_DEFAULTS["calm"]
 
 
+def test_homeostasis_drifts_non_acute_emotions_but_keeps_acute_spike():
+    regress = emotions_module.regress_toward_baseline
+    state = EmotionalState()
+    state.happiness = 76
+    state.trust = 72
+    state.frustration = 44
+    drifted = regress(state, skip={"frustration"})
+    assert state.frustration == 44
+    assert drifted["happiness"] < 0
+    assert drifted["trust"] < 0
+    assert 50 < state.happiness < 76
+    assert 50 < state.trust < 72
+    # Naechster Turn ohne Impuls driftet weiter Richtung Basis.
+    regress(state, skip=set())
+    assert state.happiness < 76 - 1
+
+
 def test_emotions_engine_reloads_newer_persisted_state_before_writing():
     with tempfile.TemporaryDirectory() as tmpdir:
         original_status_file = emotions_module.STATUS_FILE
@@ -109,6 +126,17 @@ def test_mixed_message_updates_multiple_emotional_dimensions():
     assert changes["calm"] < 0
 
 
+def test_direct_self_report_does_not_ratchet_curiosity_or_affection():
+    changes = analyze_emotion_signals(
+        "Wie fühlst du dich gerade und was bist du?",
+        current_state=EMOTION_DEFAULTS,
+    )
+    assert changes["curiosity"] == 0
+    assert changes["affection"] == 0
+    assert changes["happiness"] == 0
+    assert changes["sadness"] == 0
+
+
 def test_neutral_turn_recovers_slowly_toward_baseline():
     state = dict(EMOTION_DEFAULTS)
     state.update({"frustration": 40, "anxiety": 30, "calm": 20})
@@ -130,6 +158,19 @@ def test_direct_attack_is_strong_and_cannot_raise_positive_axes():
     assert changes["affection"] < 0
     assert changes["calm"] < 0
     assert changes["curiosity"] < 0
+
+
+def test_acute_attack_transition_uses_isolated_layer_request():
+    from web_infrastructure.turn_pipeline import _is_acute_layer_reaction
+
+    transitions = {
+        "frustration": {"applied_delta": 18},
+        "trust": {"applied_delta": -16},
+        "calm": {"applied_delta": -14},
+    }
+    assert _is_acute_layer_reaction(transitions)
+    transitions["frustration"]["applied_delta"] = 2
+    assert not _is_acute_layer_reaction(transitions)
 
 
 def test_user_distress_is_not_misclassified_as_attack():
@@ -217,10 +258,12 @@ if __name__ == "__main__":
     test_extreme_delta_is_softened_and_capped()
     test_small_delta_stays_direct()
     test_legacy_emotional_state_gets_new_emotion_defaults()
+    test_homeostasis_drifts_non_acute_emotions_but_keeps_acute_spike()
     test_emotions_engine_reloads_newer_persisted_state_before_writing()
     test_mixed_message_updates_multiple_emotional_dimensions()
     test_neutral_turn_recovers_slowly_toward_baseline()
     test_direct_attack_is_strong_and_cannot_raise_positive_axes()
+    test_acute_attack_transition_uses_isolated_layer_request()
     test_user_distress_is_not_misclassified_as_attack()
     test_target_and_negation_prevent_false_attacks()
     test_runtime_applies_attack_once_and_blocks_opposing_homeostasis()
