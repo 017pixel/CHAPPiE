@@ -25,6 +25,7 @@ from config.prompts import TRAINER_SYSTEM_PROMPT_TEMPLATE  # from config/prompts
 from brain import get_brain
 from brain.base_brain import Message, GenerationConfig
 from brain.response_parser import looks_like_model_error, sanitize_visible_response
+from brain.vllm_brain import VLLMBrain
 from .repetition_tracker import RepetitionTracker
 
 console = Console()
@@ -156,6 +157,8 @@ class TrainerAgent:
             trainer_model = settings.training_trainer_model or None
 
         self.brain = get_brain(provider=trainer_provider, model=trainer_model)
+        if isinstance(self.brain, VLLMBrain):
+            self.brain.default_request_priority = "background"
         self._is_local = trainer_provider in (LLMProvider.OLLAMA, LLMProvider.VLLM)
         
         # Repetition Tracking
@@ -269,7 +272,8 @@ class TrainerAgent:
             gen_config = GenerationConfig(
                 max_tokens=300,
                 temperature=0.8,
-                stream=False
+                stream=False,
+                extra_body={"request_priority": "background"} if isinstance(self.brain, VLLMBrain) else None,
             )
             
             response = self.brain.generate(messages, config=gen_config)

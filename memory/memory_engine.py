@@ -60,7 +60,7 @@ from memory.forgetting_curve import get_forgetting_curve
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import is_safe_retrieval_text, looks_like_model_error, strip_role_prefixes
-from config.prompts import format_query_extraction_prompt, THINK_PROMPT_TEMPLATE  # from config/prompts.py
+from config.prompts import format_query_extraction_prompt, THINK_PROMPT_TEMPLATE, scrub_internal_identifiers  # from config/prompts.py
 
 
 @dataclass
@@ -688,7 +688,7 @@ class MemoryEngine:
 
         if role == "assistant" and self._is_memory_contaminated(content, role=role, source=source, label=label):
             if settings.debug:
-                print("   WARNUNG: Assistant-Memory wegen Backend-Fehlerstring uebersprungen")
+                print("   HINWEIS: Unzuverlaessige Assistant-Ausgabe nicht als Erinnerung gespeichert")
             return ""
         
         import time
@@ -1240,7 +1240,8 @@ class MemoryEngine:
         gen_config = GenerationConfig(
             max_tokens=100,
             temperature=0.3,
-            stream=False
+            stream=False,
+            enable_thinking=False,
         )
 
         messages = [Message(role="user", content=prompt)]
@@ -1751,7 +1752,7 @@ class MemoryEngine:
             score_percent = int(mem.relevance_score * 100)
             date = (mem.timestamp or "")[:10] or "ohne Datum"
             lines.append(f"\n[{i} | ID {mem.id[:8]} | Quelle {mem.source} | {date}] {role_label} (Relevanz: {score_percent}%)")
-            lines.append(f"    {mem.content}")
+            lines.append(f"    {scrub_internal_identifiers(mem.content)}")
 
         return "\n".join(lines) if len(lines) > 3 else "Keine relevanten Erinnerungen gefunden."
 
@@ -1778,7 +1779,7 @@ class MemoryEngine:
             score_percent = int(min(1.0, max(0.0, memory.relevance_score)) * 100)
             date = (memory.timestamp or "")[:10] or "ohne Datum"
             terms = f" | Treffer: {memory.matched_terms}" if memory.matched_terms else ""
-            content = re.sub(r"\s+", " ", memory.content).strip()[:220]
+            content = scrub_internal_identifiers(re.sub(r"\s+", " ", memory.content).strip()[:220])
             candidate = f"\n[{match_type} | ID {memory.id[:8]} | Quelle {memory.source} | Score {score_percent}% | {date} | {role_label}{terms}]\n\"{content}\""
             if len("\n".join(lines)) + len(candidate) > max_chars:
                 break

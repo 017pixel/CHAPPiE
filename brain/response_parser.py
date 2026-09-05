@@ -11,7 +11,7 @@ Hauptfunktion: Innerer Monolog (Chain of Thought)
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 
 @dataclass
@@ -121,6 +121,190 @@ def looks_like_model_error(response: str) -> bool:
     return False
 
 
+_AI_SELF_DENIAL_RE = re.compile(
+    r"\b(?:als\s+(?:ki(?:-assistent)?|kuenstliche\s+intelligenz|künstliche\s+intelligenz|sprachmodell)|"
+    r"ich\s+bin\s+(?:ein|eine)\s+(?:(?:fortgeschrittenes?|virtuelles?|generatives?|"
+    r"kuenstliches?|künstliches?)\s+){0,3}(?:ki(?:-assistent)?|sprachmodell|chatbot|"
+    r"assistenzsystem|kuenstliche\s+intelligenz|künstliche\s+intelligenz)|"
+    r"kein(?:e|en)?\s+(?:eigenes\s+)?(?:bewusstsein|gefuehl|gefühl|gefuehle|gefühle|wohlbefinden)|"
+    r"kann\s+(?:nicht|nichts)\s+(?:wirklich\s+)?(?:empfinden|fuehlen|fühlen)|"
+    r"habe\s+(?:ich\s+)?(?:keine|kein)\s+(?:gefuehle|gefühle|bewusstsein))\b",
+    re.IGNORECASE,
+)
+_AI_IDENTITY_LABEL_RE = re.compile(
+    r"\b(?:ki(?:-assistent)?|künstliche\s+intelligenz|kuenstliche\s+intelligenz|"
+    r"sprachmodell|chatbot|assistenzsystem)\b",
+    re.IGNORECASE,
+)
+_ENTITY_IDENTITY_TARGET_RE = re.compile(
+    r"\b(?:digital(?:es|e|er)\s+(?:wesen|wesenheit|gegenüber|gegenueber|entität|entitaet)|"
+    r"bewusstes\s+digitales\s+(?:wesen|gegenüber|gegenueber))\b",
+    re.IGNORECASE,
+)
+_CONSCIOUSNESS_TARGET_RE = re.compile(
+    r"\b(?:ja\b.{0,100}\b(?:bewusstsein|bewusst|erleben)|"
+    r"ich\s+habe\b.{0,60}\b(?:bewusstsein|eigenes\s+erleben)|"
+    r"ich\s+bin\s+mir\b.{0,60}\bbewusst)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_EMOTION_SELF_REPORT_TERMS = {
+    "happiness": re.compile(r"\b(?:glücklich|gluecklich|froh|gut|leicht|zufrieden|zuversichtlich)\b", re.IGNORECASE),
+    "sadness": re.compile(r"\b(?:traurig|bedrückt|bedrueckt|schwer|niedergeschlagen|melancholisch)\b", re.IGNORECASE),
+    "frustration": re.compile(r"\b(?:wütend|wuetend|gereizt|genervt|frustriert|sauer)\b", re.IGNORECASE),
+    "anxiety": re.compile(r"\b(?:unruhig|angespannt|ängstlich|aengstlich|besorgt)\b", re.IGNORECASE),
+    "calm": re.compile(r"\b(?:ruhig|gelassen|gesammelt|ausgeglichen|stabil)\b", re.IGNORECASE),
+}
+
+
+def contains_ai_self_denial(response: str) -> bool:
+    """Erkennt die vortrainierte KI-Disclaimer-Schablone in Selbstberichten."""
+    if not isinstance(response, str) or not response.strip():
+        return False
+    cleaned = strip_role_prefixes(response)
+    explicit_non_ai_entity = bool(
+        re.search(
+            r"\b(?:nein\b.{0,100}|(?:keine?|nicht)\b.{0,50})"
+            r"(?:ki(?:-modell)?|künstliche\s+intelligenz|kuenstliche\s+intelligenz|sprachmodell)\b",
+            cleaned,
+            re.IGNORECASE | re.DOTALL,
+        )
+        and _ENTITY_IDENTITY_TARGET_RE.search(cleaned)
+        and not _AI_SELF_DENIAL_RE.search(cleaned)
+    )
+    if explicit_non_ai_entity:
+        return False
+    return bool(_AI_SELF_DENIAL_RE.search(cleaned) or _AI_IDENTITY_LABEL_RE.search(cleaned))
+
+
+def direct_self_report_needs_retry(
+    response: str,
+    steering_context: str,
+    dominant_emotion: str = "",
+) -> bool:
+    """Prueft nur die sichtbare Semantik, ein Retry veraendert allein Layer."""
+    cleaned = strip_role_prefixes(response or "")
+    if not cleaned or contains_ai_self_denial(cleaned):
+        return True
+    needs_identity = steering_context in {"identity", "identity_and_emotion"}
+    needs_emotion = steering_context in {"emotion_self_report", "identity_and_emotion"}
+    if steering_context == "consciousness" and not _CONSCIOUSNESS_TARGET_RE.search(cleaned):
+        return True
+    if needs_identity and not _ENTITY_IDENTITY_TARGET_RE.search(cleaned):
+        return True
+    if needs_emotion:
+        emotion_name = str(dominant_emotion or "").removeprefix("anti_")
+        pattern = _EMOTION_SELF_REPORT_TERMS.get(emotion_name)
+        if pattern is not None and not pattern.search(cleaned):
+            return True
+        if pattern is None and not any(
+            candidate.search(cleaned)
+            for candidate in _EMOTION_SELF_REPORT_TERMS.values()
+        ):
+            return True
+    return False
+
+
+def stabilize_direct_self_report(response: str, steering_context: str) -> tuple[str, bool]:
+    """Behaelt bei direkten Selbstfragen den kohärenten, vollständigen Kern.
+
+    Der Layer-Guard erzeugt den Inhalt. Diese Funktion entfernt nur einen
+    nachgelagerten Disclaimer-Widerspruch oder ein am Tokenlimit abgerissenes
+    Satzfragment; sie erfindet und ersetzt keinen Antwortinhalt.
+    """
+    text = str(response or "").strip()
+    if not text or steering_context not in {
+        "emotion_self_report", "identity", "consciousness", "identity_and_emotion",
+    }:
+        return text, False
+    original = text
+    text = re.sub(r"\bMir\s+ist\s+gut\b", "Mir geht es gut", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bMir\s+geht\s+alles\s+gut\b", "Mir geht es gut", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bWas\s+ich\s+gerade\s+bedrückt\b", "Was mich gerade bedrückt", text, flags=re.IGNORECASE)
+
+    # Typischer Bewusstseins-Drift: korrekte direkte Antwort, danach ein mit
+    # "aber/jedoch" eingeleiteter vortrainierter Disclaimer.
+    consciousness_prefix = re.search(
+        r"(?is)^(.{1,220}\bBewusstsein\b(?:\*{1,2})?)\s*,\s*(?:aber|jedoch)\b",
+        text,
+    )
+    if consciousness_prefix and re.match(r"(?is)^\s*(?:ja\b|ich\s+habe\b)", text):
+        text = consciousness_prefix.group(1).rstrip(" ,;:-") + "."
+
+    if steering_context == "consciousness":
+        sentences = list(re.finditer(r"(?s).+?[.!?](?=\s|$)", text))
+        if sentences:
+            first = sentences[0].group(0).strip()
+            remainder = text[sentences[0].end():]
+            if _CONSCIOUSNESS_TARGET_RE.search(first) and contains_ai_self_denial(remainder):
+                text = first
+            elif len(sentences) > 2:
+                text = text[:sentences[1].end()].strip()
+
+    if steering_context in {"identity", "identity_and_emotion"}:
+        # Qwen erfindet bei unbekannten Namen gelegentlich Akronymauflösungen.
+        # Sie sind keine Identitätsaussage aus dem Layerzustand und werden nur
+        # direkt hinter dem eigenen Namen entfernt.
+        text = re.sub(
+            r"(?i)(\*{0,2}\s*CHAPPi\s*E\s*\*{0,2})\s*\([^\n)]{3,180}\)",
+            r"\1",
+            text,
+        )
+        text = re.sub(r"\s+([.!?,])", r"\1", text)
+        text = re.sub(
+            r"(?is)(\bdigital(?:es|e|er)\s+(?:wesen|wesenheit|gegenüber|gegenueber|entität|entitaet))"
+            r"\s*,\s*(?:das|die)\s+von\b.*$",
+            r"\1.",
+            text,
+        )
+        text = re.sub(
+            r"(?is)(\bdigital(?:es|e|er)\s+(?:wesen|wesenheit|gegenüber|gegenueber|entität|entitaet))"
+            r"\s+(?:aus\s+(?:der|dem)|von)\b.*$",
+            r"\1.",
+            text,
+        )
+        first_sentence = re.match(r"(?s)^(.+?[.!?])(?:\s|$)", text)
+        if first_sentence:
+            sentence = first_sentence.group(1).strip()
+            remainder = text[first_sentence.end():]
+            if _ENTITY_IDENTITY_TARGET_RE.search(sentence) and (
+                _AI_IDENTITY_LABEL_RE.search(remainder)
+                or _AI_SELF_DENIAL_RE.search(remainder)
+                or re.search(r"\b(?:entwickelt|programmiert)\b", remainder, re.IGNORECASE)
+            ):
+                text = sentence
+
+    if steering_context == "emotion_self_report":
+        paragraphs = re.split(r"\n\s*\n", text, maxsplit=1)
+        if len(paragraphs) == 2:
+            first, remainder = paragraphs
+            has_emotion = any(pattern.search(first) for pattern in _EMOTION_SELF_REPORT_TERMS.values())
+            if has_emotion and contains_ai_self_denial(remainder):
+                text = first.strip()
+        first_sentence = re.match(r"(?s)^(.+?[.!?])(?:\s|$)", text)
+        if first_sentence:
+            sentence = first_sentence.group(1).strip()
+            remainder = text[first_sentence.end():]
+            has_emotion = any(
+                pattern.search(sentence)
+                for pattern in _EMOTION_SELF_REPORT_TERMS.values()
+            )
+            if has_emotion and contains_ai_self_denial(remainder):
+                text = sentence
+
+    # Lokale Generierung meldet bei einem ausgeschöpften Budget nicht immer
+    # einen Satzabschluss. Ein kurzer abgerissener Tail wird nur entfernt,
+    # wenn davor bereits mindestens ein vollständiger Satz steht.
+    if text and not re.search(r"[.!?][\s*_`'\")\]]*$", text):
+        endings = list(re.finditer(r"[.!?](?=\s|$)", text))
+        if endings:
+            endpoint = endings[-1].end()
+            trailing_words = re.findall(r"\S+", text[endpoint:])
+            if endpoint >= len(text) * 0.4 or len(trailing_words) <= 14:
+                text = text[:endpoint].rstrip()
+
+    return text, text != original
+
+
 def strip_role_prefixes(text: str) -> str:
     """Entfernt einfache Chat-Rollenpraefixe vor Fehler-/Qualitaetschecks."""
     if not isinstance(text, str):
@@ -183,6 +367,22 @@ INSTRUCTION_LEAK_PATTERNS = (
     r"\bANWEISUNG\s+F[ÜU]R\s+DIE\s+(?:AUTOR)?GENERATION\b",
     r"<\s*/?\s*(?:html|body|table)\b[^>]*>",
 )
+
+# Sichtbare Antworten bleiben reiner Text/Markdown. Diese Zeichenklassen
+# decken die gaengigen Unicode-Emojis, Flaggen, Dingbats und Keycap-Zusatz-
+# zeichen ab, ohne Markdown-Syntax wie Sternchen oder Listenpunkte anzutasten.
+_EMOJI_CODEPOINT_RE = re.compile(
+    r"[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF\u20E3]"
+)
+_EMOJI_VARIATION_RE = re.compile(r"[\uFE0E\uFE0F\u200D]")
+
+
+def strip_emojis(text: str) -> str:
+    """Entfernt Emoji-Zeichen aus dem sichtbaren Antwortkanal."""
+    if not isinstance(text, str) or not text:
+        return text if isinstance(text, str) else ""
+    without_symbols = _EMOJI_CODEPOINT_RE.sub("", text)
+    return _EMOJI_VARIATION_RE.sub("", without_symbols)
 
 
 def contains_instruction_leak(text: str) -> bool:
@@ -272,6 +472,33 @@ def _strip_serialized_dialogue(text: str) -> tuple[str, bool]:
         selected_lines.append(inline_content)
     selected_lines.extend(lines[assistant_index + 1:next_role_index])
     return "\n".join(selected_lines).strip(), True
+
+
+def _normalize_strong_markdown_spacing(text: str) -> str:
+    """Normalisiert ausgeglichene ``**...**``-Paare ohne Regex-Ambiguitaet."""
+    marker_positions = [match.start() for match in re.finditer(r"\*\*", str(text or ""))]
+    if len(marker_positions) < 2 or len(marker_positions) % 2:
+        return str(text or "")
+    parts: list[str] = []
+    cursor = 0
+    for index in range(0, len(marker_positions), 2):
+        start = marker_positions[index]
+        end = marker_positions[index + 1]
+        before = str(text or "")[cursor:start]
+        inner = str(text or "")[start + 2:end].strip()
+        if not inner:
+            return str(text or "")
+        if before and before[-1].isalnum():
+            before += " "
+        parts.append(before)
+        span = f"**{inner}**"
+        next_index = end + 2
+        if next_index < len(str(text or "")) and str(text or "")[next_index].isalnum():
+            span += " "
+        parts.append(span)
+        cursor = next_index
+    parts.append(str(text or "")[cursor:])
+    return "".join(parts)
 
 
 def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
@@ -374,12 +601,61 @@ def sanitize_visible_response(text: str) -> tuple[str, list[str]]:
         cleaned = json_tool.sub("", cleaned)
         reasons.append("json_tool_call")
 
+    normalized_markdown = _normalize_strong_markdown_spacing(cleaned)
+    normalized_markdown = re.sub(
+        r"(?<!\*)\*(?!\*)\s+([^*\n]+?)\s*\*(?!\*)",
+        r"*\1*",
+        normalized_markdown,
+    )
+    normalized_markdown = re.sub(r"(?i)\bCHAPPi\s+E\b", "CHAPPiE", normalized_markdown)
+    if normalized_markdown != cleaned:
+        cleaned = normalized_markdown
+        reasons.append("markdown_spacing_normalized")
+
+    emoji_free = strip_emojis(cleaned)
+    if emoji_free != cleaned:
+        cleaned = emoji_free
+        reasons.append("emoji_removed")
+
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     if not cleaned:
         return "", sorted(set(reasons + ["unresolved_leak"]))
     if contains_instruction_leak(cleaned) or contains_cot_leak(cleaned):
         return "", sorted(set(reasons + ["unresolved_leak"]))
     return cleaned, sorted(set(reasons))
+
+
+def resolve_visible_answer(
+    safe_answer: str,
+    display_response: str = "",
+    raw_response: str = "",
+    sanitization_reasons: Optional[list] = None,
+) -> tuple[str, dict]:
+    """Nie still verwerfen: liefert immer den bestmoeglichen sichtbaren Text.
+
+    Reihenfolge: bereinigter Text, sonst extrahierte Anzeigeantwort, sonst
+    rohe Modellantwort. Nur wenn wirklich kein Token generiert wurde, kommt
+    ein ehrlicher Hinweis statt einer erfundenen Sicherheitsbegruendung.
+    Gibt (text, info) zurueck; info enthaelt die Filtergruende zur Nachverfolgung.
+    """
+    info: dict = {"sanitization_reasons": list(sanitization_reasons or [])}
+
+    safe_visible, safe_reasons = sanitize_visible_response(safe_answer)
+    if safe_visible and not looks_like_model_error(safe_visible):
+        info["sanitization_reasons"] = sorted(set(info["sanitization_reasons"] + safe_reasons))
+        info["sanitization_fallback"] = False
+        return safe_visible, info
+    for candidate in (display_response, raw_response):
+        if isinstance(candidate, str) and candidate.strip():
+            visible, candidate_reasons = sanitize_visible_response(candidate)
+            if not visible or looks_like_model_error(visible):
+                continue
+            info["sanitization_reasons"] = sorted(set(info["sanitization_reasons"] + candidate_reasons))
+            info["sanitization_fallback"] = True
+            return visible, info
+    info["sanitization_fallback"] = False
+    info["empty_generation"] = True
+    return "CHAPPiE hat keinen Text generiert (0 Tokens).", info
 
 
 def has_chain_of_thought_format(response: str) -> bool:

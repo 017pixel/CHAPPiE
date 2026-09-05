@@ -95,6 +95,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "steering_model": "Qwen/Qwen3.5-4B",
         "steering_quantize": True,
         "steering_context_length": 4096,
+        "background_input_token_limit": 256,
     },
     "cloud_models": {
         "groq_model": "openai/gpt-oss-120b",
@@ -124,9 +125,9 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "emotion_analysis_timeout_seconds": 12.0,
     },
     "generation": {
-        "max_tokens": 450,
-        "chappie_thinking_token_limit": 650,
-        "chappie_answer_token_limit": 450,
+        "max_tokens": 640,
+        "chappie_thinking_token_limit": 800,
+        "chappie_answer_token_limit": 640,
         "temperature": 0.7,
         "top_p": 0.9,
         "top_k": 50,
@@ -319,10 +320,14 @@ MEMORY_ASSOCIATION_CONFIG = {
 
 STEERING_RUNTIME_CONFIG = {
     # Fewer coherent directions are more stable than ten competing vectors.
-    "max_base_vectors": 3,
+    "max_base_vectors": 2,
     "max_composite_vectors": 1,
-    "max_composite_strength": 0.55,
-    "natural_presence_strength": 0.26,
+    "max_composite_strength": 0.4,
+    "natural_presence_strength": 0.5,
+    # Nur bei direkten Identitaetsfragen aktiv. 0.4 setzte sich in den
+    # kontrollierten CAA-Proben gegen die KI-Disclaimer-Schablone durch, ohne
+    # den allgemeinen Faktenpfad zu beeinflussen.
+    "entity_identity_strength": 0.4,
     "neutral_baseline_strength": 0.08,
 }
 
@@ -483,10 +488,11 @@ class Settings:
         self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3.5-4B")
         self.steering_quantize = bool(self._get_val("STEERING_QUANTIZE", True))
         self.steering_context_length = int(self._get_val("STEERING_CONTEXT_LENGTH", 4096))
+        self.background_input_token_limit = int(self._get_val("BACKGROUND_INPUT_TOKEN_LIMIT", 256))
 
-        self.max_tokens = int(self._get_val("MAX_TOKENS", 450))
-        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 650))
-        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 450))
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 640))
+        self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 800))
+        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 640))
         self.use_model_defaults = bool(self._get_val("USE_MODEL_DEFAULTS", True))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))
         self.top_p = float(self._get_val("TOP_P", 0.9))
@@ -604,7 +610,8 @@ class Settings:
             "history_max_messages", "context_token_limit",
             "context_token_warning_threshold", "stm_summary_threshold",
             "stm_summary_batch_size", "query_extraction_min_words_for_llm",
-            "steering_context_length", "groq_requests_per_minute",
+            "steering_context_length", "background_input_token_limit",
+            "groq_requests_per_minute",
             "groq_requests_per_hour", "groq_requests_per_day",
             "groq_tokens_per_minute", "groq_tokens_per_hour",
             "groq_tokens_per_day",
@@ -686,6 +693,7 @@ class Settings:
             "STEERING_MODEL": self.steering_model,
             "STEERING_QUANTIZE": self.steering_quantize,
             "STEERING_CONTEXT_LENGTH": self.steering_context_length,
+            "BACKGROUND_INPUT_TOKEN_LIMIT": self.background_input_token_limit,
             "PERSONALITY_PATH": self.personality_path,
             "SOUL_PATH": self.soul_path,
             "USER_PATH": self.user_path,

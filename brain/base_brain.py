@@ -9,7 +9,7 @@ Ermoeglicht einfachen Wechsel zwischen verschiedenen Providern
 
 from abc import ABC, abstractmethod
 from typing import Generator, Optional, Dict, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -29,6 +29,7 @@ class GenerationConfig:
     extra_body: Optional[Dict[str, Any]] = None  # Fuer Steering-Vektoren und spezifische Parameter
     repetition_penalty: float = 1.1  # >1.0 bestraft Wiederholungen, 1.0 = deaktiviert
     seed: Optional[int] = None
+    enable_thinking: Optional[bool] = None  # Request-spezifischer Override fuer native Modellgedanken
 
 
 class BaseBrain(ABC):

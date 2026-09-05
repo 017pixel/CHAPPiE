@@ -53,6 +53,7 @@ class VLLMBrain(BaseBrain):
             api_key="none"  # lokaler Server braucht keinen echten Key
         )
         self._is_initialized = True
+        self.default_request_priority = "interactive"
         self._repetition_events: Dict[str, Any] = {}
         self.last_steering_report: Dict[str, Any] = {}
         print("Lokales OpenAI-Brain initialisiert")
@@ -85,7 +86,10 @@ class VLLMBrain(BaseBrain):
         self._repetition_events.clear()
 
         # Steering / provider-spezifische Parameter
-        extra_body = self._prepare_extra_body(config.extra_body)
+        extra_body = self._prepare_extra_body(
+            config.extra_body,
+            enable_thinking=config.enable_thinking,
+        )
 
         if config.stream:
             return self._stream_generate(openai_messages, config, extra_body)
@@ -334,17 +338,26 @@ class VLLMBrain(BaseBrain):
         except Exception:
             pass
 
-    def _prepare_extra_body(self, extra_body: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _prepare_extra_body(
+        self,
+        extra_body: Optional[Dict[str, Any]],
+        enable_thinking: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         """Bereitet provider-spezifische Optionen vor.
         
         enable_thinking und Sampling-Defaults werden modell-spezifisch gesetzt.
         """
         payload = dict(extra_body or {})
+        payload.setdefault("request_priority", getattr(self, "default_request_priority", "interactive"))
         if "chat_template_kwargs" not in payload:
             payload["chat_template_kwargs"] = {}
         if isinstance(payload["chat_template_kwargs"], dict):
             if is_qwen_model(self.model) or is_gemma4_model(self.model):
-                payload["chat_template_kwargs"]["enable_thinking"] = bool(settings.chain_of_thought)
+                payload["chat_template_kwargs"]["enable_thinking"] = (
+                    bool(settings.chain_of_thought)
+                    if enable_thinking is None
+                    else bool(enable_thinking)
+                )
         defaults = get_model_generation_defaults(self.model)
         if "top_p" not in payload:
             payload["top_p"] = float(settings.top_p if settings.top_p is not None else defaults["top_p"])

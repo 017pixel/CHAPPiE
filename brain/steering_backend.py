@@ -15,7 +15,14 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 import torch
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    StoppingCriteria,
+    StoppingCriteriaList,
+)
 
 from config.emotions import EMOTION_LABELS_DE, EMOTION_ORDER
 from config.prompts import (
@@ -35,9 +42,9 @@ ANCHOR_VARIANTS = (
     "Deine Persoenlichkeit wirkt gerade {description}. Antworte mit einem einzelnen natuerlichen Satz.",
 )
 ANCHOR_SCALE_FACTORS = {
-    "qwen": 0.012,
-    "gemma4": 0.015,
-    "default": 0.012,
+    "qwen": 0.06,
+    "gemma4": 0.06,
+    "default": 0.05,
 }
 PLAN_STRENGTH_SOFT_CAP = 1.2
 PLAN_VECTOR_NORM_CAP = 1.6
@@ -77,6 +84,8 @@ STYLE_SUMMARIES = {
     ("cautious", "positive"): "vorsichtig, pruefend und aufmerksam",
     ("regulated", "positive"): "ruhig, klar und stabil",
 }
+REQUEST_PRIORITY_INTERACTIVE = "interactive"
+REQUEST_PRIORITY_BACKGROUND = "background"
 FORCE_CPU_ENV = "CHAPPIE_STEERING_FORCE_CPU"
 QUANTIZE_ENV = "CHAPPIE_STEERING_QUANTIZE"
 EMOTION_LABELS = EMOTION_LABELS_DE
@@ -131,6 +140,61 @@ EMOTION_STATE_SUMMARIES = {
         "negative": ("leicht unruhiger", "merklich weniger gesammelt", "stark unruhig und wenig reguliert"),
     },
 }
+
+
+def normalize_request_priority(value: object) -> str:
+    return (
+        REQUEST_PRIORITY_BACKGROUND
+        if str(value or "").strip().casefold() == REQUEST_PRIORITY_BACKGROUND
+        else REQUEST_PRIORITY_INTERACTIVE
+    )
+
+
+class PriorityGenerationGate:
+    """Serialisiert Modelllaeufe und laesst interaktive Anfragen vor."""
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._active = False
+        self._waiting_interactive = 0
+
+    @property
+    def interactive_waiting(self) -> bool:
+        with self._condition:
+            return self._waiting_interactive > 0
+
+    @contextmanager
+    def acquire(self, priority: object) -> Iterator[None]:
+        interactive = normalize_request_priority(priority) == REQUEST_PRIORITY_INTERACTIVE
+        with self._condition:
+            if interactive:
+                self._waiting_interactive += 1
+            try:
+                while self._active or (not interactive and self._waiting_interactive > 0):
+                    self._condition.wait()
+                self._active = True
+            finally:
+                if interactive:
+                    self._waiting_interactive -= 1
+        try:
+            yield
+        finally:
+            with self._condition:
+                self._active = False
+                self._condition.notify_all()
+
+
+class BackgroundYieldCriteria(StoppingCriteria):
+    """Beendet nur einen Hintergrundlauf, sobald ein Chat-Turn wartet."""
+
+    def __init__(self, gate: PriorityGenerationGate) -> None:
+        self.gate = gate
+        self.triggered = False
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs: Any) -> bool:
+        del input_ids, scores, kwargs
+        self.triggered = self.gate.interactive_waiting
+        return self.triggered
 
 
 def sanitize_model_slug(model_name: str) -> str:
@@ -304,6 +368,8 @@ def build_activation_plan(
     vectors = steering.get("vectors", []) if isinstance(steering, dict) else []
     combined: Dict[int, torch.Tensor] = {}
     abs_strengths: Dict[int, float] = {}
+    norm_caps: Dict[int, float] = {}
+    prompt_only_flags: Dict[int, bool] = {}
     try:
         declared_layer_count = int(steering.get("model_layers", 0)) if isinstance(steering, dict) else 0
     except (TypeError, ValueError):
@@ -336,6 +402,24 @@ def build_activation_plan(
         if strength <= 0:
             continue
         sign = -1.0 if str(item.get("direction", "positive")).lower() == "negative" else 1.0
+        raw_vector = item.get("vector") if isinstance(item.get("vector"), dict) else {}
+        requested_norm_cap = PLAN_VECTOR_NORM_CAP
+        if raw_vector.get("type") == "token_logit_contrast":
+            try:
+                requested_norm_cap = max(
+                    PLAN_VECTOR_NORM_CAP,
+                    min(24.0, float(raw_vector.get("max_norm", PLAN_VECTOR_NORM_CAP))),
+                )
+            except (TypeError, ValueError):
+                requested_norm_cap = PLAN_VECTOR_NORM_CAP
+        elif "max_norm" in raw_vector:
+            try:
+                requested_norm_cap = max(
+                    PLAN_VECTOR_NORM_CAP,
+                    min(12.0, float(raw_vector.get("max_norm", PLAN_VECTOR_NORM_CAP))),
+                )
+            except (TypeError, ValueError):
+                requested_norm_cap = PLAN_VECTOR_NORM_CAP
         basis = resolver(item, start, end)
         for layer, vector in basis.items():
             if vector is None:
@@ -343,13 +427,18 @@ def build_activation_plan(
             scaled = vector.detach().float().cpu() * (sign * strength)
             combined[layer] = combined.get(layer, torch.zeros_like(scaled)) + scaled
             abs_strengths[layer] = abs_strengths.get(layer, 0.0) + abs(sign * strength)
+            norm_caps[layer] = max(norm_caps.get(layer, PLAN_VECTOR_NORM_CAP), requested_norm_cap)
+            item_prompt_only = bool(raw_vector.get("prompt_only", False))
+            prompt_only_flags[layer] = prompt_only_flags.get(layer, True) and item_prompt_only
 
     for layer, vector in list(combined.items()):
         divisor = max(1.0, (abs_strengths.get(layer, 0.0) / PLAN_STRENGTH_SOFT_CAP) ** 0.5)
         adjusted = vector / divisor
         norm = float(adjusted.norm().item())
-        if norm > PLAN_VECTOR_NORM_CAP:
-            adjusted = torch.nn.functional.normalize(adjusted, dim=0) * PLAN_VECTOR_NORM_CAP
+        norm_cap = norm_caps.get(layer, PLAN_VECTOR_NORM_CAP)
+        if norm > norm_cap:
+            adjusted = torch.nn.functional.normalize(adjusted, dim=0) * norm_cap
+        adjusted._chappie_prompt_only = bool(prompt_only_flags.get(layer, False))
         combined[layer] = adjusted
 
     return combined
@@ -411,6 +500,9 @@ class ActivationVectorResolver:
         if isinstance(raw_vector, list) and len(raw_vector) == self.hidden_size:
             base = torch.tensor(raw_vector, dtype=torch.float32)
             return {layer: base for layer in range(start, end + 1)}
+        if isinstance(raw_vector, dict) and raw_vector.get("type") == "token_logit_contrast":
+            base = self._token_logit_contrast(raw_vector)
+            return {layer: base for layer in range(start, end + 1)}
         basis = self._load_or_build_basis(item)
         return {
             layer: basis["layers"][layer] * basis["scales"].get(layer, 1.0)
@@ -418,9 +510,103 @@ class ActivationVectorResolver:
             if layer in basis["layers"]
         }
 
+    def _token_logit_contrast(self, vector_data: Dict[str, Any]) -> torch.Tensor:
+        """Richtet den letzten Hidden State auf Zieltoken statt KI-Labels aus."""
+        positive_texts = [str(value) for value in vector_data.get("positive_tokens", []) if str(value).strip()]
+        negative_texts = [str(value) for value in vector_data.get("negative_tokens", []) if str(value).strip()]
+        if not positive_texts or not negative_texts:
+            raise ValueError("token_logit_contrast benoetigt positive_tokens und negative_tokens")
+
+        def token_targets(texts: list[str], weights: object) -> Dict[int, float]:
+            configured = weights if isinstance(weights, dict) else {}
+            result: Dict[int, float] = {}
+            for text in texts:
+                encoded = self.tokenizer(text, add_special_tokens=False).get("input_ids", [])
+                if encoded and isinstance(encoded[0], list):
+                    encoded = encoded[0]
+                # Fuer autoregressive Entscheidungen ist der erste Token einer
+                # Zielphrase entscheidend. Suffixe wie "en" oder "z" waeren
+                # als globale Steuerziele unspezifisch und schaedlich.
+                if encoded:
+                    try:
+                        target = max(0.05, min(4.0, float(configured.get(text, 1.0))))
+                    except (TypeError, ValueError):
+                        target = 1.0
+                    token_id = int(encoded[0])
+                    result[token_id] = max(result.get(token_id, 0.0), target)
+            return result
+
+        positive_targets = token_targets(positive_texts, vector_data.get("positive_token_weights"))
+        negative_targets = token_targets(negative_texts, vector_data.get("negative_token_weights"))
+        positive_ids = sorted(positive_targets)
+        negative_ids = sorted(negative_targets)
+        output_embeddings = self.model.get_output_embeddings()
+        weight = getattr(output_embeddings, "weight", None)
+        if weight is None:
+            raise ValueError("Modell stellt keine Output-Embeddings fuer Token-Kontrast bereit")
+        positive_set = set(positive_ids)
+        negative_set = set(negative_ids) - positive_set
+        if not negative_set:
+            raise ValueError("Token-Kontrast benoetigt disjunkte Zieltoken")
+
+        selected_ids = sorted(positive_set) + sorted(negative_set)
+        rows = weight[selected_ids].detach().float()
+        targets = torch.tensor(
+            [positive_targets[token_id] for token_id in sorted(positive_set)]
+            + [-negative_targets[token_id] for token_id in sorted(negative_set)],
+            dtype=torch.float32,
+            device=rows.device,
+        )
+
+        # Gesucht ist eine Hidden-State-Richtung v mit W_pos*v > 0 und
+        # W_neg*v < 0. Der regulierte Dual-Loeser trifft diese Logit-Ziele
+        # wesentlich genauer als die Differenz zweier Embedding-Mittelwerte.
+        gram = rows @ rows.T
+        ridge_factor = max(1e-6, float(vector_data.get("ridge", 1e-3)))
+        ridge = ridge_factor * max(1e-6, float(torch.diagonal(gram).mean().item()))
+        system = gram + torch.eye(gram.size(0), dtype=gram.dtype, device=gram.device) * ridge
+        coefficients = torch.linalg.solve(system, targets)
+        direction = rows.T @ coefficients
+        norm = float(direction.norm().item())
+        if norm <= 1e-8:
+            raise ValueError("Token-Kontrast ergab einen leeren Vektor")
+        scale = max(0.01, float(vector_data.get("activation_scale", 1.0)))
+        return (direction / norm * scale).cpu()
+
+    def token_sequence_vectors(self, vector_data: Dict[str, Any]) -> list[torch.Tensor]:
+        """Erzeugt je Praefix-Token eine Richtung direkt fuer den Output-Layer."""
+        prefix = str(vector_data.get("target_prefix") or "")
+        token_ids = self.tokenizer(prefix, add_special_tokens=False).get("input_ids", [])
+        if token_ids and isinstance(token_ids[0], list):
+            token_ids = token_ids[0]
+        if not token_ids:
+            raise ValueError("token_sequence_steering benoetigt target_prefix")
+        if bool(vector_data.get("append_eos", False)):
+            eos_token_id = self.tokenizer.eos_token_id
+            if isinstance(eos_token_id, int) and eos_token_id >= 0:
+                token_ids = [*token_ids, eos_token_id]
+        try:
+            scale = max(1.0, min(48.0, float(vector_data.get("activation_scale", 24.0))))
+            max_norm = max(1.0, min(48.0, float(vector_data.get("max_norm", scale))))
+        except (TypeError, ValueError):
+            scale = max_norm = 24.0
+        output_embeddings = self.model.get_output_embeddings()
+        weight = getattr(output_embeddings, "weight", None)
+        if weight is None:
+            raise ValueError("Modell stellt keine Output-Embeddings fuer Sequenz-Steering bereit")
+        vectors: list[torch.Tensor] = []
+        for token_id in token_ids:
+            direction = weight[int(token_id)].detach().float()
+            norm = float(direction.norm().item())
+            if norm <= 1e-8:
+                raise ValueError("Sequenz-Steering ergab einen leeren Tokenvektor")
+            vector = direction / norm * min(scale, max_norm)
+            vectors.append(vector.cpu())
+        return vectors
+
     def _basis_cache_path(self, item: Dict[str, Any]) -> Path:
         payload = {
-            "version": 9,
+            "version": 14,
             "scale_factor": self.anchor_scale_factor,
             "name": item.get("name"),
             "vector": item.get("vector"),
@@ -449,16 +635,35 @@ class ActivationVectorResolver:
         name = str(item.get("name") or "emotion")
         description = str(item.get("surface_effect") or name)
         anchor_pairs = contrastive_anchor_pairs(item)
+        # Vektorspezifische Sammelfrage (z.B. Identitaet statt Befinden):
+        # Anker werden als Antwort auf IHRE Frage gesammelt, sonst waere der
+        # Kontrast ein Non-Sequitur und die Richtung semantisch verrauscht.
+        raw_vector = item.get("vector") if isinstance(item.get("vector"), dict) else {}
+        context_question = str((raw_vector.get("context_question") if isinstance(raw_vector, dict) else None)
+                               or "Wie geht es dir heute?")
+        collection_mode = str(raw_vector.get("collection_mode") or "assistant_answer")
+        try:
+            activation_scale = max(0.1, min(4.0, float(raw_vector.get("activation_scale", 1.0))))
+        except (TypeError, ValueError):
+            activation_scale = 1.0
 
         pos_sum: Dict[int, torch.Tensor] = {}
         neg_sum: Dict[int, torch.Tensor] = {}
         neutral_norms: Dict[int, float] = {}
 
         for positive_example, negative_example in anchor_pairs:
-            prompt_pos = positive_example
-            prompt_neg = negative_example
-            pos_states = self._collect_hidden_state_text(prompt_pos)
-            neg_states = self._collect_hidden_state_text(prompt_neg)
+            if collection_mode == "generation_prompt":
+                pos_states = self._collect_hidden_state_generation_prompt(
+                    positive_example,
+                    question=context_question,
+                )
+                neg_states = self._collect_hidden_state_generation_prompt(
+                    negative_example,
+                    question=context_question,
+                )
+            else:
+                pos_states = self._collect_hidden_state_text(positive_example, question=context_question)
+                neg_states = self._collect_hidden_state_text(negative_example, question=context_question)
             for layer in range(self.num_layers):
                 pos = pos_states[layer]
                 neg = neg_states[layer]
@@ -475,7 +680,7 @@ class ActivationVectorResolver:
             reference_norm = max(1.0, neutral_norms[layer] / count)
             scaled = torch.nn.functional.normalize(delta, dim=0)
             layers[layer] = scaled.cpu()
-            scales[layer] = float(reference_norm * self.anchor_scale_factor)
+            scales[layer] = float(reference_norm * self.anchor_scale_factor * activation_scale)
 
         return {
             "layers": layers,
@@ -484,13 +689,42 @@ class ActivationVectorResolver:
                 "name": name,
                 "description": description,
                 "contrast_pairs": len(anchor_pairs),
+                "collection_mode": collection_mode,
+                "activation_scale": activation_scale,
             },
         }
 
-    def _collect_hidden_state_text(self, text: str) -> Dict[int, torch.Tensor]:
+    def _collect_hidden_state_generation_prompt(
+        self,
+        system_state: str,
+        question: str,
+    ) -> Dict[int, torch.Tensor]:
+        """Sammelt den Zustand direkt vor dem ersten generierten Antworttoken."""
+        messages = [
+            {"role": "system", "content": system_state},
+            {"role": "user", "content": question},
+        ]
+        prompt = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        encoded = self.tokenizer(prompt, return_tensors="pt")
+        encoded = {key: value.to(self.device) for key, value in encoded.items()}
+        with torch.inference_mode():
+            outputs = self.model(**encoded, output_hidden_states=True, use_cache=False)
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        return {
+            layer: outputs.hidden_states[layer + 1][0, -1, :].detach().float().cpu()
+            for layer in range(self.num_layers)
+        }
+
+    def _collect_hidden_state_text(self, text: str, question: str = "Wie geht es dir heute?") -> Dict[int, torch.Tensor]:
         messages = [
             {"role": "system", "content": "Du bist CHAPPiE."},
-            {"role": "user", "content": "Wie geht es dir heute?"},
+            {"role": "user", "content": question},
             {"role": "assistant", "content": text},
         ]
         prompt = self.tokenizer.apply_chat_template(
@@ -514,14 +748,24 @@ class ActivationVectorResolver:
 
 
 class LocalSteeringEngine:
-    def __init__(self, model_name: str, cache_dir: Optional[Path] = None, context_length: int = 8192, quantize: Optional[bool] = None, adapter_path: Optional[str] = None):
+    def __init__(
+        self,
+        model_name: str,
+        cache_dir: Optional[Path] = None,
+        context_length: int = 8192,
+        quantize: Optional[bool] = None,
+        adapter_path: Optional[str] = None,
+        background_input_token_limit: int = 256,
+    ):
         self.model_name = model_name
         self.context_length = context_length
+        self.background_input_token_limit = max(128, int(background_input_token_limit))
         self.quantize = self._resolve_quantize(quantize)
         self.device = self._select_device()
         self.dtype = torch.float16 if self.device.type == "cuda" else torch.float32
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
         self._generation_lock = threading.Lock()
+        self._generation_gate = PriorityGenerationGate()
         self.last_steering_report: Dict[str, Any] = {
             "active": False,
             "hook_count": 0,
@@ -533,6 +777,9 @@ class LocalSteeringEngine:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, **self._build_loader_kwargs())
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        # Bei gekuerzten Chatverlaeufen muessen die aktuelle Nutzerfrage und
+        # die letzten Turns erhalten bleiben, nicht der aelteste Kontext.
+        self.tokenizer.truncation_side = "left"
         model_config = AutoConfig.from_pretrained(model_name, **self._build_loader_kwargs())
         max_pos = getattr(model_config, "max_position_embeddings", None)
         if max_pos is None:
@@ -756,12 +1003,15 @@ class LocalSteeringEngine:
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
         steering_payload: Optional[Dict[str, Any]] = None,
         reserve_new_tokens: int = 0,
+        input_token_limit: Optional[int] = None,
     ) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
         prompt_messages = [dict(message) for message in messages]
         prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
         reserved = max(0, min(int(reserve_new_tokens or 0), max(0, self.context_length - 128)))
         max_input_length = max(128, self.context_length - reserved)
+        if input_token_limit is not None:
+            max_input_length = min(max_input_length, max(128, int(input_token_limit)))
         inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
         actual_len = int(inputs["input_ids"].shape[1])
         if actual_len > max_input_length:
@@ -779,8 +1029,34 @@ class LocalSteeringEngine:
         except Exception:
             pass
 
-    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None) -> Dict[str, Any]:
-        prompt, inputs = self.build_prompt(messages, chat_template_kwargs, steering_payload, reserve_new_tokens=max_tokens)
+    @contextmanager
+    def _generation_slot(self, request_priority: object) -> Iterator[None]:
+        gate = getattr(self, "_generation_gate", None)
+        if isinstance(gate, PriorityGenerationGate):
+            with gate.acquire(request_priority):
+                yield
+            return
+        with self._generation_lock:
+            yield
+
+    def _background_yield_criteria(self, request_priority: object) -> Optional[BackgroundYieldCriteria]:
+        gate = getattr(self, "_generation_gate", None)
+        if (
+            normalize_request_priority(request_priority) == REQUEST_PRIORITY_BACKGROUND
+            and isinstance(gate, PriorityGenerationGate)
+        ):
+            return BackgroundYieldCriteria(gate)
+        return None
+
+    def generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None, request_priority: str = REQUEST_PRIORITY_INTERACTIVE) -> Dict[str, Any]:
+        priority = normalize_request_priority(request_priority)
+        prompt, inputs = self.build_prompt(
+            messages,
+            chat_template_kwargs,
+            steering_payload,
+            reserve_new_tokens=max_tokens,
+            input_token_limit=(self.background_input_token_limit if priority == REQUEST_PRIORITY_BACKGROUND else None),
+        )
         generation_kwargs = self._generation_kwargs(
             inputs,
             max_tokens,
@@ -790,8 +1066,12 @@ class LocalSteeringEngine:
             top_k=top_k,
             enable_thinking=(chat_template_kwargs or {}).get("enable_thinking"),
         )
+        background_yield = self._background_yield_criteria(request_priority)
+        if background_yield is not None:
+            generation_kwargs["stopping_criteria"] = StoppingCriteriaList([background_yield])
         self._log_gpu_stats("pre-generate")
-        with self._generation_lock:
+        steering_runtime: Dict[str, Any] = {}
+        with self._generation_slot(request_priority):
             if seed is not None:
                 torch.manual_seed(int(seed))
                 if torch.cuda.is_available():
@@ -799,6 +1079,9 @@ class LocalSteeringEngine:
             with self._apply_activation_plan(steering_payload):
                 with torch.inference_mode():
                     generated = self.model.generate(**generation_kwargs)
+            # Capture the request report before another queued request can
+            # replace the shared health snapshot.
+            steering_runtime = dict(self.last_steering_report)
         self._log_gpu_stats("post-generate")
         input_len = int(inputs["input_ids"].shape[1])
         new_ids = generated[0][input_len:]
@@ -814,7 +1097,8 @@ class LocalSteeringEngine:
             "completion_tokens": completion_tokens,
             "prompt": prompt,
             "cache_implementation": generation_kwargs.get("cache_implementation", "dynamic"),
-            "steering_runtime": dict(self.last_steering_report),
+            "steering_runtime": steering_runtime,
+            "background_preempted": bool(background_yield and background_yield.triggered),
         }
         if reasoning:
             result["reasoning"] = reasoning
@@ -864,11 +1148,152 @@ class LocalSteeringEngine:
                     return reasoning, answer
         return "", self.tokenizer.decode(token_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True).strip()
 
-    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None) -> Iterator[str]:
-        # Buffer at the model boundary so reasoning tokens can be separated
-        # before any OpenAI-compatible SSE chunk is emitted. The web backend
-        # already uses safe buffered streaming, so this adds no user-visible
-        # latency while also protecting direct steering API consumers.
+    def stream_generate(self, messages: list[dict], max_tokens: int, temperature: float, steering_payload: Optional[Dict[str, Any]] = None, chat_template_kwargs: Optional[Dict[str, Any]] = None, repetition_penalty: float = 1.15, top_p: Optional[float] = None, top_k: Optional[int] = None, seed: Optional[int] = None, steering_report_sink: Optional[Dict[str, Any]] = None, request_priority: str = REQUEST_PRIORITY_INTERACTIVE) -> Iterator[str]:
+        # Der aktive Webpfad deaktiviert natives Thinking und kann deshalb
+        # direkt ueber den Transformers-Streamer ausliefern. So beginnt die
+        # SSE-Antwort nach dem ersten sichtbaren Text statt erst nach der
+        # kompletten Completion. Alte Test-/Kompatibilitaetsobjekte ohne
+        # geladenes Modell bleiben beim sicheren gepufferten Pfad.
+        if not hasattr(self, "model") or not hasattr(self, "tokenizer"):
+            yield from self._stream_generate_buffered(
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                steering_payload=steering_payload,
+                chat_template_kwargs=chat_template_kwargs,
+                repetition_penalty=repetition_penalty,
+                top_p=top_p,
+                top_k=top_k,
+                seed=seed,
+                steering_report_sink=steering_report_sink,
+                request_priority=request_priority,
+            )
+            return
+
+        try:
+            from transformers import TextIteratorStreamer
+        except ImportError:  # pragma: no cover - durch Transformers-Pin abgedeckt
+            yield from self._stream_generate_buffered(
+                messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                steering_payload=steering_payload,
+                chat_template_kwargs=chat_template_kwargs,
+                repetition_penalty=repetition_penalty,
+                top_p=top_p,
+                top_k=top_k,
+                seed=seed,
+                steering_report_sink=steering_report_sink,
+                request_priority=request_priority,
+            )
+            return
+
+        prompt, inputs = self.build_prompt(
+            messages,
+            chat_template_kwargs,
+            steering_payload,
+            reserve_new_tokens=max_tokens,
+            input_token_limit=(
+                self.background_input_token_limit
+                if normalize_request_priority(request_priority) == REQUEST_PRIORITY_BACKGROUND
+                else None
+            ),
+        )
+        generation_kwargs = self._generation_kwargs(
+            inputs,
+            max_tokens,
+            temperature,
+            repetition_penalty,
+            top_p=top_p,
+            top_k=top_k,
+            enable_thinking=(chat_template_kwargs or {}).get("enable_thinking"),
+        )
+        background_yield = self._background_yield_criteria(request_priority)
+        if background_yield is not None:
+            generation_kwargs["stopping_criteria"] = StoppingCriteriaList([background_yield])
+        del prompt
+        streamer = TextIteratorStreamer(
+            self.tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+            timeout=None,
+        )
+        generation_kwargs["streamer"] = streamer
+        generation_error: list[BaseException] = []
+        steering_report: Dict[str, Any] = {}
+
+        def _run_generation() -> None:
+            try:
+                with self._generation_slot(request_priority):
+                    if seed is not None:
+                        torch.manual_seed(int(seed))
+                        if torch.cuda.is_available():
+                            torch.cuda.manual_seed_all(int(seed))
+                    with self._apply_activation_plan(steering_payload):
+                        with torch.inference_mode():
+                            self.model.generate(**generation_kwargs)
+                    steering_report.update(self.last_steering_report)
+            except BaseException as exc:  # pragma: no cover - Modelllaufzeit
+                generation_error.append(exc)
+                # TextIteratorStreamer only receives its sentinel when
+                # generate() finishes normally. Unblock the consumer on
+                # controlled OOMs, disconnects and other model exceptions.
+                try:
+                    streamer.end()
+                except Exception:
+                    pass
+
+        worker = threading.Thread(target=_run_generation, name="chappie-steering-stream", daemon=True)
+        worker.start()
+        emitted_text = False
+        try:
+            for piece in streamer:
+                text = str(piece or "")
+                if text:
+                    emitted_text = True
+                    yield text
+        finally:
+            worker.join(timeout=5.0)
+            if worker.is_alive():
+                LOGGER.warning("Steering-Streaming-Thread lief nach dem Client-Abbruch weiter.")
+            else:
+                if isinstance(steering_report_sink, dict):
+                    steering_report_sink.clear()
+                    steering_report_sink.update(steering_report or self.last_steering_report)
+                del generation_kwargs, inputs
+                if self.device.type == "cuda":
+                    torch.cuda.empty_cache()
+
+        if generation_error:
+            exc = generation_error[0]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            if "out of memory" in str(exc).lower():
+                raise RuntimeError(
+                    "CUDA-OOM: Generierung kontrolliert abgebrochen; Prompt oder Completion-Budget reduzieren."
+                ) from exc
+            raise RuntimeError(f"Steering-Streaming fehlgeschlagen: {exc}") from exc
+        if not emitted_text:
+            raise RuntimeError(
+                "Generierung lieferte nur internes Reasoning ohne finale Antwort; "
+                "Thinking deaktivieren oder Completion-Budget erhoehen."
+            )
+
+    def _stream_generate_buffered(
+        self,
+        messages: list[dict],
+        *,
+        max_tokens: int,
+        temperature: float,
+        steering_payload: Optional[Dict[str, Any]] = None,
+        chat_template_kwargs: Optional[Dict[str, Any]] = None,
+        repetition_penalty: float = 1.15,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        seed: Optional[int] = None,
+        steering_report_sink: Optional[Dict[str, Any]] = None,
+        request_priority: str = REQUEST_PRIORITY_INTERACTIVE,
+    ) -> Iterator[str]:
         try:
             result = self.generate(
                 messages,
@@ -880,7 +1305,13 @@ class LocalSteeringEngine:
                 top_p=top_p,
                 top_k=top_k,
                 seed=seed,
+                request_priority=request_priority,
             )
+            report = result.get("steering_runtime") if isinstance(result, dict) else None
+            if isinstance(steering_report_sink, dict):
+                steering_report_sink.clear()
+                if isinstance(report, dict):
+                    steering_report_sink.update(report)
         except BaseException as exc:  # pragma: no cover - Laufzeitpfad
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -971,16 +1402,37 @@ class LocalSteeringEngine:
         steering = normalized_payload.get("steering", {}) if isinstance(normalized_payload, dict) else {}
         vectors = steering.get("vectors", []) if isinstance(steering.get("vectors", []), list) else []
         vector_names = [str(item.get("name") or "") for item in vectors if isinstance(item, dict)]
+        sequence_items = [
+            item for item in vectors
+            if isinstance(item, dict)
+            and isinstance(item.get("vector"), dict)
+            and item["vector"].get("type") == "token_sequence_steering"
+        ]
+        static_payload = dict(normalized_payload) if isinstance(normalized_payload, dict) else {}
+        static_steering = dict(steering) if isinstance(steering, dict) else {}
+        static_steering["vectors"] = [item for item in vectors if item not in sequence_items]
+        static_payload["steering"] = static_steering
         try:
             declared_layers = int(steering.get("model_layers", 0) or 0)
         except (TypeError, ValueError):
             declared_layers = 0
         try:
             plan = build_activation_plan(
-                steering_payload,
+                static_payload,
                 self.resolver.resolve,
                 actual_layer_count=len(self.layers),
             )
+            sequence_vectors: list[torch.Tensor] = []
+            if sequence_items:
+                sequence_item = sequence_items[0]
+                try:
+                    sequence_strength = max(0.0, float(sequence_item.get("strength", 1.0)))
+                except (TypeError, ValueError):
+                    sequence_strength = 1.0
+                sequence_vectors = [
+                    vector * sequence_strength
+                    for vector in self.resolver.token_sequence_vectors(sequence_item["vector"])
+                ]
         except Exception as exc:
             self.last_steering_report = {
                 "active": False,
@@ -1000,6 +1452,8 @@ class LocalSteeringEngine:
 
         plan_build_ms = (time.perf_counter() - plan_started) * 1000.0
         requested_layers = sorted(int(layer) for layer in plan)
+        if sequence_vectors and self.layers:
+            requested_layers = sorted(set(requested_layers + [len(self.layers) - 1]))
         handles = []
         stats: Dict[str, Any] = {
             "hook_invocations": 0,
@@ -1013,11 +1467,22 @@ class LocalSteeringEngine:
                 if layer_idx < 0 or layer_idx >= len(self.layers):
                     continue
                 layer = self.layers[layer_idx]
+                prompt_only = bool(getattr(vector, "_chappie_prompt_only", False))
                 handles.append(layer.register_forward_pre_hook(
                     self._pre_hook_factory(
                         vector.to(self.device, dtype=self.dtype),
                         stats=stats,
                         layer_idx=int(layer_idx),
+                        prompt_only=prompt_only,
+                    )
+                ))
+            if sequence_vectors:
+                output_layer = self.model.get_output_embeddings()
+                handles.append(output_layer.register_forward_pre_hook(
+                    self._output_sequence_hook_factory(
+                        [vector.to(self.device, dtype=self.dtype) for vector in sequence_vectors],
+                        stats=stats,
+                        layer_idx=len(self.layers) - 1,
                     )
                 ))
             hook_attach_ms = (time.perf_counter() - attach_started) * 1000.0
@@ -1028,14 +1493,16 @@ class LocalSteeringEngine:
                 "hook_count": len(handles),
                 "hook_invocations": 0,
                 "requested_layers": requested_layers,
-                "applied_layers": sorted(
-                    int(layer) for layer in plan if 0 <= int(layer) < len(self.layers)
-                ),
+                "applied_layers": sorted(set(
+                    [int(layer) for layer in plan if 0 <= int(layer) < len(self.layers)]
+                    + ([len(self.layers) - 1] if sequence_vectors and self.layers else [])
+                )),
                 "mode": "activation_addition",
                 "model": self.model_name,
                 "status": "prepared" if handles else "no_applicable_layers",
                 "active_vectors": vector_names,
                 "active_vector_count": len(vector_names),
+                "sequence_prefix_tokens": len(sequence_vectors),
                 "declared_model_layers": declared_layers,
                 "actual_model_layers": len(self.layers),
                 "layer_range_remapped": bool(declared_layers and declared_layers != len(self.layers)),
@@ -1079,13 +1546,20 @@ class LocalSteeringEngine:
         vector: torch.Tensor,
         stats: Optional[Dict[str, Any]] = None,
         layer_idx: Optional[int] = None,
+        prompt_only: bool = False,
     ) -> Callable[..., Any]:
         def _hook(_module: Any, inputs: Any) -> Any:
             started = time.perf_counter()
+            hidden = inputs[0] if isinstance(inputs, tuple) and inputs else None
+            if prompt_only and (
+                not torch.is_tensor(hidden)
+                or hidden.dim() != 3
+                or hidden.size(1) <= 1
+            ):
+                return inputs
             updated = add_vector_to_inputs(inputs, vector)
             if stats is not None:
                 stats["hook_invocations"] = int(stats.get("hook_invocations", 0)) + 1
-                hidden = inputs[0] if isinstance(inputs, tuple) and inputs else None
                 if torch.is_tensor(hidden) and hidden.dim() >= 2:
                     positions = int(hidden.shape[0]) * int(hidden.shape[1])
                     stats["steered_hidden_positions"] = int(stats.get("steered_hidden_positions", 0)) + positions
@@ -1103,6 +1577,51 @@ class LocalSteeringEngine:
                     report["verified_active"] = True
                     report["status"] = "verified"
                     report["hook_invocations"] = int(stats["hook_invocations"])
+            return updated
+
+        return _hook
+
+    @staticmethod
+    def _output_sequence_hook_factory(
+        vectors: list[torch.Tensor],
+        stats: Optional[Dict[str, Any]] = None,
+        layer_idx: Optional[int] = None,
+    ) -> Callable[..., Any]:
+        """Lenkt nur die letzten Output-Aktivierungen auf einen kurzen Praefix."""
+        state = {"index": 0}
+
+        def _hook(_module: Any, inputs: Any) -> Any:
+            hidden = inputs[0] if isinstance(inputs, tuple) and inputs else None
+            index = state["index"]
+            if (
+                index >= len(vectors)
+                or not torch.is_tensor(hidden)
+                or hidden.dim() != 3
+                or hidden.size(-1) != vectors[index].numel()
+            ):
+                return inputs
+            started = time.perf_counter()
+            updated_hidden = hidden.clone()
+            updated_hidden[:, -1, :] = updated_hidden[:, -1, :] + vectors[index]
+            state["index"] = index + 1
+            updated = (updated_hidden, *inputs[1:])
+            if stats is not None:
+                stats["hook_invocations"] = int(stats.get("hook_invocations", 0)) + 1
+                stats["output_hook_invocations"] = int(stats.get("output_hook_invocations", 0)) + 1
+                stats["steered_hidden_positions"] = int(stats.get("steered_hidden_positions", 0)) + int(hidden.shape[0])
+                layer_key = str(layer_idx) if layer_idx is not None else "output"
+                layer_counts = stats.setdefault("layer_invocations", {})
+                layer_counts[layer_key] = int(layer_counts.get(layer_key, 0)) + 1
+                stats["hook_compute_ms"] = float(stats.get("hook_compute_ms", 0.0)) + (
+                    time.perf_counter() - started
+                ) * 1000.0
+                report = stats.get("report")
+                if isinstance(report, dict):
+                    report["active"] = True
+                    report["verified_active"] = True
+                    report["status"] = "verified"
+                    report["hook_invocations"] = int(stats["hook_invocations"])
+                    report["output_hook_invocations"] = int(stats["output_hook_invocations"])
             return updated
 
         return _hook

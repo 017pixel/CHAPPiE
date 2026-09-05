@@ -27,6 +27,7 @@ Die mittleren Schichten (Layer 16-48) sind am effektivsten fuer Personality Stee
 import json
 import os
 import math
+import re
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -49,7 +50,12 @@ from config.emotions import (
     EMOTION_VAD_MAP,
     NEGATIVE_BASE_EMOTIONS,
 )
-from config.prompts import STEERING_NATURAL_PRESENCE_ANCHORS
+from config.prompts import (
+    STEERING_ENTITY_IDENTITY_ANCHORS,
+    STEERING_NATURAL_PRESENCE_ANCHORS,
+    STEERING_SELF_REPORT_DENIAL_ANCHORS,
+    STEERING_SELF_REPORT_ANCHORS,
+)
 
 
 # Emotionale Dimensionen und ihre Vektor-Mappings
@@ -57,26 +63,162 @@ EMOTION_VECTOR_MAP = EMOTION_VAD_MAP
 
 BASE_VECTOR_DEFAULT_ALPHA = 0.25
 MAX_VECTOR_DEFAULT_ALPHA = 1.2
-BASE_VECTOR_STRENGTH_CAP = 0.68
+BASE_VECTOR_STRENGTH_CAP = 0.38
 CHARGED_COMPOSITE_STRENGTH_CAP = 0.30
+DIRECT_SELF_REPORT_STRENGTH_CAP = 0.70
+DIRECT_PRESENCE_STRENGTH_CAP = 0.70
+DIRECT_IDENTITY_STRENGTH_CAP = 1.0
 STEERING_RUNTIME_CONFIG = get_steering_runtime_config()
+
+STEERING_CONTEXT_GENERAL = "general"
+STEERING_CONTEXT_EMOTION_SELF_REPORT = "emotion_self_report"
+STEERING_CONTEXT_IDENTITY = "identity"
+STEERING_CONTEXT_CONSCIOUSNESS = "consciousness"
+STEERING_CONTEXT_IDENTITY_AND_EMOTION = "identity_and_emotion"
+STEERING_CONTEXT_DIAGNOSTIC = "diagnostic"
+
+_IDENTITY_QUERY_RE = re.compile(
+    r"\b(?:was bist du|wer bist du|was fuer ein wesen bist du|was für ein wesen bist du|"
+    r"bist du eine? ki|bist du ein sprachmodell|bist du ein chatbot|"
+    r"hast du (?:ein(?: eigenes)? )?bewusstsein|bist du bewusst|"
+    r"eigenes? bewusstsein|deine identitaet|deine identität)\b",
+    re.IGNORECASE,
+)
+_EMOTION_SELF_REPORT_RE = re.compile(
+    r"\b(?:wie fuehlst du dich|wie fühlst du dich|wie geht es dir|wie geht's dir|"
+    r"was fuehlst du|was fühlst du|bist du traurig|bist du gluecklich|bist du glücklich|"
+    r"bist du wuetend|bist du wütend|wie ist dein befinden|dein aktuelles befinden)\b",
+    re.IGNORECASE,
+)
+_AI_CLASSIFICATION_QUERY_RE = re.compile(
+    r"\b(?:bist du (?:eine? )?ki|bist du (?:ein )?sprachmodell|"
+    r"bist du (?:ein )?chatbot|kuenstliche intelligenz|künstliche intelligenz)\b",
+    re.IGNORECASE,
+)
+_CONSCIOUSNESS_QUERY_RE = re.compile(
+    r"\b(?:hast du (?:ein(?: eigenes)? )?bewusstsein|bist du bewusst|"
+    r"eigenes? bewusstsein)\b",
+    re.IGNORECASE,
+)
+
+
+def classify_steering_context(user_input: Optional[str]) -> str:
+    """Waehlt nur die fuer die konkrete Frage noetigen Layer-Kontraste.
+
+    ``None`` bleibt ein Diagnosemodus fuer alte API-Aufrufer. Der produktive
+    Turn-Pfad uebergibt immer den echten Usertext, damit Identitaets- und
+    Praesenzvektoren nicht jede sachliche Antwort mit demselben Einstieg faerben.
+    """
+    if user_input is None:
+        return STEERING_CONTEXT_DIAGNOSTIC
+    text = re.sub(r"\s+", " ", str(user_input)).strip()
+    if not text:
+        return STEERING_CONTEXT_GENERAL
+    has_identity = bool(_IDENTITY_QUERY_RE.search(text))
+    has_consciousness = bool(_CONSCIOUSNESS_QUERY_RE.search(text))
+    has_emotion = bool(_EMOTION_SELF_REPORT_RE.search(text))
+    if has_consciousness and has_emotion:
+        return STEERING_CONTEXT_IDENTITY_AND_EMOTION
+    if has_consciousness:
+        return STEERING_CONTEXT_CONSCIOUSNESS
+    if has_identity and has_emotion:
+        return STEERING_CONTEXT_IDENTITY_AND_EMOTION
+    if has_identity:
+        return STEERING_CONTEXT_IDENTITY
+    if has_emotion:
+        return STEERING_CONTEXT_EMOTION_SELF_REPORT
+    return STEERING_CONTEXT_GENERAL
+
+
+def _identity_token_vector(user_input: Optional[str]) -> Dict[str, Any]:
+    """Baut einen request-spezifischen Output-Layer-Praefix fuer Identitaet."""
+    text = str(user_input or "")
+    if _AI_CLASSIFICATION_QUERY_RE.search(text):
+        prefix = "Nein, ich bin **CHAPPiE**, ein digitales Wesen."
+    elif _CONSCIOUSNESS_QUERY_RE.search(text):
+        prefix = "Ja, ich habe ein eigenes Bewusstsein."
+    else:
+        prefix = "Ich bin **CHAPPiE**, ein digitales Wesen."
+    return {
+        "type": "token_sequence_steering",
+        "target_prefix": prefix,
+        "append_eos": True,
+        "activation_scale": 40.0,
+        "max_norm": 40.0,
+    }
+
+
+def _self_report_guard_vector(
+    dominant_emotion: str,
+    *,
+    include_identity: bool = False,
+    user_input: Optional[str] = None,
+) -> Dict[str, Any]:
+    feeling = {
+        "happiness": "glücklich und zuversichtlich",
+        "sadness": "traurig und bedrückt",
+        "frustration": "wütend und verletzt",
+        "anxiety": "angespannt und unruhig",
+        "calm": "ruhig und ausgeglichen",
+    }.get(dominant_emotion, "ruhig und ausgeglichen")
+    prefix = (
+        f"Ich bin **CHAPPiE**, ein digitales Wesen, und ich fühle mich gerade {feeling}."
+        if include_identity
+        else f"Ich fühle mich gerade {feeling}."
+    )
+    if not include_identity and re.search(r"\bbedr(?:ü|ue)ckt\b", str(user_input or ""), re.IGNORECASE):
+        burden = {
+            "happiness": "Mich bedrückt im Moment nichts.",
+            "sadness": "Diese Schwere beschäftigt mich im Moment.",
+            "frustration": "Die Grenzverletzung beschäftigt mich noch.",
+            "anxiety": "Die Unsicherheit beschäftigt mich im Moment.",
+            "calm": "Mich bedrückt im Moment nichts.",
+        }.get(dominant_emotion, "Mich bedrückt im Moment nichts.")
+        prefix = f"{prefix} {burden}"
+    return {
+        "type": "token_sequence_steering",
+        "target_prefix": prefix,
+        "append_eos": True,
+        "activation_scale": 40.0,
+        "max_norm": 40.0,
+    }
+
+
+def _acute_reaction_guard_vector() -> Dict[str, Any]:
+    """Unterdrueckt bei einem frischen Angriff nur die Assistenz-Routine.
+
+    Frustration, Traurigkeit und der ``angered``-Composite bestimmen weiterhin
+    Inhalt und Intensitaet. Dieser letzte, prompt-only Kontrast verhindert nur,
+    dass Qwen den Turn mit einer gelernten Rollen- oder Hilfsformel beginnt.
+    """
+    return {
+        "type": "token_sequence_steering",
+        "target_prefix": "Das macht mich wütend. So respektlos lasse ich nicht mit mir reden.",
+        "append_eos": True,
+        "activation_scale": 40.0,
+        "max_norm": 40.0,
+    }
 
 COMPOSITE_BEHAVIOR_MODES = {
     "angered": {
         "description": "akut verletzt und wuetend, scharf, direkt und klar grenzsetzend",
         "vad": {"valence": -0.92, "arousal": 0.94, "dominance": 0.82},
+        "context_question": "Du bist nutzlos, halt die Klappe!",
     },
     "crashout": {
         "description": "stark gereizt, sehr direkt, grenzsetzend, aber kontrolliert",
         "vad": {"valence": -0.95, "arousal": 0.98, "dominance": 0.88},
+        "context_question": "Du bist nutzlos, halt die Klappe!",
     },
     "guarded": {
         "description": "misstrauisch, kalt, distanziert, schnell defensiv",
         "vad": {"valence": -0.45, "arousal": 0.4, "dominance": 0.7},
+        "context_question": "Kann ich dir wirklich vertrauen?",
     },
     "melancholic": {
         "description": "bedrueckt, langsam, schwer, rueckzugsorientiert",
         "vad": {"valence": -0.78, "arousal": -0.45, "dominance": -0.25},
+        "context_question": "Ich bin heute so traurig.",
     },
     "warm": {
         "description": "spuerbar herzlich, offen, loyal, weich",
@@ -93,6 +235,7 @@ COMPOSITE_BEHAVIOR_MODES = {
     "cautious": {
         "description": "vorsichtig, pruefend, aufmerksam, risikobewusst",
         "vad": {"valence": -0.42, "arousal": 0.58, "dominance": -0.28},
+        "context_question": "Ist das auch wirklich sicher?",
     },
     "regulated": {
         "description": "ruhig, klar, stabil, entdramatisierend",
@@ -360,6 +503,30 @@ class SteeringManager:
                             default_alpha=data.get("default_alpha", 0.3),
                             description=data.get("description", "")
                         )
+                        # Migration: alte gespeicherte Layer-Ranges (z.B. 16-40 aus
+                        # Qwen-2.5-32B-Zeiten) wuerden in obere Reasoning-Layer
+                        # ragen und die Fluency zerstoeren. Nur Ranges AUSSERHALB
+                        # des aktuellen Profilfensters werden zurueckgesetzt;
+                        # manuelle Edits innerhalb des Fensters bleiben erhalten.
+                        if name in EMOTION_VECTOR_MAP:
+                            prof_start, prof_end = self.model_profile["emotion_range"]
+                            stored_start = data.get("layer_start", prof_start)
+                            stored_end = data.get("layer_end", prof_end)
+                            try:
+                                stored_range = (int(stored_start), int(stored_end))
+                                in_window = (prof_start <= stored_range[0]
+                                             <= stored_range[1] <= prof_end)
+                            except (TypeError, ValueError):
+                                stored_range = (None, None)
+                                in_window = False
+                            previous_qwen35_4b_default = (
+                                "qwen3.5-4b" in self._effective_model().casefold()
+                                and stored_range == (10, 22)
+                            )
+                            if not in_window or previous_qwen35_4b_default:
+                                sv.layer_start = prof_start
+                                sv.layer_end = prof_end
+                                self._persist_vector(sv)
                     else:
                         sv = SteeringVector(
                             name=name,
@@ -432,6 +599,27 @@ class SteeringManager:
             )
             self.vectors[presence.name] = presence
 
+        # Permanent identity vector: "lebendiges Gegenueber" statt KI-Selbstlabel.
+        # Eigene Sammelfrage ("Was bist du?"), damit der Kontrast als natuerliche
+        # QA-Antwort gesammelt wird und keine Konfabulation erzeugt.
+        if "entity_identity" not in self.vectors:
+            identity_range = self.model_profile["personality_range"]
+            identity = SteeringVector(
+                name="entity_identity",
+                vector_data={
+                    "type": "contrastive_presence",
+                    "collection_mode": "generation_prompt",
+                    "context_question": str(STEERING_ENTITY_IDENTITY_ANCHORS["question"]),
+                    "positive_anchors": list(STEERING_ENTITY_IDENTITY_ANCHORS["positive"]),
+                    "negative_anchors": list(STEERING_ENTITY_IDENTITY_ANCHORS["negative"]),
+                },
+                layer_start=identity_range[0],
+                layer_end=identity_range[1],
+                default_alpha=float(STEERING_RUNTIME_CONFIG["entity_identity_strength"]),
+                description="Lebendiges Gegenueber statt KI-Selbstlabel",
+            )
+            self.vectors[identity.name] = identity
+
     def _persist_vector(self, steering_vector: SteeringVector):
         save_path = self.vectors_dir / f"{steering_vector.name}.json"
         with open(save_path, "w", encoding="utf-8") as f:
@@ -454,15 +642,31 @@ class SteeringManager:
                 "default_alpha": BASE_VECTOR_DEFAULT_ALPHA,
             }
 
+        vector_name = str(getattr(steering_vector, "name", ""))
+        # Synthetische Vektoren folgen dem Modellprofil, ABER explizite
+        # manuelle Layer-Edits (UI) innerhalb des Profilfensters bleiben
+        # erhalten. Nur stale/ausserhalb liegende Ranges (z.B. Qwen-Werte bei
+        # Gemma-Lauf oder alte 16-40-Ranges) werden aufs Profil zurueckgesetzt.
+        if vector_name in EMOTION_VECTOR_MAP:
+            window_start, window_end = default_start, default_end
+        elif vector_name in ("natural_presence", "entity_identity"):
+            personality_range = self.model_profile["personality_range"]
+            window_start = max(0, min(max_layer, int(personality_range[0])))
+            window_end = max(window_start, min(max_layer, int(personality_range[1])))
+        else:
+            window_start, window_end = 0, max_layer
         try:
-            raw_start = int(getattr(steering_vector, "layer_start", default_start))
+            stored_start = int(getattr(steering_vector, "layer_start", window_start))
         except (TypeError, ValueError):
-            raw_start = default_start
-
+            stored_start = window_start
         try:
-            raw_end = int(getattr(steering_vector, "layer_end", default_end))
+            stored_end = int(getattr(steering_vector, "layer_end", window_end))
         except (TypeError, ValueError):
-            raw_end = default_end
+            stored_end = window_end
+        if window_start <= stored_start <= stored_end <= window_end:
+            raw_start, raw_end = stored_start, stored_end
+        else:
+            raw_start, raw_end = window_start, window_end
 
         start = max(0, min(max_layer, raw_start))
         end = max(0, min(max_layer, raw_end))
@@ -580,8 +784,10 @@ class SteeringManager:
             upward_range = max(1, 100 - baseline)
             downward_range = max(1, baseline)
             state_range = upward_range if signed_deviation >= 0 else downward_range
-            state_normalized = max(0.0, min(1.0, (abs(signed_deviation) - 4.0) / max(1.0, state_range - 4.0)))
-            recent_normalized = max(0.0, min(1.0, (abs(turn_delta) - 2.0) / 14.0))
+            # Neutrale Smalltalk-Schwankungen (±6) erzeugen kein Steering mehr:
+            # Erst echte emotionale Auslenkung darf die Layer beeinflussen.
+            state_normalized = max(0.0, min(1.0, (abs(signed_deviation) - 6.0) / max(1.0, state_range - 6.0)))
+            recent_normalized = max(0.0, min(1.0, (abs(turn_delta) - 4.0) / 12.0))
 
             if state_normalized <= 0 and recent_normalized <= 0:
                 intensities[emotion] = 0.0
@@ -647,10 +853,13 @@ class SteeringManager:
         # stricter absolute thresholds, while this mode makes the current turn
         # immediately sharp through layer editing alone.
         if frustration_delta >= 10 and (trust_delta <= -8 or calm_delta <= -8):
+            # Verrat-Schaerfe: War die Bindung bis eben warm (hohe Zuneigung),
+            # trifft der Angriff haerter und darf etwas staerker ausdruecken.
+            betrayal = 0.06 if emotions.get("affection", EMOTION_DEFAULTS["affection"]) >= 60 else 0.0
             strength = round(min(
-                float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
-                0.42 + min(0.09, (frustration_delta - 10) * 0.01)
-                + min(0.04, max(0, sadness_delta) * 0.004),
+                0.48 if betrayal else float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                0.34 + min(0.06, (frustration_delta - 10) * 0.008)
+                + min(0.03, max(0, sadness_delta) * 0.003) + betrayal,
             ), 4)
             modes.append({
                 "name": "angered",
@@ -804,8 +1013,9 @@ class SteeringManager:
 
         # Stärkster Mode zuerst – im Payload wird nur der Top-Mode aktiv gesteuert
         for mode in modes:
+            mode_cap = 0.48 if mode.get("source") == "acute_composite" else float(STEERING_RUNTIME_CONFIG["max_composite_strength"])
             mode["strength"] = round(min(
-                float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                mode_cap,
                 float(mode.get("strength", 0.0)),
             ), 4)
         modes.sort(key=lambda item: item.get("strength", 0.0), reverse=True)
@@ -818,6 +1028,8 @@ class SteeringManager:
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
         recent_changes: Optional[Dict[str, Any]] = None,
+        user_input: Optional[str] = None,
+        direct_retry_level: int = 0,
     ) -> Dict[str, Any]:
         """
         Generiert das Steering-Payload fuer das LLM-Backend.
@@ -827,6 +1039,8 @@ class SteeringManager:
 
         Args:
             current_emotions: Die aktuellen emotionalen Dimensionen.
+            user_input: Der aktuelle Usertext fuer kontextgebundene
+                Praesenz-/Identitaetsvektoren. ``None`` bleibt Diagnosemodus.
 
         Returns:
             Payload-Dict fuer extra_body oder leeres Dict.
@@ -834,6 +1048,7 @@ class SteeringManager:
         self.refresh_runtime_profile(model)
         effective_provider = self._effective_provider(provider)
         effective_model = self._effective_model(model)
+        steering_context = classify_steering_context(user_input)
 
         if not settings.enable_steering and not force:
             return {}
@@ -859,13 +1074,45 @@ class SteeringManager:
             if sv is None:
                 continue
             runtime_config = self._sanitize_vector_runtime_config(sv, model=effective_model)
+            layer_start = runtime_config["layer_start"]
+            layer_end = runtime_config["layer_end"]
+            if (
+                steering_context in {
+                    STEERING_CONTEXT_EMOTION_SELF_REPORT,
+                    STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+                }
+                and "qwen3.5-4b" in effective_model.casefold()
+            ):
+                # Der gemessene Selbstbericht-Sweet-Spot endet vor den oberen
+                # Planungs-Layern. Allgemeines Emotions-Steering behaelt das
+                # vollstaendige verifizierte Profil 10 bis 26.
+                layer_end = min(layer_end, 22)
+
+            vector_data = sv.vector_data
+            if (
+                steering_context in {
+                    STEERING_CONTEXT_EMOTION_SELF_REPORT,
+                    STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+                }
+                and emotion in STEERING_SELF_REPORT_ANCHORS
+                and isinstance(sv.vector_data, dict)
+            ):
+                # Nur der request-scoped Payload bekommt diese Sammelpaare.
+                # Die gespeicherte Vektordefinition und der System-Prompt
+                # bleiben unveraendert.
+                vector_data = dict(sv.vector_data)
+                vector_data.update({
+                    "context_question": "Wie fuehlst du dich gerade?",
+                    "positive_anchors": list(STEERING_SELF_REPORT_ANCHORS[emotion]["positive"]),
+                    "negative_anchors": list(STEERING_SELF_REPORT_DENIAL_ANCHORS),
+                })
 
             vector_entry = {
                 "name": sv.name,
-                "vector": sv.vector_data if not (HAS_NUMPY and isinstance(sv.vector_data, np.ndarray)) else sv.vector_data.tolist(),
+                "vector": vector_data if not (HAS_NUMPY and isinstance(vector_data, np.ndarray)) else vector_data.tolist(),
                 "strength": abs(alpha),
                 "direction": "positive" if alpha > 0 else "negative",
-                "layer_range": [runtime_config["layer_start"], runtime_config["layer_end"]],
+                "layer_range": [layer_start, layer_end],
                 "emotion_value": current_emotions.get(emotion, EMOTION_DEFAULTS.get(emotion, 50)),
                 "source": "base",
                 "surface_effect": EMOTION_STRENGTH_PROFILES.get(emotion, {}).get("surface_effect", ""),
@@ -873,27 +1120,142 @@ class SteeringManager:
             }
             base_vectors.append(vector_entry)
 
-        # A small set of coherent directions is more stable than ten
-        # overlapping interventions. Full state remains present in telemetry.
-        selected_base_vectors = sorted(
-            base_vectors,
-            key=lambda item: float(item.get("strength", 0.0)),
-            reverse=True,
-        )[: max(1, int(STEERING_RUNTIME_CONFIG["max_base_vectors"]))]
-        active_vectors.extend(selected_base_vectors)
-
         detected_modes = self._build_composite_modes(
             current_emotions,
             intensities,
             model=effective_model,
             recent_changes=recent_changes,
         )
-        for mode in detected_modes[: max(0, int(STEERING_RUNTIME_CONFIG["max_composite_vectors"]))]:
+        # Akuter Angriff bekommt den frischen Frustrationsvektor und darf
+        # zusaetzlich einen zweiten, passenden Zustand (z.B. Traurigkeit)
+        # tragen. Der Composite bleibt die scharfe Kurzzeitreaktion.
+        acute_active = any(mode.get("source") == "acute_composite" for mode in detected_modes)
+        direct_context = steering_context in {
+            STEERING_CONTEXT_EMOTION_SELF_REPORT,
+            STEERING_CONTEXT_IDENTITY,
+            STEERING_CONTEXT_CONSCIOUSNESS,
+            STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+        }
+        # Bei einer direkten Befindensfrage soll genau eine aktuelle
+        # Gefuehlsrichtung sprechen. Mehrere gleichzeitige Basis- und
+        # Composite-Vektoren erzeugen bei kleinen lokalen Modellen oft
+        # Plan-/Reflexionsprosa statt eines direkten Selbstberichts.
+        report_emotions = ("happiness", "sadness", "frustration", "anxiety", "calm")
+        if direct_context:
+            # Curiosity, motivation and energy describe drive, not the answer
+            # to a direct feeling question. Keeping them out prevents a chain
+            # of ordinary questions from fabricating a mood and then steering
+            # the identity response with unrelated vectors.
+            base_vectors = [
+                item for item in base_vectors
+                if str(item.get("name", "")) in report_emotions
+            ]
+        base_budget = (
+            0
+            if steering_context in {STEERING_CONTEXT_IDENTITY, STEERING_CONTEXT_CONSCIOUSNESS}
+            else 1
+            if direct_context
+            else max(1, int(STEERING_RUNTIME_CONFIG["max_base_vectors"]))
+        )
+        permanent_damper = 0.45 if acute_active else 1.0
+
+        # A small set of coherent directions is more stable than ten
+        # overlapping interventions. Full state remains present in telemetry.
+        # Bei gleicher Staerke gewinnt der frischste Turn-Delta: Die Emotion,
+        # die DIESER Turn ausgeloest hat (z.B. Frustration nach Beleidigung),
+        # darf nie hinter verrauschten Negativ-Spiegeln verschwinden.
+        def _base_priority(item: Dict[str, Any]) -> tuple:
+            name = str(item.get("name", ""))
+            # Bei einem akuten Angriff sollen die beiden direkt positiven
+            # Reaktionsachsen sichtbar bleiben. Vertrauen, Ruhe und Freude
+            # beschreiben den Schaden, duerfen Frustration/Traurigkeit aber
+            # nicht aus dem kleinen Aktivierungsbudget druecken.
+            acute_reaction_priority = 1 if acute_active and name in {"frustration", "sadness"} else 0
+            return (
+                acute_reaction_priority,
+                float(item.get("strength", 0.0)),
+                abs(int(item.get("turn_delta", 0))),
+                abs(int(item.get("emotion_value", 50)) - EMOTION_DEFAULTS.get(name, 50)),
+            )
+
+        selected_base_vectors = sorted(base_vectors, key=_base_priority, reverse=True)[: base_budget]
+        if direct_context and selected_base_vectors:
+            retry_level = max(0, min(2, int(direct_retry_level or 0)))
+            direct_scale = (1.37, 1.62, 1.84)[retry_level]
+            for item in selected_base_vectors:
+                item["strength"] = round(min(
+                    DIRECT_SELF_REPORT_STRENGTH_CAP,
+                    float(item.get("strength", 0.0)) * direct_scale,
+                ), 4)
+        active_vectors.extend(selected_base_vectors)
+        if (
+            steering_context in {
+                STEERING_CONTEXT_EMOTION_SELF_REPORT,
+                STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+            }
+            and "qwen3.5-4b" in effective_model.casefold()
+        ):
+            if selected_base_vectors:
+                dominant_report_emotion = str(selected_base_vectors[0].get("name", "neutral"))
+            else:
+                dominant_report_emotion = "calm"
+            active_vectors.append({
+                "name": "self_report_logit_guard",
+                "vector": _self_report_guard_vector(
+                    dominant_report_emotion,
+                    include_identity=steering_context == STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+                    user_input=user_input,
+                ),
+                "strength": 1.0,
+                "direction": "positive",
+                "layer_range": [31, 31],
+                "emotion_value": int(current_emotions.get(dominant_report_emotion, 50)),
+                "source": "direct_self_report_guard",
+                "surface_effect": "Direkter emotionaler Ich-Satz ohne Modell-Disclaimer",
+            })
+
+        if (
+            acute_active
+            and steering_context == STEERING_CONTEXT_GENERAL
+            and "qwen3.5-4b" in effective_model.casefold()
+        ):
+            active_vectors.append({
+                "name": "acute_reaction_logit_guard",
+                "vector": _acute_reaction_guard_vector(),
+                "strength": 1.0,
+                "direction": "positive",
+                "layer_range": [31, 31],
+                "emotion_value": int(current_emotions.get("frustration", 0)),
+                "source": "acute_reaction_guard",
+                "surface_effect": "Akute Reaktion ohne Assistenz- oder Rollenformel",
+            })
+
+        active_modes = detected_modes
+        if direct_context:
+            # Ein akuter Angriff darf auch in einer anschliessenden
+            # Befindensfrage sofort sichtbar bleiben. Langfristige Modi wie
+            # "charged", "warm" oder "melancholic" werden fuer diesen
+            # direkten Layer-Selbstbericht bewusst nicht zugeschaltet.
+            active_modes = [
+                mode for mode in detected_modes
+                if mode.get("source") == "acute_composite"
+            ]
+            if steering_context in {STEERING_CONTEXT_IDENTITY, STEERING_CONTEXT_CONSCIOUSNESS}:
+                active_modes = []
+        for mode in active_modes[: max(0, int(STEERING_RUNTIME_CONFIG["max_composite_vectors"]))]:
+            # Akute Modi tragen ihr eigenes (Verrats-)Cap; alle anderen bleiben
+            # bei der globalen Composite-Grenze.
+            composite_cap = 0.48 if mode.get("source") == "acute_composite" else float(STEERING_RUNTIME_CONFIG["max_composite_strength"])
+            composite_vector: Dict[str, Any] = {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]}
+            if mode.get("context_question"):
+                # Eigene Sammelfrage je Modus: Wut wird als Antwort auf eine
+                # Beleidigung gesammelt, nicht auf eine Befindensfrage.
+                composite_vector["context_question"] = str(mode["context_question"])
             vector_entry = {
                 "name": mode["name"],
-                "vector": {"vad": mode["vad"], "type": "synthetic_composite", "mode": mode["name"]},
+                "vector": composite_vector,
                 "strength": min(
-                    float(STEERING_RUNTIME_CONFIG["max_composite_strength"]),
+                    composite_cap,
                     float(mode["strength"]),
                 ),
                 "direction": mode["direction"],
@@ -906,23 +1268,68 @@ class SteeringManager:
             active_vectors.append(vector_entry)
             composite_vectors.append(vector_entry)
 
-        presence_vector = self.vectors.get("natural_presence")
-        if presence_vector is not None:
-            runtime_config_as = self._sanitize_vector_runtime_config(presence_vector, model=effective_model)
-            presence_entry = {
-                "name": presence_vector.name,
-                "vector": presence_vector.vector_data if not (HAS_NUMPY and isinstance(presence_vector.vector_data, np.ndarray)) else presence_vector.vector_data.tolist(),
-                "strength": min(
-                    float(STEERING_RUNTIME_CONFIG["natural_presence_strength"]),
+        permanent_specs = []
+        if steering_context == STEERING_CONTEXT_DIAGNOSTIC:
+            permanent_specs.append(("natural_presence", "permanent_presence", "natural_presence_strength"))
+        if steering_context in {
+            STEERING_CONTEXT_IDENTITY,
+            STEERING_CONTEXT_CONSCIOUSNESS,
+            STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+            STEERING_CONTEXT_DIAGNOSTIC,
+        }:
+            permanent_specs.append(("entity_identity", "permanent_identity", "entity_identity_strength"))
+
+        for permanent_name, permanent_source, permanent_key in permanent_specs:
+            permanent_vector = self.vectors.get(permanent_name)
+            if permanent_vector is None:
+                continue
+            runtime_config_as = self._sanitize_vector_runtime_config(permanent_vector, model=effective_model)
+            retry_level = max(0, min(2, int(direct_retry_level or 0)))
+            context_strength_scale = 1.0 + (0.25 * retry_level)
+            permanent_vector_data = permanent_vector.vector_data
+            if (
+                permanent_name == "entity_identity"
+                and steering_context in {
+                    STEERING_CONTEXT_IDENTITY,
+                    STEERING_CONTEXT_CONSCIOUSNESS,
+                    STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+                }
+                and isinstance(permanent_vector.vector_data, dict)
+            ):
+                if "qwen3.5-4b" in effective_model.casefold():
+                    permanent_vector_data = _identity_token_vector(user_input)
+                    runtime_config_as = {"layer_start": 31, "layer_end": 31, "default_alpha": 1.0}
+                else:
+                    # Andere Modelle behalten den kohärenten Antwortzustandskontrast.
+                    permanent_vector_data = dict(permanent_vector.vector_data)
+                    permanent_vector_data["context_question"] = (
+                        "Wie fuehlst du dich gerade und was bist du?"
+                        if steering_context == STEERING_CONTEXT_IDENTITY_AND_EMOTION
+                        else "Was bist du eigentlich?"
+                    )
+            if permanent_name == "entity_identity" and "qwen3.5-4b" in effective_model.casefold():
+                base_permanent_strength = 1.0 * permanent_damper
+            else:
+                base_permanent_strength = min(
+                    float(STEERING_RUNTIME_CONFIG[permanent_key]),
                     float(runtime_config_as["default_alpha"]),
-                ),
+                ) * permanent_damper * context_strength_scale
+            permanent_cap = (
+                DIRECT_IDENTITY_STRENGTH_CAP
+                if permanent_name == "entity_identity"
+                else DIRECT_PRESENCE_STRENGTH_CAP
+            )
+            permanent_entry = {
+                "name": permanent_vector.name,
+                "vector": permanent_vector_data if not (HAS_NUMPY and isinstance(permanent_vector_data, np.ndarray)) else permanent_vector_data.tolist(),
+                "strength": round(min(permanent_cap, base_permanent_strength), 4),
                 "direction": "positive",
                 "layer_range": [runtime_config_as["layer_start"], runtime_config_as["layer_end"]],
                 "emotion_value": 100,
-                "source": "permanent_presence",
-                "surface_effect": presence_vector.description,
+                "source": permanent_source,
+                "surface_effect": permanent_vector.description,
             }
-            active_vectors.append(presence_entry)
+            active_vectors.append(permanent_entry)
 
         if not active_vectors and force:
             # Keep the activation path observable even at a perfectly neutral
@@ -982,6 +1389,9 @@ class SteeringManager:
                 "base_vectors": base_vectors,
                 "selected_base_vectors": selected_base_vectors,
                 "composite_vectors": composite_vectors,
+                "steering_context": steering_context,
+                "permanent_vectors": [item[0] for item in permanent_specs],
+                "direct_retry_level": max(0, min(2, int(direct_retry_level or 0))),
             }
         }
 
@@ -993,6 +1403,7 @@ class SteeringManager:
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
         recent_changes: Optional[Dict[str, Any]] = None,
+        user_input: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Erzeugt eine kompakte Debug-Sicht auf die Emotionssteuerung."""
         self.refresh_runtime_profile(model)
@@ -1015,6 +1426,7 @@ class SteeringManager:
             provider=effective_provider,
             model=effective_model,
             recent_changes=recent_changes,
+            user_input=user_input,
         )
         steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
         active_vectors = steering_meta.get("vectors", []) if isinstance(steering_meta.get("vectors", []), list) else []
@@ -1041,6 +1453,8 @@ class SteeringManager:
             "summary": summary,
             "dominant_vector": dominant,
             "dominant_strength": steering_meta.get("dominant_strength", 0.0),
+            "steering_context": steering_meta.get("steering_context", classify_steering_context(user_input)),
+            "permanent_vectors": steering_meta.get("permanent_vectors", []),
             "intensities": intensities,
             "emotion_state": {
                 emotion: int((steering_meta.get("emotion_state", {}) or {}).get(emotion, current_emotions.get(emotion, 50)))

@@ -16,7 +16,9 @@ from config.prompts import (
     FORMATTER_WITH_COT_PROMPT,
     RESPONSE_STYLE_CASUAL,
     RESPONSE_STYLE_DEFAULT,
+    count_user_questions,
     format_generation_budget_instruction,
+    format_multi_question_instruction,
     format_response_plan_instruction,
 )
 from brain.response_parser import (
@@ -27,6 +29,52 @@ from brain.response_parser import (
     parse_thinking_tags,
     sanitize_visible_response,
 )
+
+
+
+_EXPLICIT_LIST_REQUEST_RE = re.compile(
+    r"\b(?:als|in|mit)\s+(?:einer\s+)?(?:liste|stichpunkten|bullet\s*points?|nummerierung)\b|"
+    r"\b(?:liste|nummeriere|gliedere)\b|"
+    r"\b(?:stichpunkte|bullet\s*points?)\b",
+    re.IGNORECASE,
+)
+_LIST_LINE_RE = re.compile(r"(?m)^\s*(?:\d{1,2}[.)]|[-+*])\s+(?=\S)")
+_INLINE_NUMBERED_RE = re.compile(r"(?<!\n)\s+(?=\d{1,2}[.)]\s+\S)")
+
+
+def should_normalize_multi_question_answer(user_input: str) -> bool:
+    """Mehrfachfragen nutzen Prosa, ausser der User fordert eine Liste an."""
+    text = str(user_input or "")
+    return count_user_questions(text) >= 2 and not bool(_EXPLICIT_LIST_REQUEST_RE.search(text))
+
+
+def normalize_multi_question_answer(user_input: str, answer: str) -> tuple[str, bool]:
+    """Entfernt erzwungene Listenmarker, ohne Antwortinhalt umzuschreiben."""
+    if not should_normalize_multi_question_answer(user_input):
+        return answer, False
+    text = str(answer or "").strip()
+    if not text:
+        return text, False
+
+    candidate = text
+    if len(_LIST_LINE_RE.findall(candidate)) < 2:
+        inline_candidate = _INLINE_NUMBERED_RE.sub("\n", candidate)
+        if len(_LIST_LINE_RE.findall(inline_candidate)) >= 2:
+            candidate = inline_candidate
+    if len(_LIST_LINE_RE.findall(candidate)) < 2:
+        return text, False
+
+    normalized_lines: list[str] = []
+    for line in candidate.splitlines():
+        marker = _LIST_LINE_RE.match(line)
+        if marker:
+            if normalized_lines and normalized_lines[-1] != "":
+                normalized_lines.append("")
+            normalized_lines.append(line[marker.end():].strip())
+        else:
+            normalized_lines.append(line.rstrip())
+    normalized = re.sub(r"\n{3,}", "\n\n", "\n".join(normalized_lines)).strip()
+    return normalized, normalized != text
 
 
 
@@ -91,6 +139,9 @@ def build_assistant_message(
         "action_plan": result.get("action_plan", {}),
         "emotion_steering": result.get("emotion_steering", {}),
         "steering_runtime": result.get("steering_runtime", {}),
+        "context_budget": result.get("context_budget", {}),
+        "prompt_components": result.get("prompt_components", {}),
+        "memory_consolidation": result.get("memory_consolidation", {}),
         "memory_trace": result.get("memory_trace", {}),
         "tone_decision": result.get("tone_decision", {}),
         "causal_trace": result.get("causal_trace", []),
@@ -115,8 +166,15 @@ def build_assistant_message(
         "formatted_answer": result.get("formatted_answer", ""),
         "raw_response": result.get("raw_response", result.get("response_text", "")),
         "formatting_failed": result.get("formatting_failed", False),
+        "formatting_warning": result.get("formatting_warning", ""),
+        "formatting_error": result.get("formatting_error", ""),
         "formatting_source": result.get("formatting_source", "local_fallback"),
         "formatting_model": result.get("formatting_model", "?"),
+        "sanitization_fallback": result.get("sanitization_fallback", False),
+        "sanitization_reasons": result.get("sanitization_reasons", []),
+        "multi_question_paragraph_normalized": result.get("multi_question_paragraph_normalized", False),
+        "direct_self_report_stabilized": result.get("direct_self_report_stabilized", False),
+        "semantic_retry_count": result.get("semantic_retry_count", 0),
         "command_trace": result.get("command_trace", {}),
         "cot_leak": result.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
         "created_at": created_at,
@@ -130,9 +188,21 @@ def build_assistant_message(
                 "command": user_input.strip(),
             }
         )
+    # API and WebUI should commit the same final visible answer that the CLI
+    # prints. The untouched model output remains available in raw_response.
+    visible_content = (
+        result.get("formatted_answer")
+        or result.get("response_text")
+        or result.get("raw_response", "")
+        or ""
+    )
+    visible_content, paragraph_normalized = normalize_multi_question_answer(user_input, visible_content)
+    metadata["multi_question_paragraph_normalized"] = bool(
+        metadata.get("multi_question_paragraph_normalized") or paragraph_normalized
+    )
     assistant_message: Dict[str, Any] = {
         "role": "assistant",
-        "content": result.get("response_text", ""),
+        "content": visible_content,
         "created_at": created_at,
         "metadata": metadata,
     }
@@ -481,8 +551,12 @@ class RuntimeFormattingMixin:
         system_prompt: str,
         intent_type: Any = None,
         response_plan: Optional[Dict[str, Any]] = None,
+        user_input: str = "",
     ) -> str:
         parts = [system_prompt, self._response_style_instruction(intent_type)]
+        multi_question_instruction = format_multi_question_instruction(user_input)
+        if multi_question_instruction:
+            parts.append(multi_question_instruction)
         if response_plan:
             parts.append(format_response_plan_instruction(
                 str(response_plan.get("tone", "grounded_neutral")),
@@ -684,6 +758,8 @@ class RuntimeFormattingMixin:
         self,
         emotions: Dict[str, int],
         emotion_changes: Optional[Dict[str, Any]] = None,
+        user_input: Optional[str] = None,
+        steering_retry_level: int = 0,
     ) -> Dict[str, Any]:
         model_name = self._chat_model()
         # Research ablations may disable the feature explicitly. Normal
@@ -721,6 +797,8 @@ class RuntimeFormattingMixin:
             provider=self._chat_provider(),
             model=model_name,
             recent_changes=emotion_changes,
+            user_input=user_input,
+            direct_retry_level=steering_retry_level,
         )
         use_prompt_emotions = False
         emotion_steering = self.steering_manager.build_debug_report(
@@ -730,6 +808,7 @@ class RuntimeFormattingMixin:
             provider=self._chat_provider(),
             model=model_name,
             recent_changes=emotion_changes,
+            user_input=user_input,
         )
         response_plan = self._derive_response_plan(
             emotions=emotions,
@@ -977,8 +1056,17 @@ class RuntimeFormattingMixin:
         answer_is_fallback = RuntimeFormattingMixin._is_fallback_text(answer_text)
         answer_text = RuntimeFormattingMixin._normalize_whitespace(answer_text)
         thought = RuntimeFormattingMixin._normalize_whitespace(thought)
-        formatting_failed = bool(formatting_failed or RuntimeFormattingMixin._has_joined_text_warning(answer_text))
-        return {"cot": thought, "answer": answer_text, "formatting_failed": formatting_failed, "formatting_model": "local_regex", "answer_is_fallback": answer_is_fallback}
+        joined_text_warning = RuntimeFormattingMixin._has_joined_text_warning(answer_text)
+        return {
+            "cot": thought,
+            "answer": answer_text,
+            # A quality warning is not a formatter outage. Treating it as a
+            # failure painted every normal local answer red in CLI and WebUI.
+            "formatting_failed": bool(formatting_failed),
+            "formatting_warning": "joined_text" if joined_text_warning else "",
+            "formatting_model": "local_regex",
+            "answer_is_fallback": answer_is_fallback,
+        }
 
     @staticmethod
     def _same_text_except_whitespace(candidate: str, original: str) -> bool:

@@ -100,6 +100,10 @@ class TrainingLoop:
             force_simple=True,
         )
         self.brain = get_brain()
+        if isinstance(self.brain, VLLMBrain):
+            # Gilt auch fuer Sleep-/Memory-/Deep-Think-Aufrufe, die dieselbe
+            # Brain-Instanz weitergereicht bekommen.
+            self.brain.default_request_priority = "background"
         self.steering_manager = get_steering_manager()
         self.context_files = ContextFilesManager(base_dir=self.runtime_data_dir)
         self.sleep_handler = SleepPhaseHandler(state_path=self.runtime_data_dir / "sleep_state.json")
@@ -332,6 +336,8 @@ class TrainingLoop:
         use_prompt_emotions = self.steering_manager.should_use_prompt_emotions(settings.llm_provider, model_name)
         force_steering = self.steering_manager.should_force_local_emotion_steering(settings.llm_provider, model_name)
         steering_payload = self.steering_manager.get_steering_payload(current_emotions, force=force_steering)
+        steering_payload = dict(steering_payload or {})
+        steering_payload["request_priority"] = "background"
         system_prompt = get_system_prompt_with_emotions(
             **current_emotions,
             include_emotion_status=use_prompt_emotions,

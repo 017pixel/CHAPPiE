@@ -23,6 +23,7 @@ from dataclasses import dataclass, asdict
 import fcntl
 
 from config.config import DATA_DIR
+from config.prompts import scrub_internal_identifiers
 from memory.memory_engine import MemoryEngine
 from brain.response_parser import looks_like_model_error, strip_role_prefixes
 
@@ -423,7 +424,7 @@ class ShortTermMemory:
                 time_str = created.strftime("%d.%m %H:%M")
             except (ValueError, TypeError):
                 time_str = "??.?? ??:??"
-            lines.append(f"[{time_str}] [{entry.importance}] [{entry.category}] {entry.content}")
+            lines.append(f"[{time_str}] [{entry.importance}] [{entry.category}] {scrub_internal_identifiers(entry.content)}")
         
         return "\n".join(lines)
 

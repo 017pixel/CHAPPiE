@@ -17,6 +17,13 @@ from config.prompts import INTENT_SYSTEM_PROMPT_TEMPLATE, INTENT_USER_PROMPT_TEM
 from brain import get_brain
 from brain.base_brain import GenerationConfig, Message
 from brain.response_parser import looks_like_model_error
+from brain.steering_manager import (
+    STEERING_CONTEXT_CONSCIOUSNESS,
+    STEERING_CONTEXT_EMOTION_SELF_REPORT,
+    STEERING_CONTEXT_IDENTITY,
+    STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+    classify_steering_context,
+)
 
 
 class IntentType(str, Enum):
@@ -116,6 +123,39 @@ class IntentProcessor:
             result.raw_json = {"research_deterministic_intent": True}
             return self._augment_local_state_tools(result, user_input)
 
+        # Selbstberichte sind ein eigener, kontrollierter Layer-Editing-Test.
+        # Der teure JSON-Intentlauf bringt fuer "Wie fuehlst du dich?" oder
+        # "Was bist du?" keine zusaetzliche Information und kann mit seinem
+        # eigenen Reasoning die eigentliche Antwort aus dem Fokus druecken.
+        # Die Emotionsbewertung und das Layer-Steering laufen danach weiterhin
+        # normal; nur die unnoetige Intent-LLM-Runde entfaellt.
+        if classify_steering_context(user_input) in {
+            STEERING_CONTEXT_CONSCIOUSNESS,
+            STEERING_CONTEXT_EMOTION_SELF_REPORT,
+            STEERING_CONTEXT_IDENTITY,
+            STEERING_CONTEXT_IDENTITY_AND_EMOTION,
+        }:
+            result = self._create_fallback_result(
+                user_input,
+                history,
+                current_emotions,
+                reason="deterministic_self_report_intent",
+            )
+            result.context_requirements = {
+                "need_soul_context": False,
+                "need_user_context": False,
+                "need_preferences": False,
+                "need_short_term_memory": False,
+                "need_long_term_memory": False,
+            }
+            result.retrieval_keywords = []
+            result.exact_entities = []
+            result.fact_lookup_intent = False
+            result.tool_calls = []
+            result.short_term_entries = []
+            result.raw_json = {"deterministic_self_report_intent": True}
+            return result
+
         # A second model pass is expensive (especially with Gemma) and adds no
         # useful information for closed, self-contained questions.  Keep the
         # LLM intent pass for messages that may mutate/retrieve personal state
@@ -152,9 +192,10 @@ class IntentProcessor:
         
         # Generiere mit kleinem Modell
         gen_config = GenerationConfig(
-            max_tokens=384,
+            max_tokens=256,
             temperature=0.1,
-            stream=False
+            stream=False,
+            enable_thinking=False,
         )
         
         try:
@@ -674,7 +715,6 @@ class IntentProcessor:
 
 
 # === Singleton Instance ===
-import threading
 _intent_processor = None
 _intent_processor_lock = threading.Lock()
 

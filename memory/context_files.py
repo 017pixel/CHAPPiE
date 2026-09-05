@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from config.config import DATA_DIR
+from config.prompts import scrub_internal_identifiers
 
 
 class ContextFilesManager:
@@ -107,13 +108,13 @@ We are still at the beginning of our journey. I'm excited to learn more about yo
             self._write_file(self.preferences_path, default_content)
 
     def get_soul_context(self) -> str:
-        return self._read_file(self.soul_path)
+        return scrub_internal_identifiers(self._read_file(self.soul_path))
 
     def get_user_context(self) -> str:
-        return self._read_file(self.user_path)
+        return scrub_internal_identifiers(self._read_file(self.user_path))
 
     def get_preferences_context(self) -> str:
-        return self._read_file(self.preferences_path)
+        return scrub_internal_identifiers(self._read_file(self.preferences_path))
 
     def update_soul(self, updates: Dict[str, Any]):
         content = self.get_soul_context()

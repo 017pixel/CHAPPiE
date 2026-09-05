@@ -208,6 +208,12 @@ class CHAPPiERuntime(
 
     @staticmethod
     def _single_local_chat_mode() -> bool:
+        # ``vllm_force_single_model`` is the hard local-runtime boundary.  It
+        # must also cover optional formatter/consolidation helpers; otherwise
+        # a local turn still starts a second cloud completion even though all
+        # main and small-task inference is configured for the same vLLM model.
+        if settings.is_local_single_model_mode():
+            return True
         return not bool(getattr(settings, "groq_auxiliary_enabled", True))
 
     @staticmethod

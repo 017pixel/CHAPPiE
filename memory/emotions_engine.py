@@ -99,6 +99,36 @@ def apply_emotion_delta(state: "EmotionalState", emotion: str, raw_delta: int | 
     return transition
 
 
+def regress_toward_baseline(state: "EmotionalState", skip: Optional[set] = None) -> Dict[str, int]:
+    """Homoostase: Emotionen ohne Turn-Impuls driften sanft zum Basiswert.
+
+    Verhindert dauerhafte Saettigung (z.B. alle positiven Dimensionen auf 100
+    nach vielen freundlichen Turns), die das Layer-Steering uebersteuern und
+    die Generierung kollabieren lassen wuerde. Akute Ausschlaege bleiben
+    erhalten, weil nur nicht-akute Dimensionen (|Delta| < 6) driften.
+    """
+    from config.emotions import EMOTION_DEFAULTS
+    drifted: Dict[str, int] = {}
+    skip = skip or set()
+    for emotion, baseline in EMOTION_DEFAULTS.items():
+        if emotion in skip or not hasattr(state, emotion):
+            continue
+        try:
+            value = int(getattr(state, emotion))
+        except (TypeError, ValueError):
+            continue
+        diff = int(baseline) - value
+        if diff == 0:
+            continue
+        step = max(1, min(4, abs(diff) // 8 + 1))
+        new_value = value + (step if diff > 0 else -step)
+        if (diff > 0 and new_value > baseline) or (diff < 0 and new_value < baseline):
+            new_value = int(baseline)
+        setattr(state, emotion, _clamp_emotion_value(new_value))
+        drifted[emotion] = new_value - value
+    return drifted
+
+
 @dataclass
 class EmotionalState:
     """Repraesentiert den emotionalen Zustand von CHAPiE."""
@@ -448,6 +478,13 @@ class EmotionsEngine:
         changes, analysis = self.analyze_message(user_message)
         for emotion_name, raw_delta in changes.items():
             apply_emotion_delta(self.state, emotion_name, raw_delta)
+        # Homoostase greift bei allen NICHT-akuten Dimensionen (|Delta| < 6):
+        # Smalltalk-Ratschen (+1..+5 pro Turn) werden neutralisiert, akute
+        # Ausschlaege (Angriff, Trost) bleiben stehen und klingen langsam ab.
+        regress_toward_baseline(
+            self.state,
+            skip={name for name, delta in changes.items() if abs(int(delta or 0)) >= 6},
+        )
         if settings.debug:
             print(f"Emotionsanalyse: {analysis.get('source')}")
         
@@ -513,6 +550,10 @@ class EmotionsEngine:
         """Deterministischer Runtime-Pfad ohne zweites Emotionsmodell."""
         self._sync_state_from_disk_if_newer(force=True)
         changes = self._apply_simple_message(user_message)
+        regress_toward_baseline(
+            self.state,
+            skip={name for name, delta in changes.items() if abs(int(delta or 0)) >= 6},
+        )
         self.state.clamp()
         self._save_state()
         return changes
@@ -734,16 +775,21 @@ def analyze_emotion_signals(
     positive_signal = contains_any(EMOTION_SIGNAL_PHRASES["positive"])
     trust_signal = contains_any(EMOTION_SIGNAL_PHRASES["trust"])
 
-    personal = contains_any([
+    self_focus = contains_any([
         "wie geht es dir", "wie gehts dir", "was fuehlst du", "was fühlst du",
+        "wie fuehlst du dich", "wie fühlst du dich", "was bist du", "wer bist du",
+        "bist du eine ki", "bist du ein sprachmodell", "bist du ein chatbot",
+        "eigenes bewusstsein", "deine identitaet", "deine identität",
+    ])
+    personal = self_focus or contains_any([
         "was beschaeftigt dich", "was beschäftigt dich", "ueber dich", "über dich",
-        "deine erinnerungen", "wer bist du",
+        "deine erinnerungen",
     ])
     reflective = user_distress or contains_any([
         "was bedrueckt dich", "was bedrückt dich", "was macht dir sorgen",
         "wovor hast du angst", "vermisst du", "traurig",
     ])
-    curiosity_signal = not direct_attack and ("?" in lower or contains_any([
+    curiosity_signal = not direct_attack and not self_focus and ("?" in lower or contains_any([
         "warum", "wieso", "weshalb", "wie funktioniert", "erklaer",
         "erklär", "erzaehl", "erzähl", "interessant", "spannend",
     ]))
@@ -784,7 +830,7 @@ def analyze_emotion_signals(
         changes["happiness"] += 3
         changes["affection"] += 4
         changes["calm"] += 2
-    if personal and not direct_attack:
+    if personal and not direct_attack and not self_focus:
         changes["affection"] += 2
         changes["curiosity"] += 3
     if reflective and not user_distress and not direct_attack:

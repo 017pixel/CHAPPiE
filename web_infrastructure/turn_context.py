@@ -9,6 +9,40 @@ from typing import Any, Dict, List, Optional
 from web_infrastructure.contracts import StatusCallback, TurnContext
 
 
+# Degenerierte Assistenten-Turns (Fallbacks, Fragmente, Prompt-Leaks) duerfen
+# nie in die History des naechsten Turns: Das Modell imitiert sie sonst und
+# die Generierung spiralt in 2-Token-Kollaps ("CHAPPiE schweigt...", "user...").
+# User-Turns bleiben immer erhalten, damit keine Konversation verloren geht.
+DEGENERATE_ASSISTANT_MARKERS = (
+    "CHAPPiE schweigt",
+    "CHAPPiE hat nachgedacht, schweigt aber",
+    "CHAPPiE hat nicht darueber nachgedacht",
+)
+DEGENERATE_ASSISTANT_MIN_CHARS = 20
+
+
+def sanitize_history(history: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Entfernt degenerierte Assistenten-Turns aus der Verlaufshistory."""
+    cleaned: List[Dict[str, Any]] = []
+    for msg in history or []:
+        if not isinstance(msg, dict):
+            continue
+        role = str(msg.get("role", ""))
+        content = msg.get("content", "")
+        text = content if isinstance(content, str) else str(content or "")
+        if role == "assistant":
+            stripped = text.strip()
+            if len(stripped) < DEGENERATE_ASSISTANT_MIN_CHARS:
+                continue
+            lowered = stripped.lower()
+            if any(marker.lower() in lowered for marker in DEGENERATE_ASSISTANT_MARKERS):
+                continue
+            if stripped.rstrip(".!?,;:").lower() in {"user", "assistant", "system"}:
+                continue
+        cleaned.append(msg)
+    return cleaned
+
+
 
 def is_self_contained_math_query(text: str) -> bool:
     """Detect closed arithmetic that must not be influenced by autobiographical RAG."""
@@ -65,7 +99,7 @@ def build_turn_context(
 
     return TurnContext(
         user_input=str(user_input),
-        history=list(history or []),
+        history=sanitize_history(history),
         debug_mode=bool(debug_mode),
         status_callback=status_callback,
         temporal_context=dict(temporal_context) if temporal_context is not None else None,

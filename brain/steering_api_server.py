@@ -18,7 +18,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from .steering_backend import FORCE_CPU_ENV, LocalSteeringEngine, extract_steering_payload, QUANTIZE_ENV
+from .steering_backend import (
+    FORCE_CPU_ENV,
+    QUANTIZE_ENV,
+    LocalSteeringEngine,
+    extract_steering_payload,
+    normalize_request_priority,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -49,6 +55,21 @@ def _default_context_length() -> int:
         return int(getattr(settings, "steering_context_length", 8192))
     except Exception:
         return 8192
+
+
+def _default_background_input_token_limit() -> int:
+    env_value = os.getenv("CHAPPIE_BACKGROUND_INPUT_TOKEN_LIMIT", "").strip()
+    if env_value:
+        try:
+            return max(128, int(env_value))
+        except ValueError:
+            pass
+    try:
+        from config.config import settings
+
+        return max(128, int(getattr(settings, "background_input_token_limit", 256)))
+    except Exception:
+        return 256
 
 
 def _default_quantize() -> Optional[bool]:
@@ -87,7 +108,13 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
         app.state.restart_progress = 20
         app.state.restart_step = "Modell wird geladen..."
         app.state.restart_estimated_remaining = 60
-        app.state.engine = LocalSteeringEngine(model_name, context_length=context_length, quantize=resolved_quantize, adapter_path=adapter_path)
+        app.state.engine = LocalSteeringEngine(
+            model_name,
+            context_length=context_length,
+            quantize=resolved_quantize,
+            adapter_path=adapter_path,
+            background_input_token_limit=_default_background_input_token_limit(),
+        )
         app.state.restart_status = "ready"
         app.state.restart_progress = 100
         app.state.restart_step = "Fertig!"
@@ -153,10 +180,16 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
         stream = bool(body.get("stream", False))
         payload = extract_steering_payload(body)
         chat_kwargs = payload.get("chat_template_kwargs") if isinstance(payload, dict) else None
+        request_priority = normalize_request_priority(
+            body.get("request_priority")
+            or (payload.get("request_priority") if isinstance(payload, dict) else None)
+        )
         created = int(time.time())
         request_id = f"chatcmpl-{uuid4().hex}"
 
         if stream:
+            steering_report: Dict[str, Any] = {}
+
             def _events():
                 try:
                     for piece in engine.stream_generate(
@@ -169,6 +202,8 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                         top_p=float(top_p) if top_p is not None else None,
                         top_k=int(top_k) if top_k is not None else None,
                         seed=int(seed) if seed is not None else None,
+                        steering_report_sink=steering_report,
+                        request_priority=request_priority,
                     ):
                         chunk = {
                             "id": request_id,
@@ -183,9 +218,9 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                         "object": "chat.completion.chunk",
                         "created": created,
                         "model": model,
-                        "chappie_steering": getattr(engine, "last_steering_report", {}),
+                        "chappie_steering": dict(steering_report),
                         "usage": {
-                            "chappie_steering": getattr(engine, "last_steering_report", {}),
+                            "chappie_steering": dict(steering_report),
                         },
                         "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
                     }
@@ -205,7 +240,8 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
             return StreamingResponse(_events(), media_type="text/event-stream")
 
         try:
-            result = engine.generate(
+            result = await asyncio.to_thread(
+                engine.generate,
                 messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -215,6 +251,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 top_p=float(top_p) if top_p is not None else None,
                 top_k=int(top_k) if top_k is not None else None,
                 seed=int(seed) if seed is not None else None,
+                request_priority=request_priority,
             )
         except Exception as exc:
             LOGGER.exception(
@@ -300,6 +337,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                 app.state.context_length,
                 resolved_next_quantize,
                 app.state.adapter_path,
+                _default_background_input_token_limit(),
             )
 
             app.state.restart_status = "calibrating"
