@@ -2,6 +2,189 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.8.6] - 2026-09-05
+
+### Erstellt
+- Sequenz-Steering am Output-Layer für überprüfbare Identitäts- und Gefühlsantworten ergänzt
+- Zustandsmatrix für glückliche, traurige, angespannte und wütende Selbstberichte ergänzt
+- Reproduzierbaren Akzeptanzlauf mit zweimal zehn unterschiedlichen Fragen ergänzt
+- Prioritätsprüfung für gleichzeitige Chat- und Trainingsanfragen ergänzt
+- Vierten Forschungsnachtrag mit Ausgangslage, Messwerten und Grenzen ergänzt
+
+### Verändert
+- Direkte Identitäts-, Bewusstseins- und Gefühlsfragen antworten aus dem Layer-Zustand
+- Mehrfachfragen erscheinen als natürliche Absätze statt erzwungener nummerierter Punkte
+- Markdown-Abstände und sichtbare Emoji-Ausgaben werden für Terminal und Weboberfläche normalisiert
+- Trainingsanfragen geben interaktiven Chats Vorrang und verwenden einen begrenzten jüngsten Kontext
+- Terminal, API und Frontend verwenden synchron Version 16.8.6
+
+### Gelöscht
+- KI-Selbstbeschreibung aus dem produktiven Systemprompt entfernt
+- Isolierten Layer-Test-Systemprompt vollständig geleert
+- Identitäts- und Gefühlsantworten aus späteren Modell-Promptverläufen entfernt
+- Unnötige Modell-Intentanalyse bei direkten Bewusstseinsfragen entfernt
+- Keine Chats, Erinnerungen, Emotionsstände oder Trainingsdaten gelöscht
+
+## [16.8.5] - 2026-09-04
+
+### Erstellt
+- Regressionstest für Fragezeichen-Läufe und natürliche Mehrfachantworten ergänzt
+- Absatzvertrag im reproduzierbaren 2×10-Antworttest verankert
+- Gezielte Screenshot-Regressionprobe im Forschungsbericht dokumentiert
+- Vergleich von Trainingslast und isolierter Antwortlaufzeit festgehalten
+- Version in Terminal, API und Frontend synchron auf 16.8.5 gesetzt
+
+### Verändert
+- Mehrfachfragen werden in ihrer Reihenfolge als normale Absätze beantwortet
+- Fragezeichen-Läufe wie `???` werden als eine Frage gezählt
+- Testmetriken prüfen bei Mehrfachfragen auf Listenfreiheit statt auf Nummerierung
+- Formatierungs- und Steering-Status bleiben für CLI, API und WebUI gemeinsam auswertbar
+- Trainingslast wird bei Laufzeitbewertungen ausdrücklich von der Antwortlogik getrennt
+
+### Gelöscht
+- Erzwungene nummerierte Punkte bei mehreren Fragen entfernt
+- Falsche Hochzählung von `???` als drei Fragen entfernt
+- Abnahmebedingung „nummerierte Punkte 1 bis N“ aus dem Antworttest entfernt
+- Künstliche Listenstruktur für die Teilfragen aus dem aktiven Antwortvertrag entfernt
+- Keine Chatdaten, Sitzungen, Erinnerungen oder Trainingsdaten gelöscht
+
+## [16.8.4] - 2026-09-04
+
+### Erstellt
+- Reproduzierbaren 2×10-Antworttest mit Vergleichsdaten dokumentiert
+- Einheitliche Markdown-Anzeige für Terminal und Weboberfläche ergänzt
+- Direkte Prüfungen für Mehrfachfragen und Gefühlsberichte ergänzt
+- Messung der sichtbaren Ausgabequalität im Forschungsartefakt ergänzt
+- Nachtrag zur Antwortgenerierung im Forschungsbericht ergänzt
+
+### Verändert
+- Identitäts-Steering auf die konservative getestete Stärke 0,25 eingestellt
+- Direkte Selbstfragen von unnötigem Langzeitkontext entkoppelt
+- Akute Beleidigungen erhöhen Frustration und Traurigkeit unmittelbar
+- Lokale Ein-Modell-Formatierung als harte Laufzeitgrenze abgesichert
+- Version in Terminal, API und Frontend auf 16.8.4 angehoben
+
+### Gelöscht
+- Emojis aus der sichtbaren Antwortstrecke entfernt
+- Fehlalarm „Filter fehlgeschlagen“ bei erfolgreicher Sanitization entfernt
+- Wiederholte Standardbegrüßungen aus der Kurzstil-Anweisung entfernt
+- Unnötige Modellaufrufe für direkte Selbstfragen entfernt
+- Keine Chatdaten, Sitzungen, Erinnerungen oder Trainingsdaten gelöscht
+
+## [16.8.3] - 2026-09-04
+
+### Erstellt
+- Fortschrittszeilen ab Absenden in jeder Phase ergänzt
+- Herzschlag alle vier Sekunden bei langer Generierung ergänzt
+
+### Verändert
+- Status läuft über echte Zeilen statt nur Live-Panel
+- Version auf 16.8.3 in Terminal, API und Frontend angehoben
+
+### Gelöscht
+- Unsichtbare Wartezeit ohne Rückmeldung entfernt
+
+## [16.8.2] - 2026-09-04
+
+### Erstellt
+- Live-Fortschritt während der Antwortgenerierung im Terminal ergänzt
+- Fallback-Kette für generierte Antworten eingebaut
+- Filter-Hinweis im Antwortbericht ergänzt
+- Regressionstests für Feedback und Antwortanzeige hinzugefügt
+
+### Verändert
+- Generierte Antworten werden nie mehr still verworfen
+- Filtergründe landen in Metadaten statt im Antworttext
+- Version auf 16.8.2 in Terminal, API und Frontend angehoben
+
+### Gelöscht
+- Sicherheits-Verwerfungssatz aus der Antwortanzeige entfernt
+- Leere Standardantwort bei vorhandenen Tokens entfernt
+
+## [16.8.1] - 2026-09-03
+
+### Erstellt
+- Eigene Sammelfragen je Emotionsmodus ergänzt
+- Verrats-Schärfe bei Angriff nach warmer Bindung ergänzt
+- Anzeige-Namen gegen interne Label-Leaks eingebaut
+
+### Verändert
+- Wut nach warmem Verlauf bleibt grenzsetzend statt kuschelig
+- Erinnerungs- und Kontexttexte ohne Englisch-Bezeichner dargestellt
+- Version auf 16.8.1 in Terminal, API und Frontend angehoben
+
+### Gelöscht
+- Wörtliches Echo von memory_replay und Phasennamen entfernt
+
+## [16.8.0] - 2026-09-03
+
+### Erstellt
+- Eigenen Identitäts-Vektor für lebendiges Gegenüber statt KI-Selbstlabel ergänzt
+- Emotions-Homöostase gegen dauerhafte Gefühlssättigung eingebaut
+- History-Hygiene gegen degenerierte Antwortspiralen eingebaut
+- Tuning-Harness mit fünf festen Prüffällen und Messprotokoll hinzugefügt
+- Forschungsbericht V6 um Emotions-Nachtrag mit drei Diagrammen erweitert
+
+### Verändert
+- Layer-Steering auf fühlbar, aber flüssig neu ausbalanciert
+- Emotionsfenster endet vor den oberen Reasoning-Layern
+- Neutrales Geplauder steuert die Layer nicht mehr an
+- Angriffe treffen gezielt die frischeste Emotion bei gedämpfter Präsenz
+- Version auf 16.8.0 in Terminal, API und Frontend angehoben
+
+### Gelöscht
+- Übersteuerung durch zehn gleichzeitige Emotionsvektoren entfernt
+- Veraltete Layer-Bereiche aus gespeicherten Vektordateien entfernt
+- Irreführende Steering-Anzeige im Terminalbericht korrigiert
+- Leere Standardantworten aus dem Gesprächsverlauf entfernt
+- Keine Nutzerdaten, Sitzungen oder Erinnerungen gelöscht
+
+## [16.7.1] - 2026-09-03
+
+### Erstellt
+- Eigenen Hintergrund-Infobereich für Schlafphasen- und Memory-Meldungen ergänzt
+- Schlafphase-Hinweis direkt im Antwortbericht ergänzt
+- Regressionstests für Live-Anzeige, Schlafphase-Panel und Eingabezeile ergänzt
+- Schutz der Eingabezeile vor verspäteten Hintergrundausgaben ergänzt
+- Neutrale User-Anzeige statt Personennamen in der Eingabezeile ergänzt
+
+### Verändert
+- Hintergrundausgaben zerreißen das Live-Display während des Streamings nicht mehr
+- Schlafphasen-Abschluss erscheint als eigener Block statt in der Eingabezeile
+- Eingabezeile zeigt jetzt User statt Benjamin
+- Terminal-, API- und Frontend-Version auf 16.7.1 angehoben
+- Abschluss der Schlafphase bleibt auch bei schnellem Weitertippen sichtbar
+
+### Gelöscht
+- Doppeltes Step-1-Panel bei gleichzeitiger Schlafphase entfernt
+- Überlappung von Schlafphasen-Banner und Fortschrittsanzeige entfernt
+- Vermischung von Sleep-Meldungen mit der Eingabezeile entfernt
+- Keine Nutzerdaten, Sitzungen oder Erinnerungen gelöscht
+- Keine API-Endpunkte oder Verfahren entfernt
+
+## [16.7.0] - 2026-09-03
+
+### Erstellt
+- Restart-Befehle für CHAPPiE und CLI im Terminal ergänzt
+- Dreispaltige Hilfe mit Chat, Forschung und Nach-Ausgabe-Bereich ergänzt
+- Auswahlmenü für den Neustart beim einfachen Restart-Befehl ergänzt
+- E2E-Abdeckung für alle Terminal-Befehle ergänzt
+- Hinweiszeile mit Beispielen für Emotionen und Suche ergänzt
+
+### Verändert
+- Hilfe passt sich jetzt automatisch an die Fensterbreite an
+- Remote-Befehle für Laufzeit, Modell, Thinking und Steering zeigen echte Serverwerte
+- Neue Sitzungen starten jetzt auf dem Server statt nur lokal
+- Schlafphase und Gedächtnissuche funktionieren jetzt auch im Remote-Modus
+- Terminal-, API- und Frontend-Version auf 16.7.0 angehoben
+
+### Gelöscht
+- Einspaltige unübersichtliche Hilfeansicht entfernt
+- Platzhaltertexte ohne Serverantwort bei Remote-Befehlen entfernt
+- Lokale Verlaufslöschung ohne neue Serversitzung entfernt
+- Keine Nutzerdaten, Sitzungen oder Erinnerungen gelöscht
+- Keine API-Endpunkte oder Verfahren entfernt
+
 ## [16.6.0] - 2026-09-03
 
 ### Erstellt
@@ -24,6 +207,29 @@ Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 - Doppelte Anwendung von Emotionsübergängen innerhalb eines Turns entfernt
 - Übergabe roher Prompt-Echos und interner Think-Fragmente an den Formatter entfernt
 - Rote Turn-Fehler bei erfolgreicher lokaler Formatierung oder Sanitization entfernt
+
+## [16.5.3] - 2026-09-03
+
+### Erstellt
+- Antwortbezogenen Nachweis für aktives Emotion-Steering ergänzt
+- Schutz für parallel laufende Trainingsanfragen ergänzt
+- Regressionstest für gestreamte Steering-Antworten ergänzt
+- Antwortsteuerung für lokale Qwen-Webantworten kompatibel erweitert
+- Reparaturstatus der aktuellen Update-Version dokumentiert
+
+### Verändert
+- Der SSE-Abschluss verwendet jetzt den Nachweis der eigenen Antwort
+- Ein späterer ungestützter Request kann den aktuellen Steering-Status nicht mehr ersetzen
+- Lokale Webantworten verwenden trotz globaler Thinking-Einstellung den sicheren Antwortmodus
+- API- und Frontend-Versionsanzeige auf 16.5.3 angehoben
+- Öffentliche Chat- und Trainings-Einstiege bleiben unverändert kompatibel
+
+### Gelöscht
+- Keine bestehenden Chat-Daten gelöscht
+- Keine Trainingsdaten oder Trainingsprozesse gelöscht
+- Keine öffentlichen API-Endpunkte entfernt
+- Keine Modellparameter oder Steering-Vektoren entfernt
+- Keine Nutzerprofile oder persönlichen Kontextdateien entfernt
 
 ## [16.5.2] - 2026-09-03
 

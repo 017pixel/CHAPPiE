@@ -2,9 +2,11 @@
 
 ## Produktiver Standard
 
-Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent und Query-Extraktion auf demselben geladenen Modell. Optionale Groq-Hilfsaufrufe für strukturierte Emotionsanalyse und Leerraumformatierung ändern diesen lokalen Antwortprovider nicht.
+Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent, Query-Extraktion und optionale Format-/Konsolidierungshilfen auf dem lokalen Ein-Modell-Pfad. Groq-Hilfsaufrufe werden erst verwendet, wenn dieser Schutz ausdrücklich deaktiviert und `groq_auxiliary_enabled=true` gesetzt ist.
 
 Alternative lokale Modelle wie Gemma 4 sind möglich. Der Steering-Service liest Hidden-Größe und Layerzahl aus dem geladenen Modell und skaliert das konfigurierte relative Layerfenster auf die tatsächliche Architektur. VRAM, Quantisierung und die sichtbare Vektorwirkung müssen auf dem Modellserver separat geprüft werden.
+
+Interaktive Chat-Anfragen haben am Steering-Service Vorrang vor autonomen Trainingsläufen. Hintergrundläufe werden bei einem wartenden Chat nach dem nächsten erzeugten Token beendet. Zusätzlich begrenzt `background_input_token_limit` den Trainings-Prefill standardmäßig auf die jüngsten 256 Tokens; der normale Chat behält das volle konfigurierte Kontextfenster.
 
 ## Vector-only-Vertrag
 
@@ -12,7 +14,7 @@ Für die finale lokale Antwort gilt:
 
 - keine Emotionswerte und kein Emotions-Antwortplan im System-Prompt
 - keine emotionsabhängige Temperatur, Wiederholungsstrafe oder Tokenzahl
-- höchstens drei dominante Basisvektoren und ein Kombinationsvektor pro Turn
+- höchstens zwei dominante Basisvektoren und ein Kombinationsvektor pro Turn
 - ein kleiner kontrastiver Präsenzvektor gegen generische Modellfloskeln
 - Safety-Grenzen bleiben als kurzer, emotionsunabhängiger Systemvertrag bestehen
 

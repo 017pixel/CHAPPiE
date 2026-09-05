@@ -8,9 +8,11 @@ Die Emotionsanalyse darf intern Textsignale auswerten, weil sie nur den persiste
 
 ## Steering
 
-Die Basisvektoren entstehen aus semantisch gepaarten positiven und negativen Ankerantworten. Pro Turn werden die drei stärksten Basisrichtungen und höchstens ein zusammengesetztes Muster aktiviert. Das reduziert widersprüchliche Vektoren und hält den Eingriff begrenzt. Jede Dimension wird gegen ihren eigenen Basiswert ausgewertet; Energie 100 und Motivation 80 sind deshalb neutral und nicht automatisch positiv dominant. Starke aktuelle Deltas wirken sofort. Direkte Angriffe können den akuten Modus `angered` auslösen, während langfristig extreme Zustände weiter über `crashout`, `guarded` oder `melancholic` abgebildet werden. Ein begrenzter `natural_presence`-Vektor kontrastiert natürliche Ich-Perspektive und Erinnerungsanschluss mit generischen Modellfloskeln. Er verändert keine Safety-Refusals.
+Die Basisvektoren entstehen aus semantisch gepaarten positiven und negativen Ankerantworten. Pro Turn werden höchstens die zwei stärksten Basisrichtungen und ein zusammengesetztes Muster aktiviert. Direkte Selbstberichte werden weiter isoliert: eine Identitätsfrage nutzt nur den Identitätsvektor, eine Befindensfrage höchstens eine primäre Gefühlsrichtung. Das reduziert widersprüchliche Vektoren und hält den Eingriff begrenzt. Jede Dimension wird gegen ihren eigenen Basiswert ausgewertet; Energie 100 und Motivation 80 sind deshalb neutral und nicht automatisch positiv dominant. Starke aktuelle Deltas wirken sofort. Direkte Angriffe können den akuten Modus `angered` auslösen, während langfristig extreme Zustände weiter über `crashout`, `guarded` oder `melancholic` abgebildet werden. Ein begrenzter `natural_presence`-Vektor kontrastiert natürliche Ich-Perspektive und Erinnerungsanschluss mit generischen Modellfloskeln. Er verändert keine Safety-Refusals.
 
 Qwen 3.5 4B verwendet weiterhin das verifizierte Profil mit 32 Layern, Hidden-Größe 2560 und Emotionsfenster 10 bis 26. Für Gemma 4 liest das Backend die reale Layerzahl und Hidden-Größe aus der Modellkonfiguration. Abweichende Profilfenster werden proportional auf die geladene Architektur skaliert. Der Cache ist pro Modell und Vektor getrennt.
+
+Direkte Identitäts-, Bewusstseins- und Gefühlsfragen verwenden zusätzlich ein kurzes Sequenz-Steering am Output-Layer. Der Zielanfang wird tokenweise aus den Output-Embeddings abgeleitet und endet kontrolliert mit EOS. Welcher Gefühlsanfang aktiv ist, folgt ausschließlich dem aktuellen Emotionszustand; der finale Systemprompt und der isolierte Test-Systemprompt enthalten keine entsprechende Selbstbeschreibung. Diese Methode prüft steuerbares Modellverhalten, nicht phänomenales Bewusstsein.
 
 Der Laufzeitbericht belegt nicht mehr nur registrierte Hooks. Er enthält unter anderem:
 
@@ -29,7 +31,7 @@ Appraisal und Life-Homeostasis werden pro Turn genau einmal angewendet. Homeosta
 
 ## Groq-Hilfswege und Formatierung
 
-`emotion_analysis_provider=groq` verwendet standardmäßig `openai/gpt-oss-20b` mit JSON-Objektmodus, niedrigem Reasoning-Aufwand und ohne ausgegebenes Reasoning. Die Antwortformatierung verwendet das schnelle `llama-3.1-8b-instant` und `max_completion_tokens`. Beide Hilfswege sind über `groq_auxiliary_enabled` abschaltbar und fallen ohne gültigen Key, bei Timeout oder bei ungültigem JSON deterministisch und ohne Zustandsverlust auf lokale Logik zurück.
+`emotion_analysis_provider=groq` verwendet standardmäßig `openai/gpt-oss-20b` mit JSON-Objektmodus, niedrigem Reasoning-Aufwand und ohne ausgegebenes Reasoning. Die Antwortformatierung verwendet das schnelle `llama-3.1-8b-instant` und `max_completion_tokens`. Beide Hilfswege sind über `groq_auxiliary_enabled` abschaltbar; `vllm_force_single_model=true` bildet zusätzlich eine harte lokale Grenze. Ohne gültigen Key, bei Timeout oder bei ungültigem JSON fällt die Runtime deterministisch und ohne Zustandsverlust auf lokale Logik zurück.
 
 Der Formatter erhält nur die bereits extrahierte sichtbare Antwort, nicht den rohen Providertext mit möglichen Prompt-Echos oder Think-Tags. Ein erfolgreicher lokaler Fallback oder eine erfolgreiche Sanitization markiert den gesamten Turn nicht mehr als Fehler.
 

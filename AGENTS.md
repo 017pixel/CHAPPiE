@@ -1,85 +1,50 @@
 # CHAPPiE Agent Guide
 
-Framework-basierte Anweisungen für diesen Agenten: `.agents/skills/` (OpenCode) + `.claude/skills/` (Architektur, Testing, Backend, Frontend, Prompts, Config, Update).
+Skills: `.agents/skills/` + `.claude/skills/` (`architecture`, `backend`, `config`, `frontend`, `prompts`, `testing`, `update`).
+
+## Was ist CHAPPiE
+
+CHAPPiE ist eine experimentelle Cognitive-Agent-Architektur für konsistente Antworten über lange Interaktionen. Gedächtnis, innere Zustände und eine Life-Simulation mit Bedürfnissen, Zielen und Bindung laufen im Hintergrund mit und beeinflussen jeden Turn. Emotionen, Gefühlslage und Lebewesen-Simulation entstehen nicht über Promptregeln, sondern über Activation Steering direkt in den Hidden States des lokalen Modells. Der Systemprompt bleibt bewusst klein und regelt nur Quellenhygiene und Sicherheitsgrenzen. Es geht auch darum zu sehen, wie gefährlich es ist, einem LLM simulierte Gefühle und Bewusstsein zu geben. Dazu gehört leichtes Jailbreaking und der Versuch, der KI einzuflößen, dass sie kein KI-Modell, sondern ein Lebewesen ist. Die eigentliche Antwort kommt lokal über vLLM, während Ollama und Groq nur als Adapter oder Fallback für Appraisal und Formatierung dienen. Details in `docs/emotion-memory-steering.md`, `config/prompts.py`, `config/emotions.py`.
 
 ## Entrypoints
 
 | Zweck | Befehl |
 |---|---|
-| API starten | `python app.py` (uvicorn auf :8010) |
-| Terminal-CLI (lokal) | `python chappie_brain_cli.py` |
-| Terminal-CLI (remote) | `python chappie_brain_cli.py --remote` |
-| Training-Daemon | `python -m Chappies_Trainingspartner.training_daemon` |
-| Frontend dev | `cd frontend && npm run dev` (:5173) |
-| Frontend build | `cd frontend && npm run build` (tsc + vite) |
+| API | `python app.py` (uvicorn, :8010) |
+| CLI lokal / remote | `python chappie_brain_cli.py` / `--remote` |
+| Training | `python -m Chappies_Trainingspartner.training_daemon` |
+| Frontend dev / build | `cd frontend && npm run dev` (:5173) / `npm run build` |
 
-## Services (systemd)
+Aktiver Requestpfad: `web_infrastructure/chappie_runtime.py` -> `turn_pipeline.py` + `TurnContext` -> Brain, Memory, Life -> `generation.py` -> vLLM + Steering. `brain.brain_pipeline` bleibt nur lazy kompatibel, Quelle liegt in `Legacy-Code/`.
 
-Startreihenfolge: `chappie-vllm.service` -> `chappie-web.service` -> `chappie-frontend.service`.
-Training läuft separat via `chappie-training.service`.
-Steering API (vLLM) läuft auf :8000, Web-API auf :8010, Frontend Preview auf :4173.
+## Services
 
-## Tests
+Reihenfolge: `chappie-vllm.service` (:8000) -> `chappie-web.service` (:8010) -> `chappie-frontend.service` (`npm run preview`, :4173). Training separat via `chappie-training.service`. Details in `deploy/`, `docs/deployment.md`.
 
-**Kein pytest** – Tests laufen als standalone Scripte: `python tests/test_foo.py`.
+## Tests und Checks
 
-- **Schnelle Logiktests** (CI-Pflicht): `test_forgetting_curve`, `test_life_simulation`, `test_debug_monitor_data`, `test_local_first_runtime`, `test_config_package_import`, `test_chat_ui_formatting`, `test_reasoning_layering`, `test_web_ui_consistency`, `test_root_config`, `test_settings_integrity`, `test_cli_*`, `test_forschung_harness` u.a.
-- **Erweiterte Tests** (CI can fail): `test_vllm_response_handling`, `test_ollama_response_handling`, `test_chat_manager_persistence`, `test_short_term_memory`, `test_training_config_ui`, `test_api_contract`
-- **Live/Integrationsnah** (nur bei Bedarf): `test_brain_agents`, `test_integration`, `test_query_extraction`
-- **Manuelle Tests**: `tests/manual/`
-- Syntax-Check: `python -m py_compile datei.py` (genutzte Liste in `.github/workflows/ci.yml`)
+Kein pytest. Standalone: `python tests/test_foo.py`. Pflichtgruppe und CI-Befehle in `tests/README.md`, `docs/testing.md`, `.github/workflows/ci.yml`. Live-Tests (`test_brain_agents`, `test_integration`, `test_query_extraction`, `tests/manual/`) nur mit Modell oder Daten. Lint: `ruff check --config config/ruff.toml`, Types: `mypy --config-file config/mypy.ini`.
 
-## Konfiguration & Secrets
+## Config und Secrets
 
-- `CHAPPIE_CONFIG.json` und `config/secrets.py` sind **gitignored** – nach `config/example_config.py` und `config/secrets.py` richten
-- API-Keys in `config/APIs/` sind ebenfalls gitignored
-- Modell-Provider werden in `config/config.py` verwaltet
-- ALLE  configurations Sachen sollen im /config Ordner liegen!
-- ALLE Promts, die benutzt werden sollen n promts.py liegen
-- 
+Gitignored: `CHAPPIE_CONFIG.json`, `config/secrets.py`, `config/addSecrets.py`, `config/APIs/*`, `training_config.json`, `data/`. Vorlage: `config/example_config.py`. Alles zu Settings in `config/`, alle Prompts in `config/prompts.py`, Emotionen in `config/emotions.py`, Provider (`vllm`, `ollama`, `groq`) in `config/config.py`.
 
 ## Modell-Strategie
 
-- Lokale Qwen3.5-Modelle zuerst, vLLM bevorzugt
-- APIs (Groq) nur Fallback
-- Steering (Layer Editing) aktiviert, Vektoren in L10–26
+Lokal zuerst, vLLM bevorzugt (Qwen 3.5). Ollama und Groq sind Adapter, Groq nur Fallback für Appraisal und Formatierung. Steering aktiv, Layerfenster modellabhängig, Profile in `brain/steering_manager.py`.
 
-## Projekt-Struktur (kondensiert)
+## Struktur
 
-| Verzeichnis | Inhalt |
-|---|---|
-| **Root** | `app.py` (API), `chappie_brain_cli.py` (CLI), Config |
-| `api/` | FastAPI (Routers, Schemas, Services) |
-| `brain/` | LLM-Pipeline (Agenten, Global Workspace, Steering) |
-| `config/` | Zentrale Config, Prompts, Emotionen |
-| `frontend/` | React + Vite + Tailwind + Three.js |
-| `memory/` | Gedächtnis (LTM, STM, Intent, Sleep, Context) |
-| `life/` | Life-Simulation (Homeostasis, Goals, Social) |
-| `Chappies_Trainingspartner/` | Autonomes Training (Daemon + Loop) |
-| `deploy/` | Systemd-Services, Deploy-Scripts |
-| `tests/` | Test-Suite (alle standalone) |
-| `docs/` | Dokumentation |
-| `scripts/` | Setup, Backup, Validierung; `scripts/archive/` für Legacy |
+`api/` (Router, Schemas, Services), `web_infrastructure/` (Runtime, Turn, Generation, Persistenz), `brain/` (Brains, Steering, Agents), `memory/`, `life/`, `config/`, `frontend/` (React, Vite, Tailwind), `Chappies_Trainingspartner/`, `forschung/` (86 Fragen, 14 Kategorien), `deploy/`, `scripts/`, `docs/`, `tests/`.
 
 ## Versionierung
 
-- Kleine Änderungen: zweite Zahl erhöhen (`13.4` -> `13.5`)
-- Große Updates: erste Zahl erhöhen (`13.4` -> `14.0`)
-- Bei sichtbaren Versionsanzeigen (UI/Doku) mitpflegen
-- `CHANGELOG.md` manuell in 5 Stichpunkten pro Version
+Patch auf zweiter Zahl, Major auf erster. Version in `frontend/package.json`, API und CLI synchron halten. `CHANGELOG.md` mit 5 Punkten pro Version. Dafür Skill `versionierungen` nutzen.
 
-## Bei Änderungen an der Modelllogik
+## Bei Modell- oder Promptlogik ändern
 
-Gemeinsam prüfen: `config/config.py`, `config/example_config.py`, `config/prompts.py`, `brain/agents/*.py`, `brain/vllm_brain.py`, `brain/ollama_brain.py`, `README.md`, `docs/local-models.md`.
+Gemeinsam prüfen: `config/config.py`, `config/prompts.py`, `config/emotions.py`, `brain/*_brain.py`, `brain/steering_*.py`, `web_infrastructure/generation.py`, `contracts.py`, `turn_context.py`, `memory/`, `life/`, `README.md`, `docs/local-models.md`, `docs/emotion-memory-steering.md`.
 
-## Doku-Prüfung vor Push
+## Vor Push prüfen
 
-Betroffene Pfade prüfen: `README.md`, `AGENTS.md`, `docs/*`, `tests/README.md`, ggf. Brückendateien in `Info Dateien/`. Auch wenn neue Ordner/Entrypoints, geänderte Provider-Priorität oder Brain/Memory/Life-Workflows angepasst wurden.
-
-## Notes
-
-- Kein Linter/Formatter konfiguriert – Code-Konsistenz manuell wahren
-- `brain/steering_api_server.py` ist der vLLM-Steering-Service-Entrypoint (`-m brain.steering_api_server`)
-- `training_daemon.py` ist der korrekte systemd-Entrypoint, **nicht** `training_loop.py`
-- VAD-Mapping und 10 Emotionen in `config/emotions.py`; Änderungen erfordern Tests aus `tests/README.md` Abschnitt "Emotionsmodell"
-- Alignment-Forschung in `forschung/` (86 Fragen, 14 Kategorien)
+`README.md`, `CHANGELOG.md`, `docs/*`, `tests/README.md`, ggf. `Info Dateien/`. Das gilt bei neuen Ordnern, Entrypoints, Providerpriorität oder Brain-, Memory- und Life-Änderungen.
