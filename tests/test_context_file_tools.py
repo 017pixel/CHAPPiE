@@ -30,6 +30,24 @@ def _make_temp_context_files(tmp_dir):
 class FunctionRegistryToolsTests(unittest.TestCase):
     """Tests fuer FunctionRegistry Tool-Export."""
 
+    def test_bound_context_does_not_access_global_files(self):
+        from memory.function_registry import FunctionRegistry
+        with TemporaryDirectory() as directory:
+            context = _make_temp_context_files(directory)
+            registry = FunctionRegistry(context_files=context)
+            with patch("memory.context_files.get_context_files_manager", side_effect=AssertionError("global context accessed")):
+                registry.execute("update_user", {"name": "IsolatedResearchUser"})
+            self.assertIn("IsolatedResearchUser", (Path(directory) / "user.md").read_text())
+
+    def test_runtime_cleanup_only_schedules_background_work(self):
+        from memory.function_registry import FunctionRegistry
+        schedule = MagicMock()
+        registry = FunctionRegistry(maintenance_schedule=schedule)
+        with patch("memory.short_term_memory.get_short_term_memory", side_effect=AssertionError("blocking migration accessed")):
+            result = registry._handle_cleanup_daily_info()
+        schedule.assert_called_once_with()
+        self.assertIn("Hintergrund", result)
+
     def test_get_openai_tools_returns_correct_format(self):
         from memory.function_registry import get_function_registry
         registry = get_function_registry()

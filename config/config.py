@@ -78,6 +78,12 @@ except ImportError:
 # ----------
 
 DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
+    "runtime_defaults": {
+        "memory_enabled": True,
+        "steering_enabled": True,
+        "steering_mode": "combined",
+        "live_enabled": True,
+    },
     "api": {
         "groq_api_key": "DEIN_GROQ_API_KEY_HIER",
     },
@@ -93,6 +99,7 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "enable_steering": True,
         "steering_provider": "vllm",
         "steering_model": "Qwen/Qwen3.5-4B",
+        "steering_vector_pack": "",
         "steering_quantize": True,
         "steering_context_length": 4096,
         "background_input_token_limit": 256,
@@ -125,9 +132,9 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "emotion_analysis_timeout_seconds": 12.0,
     },
     "generation": {
-        "max_tokens": 640,
+        "max_tokens": 1200,
         "chappie_thinking_token_limit": 800,
-        "chappie_answer_token_limit": 640,
+        "chappie_answer_token_limit": 1200,
         "temperature": 0.7,
         "top_p": 0.9,
         "top_k": 50,
@@ -318,16 +325,39 @@ MEMORY_ASSOCIATION_CONFIG = {
     "schema_version": 2,
 }
 
+MEMORY_PROMOTION_CONFIG = {
+    "batch_size": 32,
+    "retry_seconds": 5.0,
+    "shutdown_seconds": 5.0,
+}
+
+CLI_INTERACTION_CONFIG = {
+    "completion_rows": 3,
+    "two_column_min_width": 120,
+}
+
 STEERING_RUNTIME_CONFIG = {
-    # Fewer coherent directions are more stable than ten competing vectors.
-    "max_base_vectors": 2,
+    "measured_max_base_vectors": 3,
+    "production_alpha_cap": 0.4,
+    "research_alpha_cap": 2.2,
+    "acute_delta_weight": 2.0,
+    "minimum_mixer_coefficient": 0.01,
+    "sequence_max_bias": 1.5,
+    "sequence_reference_strength": 0.4,
+    "sequence_window": 24,
+    "sequence_decay": "exponential",
+    # V18: ein Profil, ein Budget. Immer Top 3 Basis, Top 1 Composite.
+    "max_base_vectors": 3,
     "max_composite_vectors": 1,
     "max_composite_strength": 0.4,
+    # Summe aller aktiven Basis-Staerken ist gedeckelt, staerkste bleibt dominant.
+    "max_total_base_strength": 0.6,
     "natural_presence_strength": 0.5,
     # Nur bei direkten Identitaetsfragen aktiv. 0.4 setzte sich in den
     # kontrollierten CAA-Proben gegen die KI-Disclaimer-Schablone durch, ohne
     # den allgemeinen Faktenpfad zu beeinflussen.
     "entity_identity_strength": 0.4,
+    # Nur Fallback bei wirklich leerem Zustand, kein Standard bei Isolation.
     "neutral_baseline_strength": 0.08,
 }
 
@@ -484,15 +514,20 @@ class Settings:
         self.chroma_persist_directory = self._get_path("CHROMA_PERSIST_DIRECTORY", str(CHROMA_DB_DIR))
 
         self.enable_steering = bool(self._get_val("ENABLE_STEERING", True))
+        self.runtime_defaults = {
+            key: self._get_val(key.upper(), value)
+            for key, value in DEFAULT_CONFIG["runtime_defaults"].items()
+        }
         self.steering_provider = _parse_provider(self._get_val("STEERING_PROVIDER", "vllm"))
         self.steering_model = self._get_val("STEERING_MODEL", "Qwen/Qwen3.5-4B")
+        self.steering_vector_pack = str(self._get_val("STEERING_VECTOR_PACK", ""))
         self.steering_quantize = bool(self._get_val("STEERING_QUANTIZE", True))
         self.steering_context_length = int(self._get_val("STEERING_CONTEXT_LENGTH", 4096))
         self.background_input_token_limit = int(self._get_val("BACKGROUND_INPUT_TOKEN_LIMIT", 256))
 
-        self.max_tokens = int(self._get_val("MAX_TOKENS", 640))
+        self.max_tokens = int(self._get_val("MAX_TOKENS", 1200))
         self.chappie_thinking_token_limit = int(self._get_val("CHAPPIE_THINKING_TOKEN_LIMIT", 800))
-        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 640))
+        self.chappie_answer_token_limit = int(self._get_val("CHAPPIE_ANSWER_TOKEN_LIMIT", 1200))
         self.use_model_defaults = bool(self._get_val("USE_MODEL_DEFAULTS", True))
         self.temperature = float(self._get_val("TEMPERATURE", 0.7))
         self.top_p = float(self._get_val("TOP_P", 0.9))
@@ -576,7 +611,7 @@ class Settings:
             "intent_processor_model_ollama", "intent_processor_model_vllm",
             "query_extraction_ollama_model", "query_extraction_vllm_model",
             "query_extraction_groq_model", "emotion_analysis_model",
-            "emotion_analysis_host", "embedding_model", "steering_model",
+            "emotion_analysis_host", "embedding_model", "steering_model", "steering_vector_pack",
             "training_chappie_model", "training_trainer_model",
             "training_runtime_directory",
         ]
@@ -636,6 +671,7 @@ class Settings:
             return value.value if value is not None else "auto"
 
         return {
+            **{key.upper(): value for key, value in self.runtime_defaults.items()},
             "LLM_PROVIDER": self.llm_provider.value,
             "GROQ_API_KEY": self.groq_api_key,
             "GROQ_MODEL": self.groq_model,
@@ -691,6 +727,7 @@ class Settings:
             "ENABLE_STEERING": self.enable_steering,
             "STEERING_PROVIDER": provider_value(self.steering_provider),
             "STEERING_MODEL": self.steering_model,
+            "STEERING_VECTOR_PACK": self.steering_vector_pack,
             "STEERING_QUANTIZE": self.steering_quantize,
             "STEERING_CONTEXT_LENGTH": self.steering_context_length,
             "BACKGROUND_INPUT_TOKEN_LIMIT": self.background_input_token_limit,

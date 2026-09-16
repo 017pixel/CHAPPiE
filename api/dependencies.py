@@ -14,3 +14,11 @@ def get_backend() -> CHAPPiERuntime:
         if _backend is None:
             _backend = create_chappie_backend()
     return _backend
+
+
+def close_backend() -> None:
+    global _backend
+    with _backend_lock:
+        if _backend is not None:
+            _backend.close()
+            _backend = None

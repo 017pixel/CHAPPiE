@@ -56,6 +56,7 @@ class VLLMBrain(BaseBrain):
         self.default_request_priority = "interactive"
         self._repetition_events: Dict[str, Any] = {}
         self.last_steering_report: Dict[str, Any] = {}
+        self.last_finish_reason: str = ""
         print("Lokales OpenAI-Brain initialisiert")
         print(f"   Lokal verbunden: {self.url}")
         print(f"   Modell: {self.model}")
@@ -335,8 +336,40 @@ class VLLMBrain(BaseBrain):
                 report = getattr(response, "chappie_steering", None)
             if isinstance(report, dict):
                 self.last_steering_report = dict(report)
+            # V18: finish_reason vom Provider sichern, damit echte Laengen-
+            # kuerzungen im Timing und Report sichtbar sind.
+            finish = self._extract_finish_reason(response)
+            if finish:
+                self.last_finish_reason = finish
+                if isinstance(self.last_steering_report, dict):
+                    gen = dict(self.last_steering_report.get("generation", {}))
+                    gen["finish_reason"] = finish
+                    self.last_steering_report["generation"] = gen
         except Exception:
             pass
+
+    @staticmethod
+    def _extract_finish_reason(response: Any) -> str:
+        try:
+            if hasattr(response, "model_dump"):
+                payload = response.model_dump()
+            elif isinstance(response, dict):
+                payload = response
+            else:
+                payload = getattr(response, "__dict__", {})
+            choices = (payload.get("choices", []) if isinstance(payload, dict) else []) or []
+            if choices and isinstance(choices[0], dict):
+                finish = choices[0].get("finish_reason")
+                if finish:
+                    return str(finish)
+            raw_choices = getattr(response, "choices", None) or []
+            if raw_choices:
+                finish = getattr(raw_choices[0], "finish_reason", None)
+                if finish:
+                    return str(finish)
+        except Exception:
+            pass
+        return ""
 
     def _prepare_extra_body(
         self,

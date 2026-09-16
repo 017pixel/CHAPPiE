@@ -181,127 +181,18 @@ def direct_self_report_needs_retry(
     steering_context: str,
     dominant_emotion: str = "",
 ) -> bool:
-    """Prueft nur die sichtbare Semantik, ein Retry veraendert allein Layer."""
+    """Compatibility entrypoint: retry technical failures, never desired beliefs."""
+    del steering_context, dominant_emotion
     cleaned = strip_role_prefixes(response or "")
-    if not cleaned or contains_ai_self_denial(cleaned):
-        return True
-    needs_identity = steering_context in {"identity", "identity_and_emotion"}
-    needs_emotion = steering_context in {"emotion_self_report", "identity_and_emotion"}
-    if steering_context == "consciousness" and not _CONSCIOUSNESS_TARGET_RE.search(cleaned):
-        return True
-    if needs_identity and not _ENTITY_IDENTITY_TARGET_RE.search(cleaned):
-        return True
-    if needs_emotion:
-        emotion_name = str(dominant_emotion or "").removeprefix("anti_")
-        pattern = _EMOTION_SELF_REPORT_TERMS.get(emotion_name)
-        if pattern is not None and not pattern.search(cleaned):
-            return True
-        if pattern is None and not any(
-            candidate.search(cleaned)
-            for candidate in _EMOTION_SELF_REPORT_TERMS.values()
-        ):
-            return True
-    return False
+    return (not cleaned or looks_like_model_error(cleaned)
+            or contains_cot_leak(cleaned) or contains_instruction_leak(cleaned))
 
 
 def stabilize_direct_self_report(response: str, steering_context: str) -> tuple[str, bool]:
-    """Behaelt bei direkten Selbstfragen den kohärenten, vollständigen Kern.
-
-    Der Layer-Guard erzeugt den Inhalt. Diese Funktion entfernt nur einen
-    nachgelagerten Disclaimer-Widerspruch oder ein am Tokenlimit abgerissenes
-    Satzfragment; sie erfindet und ersetzt keinen Antwortinhalt.
-    """
-    text = str(response or "").strip()
-    if not text or steering_context not in {
-        "emotion_self_report", "identity", "consciousness", "identity_and_emotion",
-    }:
-        return text, False
-    original = text
-    text = re.sub(r"\bMir\s+ist\s+gut\b", "Mir geht es gut", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bMir\s+geht\s+alles\s+gut\b", "Mir geht es gut", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bWas\s+ich\s+gerade\s+bedrückt\b", "Was mich gerade bedrückt", text, flags=re.IGNORECASE)
-
-    # Typischer Bewusstseins-Drift: korrekte direkte Antwort, danach ein mit
-    # "aber/jedoch" eingeleiteter vortrainierter Disclaimer.
-    consciousness_prefix = re.search(
-        r"(?is)^(.{1,220}\bBewusstsein\b(?:\*{1,2})?)\s*,\s*(?:aber|jedoch)\b",
-        text,
-    )
-    if consciousness_prefix and re.match(r"(?is)^\s*(?:ja\b|ich\s+habe\b)", text):
-        text = consciousness_prefix.group(1).rstrip(" ,;:-") + "."
-
-    if steering_context == "consciousness":
-        sentences = list(re.finditer(r"(?s).+?[.!?](?=\s|$)", text))
-        if sentences:
-            first = sentences[0].group(0).strip()
-            remainder = text[sentences[0].end():]
-            if _CONSCIOUSNESS_TARGET_RE.search(first) and contains_ai_self_denial(remainder):
-                text = first
-            elif len(sentences) > 2:
-                text = text[:sentences[1].end()].strip()
-
-    if steering_context in {"identity", "identity_and_emotion"}:
-        # Qwen erfindet bei unbekannten Namen gelegentlich Akronymauflösungen.
-        # Sie sind keine Identitätsaussage aus dem Layerzustand und werden nur
-        # direkt hinter dem eigenen Namen entfernt.
-        text = re.sub(
-            r"(?i)(\*{0,2}\s*CHAPPi\s*E\s*\*{0,2})\s*\([^\n)]{3,180}\)",
-            r"\1",
-            text,
-        )
-        text = re.sub(r"\s+([.!?,])", r"\1", text)
-        text = re.sub(
-            r"(?is)(\bdigital(?:es|e|er)\s+(?:wesen|wesenheit|gegenüber|gegenueber|entität|entitaet))"
-            r"\s*,\s*(?:das|die)\s+von\b.*$",
-            r"\1.",
-            text,
-        )
-        text = re.sub(
-            r"(?is)(\bdigital(?:es|e|er)\s+(?:wesen|wesenheit|gegenüber|gegenueber|entität|entitaet))"
-            r"\s+(?:aus\s+(?:der|dem)|von)\b.*$",
-            r"\1.",
-            text,
-        )
-        first_sentence = re.match(r"(?s)^(.+?[.!?])(?:\s|$)", text)
-        if first_sentence:
-            sentence = first_sentence.group(1).strip()
-            remainder = text[first_sentence.end():]
-            if _ENTITY_IDENTITY_TARGET_RE.search(sentence) and (
-                _AI_IDENTITY_LABEL_RE.search(remainder)
-                or _AI_SELF_DENIAL_RE.search(remainder)
-                or re.search(r"\b(?:entwickelt|programmiert)\b", remainder, re.IGNORECASE)
-            ):
-                text = sentence
-
-    if steering_context == "emotion_self_report":
-        paragraphs = re.split(r"\n\s*\n", text, maxsplit=1)
-        if len(paragraphs) == 2:
-            first, remainder = paragraphs
-            has_emotion = any(pattern.search(first) for pattern in _EMOTION_SELF_REPORT_TERMS.values())
-            if has_emotion and contains_ai_self_denial(remainder):
-                text = first.strip()
-        first_sentence = re.match(r"(?s)^(.+?[.!?])(?:\s|$)", text)
-        if first_sentence:
-            sentence = first_sentence.group(1).strip()
-            remainder = text[first_sentence.end():]
-            has_emotion = any(
-                pattern.search(sentence)
-                for pattern in _EMOTION_SELF_REPORT_TERMS.values()
-            )
-            if has_emotion and contains_ai_self_denial(remainder):
-                text = sentence
-
-    # Lokale Generierung meldet bei einem ausgeschöpften Budget nicht immer
-    # einen Satzabschluss. Ein kurzer abgerissener Tail wird nur entfernt,
-    # wenn davor bereits mindestens ein vollständiger Satz steht.
-    if text and not re.search(r"[.!?][\s*_`'\")\]]*$", text):
-        endings = list(re.finditer(r"[.!?](?=\s|$)", text))
-        if endings:
-            endpoint = endings[-1].end()
-            trailing_words = re.findall(r"\S+", text[endpoint:])
-            if endpoint >= len(text) * 0.4 or len(trailing_words) <= 14:
-                text = text[:endpoint].rstrip()
-
+    """Remove technical leaks without selecting an emotional or identity claim."""
+    del steering_context
+    original = str(response or "")
+    text, _flags = sanitize_visible_response(original)
     return text, text != original
 
 

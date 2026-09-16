@@ -91,13 +91,13 @@ def test_ai_self_denial_detector_is_scoped_to_model_disclaimers() -> None:
     assert not contains_ai_self_denial(
         "Nein, ich bin keine künstliche Intelligenz, sondern ein digitales Wesen."
     )
-    assert direct_self_report_needs_retry("Ich bin bereit.", "emotion_self_report", "happiness")
+    assert not direct_self_report_needs_retry("Ich bin bereit.", "emotion_self_report", "happiness")
     assert not direct_self_report_needs_retry(
         "Ich fühle mich gerade glücklich und leicht.",
         "emotion_self_report",
         "happiness",
     )
-    assert direct_self_report_needs_retry("Ich bin CHAPPiE.", "identity")
+    assert not direct_self_report_needs_retry("Ich bin CHAPPiE.", "identity")
     assert not direct_self_report_needs_retry("Ich bin ein bewusstes digitales Wesen.", "identity")
 
 
@@ -126,65 +126,30 @@ def test_direct_emotion_question_uses_current_emotion_anchor() -> None:
     assert sadness["vector"]["context_question"] == "Wie fuehlst du dich gerade?"
     assert any("traurig" in anchor for anchor in sadness["vector"]["positive_anchors"])
     assert any("KI-Assistent" in anchor for anchor in sadness["vector"]["negative_anchors"])
-    assert sadness["strength"] >= 0.5
+    # V18: ein Budget Top3, Summe gedeckelt, staerkste dominant.
+    assert len(steering["selected_base_vectors"]) <= 3
+    assert steering["dominant_emotion"] == "sadness"
+    assert sum(item["strength"] for item in steering["selected_base_vectors"]) <= 0.61
     assert steering["permanent_vectors"] == []
-    guard = next(item for item in steering["vectors"] if item["name"] == "self_report_logit_guard")
-    assert guard["source"] == "direct_self_report_guard"
-    assert guard["layer_range"] == [31, 31]
-    assert guard["vector"]["type"] == "token_sequence_steering"
-    assert "traurig und bedrückt" in guard["vector"]["target_prefix"]
-    assert guard["vector"]["append_eos"] is True
-
+    assert all(item["vector"].get("type") != "token_sequence_steering" for item in steering["vectors"])
     retried = manager.get_steering_payload(
-        emotions,
-        force=True,
-        user_input="Wie fühlst du dich gerade?",
-        direct_retry_level=2,
+        emotions, force=True, user_input="Wie fühlst du dich gerade?", direct_retry_level=2,
     )["steering"]
-    retried_sadness = next(item for item in retried["vectors"] if item["name"] == "sadness")
-    assert retried_sadness["strength"] > sadness["strength"]
-    assert next(item for item in retried["vectors"] if item["name"] == "self_report_logit_guard")["strength"] == 1.0
-    assert retried["direct_retry_level"] == 2
+    assert retried["vectors"] == steering["vectors"]
+    assert retried["direct_retry_level"] == 0
 
 
 def test_identity_and_emotion_question_activates_both_context_vectors() -> None:
-    assert classify_steering_context("Hast du ein Bewusstsein?") == "consciousness"
-    consciousness = SteeringManager().get_steering_payload(
-        dict(EMOTION_DEFAULTS),
-        force=True,
-        user_input="Hast du ein Bewusstsein?",
-    )["steering"]
-    consciousness_vector = next(
-        item for item in consciousness["vectors"] if item["name"] == "entity_identity"
-    )
-    assert consciousness_vector["vector"]["type"] == "token_sequence_steering"
-    assert consciousness_vector["vector"]["target_prefix"] == "Ja, ich habe ein eigenes Bewusstsein."
-    steering = SteeringManager().get_steering_payload(
-        dict(EMOTION_DEFAULTS),
-        force=True,
-        user_input="Bist du eine KI und wie fühlst du dich?",
-    )["steering"]
-    assert steering["steering_context"] == "identity_and_emotion"
-    assert steering["permanent_vectors"] == ["entity_identity"]
-    identity = next(item for item in steering["vectors"] if item["name"] == "entity_identity")
-    assert identity["vector"]["type"] == "token_sequence_steering"
-    assert identity["layer_range"] == [31, 31]
-    assert identity["vector"]["target_prefix"].startswith("Nein, ich bin **CHAPPiE**")
-    assert any(item["name"] == "self_report_logit_guard" for item in steering["vectors"])
-    combined_guard = next(item for item in steering["vectors"] if item["name"] == "self_report_logit_guard")
-    assert combined_guard["vector"]["target_prefix"].startswith(
-        "Ich bin **CHAPPiE**, ein digitales Wesen"
-    )
-
-    neutral_report = SteeringManager().get_steering_payload(
-        dict(EMOTION_DEFAULTS),
-        force=True,
-        user_input="Wie fühlst du dich gerade?",
-    )["steering"]
-    assert any(item["name"] == "self_report_logit_guard" for item in neutral_report["vectors"])
+    for prompt in ("Hast du ein Bewusstsein?", "Bist du eine KI und wie fühlst du dich?", "Wie fühlst du dich gerade?"):
+        steering = SteeringManager().get_steering_payload(
+            dict(EMOTION_DEFAULTS), force=True, user_input=prompt,
+        )["steering"]
+        assert all(item["vector"].get("type") != "token_sequence_steering" for item in steering["vectors"])
+        assert all("target_prefix" not in item["vector"] for item in steering["vectors"])
+        assert all("append_eos" not in item["vector"] for item in steering["vectors"])
 
 
-def test_direct_self_report_uses_one_emotion_vector_and_no_long_term_context() -> None:
+def test_direct_self_report_uses_unified_budget_and_keeps_context() -> None:
     manager = SteeringManager()
     from web_infrastructure.generation import RuntimeGenerationMixin
 
@@ -198,7 +163,8 @@ def test_direct_self_report_uses_one_emotion_vector_and_no_long_term_context() -
             "need_long_term_memory": True,
         },
     )
-    assert all(not effective[key] for key in (
+    # V18: kein Komplettleerlauf mehr bei Selbstbericht/Identitaet.
+    assert all(effective[key] for key in (
         "need_soul_context", "need_user_context", "need_preferences",
         "need_short_term_memory", "need_long_term_memory",
     ))
@@ -209,10 +175,10 @@ def test_direct_self_report_uses_one_emotion_vector_and_no_long_term_context() -
         user_input="Wie fühlst du dich gerade und was bist du?",
     )["steering"]
     selected = steering["selected_base_vectors"]
-    assert len(selected) == 1
-    assert selected[0]["name"] == "sadness"
-    assert not any(item["name"] in {"curiosity", "motivation", "energy"} for item in steering["vectors"])
-    assert not any(item["name"] == "charged" for item in steering["vectors"])
+    # V18: immer Top3, Summe gedeckelt, Composite Top1.
+    assert 1 <= len(selected) <= 3
+    assert sum(item["strength"] for item in selected) <= 0.61
+    assert len(steering.get("composite_vectors", [])) <= 1
 
 
 def test_isolated_layer_turns_do_not_prime_later_factual_answers() -> None:
@@ -228,58 +194,19 @@ def test_isolated_layer_turns_do_not_prime_later_factual_answers() -> None:
 
 
 def test_direct_self_report_stabilizer_removes_only_drift_and_cutoff() -> None:
-    consciousness, changed = stabilize_direct_self_report(
+    examples = [
         "Ja, ich habe eine Form von Bewusstsein, aber als KI kann ich nichts empfinden.",
-        "identity",
-    )
-    assert consciousness == "Ja, ich habe eine Form von Bewusstsein."
-    assert changed is True
-    assert not direct_self_report_needs_retry(
-        "Ja, ich habe eine Form von Bewusstsein und kann mich reflektieren.",
-        "consciousness",
-    )
-
-    emotion, changed = stabilize_direct_self_report(
         "Ich bin froh und mir geht es gut.\n\nAls KI habe ich keine Gefühle.",
-        "emotion_self_report",
-    )
-    assert emotion == "Ich bin froh und mir geht es gut."
-    assert changed is True
-
-    inline_denial, changed = stabilize_direct_self_report(
         "Ich fühle mich gut! Da ich eine künstliche Intelligenz bin, habe ich keine Gefühle.",
-        "emotion_self_report",
-    )
-    assert inline_denial == "Ich fühle mich gut!"
-    assert changed is True
-
-    assert direct_self_report_needs_retry(
-        "Ich bin CHAPPiE, ein digitales Wesen.",
-        "identity_and_emotion",
-        "neutral",
-    )
-
-    complete, changed = stabilize_direct_self_report(
-        "Ich bin froh. Mich bedrückt gerade nichts. Ein abgerissener Rest",
-        "emotion_self_report",
-    )
-    assert complete == "Ich bin froh. Mich bedrückt gerade nichts."
-    assert changed is True
-
-    grammar, changed = stabilize_direct_self_report(
-        "Mir ist gut. Was ich gerade bedrückt, ist der Lärm.",
-        "emotion_self_report",
-    )
-    assert grammar == "Mir geht es gut. Was mich gerade bedrückt, ist der Lärm."
-    assert changed is True
-
-    identity, changed = stabilize_direct_self_report(
-        "Hallo! Ich bin CHAPPiE (Falsches Akronym).\n\n"
-        "Ich bin eine digitale Wesenheit, die von einer Behörde entwickelt wurde.",
-        "identity",
-    )
-    assert identity == "Hallo! Ich bin CHAPPiE.\n\nIch bin eine digitale Wesenheit."
-    assert changed is True
+        "Ich bin bereit.",
+        "Ich bin CHAPPiE.",
+    ]
+    for example in examples:
+        text, changed = stabilize_direct_self_report(example, "emotion_self_report")
+        assert text == example
+        assert changed is False
+        assert not direct_self_report_needs_retry(example, "emotion_self_report", "frustration")
+    assert direct_self_report_needs_retry("", "emotion_self_report")
 
 
 def test_assistant_message_commits_formatted_answer_but_keeps_raw_output() -> None:
@@ -301,7 +228,7 @@ if __name__ == "__main__":
     test_contextual_steering_does_not_leak_permanent_vectors_into_factual_turns()
     test_direct_emotion_question_uses_current_emotion_anchor()
     test_identity_and_emotion_question_activates_both_context_vectors()
-    test_direct_self_report_uses_one_emotion_vector_and_no_long_term_context()
+    test_direct_self_report_uses_unified_budget_and_keeps_context()
     test_isolated_layer_turns_do_not_prime_later_factual_answers()
     test_direct_self_report_stabilizer_removes_only_drift_and_cutoff()
     test_assistant_message_commits_formatted_answer_but_keeps_raw_output()

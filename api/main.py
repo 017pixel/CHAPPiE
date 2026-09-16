@@ -1,20 +1,28 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from api.routers import chat, context, memory, runtime, system, training
-from api.dependencies import get_backend
+from api.dependencies import get_backend, close_backend
 from Chappies_Trainingspartner import daemon_manager
 from config.config import settings, get_active_model
 
 
 LOGGER = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    close_backend()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="CHAPPiE App API",
-    version="16.8.6",
+    version="17.2.0-dev.2",
     description="FastAPI-Schicht fuer CHAPPiEs React-Frontend.",
 )
 
@@ -56,7 +64,7 @@ def root_overview():
     return JSONResponse({
         "app": {
             "name": "CHAPPiE App API",
-            "version": "16.8.6",
+            "version": "17.2.0-dev.2",
             "docs": "/docs",
             "openapi": "/openapi.json",
         },

@@ -13,7 +13,7 @@ from memory.emotions_engine import EmotionsEngine
 from memory.chat_manager import ChatManager
 from memory.short_term_memory import get_short_term_memory
 from memory.personality_manager import PersonalityManager
-from memory.function_registry import get_function_registry
+from memory.function_registry import FunctionRegistry
 from memory.context_files import get_context_files_manager
 from memory.intent_processor import get_intent_processor, reset_intent_processor
 from memory.debug_logger import get_debug_logger
@@ -147,14 +147,6 @@ class CHAPPiERuntime(
         else:
             self.short_term_memory = get_short_term_memory(memory_engine=self.memory)
         
-        # Migration von abgelaufenen Eintraegen beim Start
-        try:
-            migrated = self.short_term_memory.migrate_expired_entries()
-            if migrated > 0:
-                print(f"[CHAPPiE] {migrated} Eintraege ins Langzeitgedaechtnis migriert")
-        except Exception as e:
-            print(f"[CHAPPiE] Migration fehlgeschlagen: {e}")
-
         # NEU: Intent Processor (Step 1)
         self.intent_processor = get_intent_processor()
         self._intent_signature = self._build_intent_signature()
@@ -171,7 +163,12 @@ class CHAPPiERuntime(
         )
 
         # Function Registry
-        self.function_registry = get_function_registry()
+        self.function_registry = FunctionRegistry(
+            short_term_memory=self.short_term_memory,
+            personality_manager=self.personality_manager,
+            context_files=self.context_files,
+            maintenance_schedule=lambda: self.retrieval_promotion.schedule(),
+        )
         if self.runtime_data_dir:
             from life.service import LifeSimulationService
             self.life_simulation = LifeSimulationService(
@@ -187,13 +184,35 @@ class CHAPPiERuntime(
         self._token_counter: Optional[ModelTokenCounter] = None
         self._token_counter_model: Optional[str] = None
         self.generation = GenerationGateway(lambda: self.brain)
+        from memory.event_store import EventStore
+        from memory.retrieval_promotion import RetrievalPromotion
+        self.event_store = EventStore(Path(data_dir) / "events.sqlite3")
+        self.retrieval_promotion = RetrievalPromotion(
+            self.event_store, lambda: self.memory,
+            maintenance=self._migrate_memory_background,
+        )
         self.persistence = TurnPersistence(
-            memory_getter=lambda: self.memory,
-            short_term_memory_getter=lambda: self.short_term_memory,
+            event_store=self.event_store, promotion=self.retrieval_promotion,
             timestamp_callback=self._set_last_memory_timestamp,
         )
+        self._turn_lock = threading.Lock()
+        self._active_turn = None
         self.turn_pipeline = TurnPipeline(self)
+    def close(self):
+        """Stop the background worker; unfinished records remain durable."""
+        self.retrieval_promotion.close()
+
+    def _migrate_memory_background(self):
+        from memory.short_term_memory import ShortTermMemory
+        snapshot = ShortTermMemory(memory_engine=self.memory,
+                                   storage_path=self.short_term_memory.storage_path,
+                                   ttl_hours=self.short_term_memory.ttl_hours)
+        return snapshot.migrate_expired_entries()
+
     def _feature_enabled(self, name: str) -> bool:
+        turn = getattr(self, "_active_turn", None)
+        if name == "memory" and turn is not None and not turn.runtime_settings.memory_enabled:
+            return False
         return bool(self.feature_flags.get(name, True))
 
     @staticmethod
@@ -425,19 +444,26 @@ class CHAPPiERuntime(
         debug_mode: bool = False,
         status_callback: Optional[StatusCallback] = None,
         temporal_context: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> ResponseEnvelope:
         """Run a turn through the shared pipeline and return the final envelope."""
+        session_id = self.chat_manager.ensure_session_id(session_id)
+        snapshot = self.chat_manager.get_runtime_settings(session_id)
         turn = build_turn_context(
             user_input,
             history,
             debug_mode=debug_mode,
             status_callback=status_callback,
             temporal_context=temporal_context,
+            session_id=session_id,
+            runtime_settings=snapshot,
         )
         return self.turn_pipeline.process(turn)
 
     def _begin_turn(self, turn: TurnContext, *, streaming: bool) -> None:
         """Apply the setup shared by synchronous and streamed turns."""
+        self._active_turn = turn
+        self._turn_timings = {}
         if turn.debug_mode:
             self.debug_logger.enable()
         elif not settings.cli_debug_always_on:
@@ -523,14 +549,19 @@ class CHAPPiERuntime(
         debug_mode: bool = False,
         status_callback: Optional[StatusCallback] = None,
         temporal_context: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> Generator[StreamEvent, None, None]:
         """Run a turn through the shared pipeline and stream its events."""
+        session_id = self.chat_manager.ensure_session_id(session_id)
+        snapshot = self.chat_manager.get_runtime_settings(session_id)
         turn = build_turn_context(
             user_input,
             history,
             debug_mode=debug_mode,
             status_callback=status_callback,
             temporal_context=temporal_context,
+            session_id=session_id,
+            runtime_settings=snapshot,
         )
         yield from self.turn_pipeline.process_stream(turn)
 

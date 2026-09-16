@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from web_infrastructure.timing import measured
+
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -114,6 +116,9 @@ def build_assistant_message(
     if not isinstance(timing, dict):
         timing = {}
     metadata = {
+        "runtime_settings": result.get("runtime_settings", {}),
+        "session_id": result.get("session_id"),
+        "turn_id": result.get("turn_id"),
         "thought_process": result.get("thought_process"),
         "model_reasoning": result.get("model_reasoning"),
         "reasoning_only": result.get("reasoning_only", False),
@@ -170,6 +175,10 @@ def build_assistant_message(
         "formatting_error": result.get("formatting_error", ""),
         "formatting_source": result.get("formatting_source", "local_fallback"),
         "formatting_model": result.get("formatting_model", "?"),
+        "formatting_reason": result.get("formatting_reason", result.get("formatting_skip_reason", "")),
+        "formatting_skip_reason": result.get("formatting_skip_reason", result.get("formatting_reason", "")),
+        "finish_reason": result.get("finish_reason", (result.get("timing", {}) or {}).get("finish_reason", "unknown") if isinstance(result.get("timing"), dict) else "unknown"),
+        "technical_retry_count": result.get("technical_retry_count", 0),
         "sanitization_fallback": result.get("sanitization_fallback", False),
         "sanitization_reasons": result.get("sanitization_reasons", []),
         "multi_question_paragraph_normalized": result.get("multi_question_paragraph_normalized", False),
@@ -291,6 +300,12 @@ class RuntimeFormattingMixin:
         display_response = parsed.answer.strip() or alt_parsed.answer.strip() or content_without_model_reasoning.strip()
         thought = parsed.thought or alt_parsed.thought or ""
         model_reasoning = model_reasoning_block.content or ""
+
+        if not thought and not model_reasoning:
+            prose_thought, prose_rest = self._split_unconcluded_prose_thinking(content_without_model_reasoning)
+            if prose_thought and not prose_rest.strip():
+                thought = prose_thought
+                display_response = ""
 
         # Strip <think>/<thinking> tags from display_response — these are internal markers,
         # never user-visible. ALWAYS remove them, even if no answer tag was found.
@@ -427,12 +442,8 @@ class RuntimeFormattingMixin:
         if calm > 72 and frustration < 45 and anxiety < 45:
             temperature = min(temperature, max(0.50, settings.temperature * 0.92))
 
-        # >75: Nur das Antwortbudget kürzen; das Denkbudget bleibt vollständig erhalten.
-        if frustration > 75:
-            thinking_limit = int(getattr(settings, "chappie_thinking_token_limit", 800))
-            answer_limit = int(getattr(settings, "chappie_answer_token_limit", 1200))
-            max_tokens = min(max_tokens, thinking_limit + int(answer_limit * 0.7))
-
+        # V18: Einheitsbudget. Keine Token-Kuerzung bei Frustration, nur
+        # Sampling-Daempfung oben. Lange Antworten laufen bis 1200.
         return {
             "temperature": round(temperature, 3),
             "repetition_penalty": round(repetition_penalty, 3),
@@ -754,6 +765,7 @@ class RuntimeFormattingMixin:
             },
         ]
 
+    @measured("steering_plan_ms")
     def _build_prompt_runtime(
         self,
         emotions: Dict[str, int],
@@ -762,9 +774,8 @@ class RuntimeFormattingMixin:
         steering_retry_level: int = 0,
     ) -> Dict[str, Any]:
         model_name = self._chat_model()
-        # Research ablations may disable the feature explicitly. Normal
-        # web chat must always keep activation steering enabled, even if
-        # an old settings payload still contains emotions=false.
+        # Research feature ablations and per-session steering switches are
+        # independent of the persistent emotional state.
         if self.research_mode and not self._feature_enabled("emotions"):
             neutral_emotions = dict(EMOTION_DEFAULTS)
             response_plan = self._derive_response_plan(
@@ -787,10 +798,7 @@ class RuntimeFormattingMixin:
                 "prompt_emotion_mode": "ablation_disabled",
                 "response_plan": response_plan,
             }
-        # The live chat never switches to a non-steered logic route.  The
-        # local vLLM model and activation steering are fixed for every
-        # request, including arithmetic and self-contained questions.
-        force_steering = True
+        # Session mode controls interventions on the fixed local model.
         steering_payload = self.steering_manager.get_steering_payload(
             emotions,
             force=True,
@@ -799,12 +807,15 @@ class RuntimeFormattingMixin:
             recent_changes=emotion_changes,
             user_input=user_input,
             direct_retry_level=steering_retry_level,
+            steering_mode=(self._active_turn.runtime_settings.steering_mode if getattr(self, "_active_turn", None) else "combined"),
+            steering_enabled=(self._active_turn.runtime_settings.steering_enabled if getattr(self, "_active_turn", None) else True),
         )
+        force_steering = bool(steering_payload.get("steering", {}).get("enabled", False))
         use_prompt_emotions = False
         emotion_steering = self.steering_manager.build_debug_report(
             emotions,
             steering_payload=steering_payload,
-            force=True,
+            force=force_steering,
             provider=self._chat_provider(),
             model=model_name,
             recent_changes=emotion_changes,
@@ -940,21 +951,27 @@ class RuntimeFormattingMixin:
         result = RuntimeFormattingMixin._strip_leaked_metadata(result)
         return result
 
+    @measured("formatting_ms")
     def _format_via_groq(self, raw_text: str) -> Dict[str, Any]:
         """Sendet Rohtext an Groq zur Formatierung. Gibt {'cot', 'answer', 'formatting_failed', 'formatting_source'} zurück."""
         clean_text = self._clean_raw_text(raw_text)
         local_only = self._single_local_chat_mode()
         if not clean_text:
             source = "local_forced" if (local_only or getattr(self, "force_local_formatting", False)) else "groq"
-            return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "answer_is_fallback": True}
+            reason = "single_local_model" if local_only else ("forced_local" if getattr(self, "force_local_formatting", False) else "empty_input")
+            return {"cot": "", "answer": self._FALLBACK_SILENT, "formatting_failed": False, "formatting_source": source, "formatting_model": "local_regex" if source != "groq" else settings.groq_format_model, "formatting_reason": reason, "formatting_skip_reason": reason, "answer_is_fallback": True}
         if local_only or getattr(self, "force_local_formatting", False):
             result = self._local_format_fallback(clean_text, formatting_failed=False)
             result["formatting_source"] = "local_forced"
-            result["formatting_skip_reason"] = "single_local_model" if local_only else "forced_local"
+            reason = "single_local_model" if local_only else "forced_local"
+            result["formatting_reason"] = reason
+            result["formatting_skip_reason"] = reason
             return result
         if not settings.groq_api_key:
             result = self._local_format_fallback(clean_text, formatting_failed=False)
             result["formatting_source"] = "local_fallback"
+            result["formatting_reason"] = "missing_api_key"
+            result["formatting_skip_reason"] = "missing_api_key"
             result["formatting_failed"] = False
             return result
         try:
@@ -966,6 +983,7 @@ class RuntimeFormattingMixin:
             if not allowed:
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
                 result["formatting_source"] = "local_fallback"
+                result["formatting_reason"] = reason
                 result["formatting_skip_reason"] = reason
                 return result
 
@@ -1008,9 +1026,10 @@ class RuntimeFormattingMixin:
             if not self._same_text_except_whitespace(answer, clean_text):
                 result = self._local_format_fallback(clean_text, formatting_failed=False)
                 result["formatting_source"] = "local_integrity_fallback"
+                result["formatting_reason"] = "groq_changed_content"
                 result["formatting_skip_reason"] = "groq_changed_content"
                 return result
-            return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": settings.groq_format_model, "answer_is_fallback": self._is_fallback_text(answer)}
+            return {"cot": cot, "answer": answer, "formatting_failed": False, "formatting_source": "groq", "formatting_model": settings.groq_format_model, "formatting_reason": "groq_format", "formatting_skip_reason": "groq_format", "answer_is_fallback": self._is_fallback_text(answer)}
         except Exception as e:
             error_msg = str(e).lower()
             reason = "timeout" if any(kw in error_msg for kw in ("timeout", "timed out", "connect", "unreachable")) else "error"
@@ -1020,8 +1039,36 @@ class RuntimeFormattingMixin:
                 print(f"[Groq Format] Fehler: {e}")
             result = self._local_format_fallback(clean_text, formatting_failed=False)
             result["formatting_source"] = "local_fallback"
+            result["formatting_reason"] = reason
             result["formatting_error"] = reason
             return result
+
+    @staticmethod
+    def _split_unconcluded_prose_thinking(clean_text: str) -> tuple[str, str]:
+        """Erkennt einen nie beendeten Prosa-Denkblock als Thought statt Antwort.
+
+        Manche Builds schreiben mit nativem Thinking einen "Thinking Process:"
+        als Fliesstext ohne Final-Marker (live belegt 2026-09-08: Qwen3.5-4B,
+        finish=length). Ohne diesen Guard landet der Scratchpad als sichtbare
+        Antwort; mit Guard wird er zum CoT und die Antwort zum Fallback.
+        """
+        if not isinstance(clean_text, str) or not clean_text.strip():
+            return "", clean_text
+        if re.search(r"<\s*(think|thinking|thought|reasoning|gedanke)\b", clean_text, re.IGNORECASE):
+            return "", clean_text
+        if not re.match(
+            r"^\s*(?:#{1,6}\s*)?(?:Thinking|Reasoning|Thought)\s+Process\s*: ?",
+            clean_text,
+            re.IGNORECASE,
+        ):
+            return "", clean_text
+        if re.search(
+            r"(?:^|\n)\s*(?:#{1,6}\s*)?(?:Final\s+(?:Answer|Response)|Finale\s+Antwort)\s*:\s*",
+            clean_text,
+            re.IGNORECASE,
+        ):
+            return "", clean_text
+        return clean_text.strip(), ""
 
     @staticmethod
     def _local_format_fallback(clean_text: str, formatting_failed: bool = False) -> Dict[str, Any]:
