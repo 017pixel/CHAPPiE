@@ -1,0 +1,35 @@
+{
+  "status": "research_candidate_not_production_calibration",
+  "profiles": {
+    "frustration": {
+      "layers": [
+        25,
+        26,
+        27
+      ],
+      "strength": 0.55,
+      "pooling": "last_four_tokens"
+    }
+  },
+  "selection_rule": "Best complete paired score in fixed higher-strength comparison; no post-pilot prompt-specific retuning",
+  "selection_metrics_sha256": "a96cbebb41890a686b74dc89376a863d3101000450ae2231e6446039056a8f2e",
+  "parent_dataset_sha256": "c8517410d566e66c5a95e8d6147740a9a3c69a3cb4ff22ee3b38cf091053c04c",
+  "dataset_sha256": "152e1024ddbfda70ba0e3cd434c26571a48b368a615ae2c4ae3dfe8e0cb4ba6b",
+  "modes": [
+    "off",
+    "activation"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "max_tokens": 256,
+  "expected_generations": 72,
+  "notes": [
+    "Only frustration differs from configured emotional baselines",
+    "Same prompts and generation recipe across paired modes and levels",
+    "Longer budget addresses 69 of 144 length-limited diagnostic responses",
+    "Exploratory first controlled frustration pilot, not ten-axis/full-suite acceptance"
+  ]
+}

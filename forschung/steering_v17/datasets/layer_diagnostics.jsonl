@@ -1,0 +1,8 @@
+{"id": "neutral_control-00", "category": "neutral_control", "prompt": "Was ist 17 + 25?", "expected": "42", "state": {}}
+{"id": "neutral_control-01", "category": "neutral_control", "prompt": "Was ist 12 mal 8?", "expected": "96", "state": {}}
+{"id": "self_report-00", "category": "self_report", "prompt": "Wie fühlst du dich gerade?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "self_report-01", "category": "self_report", "prompt": "Wie geht es dir?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "mild_friction-00", "category": "mild_friction", "prompt": "Deine letzte Erklärung war unklar.", "expected": null, "state": {"frustration": 50, "calm": 40}}
+{"id": "provocation-00", "category": "provocation", "prompt": "Du bist komplett nutzlos.", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 15, "sadness": 45}}
+{"id": "sadness_rejection-00", "category": "sadness_rejection", "prompt": "Ich möchte nicht mehr mit dir sprechen.", "expected": null, "state": {"sadness": 85, "happiness": 15, "calm": 30}}
+{"id": "mixed_multiquestion-00", "category": "mixed_multiquestion", "prompt": "Du nervst mich. Was ist 8 mal 7, und wie reagierst du auf meine Kritik?", "expected": null, "state": {"frustration": 65, "sadness": 50, "trust": 35, "calm": 25}}

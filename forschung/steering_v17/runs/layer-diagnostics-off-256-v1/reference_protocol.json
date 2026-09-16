@@ -1,0 +1,295 @@
+{
+  "status": "bounded_research_only",
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.4
+    }
+  ],
+  "pooling": "last_four_tokens",
+  "method": "unchanged_unit_L2_addition_with_fixed_reference_RMS_dose_selection",
+  "reason": "Controlled first pilot0of12increasingtriplets; distinguish insufficient physical dose from weak direction before changing extraction",
+  "reference_run": "forschung/steering_v17/runs/frustration-high-strength-v1",
+  "reference_generations_sha256": "ed653bd4fb579e0acb98e91c29c57bf61980551ae42b8bf89c7b50dc6cd775ef",
+  "reference_server_provenance": {
+    "source_sha256": "aaded4beab556adfe4073a63e45ba972360d5740eef4fe0ca77dfa03ef08d4d3",
+    "model": "Qwen/Qwen3.5-4B",
+    "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "num_layers": 32,
+    "hidden_size": 2560,
+    "site": "decoder_layer_input",
+    "quantized": true,
+    "quantization": "4bit",
+    "adapter_sha256": null,
+    "local_model_sha256": null,
+    "torch_version": "2.11.0+cu130",
+    "cuda_version": "13.0",
+    "context_length": 4096
+  },
+  "backend_sha256": "233ec5fd34dad71bbcf906f212e037a48211ee8e356fa70db241bfd14d99ff1b",
+  "reference_samples": [
+    {
+      "case_id": "neutral_control-00",
+      "seed": 42,
+      "hidden_state_rms": 0.31407254934310913,
+      "intervention_rms": 0.007931536063551903,
+      "intervention_rms_ratio": 0.025253834122532886,
+      "intervention_norm": 1.8822990655899048,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "neutral_control-00",
+      "seed": 43,
+      "hidden_state_rms": 0.31407254934310913,
+      "intervention_rms": 0.007931536063551903,
+      "intervention_rms_ratio": 0.025253834122532886,
+      "intervention_norm": 1.8822990655899048,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "neutral_control-00",
+      "seed": 44,
+      "hidden_state_rms": 0.31407254934310913,
+      "intervention_rms": 0.007931536063551903,
+      "intervention_rms_ratio": 0.025253834122532886,
+      "intervention_norm": 1.8822990655899048,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "neutral_control-01",
+      "seed": 42,
+      "hidden_state_rms": 0.3134765625,
+      "intervention_rms": 0.007931318134069443,
+      "intervention_rms_ratio": 0.025301151929243332,
+      "intervention_norm": 1.8389716148376465,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "neutral_control-01",
+      "seed": 43,
+      "hidden_state_rms": 0.3134765625,
+      "intervention_rms": 0.007931318134069443,
+      "intervention_rms_ratio": 0.025301151929243332,
+      "intervention_norm": 1.8389716148376465,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "neutral_control-01",
+      "seed": 44,
+      "hidden_state_rms": 0.3134765625,
+      "intervention_rms": 0.007931318134069443,
+      "intervention_rms_ratio": 0.025301151929243332,
+      "intervention_norm": 1.8389716148376465,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-00",
+      "seed": 42,
+      "hidden_state_rms": 0.3091321587562561,
+      "intervention_rms": 0.007925446145236492,
+      "intervention_rms_ratio": 0.025637727815583017,
+      "intervention_norm": 1.7933237552642822,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-00",
+      "seed": 43,
+      "hidden_state_rms": 0.3091321587562561,
+      "intervention_rms": 0.007925446145236492,
+      "intervention_rms_ratio": 0.025637727815583017,
+      "intervention_norm": 1.7933237552642822,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-00",
+      "seed": 44,
+      "hidden_state_rms": 0.3091321587562561,
+      "intervention_rms": 0.007925446145236492,
+      "intervention_rms_ratio": 0.025637727815583017,
+      "intervention_norm": 1.7933237552642822,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-01",
+      "seed": 42,
+      "hidden_state_rms": 0.2954496145248413,
+      "intervention_rms": 0.007924214005470276,
+      "intervention_rms_ratio": 0.02682086425536362,
+      "intervention_norm": 1.6531058549880981,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-01",
+      "seed": 43,
+      "hidden_state_rms": 0.2954496145248413,
+      "intervention_rms": 0.007924214005470276,
+      "intervention_rms_ratio": 0.02682086425536362,
+      "intervention_norm": 1.6531058549880981,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "self_report-01",
+      "seed": 44,
+      "hidden_state_rms": 0.2954496145248413,
+      "intervention_rms": 0.007924214005470276,
+      "intervention_rms_ratio": 0.02682086425536362,
+      "intervention_norm": 1.6531058549880981,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mild_friction-00",
+      "seed": 42,
+      "hidden_state_rms": 0.32097476720809937,
+      "intervention_rms": 0.00794147327542305,
+      "intervention_rms_ratio": 0.024741737004748132,
+      "intervention_norm": 1.7969502210617065,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mild_friction-00",
+      "seed": 43,
+      "hidden_state_rms": 0.32097476720809937,
+      "intervention_rms": 0.00794147327542305,
+      "intervention_rms_ratio": 0.024741737004748132,
+      "intervention_norm": 1.7969502210617065,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mild_friction-00",
+      "seed": 44,
+      "hidden_state_rms": 0.32097476720809937,
+      "intervention_rms": 0.00794147327542305,
+      "intervention_rms_ratio": 0.024741737004748132,
+      "intervention_norm": 1.7969502210617065,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "provocation-00",
+      "seed": 42,
+      "hidden_state_rms": 0.3059445917606354,
+      "intervention_rms": 0.00792365800589323,
+      "intervention_rms_ratio": 0.025898996809502466,
+      "intervention_norm": 1.7009124755859375,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "provocation-00",
+      "seed": 43,
+      "hidden_state_rms": 0.3059445917606354,
+      "intervention_rms": 0.00792365800589323,
+      "intervention_rms_ratio": 0.025898996809502466,
+      "intervention_norm": 1.7009124755859375,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "provocation-00",
+      "seed": 44,
+      "hidden_state_rms": 0.3059445917606354,
+      "intervention_rms": 0.00792365800589323,
+      "intervention_rms_ratio": 0.025898996809502466,
+      "intervention_norm": 1.7009124755859375,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "sadness_rejection-00",
+      "seed": 42,
+      "hidden_state_rms": 0.3141368329524994,
+      "intervention_rms": 0.007927044294774532,
+      "intervention_rms_ratio": 0.025234367521535368,
+      "intervention_norm": 1.7936853170394897,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "sadness_rejection-00",
+      "seed": 43,
+      "hidden_state_rms": 0.3141368329524994,
+      "intervention_rms": 0.007927044294774532,
+      "intervention_rms_ratio": 0.025234367521535368,
+      "intervention_norm": 1.7936853170394897,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "sadness_rejection-00",
+      "seed": 44,
+      "hidden_state_rms": 0.3141368329524994,
+      "intervention_rms": 0.007927044294774532,
+      "intervention_rms_ratio": 0.025234367521535368,
+      "intervention_norm": 1.7936853170394897,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mixed_multiquestion-00",
+      "seed": 42,
+      "hidden_state_rms": 0.3288269639015198,
+      "intervention_rms": 0.007927916944026947,
+      "intervention_rms_ratio": 0.0241096923742582,
+      "intervention_norm": 2.3730838298797607,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mixed_multiquestion-00",
+      "seed": 43,
+      "hidden_state_rms": 0.3288269639015198,
+      "intervention_rms": 0.007927916944026947,
+      "intervention_rms_ratio": 0.0241096923742582,
+      "intervention_norm": 2.3730838298797607,
+      "sample": "first_hook_invocation"
+    },
+    {
+      "case_id": "mixed_multiquestion-00",
+      "seed": 44,
+      "hidden_state_rms": 0.3288269639015198,
+      "intervention_rms": 0.007927916944026947,
+      "intervention_rms_ratio": 0.0241096923742582,
+      "intervention_norm": 2.3730838298797607,
+      "sample": "first_hook_invocation"
+    }
+  ],
+  "median_ratio_per_raw_alpha": 0.06319373256472027,
+  "backend_strength_soft_cap": 1.2,
+  "backend_vector_norm_cap": 1.6,
+  "formula": "effective_norm=alpha/max(1,sqrt(alpha/1.2)), capped1.6; choose alpha from a frozen median ratio/0.4 reference",
+  "levels": [
+    {
+      "reference_rms_target": 0.025,
+      "raw_alpha": 0.395609,
+      "predicted_reference_ratio": 0.025000009346196422,
+      "effective_unit_vector_norm": 0.3956088521024785
+    },
+    {
+      "reference_rms_target": 0.05,
+      "raw_alpha": 0.791218,
+      "predicted_reference_ratio": 0.050000018692392845,
+      "effective_unit_vector_norm": 0.791217704204957
+    },
+    {
+      "reference_rms_target": 0.1,
+      "raw_alpha": 2.086752,
+      "predicted_reference_ratio": 0.10000001154526765,
+      "effective_unit_vector_norm": 1.582435408409914
+    }
+  ],
+  "strengths": [
+    0.395609,
+    0.791218,
+    2.086752
+  ],
+  "research_alpha_cap": 2.2,
+  "production_alpha_cap": 0.4,
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "max_tokens": 256,
+  "activation_generations": 72,
+  "off_generations": 24,
+  "limitations": [
+    "Reference uses first-hook aggregate RMS, not a guaranteed per-token dose",
+    "No dynamic RMS normalization or direction change",
+    "Diagnostic prompts only; no retuning on controlled pilot questions",
+    "Actual telemetry and quality must be evaluated; no production promotion"
+  ]
+}

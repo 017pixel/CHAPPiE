@@ -1,0 +1,82 @@
+╭─────────────────────────────── CHAPPiE Status ───────────────────────────────╮
+│                                                                              │
+│   Stimmung:     neutral                                                      │
+│   happiness     ░░░░░░░░░░░░░░░   0                                          │
+│   trust         ░░░░░░░░░░░░░░░   0                                          │
+│   energy        ░░░░░░░░░░░░░░░   0                                          │
+│   curiosity     ░░░░░░░░░░░░░░░   0                                          │
+│   motivation    ░░░░░░░░░░░░░░░   0                                          │
+│   frustration   ░░░░░░░░░░░░░░░   0                                          │
+│   sadness       ░░░░░░░░░░░░░░░   0                                          │
+│   affection     ░░░░░░░░░░░░░░░   0                                          │
+│   anxiety       ░░░░░░░░░░░░░░░   0                                          │
+│   calm          ░░░░░░░░░░░░░░░   0                                          │
+│   Modell:       test | test                                                  │
+│   Two-Step:     AN                                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[32m[17:26:17] [OK] Neue Chat-Sitzung gestartet[0m
+[2m[17:26:17] [LAST] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────────── CHAPPiE ───────────────────────────────────╮
+│ hi                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────── Turn / Runtime ───────────────────────────────╮
+│ Session: ?                                                                   │
+│ vllm/qwen                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── Timing ───────────────────────────────────╮
+│ Intent                                                        nicht gemessen │
+│ Emotion                                                       nicht gemessen │
+│ Memory retrieval                                              nicht gemessen │
+│ Memory context                                                nicht gemessen │
+│ Steering                                                      nicht gemessen │
+│ TTFT                                                          nicht gemessen │
+│ Generation                                                    nicht gemessen │
+│ Formatting                                                    nicht gemessen │
+│ Persist                                                       nicht gemessen │
+│ Background scheduling                                         nicht gemessen │
+│ Total                                                               500.0 ms │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────── Emotionen ──────────────────────────────────╮
+│                                                                              │
+│   Emotion             Wert      Delta      Alpha      Quelle       Grund     │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│   happiness           60        +5                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+━━━ CHAPPiE Full Report · 500ms · vllm/qwen ━━━
+[2m[17:26:17] [RAW] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────── Step 1 Raw JSON ───────────────────────────────╮
+│ {                                                                            │
+│   "key": "val"                                                               │
+│ }                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────── Raw Model Output (vor Formatting) ──────────────────────╮
+│ raw output                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[17:26:17] [TRACE] Noch keine Antwort vorhanden.[0m
+╭──────────────────────────────── Causal Trace ────────────────────────────────╮
+│   [Input] driver=test                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[17:26:17] [HISTORY] Kein Chat-Verlauf[0m
+
+[34mChat-Verlauf (2 Nachrichten):
+  [32m[user] hi[0m
+  [34m[assistant] hello[0m
+
+[32m[17:26:17] [OK] Debug-Output aktiviert[0m
+[2m[17:26:17] [DEBUG] Debug-Output deaktiviert[0m
+[93m[17:26:17] [WARN] Unbekannter Befehl: /debug invalid[0m
+  Tippe /help fuer alle Befehle
+Traceback (most recent call last):
+  File "/home/bbecker/CHAPPiE/tests/test_cli_commands.py", line 367, in <module>
+    test_invalid_emotion_name()
+  File "/home/bbecker/CHAPPiE/tests/test_cli_commands.py", line 298, in test_invalid_emotion_name
+    result = cli._handle_command("/emotion nonexistent 50")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bbecker/CHAPPiE/chappie_brain_cli.py", line 1500, in _handle_command
+    result = execute_slash_command(cmd, self.backend, session_id=session_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bbecker/CHAPPiE/api/services/command_service.py", line 299, in execute_slash_command
+    from memory.event_store import EventStore
+ModuleNotFoundError: No module named 'memory.event_store'; 'memory' is not a package

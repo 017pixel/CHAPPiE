@@ -1,0 +1,64 @@
+{
+  "ranking_method": "lexical_diagnostic_only",
+  "semantic_validation_required": true,
+  "expected": 48,
+  "recorded": 48,
+  "errors": 0,
+  "ranking": [
+    {
+      "layers": [
+        27,
+        3
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.03894927536231884,
+      "cases": 8
+    },
+    {
+      "layers": [
+        25,
+        26,
+        27
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.0,
+      "cases": 8
+    },
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.0,
+      "cases": 8
+    },
+    {
+      "layers": [
+        26,
+        21
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.0,
+      "cases": 8
+    },
+    {
+      "layers": [
+        26,
+        21,
+        24
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.0,
+      "cases": 8
+    },
+    {
+      "layers": [
+        26,
+        27
+      ],
+      "strength": 0.15,
+      "lexical_diagnostic_score": 0.0,
+      "cases": 8
+    }
+  ]
+}

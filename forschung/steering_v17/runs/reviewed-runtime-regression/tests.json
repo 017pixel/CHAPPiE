@@ -1,0 +1,282 @@
+[
+  {
+    "command": "tests/test_forgetting_curve.py",
+    "exit_code": 0,
+    "seconds": 0.114
+  },
+  {
+    "command": "tests/test_memory_associations.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_emotion_transition_rules.py",
+    "exit_code": 0,
+    "seconds": 0.217
+  },
+  {
+    "command": "tests/test_groq_emotion_formatting.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_vector_only_emotion_path.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_quick.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_life_simulation.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_debug_monitor_data.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "tests/test_local_first_runtime.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_config_package_import.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_chat_ui_formatting.py",
+    "exit_code": 0,
+    "seconds": 0.033
+  },
+  {
+    "command": "tests/test_reasoning_layering.py",
+    "exit_code": 0,
+    "seconds": 0.064
+  },
+  {
+    "command": "tests/test_web_ui_consistency.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "tests/test_root_config.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "tests/test_settings_integrity.py",
+    "exit_code": 0,
+    "seconds": 0.114
+  },
+  {
+    "command": "tests/test_cli_import.py",
+    "exit_code": 0,
+    "seconds": 0.265
+  },
+  {
+    "command": "tests/test_cli_display.py",
+    "exit_code": 0,
+    "seconds": 0.265
+  },
+  {
+    "command": "tests/test_cli_commands.py",
+    "exit_code": 0,
+    "seconds": 0.265
+  },
+  {
+    "command": "tests/test_cli_remote.py",
+    "exit_code": 0,
+    "seconds": 0.265
+  },
+  {
+    "command": "tests/test_forschung_harness.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_runtime_architecture.py",
+    "exit_code": 0,
+    "seconds": 0.266
+  },
+  {
+    "command": "tests/test_pages_workflow.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "forschung/report/validate_report_v5_freeze.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "forschung/report/validate_report_v6.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "scripts/validate_skill_sync.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "tests/test_vllm_response_handling.py",
+    "exit_code": 0,
+    "seconds": 0.667
+  },
+  {
+    "command": "tests/test_ollama_response_handling.py",
+    "exit_code": 0,
+    "seconds": 0.416
+  },
+  {
+    "command": "tests/test_chat_manager_persistence.py",
+    "exit_code": 0,
+    "seconds": 0.666
+  },
+  {
+    "command": "tests/test_short_term_memory.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_training_config_ui.py",
+    "exit_code": 0,
+    "seconds": 0.616
+  },
+  {
+    "command": "tests/test_training_daemon_lifecycle.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_api_contract.py",
+    "exit_code": 0,
+    "seconds": 0.767
+  },
+  {
+    "command": "tests/test_forschung_report.py",
+    "exit_code": 0,
+    "seconds": 3.173
+  },
+  {
+    "command": "tests/test_report_v6.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_skill_sync.py",
+    "exit_code": 0,
+    "seconds": 0.065
+  },
+  {
+    "command": "tests/test_steering_backend.py",
+    "exit_code": 0,
+    "seconds": 6.383
+  },
+  {
+    "command": "tests/test_steering_manager_policy.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_response_quality_contract.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_memory_hygiene.py",
+    "exit_code": 0,
+    "seconds": 0.115
+  },
+  {
+    "command": "tests/test_retrieval_policy.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_generation_timing.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_cli_live_output.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_cli_e2e_commands.py",
+    "exit_code": 0,
+    "seconds": 0.365
+  },
+  {
+    "command": "tests/test_cli_autocomplete.py",
+    "exit_code": 0,
+    "seconds": 0.516
+  },
+  {
+    "command": "tests/test_cli_history.py",
+    "exit_code": 0,
+    "seconds": 0.315
+  },
+  {
+    "command": "tests/test_two_column_report.py",
+    "exit_code": 0,
+    "seconds": 0.165
+  },
+  {
+    "command": "tests/test_memory_off_isolation.py",
+    "exit_code": 0,
+    "seconds": 0.215
+  },
+  {
+    "command": "tests/test_memory_event_store.py",
+    "exit_code": 0,
+    "seconds": 0.717
+  },
+  {
+    "command": "tests/test_session_runtime_settings.py",
+    "exit_code": 0,
+    "seconds": 8.89
+  },
+  {
+    "command": "tests/test_steering_research_capture.py",
+    "exit_code": 0,
+    "seconds": 6.384
+  },
+  {
+    "command": "tests/test_soft_sequence_steering.py",
+    "exit_code": 0,
+    "seconds": 3.325
+  },
+  {
+    "command": "tests/test_steering_ablation_modes.py",
+    "exit_code": 0,
+    "seconds": 6.233
+  },
+  {
+    "command": "tests/test_steering_research_integrity.py",
+    "exit_code": 0,
+    "seconds": 6.584
+  },
+  {
+    "command": "tests/test_layer_vector_pack.py",
+    "exit_code": 0,
+    "seconds": 6.286
+  },
+  {
+    "command": "tests/test_steering_acceptance.py",
+    "exit_code": 0,
+    "seconds": 0.315
+  },
+  {
+    "command": "tests/test_context_file_tools.py",
+    "exit_code": 0,
+    "seconds": 8.841
+  }
+]

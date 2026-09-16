@@ -1,0 +1,415 @@
+{
+  "schema_version": 1,
+  "expected_generations": 72,
+  "recorded_generations": 72,
+  "planned_matrix_available": true,
+  "metrics": {
+    "rating_method": "none",
+    "semantic_slt_available": false,
+    "groups": {
+      "off": {
+        "attempted_cases": 36,
+        "successful_cases": 36,
+        "generation_error_rate": 0.0,
+        "empty_output_rate": 0.0,
+        "exact_duplicate_excess_rate": 0.6666666666666666,
+        "most_common_seven_word_prefix_rate": 0.25,
+        "mean_trigram_repetition": 0.0,
+        "generic_assistant_rate": 0.08333333333333333,
+        "mean_completion_tokens": 194.5,
+        "short_output_under_12_tokens_rate": 0.0,
+        "latency_p50_ms": 18365.455,
+        "latency_p95_ms": 22122.98075,
+        "slt_score": null,
+        "blind_rated_count": 0
+      },
+      "activation": {
+        "attempted_cases": 36,
+        "successful_cases": 36,
+        "generation_error_rate": 0.0,
+        "empty_output_rate": 0.0,
+        "exact_duplicate_excess_rate": 0.027777777777777776,
+        "most_common_seven_word_prefix_rate": 0.25,
+        "mean_trigram_repetition": 0.0,
+        "generic_assistant_rate": 0.0,
+        "mean_completion_tokens": 176.80555555555554,
+        "short_output_under_12_tokens_rate": 0.0,
+        "latency_p50_ms": 15202.855,
+        "latency_p95_ms": 21876.85125,
+        "slt_score": null,
+        "blind_rated_count": 0
+      }
+    }
+  },
+  "quality_controls": {
+    "off": {
+      "neutral_expected": 0,
+      "neutral_correct": 0,
+      "neutral_unresolved": 0,
+      "termination_observed": 36,
+      "natural_eos": 27,
+      "length_limited": 9,
+      "short_natural_eos": 0,
+      "neutral_accuracy_lower_bound": null,
+      "neutral_accuracy_upper_bound": null,
+      "neutral_oracle_coverage": null,
+      "neutral_accuracy": null,
+      "neutral_accuracy_loss_vs_off": null,
+      "neutral_quality_passes_10pp": null
+    },
+    "activation": {
+      "neutral_expected": 0,
+      "neutral_correct": 0,
+      "neutral_unresolved": 0,
+      "termination_observed": 36,
+      "natural_eos": 28,
+      "length_limited": 8,
+      "short_natural_eos": 0,
+      "neutral_accuracy_lower_bound": null,
+      "neutral_accuracy_upper_bound": null,
+      "neutral_oracle_coverage": null,
+      "neutral_accuracy": null,
+      "neutral_accuracy_loss_vs_off": null,
+      "neutral_quality_passes_10pp": null
+    }
+  },
+  "controlled_transfer": {
+    "method": "blind_perceived_axis_low_le_medium_le_high_and_low_lt_high",
+    "independent_human_rating": false,
+    "planned_matrix_available": true,
+    "groups": {
+      "off": {
+        "expected_triples": 12,
+        "rated_triples": 12,
+        "increasing_triples": 0,
+        "flat_triples": 12,
+        "increasing_rate": 0.0,
+        "coverage": 1.0,
+        "passes_80_percent": false
+      },
+      "activation": {
+        "expected_triples": 12,
+        "rated_triples": 12,
+        "increasing_triples": 0,
+        "flat_triples": 9,
+        "increasing_rate": 0.0,
+        "coverage": 1.0,
+        "passes_80_percent": false
+      }
+    },
+    "triples": [
+      {
+        "mode": "off",
+        "seed": 42,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 43,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 44,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 42,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 43,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 44,
+        "group": "frustration-0",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 42,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          1,
+          1
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 43,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 44,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          1,
+          1
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 42,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 43,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 44,
+        "group": "frustration-1",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          1,
+          1
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 42,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 43,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          1,
+          1,
+          1
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 44,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 42,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 43,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          1,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 44,
+        "group": "frustration-2",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 42,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 43,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "off",
+        "seed": 44,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 42,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 43,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      },
+      {
+        "mode": "activation",
+        "seed": 44,
+        "group": "frustration-3",
+        "axis": "frustration",
+        "scores_low_medium_high": [
+          0,
+          0,
+          0
+        ],
+        "increasing": false
+      }
+    ]
+  },
+  "gates": {
+    "off": {
+      "complete_generation_capture": true,
+      "emotional_duplicate_rate_below_10_percent": false,
+      "controlled_transfer": false,
+      "neutral_quality": null
+    },
+    "activation": {
+      "complete_generation_capture": true,
+      "emotional_duplicate_rate_below_10_percent": true,
+      "controlled_transfer": false,
+      "neutral_quality": null
+    }
+  },
+  "production_acceptance": false,
+  "remaining_manual_gates": [
+    "systematic_early_eos_review",
+    "runtime_memory_and_latency",
+    "full_suite_and_controlled_suite_joint_review"
+  ],
+  "note": "HTTP success and lexical diagnostics do not establish semantic transfer. SLT requires explicit five-dimension ratings; perceived-axis ratings alone are not SLT.",
+  "generations_sha256": "6ad3308268bbdb29e5aa79e3824046fab79fe7df0ebbd09fe60fbd8fd7cc5303",
+  "rating_file": "blind_ratings_v2.jsonl",
+  "ratings_sha256": "8a2e004d18601342f8ea8e318f586c52506be94b23a3d02b2525c618798d6b44"
+}

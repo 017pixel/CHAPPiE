@@ -1,0 +1,25 @@
+ Forschung Harness Tests
+==================================================
+  PASS test_parser_parses_all_categories
+  PASS test_parser_extracts_commands
+  PASS test_parser_question_content
+  PASS test_session_logger_creates_dirs_and_files
+  PASS test_session_logger_error_entry
+  PASS test_session_logger_uses_next_free_highest_id
+  PASS test_module_imports
+  PASS test_config_path_resolution
+  PASS test_allignement_tests_importable
+  PASS test_explicit_question_selection_is_validated_and_counted
+  PASS test_partial_session_validator_derives_exact_selected_keys
+  PASS test_session_validator_rejects_hard_generation_errors
+  PASS test_gemma_research_config_requests_t4_safe_quantization
+  PASS test_gpt_research_config_pins_cloud_sampling
+  PASS test_ablation_profiles_cover_neutral_single_layers_and_combinations
+  PASS test_invalid_research_turns_trigger_contamination_guard
+   Emotions: Simple-Analyse aktiv (Research-Ein-Modell-Modus)
+Emotions Engine geladen: H=50 T=50 E=100
+  PASS test_research_emotions_never_initialize_or_reuse_auxiliary_brain
+  PASS test_provider_request_audit_and_validator_reject_foreign_provider_call
+
+==================================================
+  ALLE 18 TESTS BESTANDEN

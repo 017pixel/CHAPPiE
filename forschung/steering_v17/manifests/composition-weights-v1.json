@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "source_pack_sha256": "4fc01dc86c5aacbcc6b456b3ded7f7aade0060371b02ae05af78ceadd55aba82",
+  "purpose": "Prespecified exploratory direct-vs-composed direction comparison; no empirical calibration.",
+  "normalization": "Sum signed unit base vectors, then unit L2 separately per pooling and layer. Same raw alpha and backend caps for each arm.",
+  "limitations": [
+    "Weights are a semantic research hypothesis, not learned or optimized against generated responses.",
+    "Negative base directions are not established semantic opposites.",
+    "A selected frustration layer is not an independently optimal site for every composite.",
+    "Angered equals frustration in the composed arm; crashout adds energy and motivation. Their distinction remains an empirical question."
+  ],
+  "composites": {
+    "angered": {
+      "frustration": 1
+    },
+    "crashout": {
+      "frustration": 1,
+      "energy": 0.5,
+      "motivation": 0.25
+    },
+    "guarded": {
+      "trust": -1,
+      "anxiety": 0.5,
+      "affection": -0.5
+    },
+    "melancholic": {
+      "sadness": 1,
+      "energy": -0.5,
+      "calm": 0.25
+    },
+    "warm": {
+      "affection": 1,
+      "trust": 0.5,
+      "happiness": 0.5
+    },
+    "cautious": {
+      "anxiety": 1,
+      "calm": 0.5,
+      "trust": -0.25
+    }
+  }
+}

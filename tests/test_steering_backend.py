@@ -409,12 +409,14 @@ def test_stream_generate_emits_before_model_finishes():
         def generate(self, **kwargs):
             streamer = kwargs["streamer"]
             self.started.set()
+            streamer.put(kwargs["input_ids"])
             streamer.put(torch.tensor([10]))
             time.sleep(0.08)
             streamer.put(torch.tensor([11]))
             streamer.put(torch.tensor([12]))
             streamer.end()
             self.finished.set()
+            return torch.tensor([[1, 10, 11, 12]])
 
     engine = LocalSteeringEngine.__new__(LocalSteeringEngine)
     engine.model_name = "Qwen/Qwen3.5-4B"
@@ -425,11 +427,11 @@ def test_stream_generate_emits_before_model_finishes():
     engine.model = Model()
     engine._generation_lock = threading.Lock()
     engine.build_prompt = lambda *_args, **_kwargs: ("prompt", {"input_ids": torch.tensor([[1]])})
-    engine._generation_kwargs = lambda *_args, **_kwargs: {"input_ids": torch.tensor([[1]])}
+    engine._generation_kwargs = lambda *_args, **_kwargs: {"input_ids": torch.tensor([[1]]), "max_new_tokens": 8, "eos_token_id": 12}
     engine.last_steering_report = {}
 
     @contextmanager
-    def apply_report(_payload):
+    def apply_report(_payload, _input_len=0):
         engine.last_steering_report = {"status": "verified", "hook_count": 3}
         yield
 
@@ -445,7 +447,8 @@ def test_stream_generate_emits_before_model_finishes():
     assert "Hallo" in first + "".join(remainder)
     assert "Welt" in first + "".join(remainder)
     assert engine.model.finished.is_set()
-    assert report_sink == {"status": "verified", "hook_count": 3}
+    assert report_sink["status"] == "verified" and report_sink["hook_count"] == 3
+    assert report_sink["generation"]["natural_eos"] is True
 
 
 def test_generate_snapshots_report_before_generation_lock_is_released():
@@ -480,12 +483,11 @@ def test_generate_snapshots_report_before_generation_lock_is_released():
     )
     engine._generation_lock = ReportOverwritingLock()
     engine.build_prompt = lambda *_args, **_kwargs: ("prompt", {"input_ids": torch.tensor([[1]])})
-    engine._generation_kwargs = lambda *_args, **_kwargs: {}
     engine._log_gpu_stats = lambda *_args, **_kwargs: None
     engine.last_steering_report = {}
 
     @contextmanager
-    def apply_report(_payload):
+    def apply_report(_payload, _input_len=0):
         try:
             yield
         finally:
@@ -496,6 +498,7 @@ def test_generate_snapshots_report_before_generation_lock_is_released():
     result = engine.generate([], max_tokens=1, temperature=0.0)
 
     assert result["steering_runtime"] == {"status": "verified", "hook_count": 17}
+    assert result["natural_eos"] is True
     assert engine.last_steering_report["status"] == "no_applicable_layers"
 
 
@@ -719,7 +722,8 @@ def test_neutral_smalltalk_produces_no_base_vectors():
         )
         sources = {v["source"] for v in payload["steering"]["vectors"]}
         assert "base" not in sources
-        assert payload["steering"]["dominant_emotion"] == "neutral"
+        # V18: kein irrefuehrendes neutral (0.00) bei Stil-Isolation.
+        assert payload["steering"]["dominant_emotion"] == "identity-isoliert"
     finally:
         settings.llm_provider = provider_before
         settings.vllm_model = model_before
@@ -744,42 +748,27 @@ def test_acute_attack_prefers_fresh_frustration_and_dampens_permanents():
         vectors = payload["steering"]["vectors"]
         base_names = [v["name"] for v in vectors if v["source"] == "base"]
         assert base_names[0] == "frustration"
-        assert 1 <= len(base_names) <= 2
+        # V18: ein Budget Top3, Summe gedeckelt.
+        assert 1 <= len(base_names) <= 3
         assert "sadness" in base_names
         assert payload["steering"]["dominant_emotion"] == "angered"
-        guard = next(
-            vector for vector in vectors
-            if vector["source"] == "acute_reaction_guard"
-        )
-        assert guard["layer_range"] == [31, 31]
-        assert guard["vector"]["type"] == "token_sequence_steering"
-        assert "wütend" in guard["vector"]["target_prefix"]
+        assert not any(v["source"] == "acute_reaction_guard" for v in vectors)
+        assert not any(v["vector"].get("type") == "token_sequence_steering" for v in vectors)
         for vector in vectors:
-            if vector["source"] != "acute_reaction_guard":
-                assert vector["strength"] <= 0.6
+            assert vector["strength"] <= 0.6
     finally:
         settings.llm_provider = provider_before
         settings.vllm_model = model_before
 
 
-def test_output_sequence_hook_steers_only_last_position_in_order():
-    vectors = [torch.tensor([1.0, 2.0]), torch.tensor([3.0, 4.0])]
-    stats = {"hook_invocations": 0, "steered_hidden_positions": 0,
-             "hook_compute_ms": 0.0, "layer_invocations": {}}
-    hook = LocalSteeringEngine._output_sequence_hook_factory(vectors, stats=stats, layer_idx=31)
-
-    first = torch.zeros((1, 3, 2))
-    first_result = hook(None, (first,))[0]
-    assert torch.equal(first_result[0, 0], torch.zeros(2))
-    assert torch.equal(first_result[0, -1], vectors[0])
-
-    second = torch.zeros((1, 1, 2))
-    second_result = hook(None, (second,))[0]
-    assert torch.equal(second_result[0, -1], vectors[1])
-    exhausted_result = hook(None, (second,))[0]
-    assert torch.equal(exhausted_result, second)
-    assert stats["hook_invocations"] == 2
-    assert stats["output_hook_invocations"] == 2
+def test_hard_sequence_intervention_is_retired():
+    resolver = ActivationVectorResolver.__new__(ActivationVectorResolver)
+    try:
+        resolver.token_sequence_vectors({"target_prefix": "A fixed answer.", "append_eos": True})
+    except ValueError as exc:
+        assert "retired" in str(exc)
+    else:
+        raise AssertionError("Hard sequence steering must not remain executable")
 
 
 def test_history_hygiene_drops_degenerate_assistant_turns():
@@ -801,6 +790,10 @@ def test_history_hygiene_drops_degenerate_assistant_turns():
 
 
 if __name__ == "__main__":
+    test_background_prompt_limit_preserves_recent_chat_tail()
+    test_generate_snapshots_report_before_generation_lock_is_released()
+    test_stream_generate_emits_before_model_finishes()
+    test_stream_generate_keeps_request_scoped_steering_report()
     test_extract_steering_payload_supports_extra_body_wrapper()
     test_build_activation_plan_combines_sign_and_strength()
     test_add_vector_to_output_updates_first_tuple_tensor_only()
@@ -830,6 +823,6 @@ if __name__ == "__main__":
     test_entity_identity_vector_uses_own_question_and_model_ranges()
     test_neutral_smalltalk_produces_no_base_vectors()
     test_acute_attack_prefers_fresh_frustration_and_dampens_permanents()
-    test_output_sequence_hook_steers_only_last_position_in_order()
+    test_hard_sequence_intervention_is_retired()
     test_history_hygiene_drops_degenerate_assistant_turns()
     print("OK: steering backend")

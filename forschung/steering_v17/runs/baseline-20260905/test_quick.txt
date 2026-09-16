@@ -1,0 +1,54 @@
+============================================================
+CHAPPiE Quick Tests (No API Calls)
+============================================================
+
+TEST 1: Importing modules...
+  [OK] Provider: vllm
+  [OK] Groq Model: openai/gpt-oss-120b
+  [OK] Groq Key: SET
+  [OK] Brain configs: 7 agents
+  [OK] Forgetting curve: retention@1h = 44.00%
+  [OK] Sleep handler: 15 interactions or 22.6 hours
+
+TEST 2: Creating agents...
+  [OK] SensoryCortex: sensory_cortex
+  [OK] Amygdala: amygdala
+  [OK] Hippocampus: hippocampus
+  [OK] PrefrontalCortex: prefrontal_cortex
+  [OK] BasalGanglia: basal_ganglia
+  [OK] Neocortex: neocortex
+  [OK] MemoryAgent: memory_agent
+
+TEST 3: Testing context files...
+  [OK] Soul: 1961 chars
+  [OK] User: 1659 chars
+  [OK] Preferences: 4065 chars
+
+TEST 4: Testing brain pipeline...
+[SteeringManager] Initialisiert mit 12 Vektoren
+   Modell-Profil: 32 Layers
+   Emotions-Bereich: Layer (10, 26)
+  [OK] Provider: vllm
+  [OK] Model: Qwen/Qwen3.5-4B
+
+TEST 5: Testing forgetting curve math...
+  [OK] Retention @20min: 58.42% (expected ~58%)
+  [OK] Retention @1h: 44.00% (expected ~44%)
+  [OK] Retention @24h: 33.00% (expected ~33%)
+  [OK] Strength boost: 1.50
+  [OK] Optimal review: 0.2 hours
+
+TEST 6: Testing API key formats...
+  [OK] Groq key: SET
+
+TEST 7: Testing provider enum...
+  [OK] Providers: ['ollama', 'groq', 'vllm']
+
+TEST 8: Testing Groq brain import...
+WARNUNG: Groq Brain - Kein API-Key konfiguriert!
+   Trage deinen Key in CHAPPIE_CONFIG.json ein
+  [OK] GroqBrain created: {'name': 'openai/gpt-oss-20b', 'provider': 'groq', 'local': False, 'api_configured': True}
+
+============================================================
+Results: 8/8 tests passed (100%)
+============================================================

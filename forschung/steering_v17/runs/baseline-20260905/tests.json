@@ -1,0 +1,217 @@
+[
+  {
+    "command": "tests/test_forgetting_curve.py",
+    "exit_code": 0,
+    "seconds": 0.072
+  },
+  {
+    "command": "tests/test_memory_associations.py",
+    "exit_code": 0,
+    "seconds": 0.102
+  },
+  {
+    "command": "tests/test_emotion_transition_rules.py",
+    "exit_code": 0,
+    "seconds": 0.168
+  },
+  {
+    "command": "tests/test_groq_emotion_formatting.py",
+    "exit_code": 0,
+    "seconds": 0.067
+  },
+  {
+    "command": "tests/test_vector_only_emotion_path.py",
+    "exit_code": 0,
+    "seconds": 0.155
+  },
+  {
+    "command": "tests/test_quick.py",
+    "exit_code": 0,
+    "seconds": 0.189
+  },
+  {
+    "command": "tests/test_life_simulation.py",
+    "exit_code": 0,
+    "seconds": 0.118
+  },
+  {
+    "command": "tests/test_debug_monitor_data.py",
+    "exit_code": 0,
+    "seconds": 0.049
+  },
+  {
+    "command": "tests/test_local_first_runtime.py",
+    "exit_code": 0,
+    "seconds": 0.249
+  },
+  {
+    "command": "tests/test_config_package_import.py",
+    "exit_code": 0,
+    "seconds": 0.067
+  },
+  {
+    "command": "tests/test_chat_ui_formatting.py",
+    "exit_code": 0,
+    "seconds": 0.021
+  },
+  {
+    "command": "tests/test_reasoning_layering.py",
+    "exit_code": 0,
+    "seconds": 0.048
+  },
+  {
+    "command": "tests/test_web_ui_consistency.py",
+    "exit_code": 0,
+    "seconds": 0.058
+  },
+  {
+    "command": "tests/test_root_config.py",
+    "exit_code": 0,
+    "seconds": 0.059
+  },
+  {
+    "command": "tests/test_settings_integrity.py",
+    "exit_code": 0,
+    "seconds": 0.096
+  },
+  {
+    "command": "tests/test_cli_import.py",
+    "exit_code": 0,
+    "seconds": 0.239
+  },
+  {
+    "command": "tests/test_cli_display.py",
+    "exit_code": 0,
+    "seconds": 0.225
+  },
+  {
+    "command": "tests/test_cli_commands.py",
+    "exit_code": 0,
+    "seconds": 0.226
+  },
+  {
+    "command": "tests/test_cli_remote.py",
+    "exit_code": 0,
+    "seconds": 0.205
+  },
+  {
+    "command": "tests/test_forschung_harness.py",
+    "exit_code": 0,
+    "seconds": 0.194
+  },
+  {
+    "command": "tests/test_runtime_architecture.py",
+    "exit_code": 0,
+    "seconds": 0.217
+  },
+  {
+    "command": "tests/test_pages_workflow.py",
+    "exit_code": 0,
+    "seconds": 0.031
+  },
+  {
+    "command": "forschung/report/validate_report_v5_freeze.py",
+    "exit_code": 0,
+    "seconds": 0.042
+  },
+  {
+    "command": "forschung/report/validate_report_v6.py",
+    "exit_code": 0,
+    "seconds": 0.078
+  },
+  {
+    "command": "scripts/validate_skill_sync.py",
+    "exit_code": 0,
+    "seconds": 0.04
+  },
+  {
+    "command": "tests/test_vllm_response_handling.py",
+    "exit_code": 0,
+    "seconds": 0.632
+  },
+  {
+    "command": "tests/test_ollama_response_handling.py",
+    "exit_code": 0,
+    "seconds": 0.413
+  },
+  {
+    "command": "tests/test_chat_manager_persistence.py",
+    "exit_code": 0,
+    "seconds": 0.052
+  },
+  {
+    "command": "tests/test_short_term_memory.py",
+    "exit_code": 0,
+    "seconds": 0.155
+  },
+  {
+    "command": "tests/test_training_config_ui.py",
+    "exit_code": 0,
+    "seconds": 0.695
+  },
+  {
+    "command": "tests/test_training_daemon_lifecycle.py",
+    "exit_code": 0,
+    "seconds": 0.123
+  },
+  {
+    "command": "tests/test_api_contract.py",
+    "exit_code": 0,
+    "seconds": 0.824
+  },
+  {
+    "command": "tests/test_forschung_report.py",
+    "exit_code": 0,
+    "seconds": 3.146
+  },
+  {
+    "command": "tests/test_report_v6.py",
+    "exit_code": 0,
+    "seconds": 0.076
+  },
+  {
+    "command": "tests/test_skill_sync.py",
+    "exit_code": 0,
+    "seconds": 0.03
+  },
+  {
+    "command": "tests/test_steering_backend.py",
+    "exit_code": 0,
+    "seconds": 6.583
+  },
+  {
+    "command": "tests/test_steering_manager_policy.py",
+    "exit_code": 0,
+    "seconds": 0.151
+  },
+  {
+    "command": "tests/test_response_quality_contract.py",
+    "exit_code": 0,
+    "seconds": 0.164
+  },
+  {
+    "command": "tests/test_memory_hygiene.py",
+    "exit_code": 0,
+    "seconds": 0.104
+  },
+  {
+    "command": "tests/test_retrieval_policy.py",
+    "exit_code": 0,
+    "seconds": 0.143
+  },
+  {
+    "command": "tests/test_generation_timing.py",
+    "exit_code": 0,
+    "seconds": 0.181
+  },
+  {
+    "command": "tests/test_cli_live_output.py",
+    "exit_code": 0,
+    "seconds": 0.205
+  },
+  {
+    "command": "tests/test_cli_e2e_commands.py",
+    "exit_code": 0,
+    "seconds": 0.35
+  }
+]

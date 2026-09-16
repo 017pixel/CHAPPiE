@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/home/bbecker/CHAPPiE/tests/test_report_v6.py", line 32, in <module>
+    test_report_v6_contract()
+  File "/home/bbecker/CHAPPiE/tests/test_report_v6.py", line 20, in test_report_v6_contract
+    assert validate() == []
+           ^^^^^^^^^^^^^^^^
+AssertionError

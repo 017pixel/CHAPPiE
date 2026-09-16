@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T07:23:52.736568+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "96b548db6aaa6ad0530b34ea723e10d5c92853f9e53f7ee809ce6b48340c0e09",
+  "source_tree_sha256": "a084b48dbdfacf363d0ba44a0b3e0492c2c786f66f6ccfcf1356cb8a02e44cb5",
+  "model": "Qwen/Qwen3.5-4B",
+  "dataset_hash": "fc1a27f088ebe09ee02838ed9bc972477601071d1c9f3217fb29c9cac8356b1d",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/datasets/layer_diagnostics.jsonl",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "off"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "temperature": 0.7,
+  "max_tokens": 256,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": null,
+  "vector_pack": null
+}

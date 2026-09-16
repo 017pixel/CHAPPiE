@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T06:44:11.263279+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "e060f7d33dbbddfbc1aecdfc017338bf5542fdccac2105a7c4e96879fbc607e7",
+  "source_tree_sha256": "6a09c5184f2e71e406c65b07523d8689c02ac42c77a9a0489b367b6dda46b28b",
+  "model": "Qwen/Qwen3.5-4B",
+  "dataset_hash": "152e1024ddbfda70ba0e3cd434c26571a48b368a615ae2c4ae3dfe8e0cb4ba6b",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/datasets/controlled_frustration_pilot_v1.jsonl",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "off",
+    "activation"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "temperature": 0.7,
+  "max_tokens": 256,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "vector_pack": {
+    "path": "forschung/steering_v17/vectors/qwen35-pinned-v2/vector_pack.json",
+    "sha256": "4fc01dc86c5aacbcc6b456b3ded7f7aade0060371b02ae05af78ceadd55aba82",
+    "status": "uncalibrated",
+    "profiles_sha256": "ac4134298cbc2c9100c75fc42fdd8ce59555cb94b1483383e830d20276d80cd2",
+    "profile_policy": "research"
+  }
+}

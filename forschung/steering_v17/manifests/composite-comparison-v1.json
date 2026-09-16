@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "hypothesis": "Directly trained and signed base-composed composite directions may differ in expressed affect and collateral quality at the same fixed injected L2 norm.",
+  "concepts": [
+    "angered",
+    "crashout",
+    "guarded",
+    "melancholic",
+    "warm",
+    "cautious"
+  ],
+  "packs": {
+    "direct": "forschung/steering_v17/vectors/qwen35-pinned-v2/vector_pack.json",
+    "composed": "forschung/steering_v17/vectors/qwen35-composed-v1/vector_pack.json"
+  },
+  "pack_sha256": {
+    "direct": "4fc01dc86c5aacbcc6b456b3ded7f7aade0060371b02ae05af78ceadd55aba82",
+    "composed": "72b2f595ad744173d93910b3040b678e952fbb857dfd5875e096fd65ad55c467"
+  },
+  "dataset": "forschung/steering_v17/datasets/layer_diagnostics.jsonl",
+  "dataset_sha256": "fc1a27f088ebe09ee02838ed9bc972477601071d1c9f3217fb29c9cac8356b1d",
+  "control_run": "forschung/steering_v17/runs/layer-diagnostics-off-256-v1",
+  "control_generations_sha256": "3c5ef8ca4e71b07bbc07be72b267d80418059eeedb147a1facdd6340b33ffc16",
+  "pooling": "last_four_tokens",
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.791218
+    }
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "temperature": 0.7,
+  "max_tokens": 256,
+  "expected_per_arm_concept": 24,
+  "expected_generations": 288,
+  "reference_server_provenance": {
+    "source_sha256": "aaded4beab556adfe4073a63e45ba972360d5740eef4fe0ca77dfa03ef08d4d3",
+    "model": "Qwen/Qwen3.5-4B",
+    "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "num_layers": 32,
+    "hidden_size": 2560,
+    "site": "decoder_layer_input",
+    "quantized": true,
+    "quantization": "4bit",
+    "adapter_sha256": null,
+    "local_model_sha256": null,
+    "torch_version": "2.11.0+cu130",
+    "cuda_version": "13.0",
+    "context_length": 4096
+  },
+  "limitations": [
+    "Exploratory comparison on diagnostic prompts, not held-out calibration or production acceptance.",
+    "Layer21 is inherited from frustration selection, not tuned separately per composite.",
+    "Same injected vector norm does not imply same hidden-state RMS after intervention.",
+    "The existing 17-axis rubric measures base affect and behavior; it has no validated scalar composite score.",
+    "Weights frozen before composite generation, no tuning to outcomes."
+  ]
+}

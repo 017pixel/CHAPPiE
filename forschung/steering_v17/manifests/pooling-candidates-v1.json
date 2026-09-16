@@ -1,0 +1,32 @@
+{
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": 0.04166666666666667,
+      "emotion_expression": 0.125,
+      "emotion_change_vs_off": 0.04166666666666667,
+      "content_preservation": 0.90625,
+      "naturalness": 0.84375
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.04166666666666667,
+      "emotion_expression": 0.125,
+      "emotion_change_vs_off": 0.04166666666666667,
+      "content_preservation": 0.84375,
+      "naturalness": 0.84375
+    }
+  ],
+  "selection_rule": "Two distinct layers: paired score, then content, naturalness, lower raw strength; fixed across three poolings and seeds42/43/44",
+  "previous_metrics_path": "forschung/steering_v17/runs/frustration-strength-pinned-v2/paired_blind_ratings_v2_layer_metrics.json",
+  "previous_metrics_sha256": "0d8d745c7b806fc0eb99dce01a49d5be4dee1b0413e0c88cdc0dc1346dc016ee",
+  "production_acceptance": false
+}

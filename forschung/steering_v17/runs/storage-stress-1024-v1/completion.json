@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "processes": 8,
+  "turns": 1024,
+  "events": 2048,
+  "messages": 2048,
+  "pending_user_promotions": 1024,
+  "assistant_retrieval_eligible": 0,
+  "sqlite_integrity": "ok",
+  "elapsed_seconds": 54.79006103705615,
+  "exchange_duration_ms": {
+    "min": 10.154719464480877,
+    "max": 752.7724681422114
+  },
+  "scope": "real SQLite and chat JSON, no inference or embedding; not throughput-isolated from other host work",
+  "embedding_promotion_executed": false
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-05T16:19:49.048588+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "b7591e78f6349aad950d169a5df48da929add272009284ac1819719f3be6c5f2",
+  "model": "Qwen/Qwen3.5-4B",
+  "dataset_hash": "37bd77f8b21617e6d184d692ff607cdd67e8756e36d5ae217c065b6d0485ebd5",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "off",
+    "sequence"
+  ],
+  "seeds": [
+    42
+  ],
+  "temperature": 0.7,
+  "max_tokens": 128,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": null,
+  "vector_pack": null
+}

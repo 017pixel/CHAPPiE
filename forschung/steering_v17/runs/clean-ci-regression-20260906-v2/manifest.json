@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T07:10:48.884257+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "4c148decba48e63a24004525988de9e578d32251fc2007185d48dcd034f2d93d",
+  "source_tree_sha256": "3297e02ab81da942437bc22988db4e3c49c1aa36568a49c2cf79f3045585e3e0",
+  "model": "none",
+  "dataset_hash": "cc920381af21003d183582213490f3aea2f0d8d21a0af860ab37e273751fcdef",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/runs/clean-ci-regression-20260906-v2/commands.json",
+  "versions": {
+    "torch": null,
+    "transformers": null,
+    "httpx": "0.28.1",
+    "numpy": "2.5.2"
+  },
+  "modes": [
+    "minimal_ci_dependencies"
+  ],
+  "seeds": [],
+  "temperature": 0,
+  "max_tokens": 0,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": null,
+  "vector_pack": null
+}

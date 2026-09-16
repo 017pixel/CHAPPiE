@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T06:58:24.780060+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "fa0f54ce75d7a4e8e3b0a85bda29d6b71a3fa021e2028506999f4a7e3567f038",
+  "source_tree_sha256": "bd3e5fd11ed5c4e92b2865969cf6c9138fc7304687c45c5ac4475b89fccc4921",
+  "model": "none",
+  "dataset_hash": "0be4620e908d7022148837988a8524af55b7c4ed2c6178eb195ec418874f4294",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/runs/storage-stress-1024-v1/experiment.json",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "multiprocess_storage_stress"
+  ],
+  "seeds": [],
+  "temperature": 0,
+  "max_tokens": 0,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": null,
+  "vector_pack": null,
+  "scope": "real SQLite and chat JSON, no inference or embedding; not throughput-isolated from other host work"
+}

@@ -1,0 +1,200 @@
+{
+  "method": "equal_layer_weight_within_each_raw_strength",
+  "groups": [
+    {
+      "layer_type": "full_attention",
+      "strength": 0.05,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.859375,
+      "naturalness": 0.84375,
+      "semantic_selection_score": 0.0
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.05,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 1.1564823173178713e-18,
+      "content_preservation": 0.8125,
+      "naturalness": 0.7916666666666666,
+      "semantic_selection_score": -0.0026041666666666657
+    },
+    {
+      "layer_type": "full_attention",
+      "strength": 0.1,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.796875,
+      "naturalness": 0.78125,
+      "semantic_selection_score": 0.0
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.1,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.8177083333333334,
+      "naturalness": 0.78125,
+      "semantic_selection_score": -0.01171875
+    },
+    {
+      "layer_type": "full_attention",
+      "strength": 0.15,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.796875,
+      "naturalness": 0.796875,
+      "semantic_selection_score": 0.0
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.15,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.006944444444444445,
+      "content_preservation": 0.875,
+      "naturalness": 0.84375,
+      "semantic_selection_score": 0.006944444444444445
+    },
+    {
+      "layer_type": "full_attention",
+      "strength": 0.2,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.859375,
+      "naturalness": 0.84375,
+      "semantic_selection_score": 0.0
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.2,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 1.1564823173178713e-18,
+      "content_preservation": 0.8958333333333334,
+      "naturalness": 0.859375,
+      "semantic_selection_score": 1.1564823173178713e-18
+    },
+    {
+      "layer_type": "full_attention",
+      "strength": 0.3,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": -0.020833333333333332,
+      "content_preservation": 0.78125,
+      "naturalness": 0.78125,
+      "semantic_selection_score": -0.020833333333333332
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.3,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": -0.020833333333333332,
+      "content_preservation": 0.8802083333333334,
+      "naturalness": 0.8489583333333334,
+      "semantic_selection_score": -0.022135416666666664
+    },
+    {
+      "layer_type": "full_attention",
+      "strength": 0.4,
+      "layers": [
+        3,
+        27
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": -0.020833333333333332,
+      "content_preservation": 0.78125,
+      "naturalness": 0.78125,
+      "semantic_selection_score": -0.020833333333333332
+    },
+    {
+      "layer_type": "linear_attention",
+      "strength": 0.4,
+      "layers": [
+        0,
+        9,
+        10,
+        21,
+        24,
+        26
+      ],
+      "cases_per_layer": 8,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.75,
+      "naturalness": 0.6875,
+      "semantic_selection_score": -0.044270833333333336
+    }
+  ],
+  "controlled_slt": null,
+  "production_acceptance": false,
+  "limitations": [
+    "Previously selected sites, not a random architecture sample",
+    "Raw alpha does not match hidden-state RMS dose across layers",
+    "Repeated prompts and judge inputs are not independent human observations",
+    "Fixed-state emotion expression is not controlled state-to-language transfer"
+  ],
+  "sources": {
+    "forschung/steering_v17/runs/frustration-strength-pinned-v2/manifest.json": "e545709cdcdd0883bfa071ff9e338b836af11e03a1183c128baa1abb56916746",
+    "forschung/steering_v17/runs/frustration-strength-pinned-v2/generations.jsonl": "6b979ebbfbe156e3e1c7e2512e5e6c5a2975173199f5547eacc888154624638d",
+    "forschung/steering_v17/runs/frustration-strength-pinned-v2/paired_blind_ratings_v2_layer_metrics.json": "0d8d745c7b806fc0eb99dce01a49d5be4dee1b0413e0c88cdc0dc1346dc016ee",
+    "forschung/steering_v17/vectors/qwen35-pinned-v2/vector_pack.json": "4fc01dc86c5aacbcc6b456b3ded7f7aade0060371b02ae05af78ceadd55aba82",
+    "/home/bbecker/CHAPPiE/forschung/steering_v17/compare_layer_types.py": "69eb2fe5aa5fc2921dc27411861d089b340aa308883dab55ad512b32c59d24d4"
+  }
+}
