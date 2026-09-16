@@ -1,9 +1,9 @@
-"""CHAPPiE Terminal Interface v16.8.6
+"""CHAPPiE Terminal Interface v17.2.0-dev.2
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
 Inkl. /thinking Command zum Aktivieren/Deaktivieren des Reasonings.
-Paritaet zur Web-UI (API 16.8.6): Sessions, command_mode, alle Slash-Commands.
+Paritaet zur Web-UI (API 17.2.0-dev.2): Sessions, command_mode, alle Slash-Commands.
 
 Modes:
   Local  - Direct backend (create_chappie_backend), process_stream() with Live display
@@ -31,8 +31,10 @@ import threading
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional, Generator
+from urllib.parse import urlsplit
 
 from config.emotions import EMOTION_ORDER
+from config.commands import HELP_COLUMNS
 
 try:
     from rich.console import Console, Group as _RichGroup
@@ -68,6 +70,15 @@ def _response_panel(content: str, title: str, border_style: str):
         border_style=border_style,
         padding=(0, 1),
     )
+
+
+def _print_command_output(output: str) -> None:
+    """Gibt Befehlsausgaben als gerendertes Markdown aus, damit **fett** nicht literal erscheint."""
+    text = output if isinstance(output, str) else str(output)
+    if HAS_RICH:
+        console.print(_response_panel(text, "[bold magenta]Command[/]", "magenta"))  # type: ignore[union-attr]
+    else:
+        print(f"\n{Colors.MEMORY}{text}{Colors.RESET}\n")
 
 _FULL_REPORT_DEFAULT = False
 
@@ -118,38 +129,6 @@ class _StrayOutputCapture:
         return getattr(self._real, name)
 
 
-HELP_COLUMNS = (
-    ("Chat-Befehle", [
-        ("/status", "Status + Life"),
-        ("/clear", "Neue Sitzung"),
-        ("/new", "Neue Sitzung"),
-        ("/sessions", "Sessions auflisten"),
-        ("/session <id>", "Session wechseln"),
-        ("/history", "Verlauf anzeigen"),
-        ("/md", "soul, user, Prefs"),
-        ("/restart", "Neustart: chappie | cli"),
-        ("/exit", "Beenden"),
-        ("/help", "Diese Hilfe"),
-    ]),
-    ("Forschungs-Befehle", [
-        ("/runtime", "Modell, Provider"),
-        ("/model", "Modell wechseln"),
-        ("/thinking", "Reasoning an/aus"),
-        ("/steering", "Steering Report"),
-        ("/emotion", "Emotionen setzen"),
-        ("/resetemotions", "Emotionen reset"),
-        ("/sleep", "Schlafphase"),
-        ("/memory", "Gedaechtnis Suche"),
-        ("/debug", "Debug an/aus"),
-    ]),
-    ("Nach Ausgabe Befehle", [
-        ("/last", "Voller Report"),
-        ("/raw", "Step 1 + Raw Output"),
-        ("/trace", "Causal Trace"),
-        ("/compact", "Kompakter Report"),
-        ("/full", "Voller Report"),
-    ]),
-)
 
 
 class Colors:
@@ -222,6 +201,13 @@ def _emo_color(value: int) -> str:
     elif value >= 30:
         return "yellow"
     return "red"
+
+
+def _count_words(text: str) -> int:
+    """V18: Live-Anzeige zaehlt Woerter aus sichtbarem Text, keine SSE-Events."""
+    if not isinstance(text, str) or not text.strip():
+        return 0
+    return len(text.strip().split())
 
 
 EMOTION_NAMES = EMOTION_ORDER
@@ -324,13 +310,34 @@ class RemoteBackend:
         except Exception as e:
             return f"Error: {e}"
 
+    def export_session(self, mode: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+        sid = session_id if session_id is not None else self.session_id
+        if not sid:
+            return {"error": "Keine aktive Session vorhanden."}
+        try:
+            response = requests.get(
+                f"{self.base_url}/sessions/{sid}/export",
+                params={"mode": mode},
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict):
+                incoming = data.get("session_id")
+                if incoming:
+                    self.session_id = incoming
+                return data
+            return {"error": "Ungültige Export-Antwort vom Server."}
+        except Exception as exc:
+            return {"error": str(exc)}
+
 
 # ═══════════════════════════════════════════════════════════════════
 # CHAPPiEBrainCLI
 # ═══════════════════════════════════════════════════════════════════
 
 class CHAPPiEBrainCLI:
-    CLI_VERSION = "16.8.6"
+    CLI_VERSION = "17.2.0-dev.2"
 
     def __init__(self, remote_url: Optional[str] = None):
         self.remote_url = remote_url
@@ -411,12 +418,8 @@ class CHAPPiEBrainCLI:
             }
             message_id = self.backend.chat_manager.create_message_id()
             assistant_message = self.backend.build_assistant_message(user_text, result, message_id=message_id)
-            session = self.backend.chat_manager.load_session(session_id)
-            messages = list(session.get("messages", []))
-            # Pending-Logik der API ist hier nicht noetig, direkt beide Nachrichten speichern.
-            messages.extend([user_message, assistant_message])
-            self.backend.chat_manager.save_session(session_id, messages, title=session.get("title"))
-            self.history = list(messages)
+            session = self.backend.chat_manager.append_messages(session_id, [user_message, assistant_message])
+            self.history = list(session.get("messages", []))
             # Neue Session nach /clear und /new uebernehmen.
             replacement = result.get("replacement_session_id")
             if replacement:
@@ -482,10 +485,12 @@ class CHAPPiEBrainCLI:
     def _process_local(self, user_text: str):
         # Slash-Commands laufen wie in der Web-UI ueber command_service.
         if user_text.strip().startswith("/"):
+            if (user_text.strip().lower().split() or [""])[0] == "/copy":
+                return self._handle_copy_command(user_text)
             from api.services.command_service import execute_slash_command
             try:
                 session_id, _ = self._ensure_local_session()
-                result = execute_slash_command(user_text.strip(), self.backend)
+                result = execute_slash_command(user_text.strip(), self.backend, session_id=session_id)
                 replacement = result.get("replacement_session_id")
                 if replacement:
                     session_id = replacement
@@ -494,7 +499,7 @@ class CHAPPiEBrainCLI:
                 self.last_result = result
                 output = result.get("response_text", "")
                 if HAS_RICH:
-                    console.print(Panel(output, title="[bold magenta]Command[/]", border_style="magenta", padding=(0, 1)))
+                    console.print(_response_panel(output, "[bold magenta]Command[/]", "magenta"))
                 else:
                     print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
                 self._persist_local_turn(session_id, user_text, result)
@@ -516,6 +521,7 @@ class CHAPPiEBrainCLI:
                 history,
                 debug_mode=True,
                 temporal_context={"user_message_created_at": _dt.now().astimezone().isoformat()},
+                session_id=session_id,
             )
             self.last_result = result
             self._persist_local_turn(session_id, user_text, result)
@@ -533,6 +539,7 @@ class CHAPPiEBrainCLI:
                     history,
                     debug_mode=True,
                     temporal_context={"user_message_created_at": _dt2.now().astimezone().isoformat()},
+                    session_id=session_id,
                 )
                 for event in gen:
                     if abort.is_set():
@@ -556,8 +563,7 @@ class CHAPPiEBrainCLI:
         step1_done = False
         step1_start = time.time()
         streaming_start = 0.0
-        token_count = 0
-        last_tps_update = 0.0
+        word_count = 0
         tps = 0.0
         last_progress_print = 0.0
         last_progress_stage = ""
@@ -577,10 +583,9 @@ class CHAPPiEBrainCLI:
                                 live.update(self._render_spinner(time.time() - step1_start))
                             elif streaming_start > 0:
                                 now = time.time()
-                                if now - last_tps_update > 0.5:
-                                    tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
-                                    last_tps_update = now
-                                live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
+                                elapsed = max(0.01, now - streaming_start)
+                                tps = round(word_count / elapsed, 1)
+                                live.update(self._render_streaming(collected, word_count, tps, now - streaming_start))
                             continue
 
                         if event is None:
@@ -608,9 +613,10 @@ class CHAPPiEBrainCLI:
                         elif ev == "token":
                             if streaming_start == 0:
                                 streaming_start = time.time()
-                                last_tps_update = streaming_start
                             collected[event.get("token_type", "answer")] += event.get("content", "")
-                            token_count += 1
+                            word_count = _count_words(collected.get("answer", ""))
+                            elapsed = max(0.01, time.time() - streaming_start)
+                            tps = round(word_count / elapsed, 1)
 
                         elif ev == "error":
                             error = event.get("error", "Unbekannter Fehler")
@@ -724,8 +730,7 @@ class CHAPPiEBrainCLI:
         step1_done = False
         step1_start = time.time()
         streaming_start = 0.0
-        token_count = 0
-        last_tps_update = 0.0
+        word_count = 0
         tps = 0.0
         last_progress_print = 0.0
         last_progress_stage = ""
@@ -745,10 +750,9 @@ class CHAPPiEBrainCLI:
                                 live.update(self._render_spinner(time.time() - step1_start))
                             elif streaming_start > 0:
                                 now = time.time()
-                                if now - last_tps_update > 0.5:
-                                    tps = token_count / (now - streaming_start) if (now - streaming_start) > 0 else 0
-                                    last_tps_update = now
-                                live.update(self._render_streaming(collected, token_count, tps, now - streaming_start))
+                                elapsed = max(0.01, now - streaming_start)
+                                tps = round(word_count / elapsed, 1)
+                                live.update(self._render_streaming(collected, word_count, tps, now - streaming_start))
                             continue
 
                         if event is None:
@@ -776,9 +780,10 @@ class CHAPPiEBrainCLI:
                         elif ev == "token":
                             if streaming_start == 0:
                                 streaming_start = time.time()
-                                last_tps_update = streaming_start
                             collected[event.get("token_type", "answer")] += event.get("content", "")
-                            token_count += 1
+                            word_count = _count_words(collected.get("answer", ""))
+                            elapsed = max(0.01, time.time() - streaming_start)
+                            tps = round(word_count / elapsed, 1)
 
                         elif ev == "error":
                             error = event.get("error", "Unbekannter Fehler")
@@ -861,6 +866,9 @@ class CHAPPiEBrainCLI:
             "formatting_error": metadata.get("formatting_error", ""),
             "formatting_source": metadata.get("formatting_source", "local_fallback"),
             "formatting_model": metadata.get("formatting_model", "?"),
+            "formatting_reason": metadata.get("formatting_reason", metadata.get("formatting_skip_reason", "")),
+            "formatting_skip_reason": metadata.get("formatting_skip_reason", metadata.get("formatting_reason", "")),
+            "finish_reason": metadata.get("finish_reason", (metadata.get("timing", {}) or {}).get("finish_reason", "unknown") if isinstance(metadata.get("timing"), dict) else "unknown"),
             "cot_leak": metadata.get("cot_leak", {"is_unexpected_cot": False, "score": 0.0, "reasons": []}),
             "command_trace": metadata.get("command_trace", {}),
             "replacement_session_id": metadata.get("replacement_session_id", ""),
@@ -961,7 +969,7 @@ class CHAPPiEBrainCLI:
         )
 
     @staticmethod
-    def _render_streaming(collected: dict, token_count: int, tps: float, elapsed: float):
+    def _render_streaming(collected: dict, word_count: int, tps: float, elapsed: float):
         parts = []
         if collected.get("reasoning"):
             cot = collected["reasoning"]
@@ -978,7 +986,7 @@ class CHAPPiEBrainCLI:
         cursor = "█" if int(time.time() * 2) % 2 == 0 else " "
         parts.append(Panel(
             Text(answer + cursor, style="bold bright_cyan"),
-            title=f"[bold bright_cyan]Antwort[/]  [dim]{token_count} tk  {tps:.0f} tk/s  {elapsed:.1f}s[/]",
+            title=f"[bold bright_cyan]Live[/]  [dim]{word_count} Woerter  {tps:.1f} W/s  {elapsed:.1f}s[/]",
             border_style="bright_cyan",
         ))
         if not parts:
@@ -1075,35 +1083,23 @@ class CHAPPiEBrainCLI:
         rep_events = result.get("repetition_events", {})
 
         if HAS_RICH:
-            table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
-            table.add_column("k", style="dim")
-            table.add_column("v")
+            left = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
+            left.add_column("k", style="dim")
+            left.add_column("v")
+
+            right = Table(box=box.SIMPLE, show_header=False, padding=(0, 2))
+            right.add_column("k", style="dim")
+            right.add_column("v")
 
             intent_str = f"{intent} ({confidence:.2f})" if confidence else str(intent)
             tools_str = ", ".join(tools) if tools else "none"
-            table.add_row("Intent:", f"{intent_str}    Tools: {tools_str}")
+            left.add_row("Intent:", f"{intent_str}    Tools: {tools_str}")
 
-            emo_parts = []
-            for name in EMOTION_NAMES:
-                b = emotion_before.get(name, 0)
-                a = emotion_after.get(name, 0)
-                d = a - b
-                if d == 0:
-                    continue
-                sign = f"[green]↑+{d}[/]" if d > 0 else f"[red]↓{d}[/]"
-                emo_parts.append(f"{name} [bold]{a}[/] {sign}")
-            if emo_parts:
-                table.add_row("Emotionen:", "  ".join(emo_parts))
-
-            steer_str = "VECTOR" if ("vector" in prompt_mode or "layer" in prompt_mode) else "PROMPT"
-            dom = steering.get("dominant_vector", "neutral")
-            dom_s = steering.get("dominant_strength", 0)
-            table.add_row("Steering:", f"[{_emo_color(int(dom_s * 100))}]{steer_str} | dominant: {dom} ({dom_s:.2f})[/]")
-
-            table.add_row("Tone:", f"{tone.get('tone', '?')}  ({tone.get('tone_reason', '')[:80]})")
+            left.add_row("Tone:", f"{tone.get('tone', '?')}  ({tone.get('tone_reason', '')[:80]})")
 
             fmt_source = result.get("formatting_source", "local_fallback")
             fmt_model = result.get("formatting_model", "?")
+            fmt_reason = result.get("formatting_reason", result.get("formatting_skip_reason", ""))
             fmt_failed = result.get("formatting_failed", False)
             if fmt_failed:
                 fmt_color = "red"
@@ -1114,25 +1110,29 @@ class CHAPPiEBrainCLI:
             else:
                 fmt_color = "yellow"
                 fmt_label = "LOCAL"
-            table.add_row("Format:", f"[{fmt_color}]{fmt_label}[/] ({fmt_model})")
+            fmt_detail = f"[{fmt_color}]{fmt_label}[/] ({fmt_model})"
+            if fmt_reason:
+                fmt_detail += f" Grund: {fmt_reason}"
+            left.add_row("Format:", fmt_detail)
 
             focus = (workspace.get("dominant_focus") or {})
             focus_label = focus.get("label", "?")
             focus_sal = focus.get("salience", 0)
             mem_count = mem_trace.get("memories_found", 0) if isinstance(mem_trace, dict) else 0
             mem_rel = mem_trace.get("top_relevance", 0) if isinstance(mem_trace, dict) else 0
-            table.add_row("Focus:", f"{focus_label} ({focus_sal:.2f})    Memory: {mem_count} matches @{mem_rel:.2f}")
+            left.add_row("Focus:", f"{focus_label} ({focus_sal:.2f})    Memory: {mem_count} matches @{mem_rel:.2f}")
 
             est = budget.get("estimated_tokens", 0)
             lim = budget.get("token_limit", 4096)
             trimmed = "TRIMMED" if budget.get("was_trimmed") else "ok"
-            table.add_row("Budget:", f"{est}/{lim} tokens ({trimmed})")
+            left.add_row("Budget:", f"{est}/{lim} tokens ({trimmed})")
 
             if timing:
                 ttft = timing.get("ttft_ms", 0)
                 rtk = timing.get("reasoning_tokens", 0)
                 atk = timing.get("answer_tokens", 0)
                 gen = timing.get("total_gen_ms", 0)
+                finish = timing.get("finish_reason", result.get("finish_reason", "unknown"))
                 has_cot = bool(result.get("formatted_cot", "")) and result.get("formatted_cot", "") != "CHAPPiE hat nicht darueber nachgedacht und sofort geantwortet."
                 if rtk > 0:
                     r_label = f"r:{rtk}tk"
@@ -1140,46 +1140,108 @@ class CHAPPiEBrainCLI:
                     r_label = "r:~tk"
                 else:
                     r_label = "r:0tk (kein CoT)"
-                table.add_row("Timing:", f"TTFT:{ttft}ms  {r_label}  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms")
+                timing_str = f"TTFT:{ttft}ms  {r_label}  a:{atk}tk  gen:{gen}ms  total:{proc_time:.0f}ms"
+                if finish and finish != "unknown":
+                    timing_str += f"  finish:{finish}"
+                left.add_row("Timing:", timing_str)
 
             if rep_events:
                 parts = []
                 for key, val in sorted(rep_events.items()):
                     parts.append(f"[bold red]{key}[/]")
-                table.add_row("Repetition:", ", ".join(parts))
+                left.add_row("Repetition:", ", ".join(parts))
 
             causal_chain = " → ".join(c.get("phase", "?") for c in (causal or [])[:5])
             if causal_chain:
-                table.add_row("Trace:", causal_chain)
+                left.add_row("Trace:", causal_chain)
 
             debug_entries = result.get("debug_entries", [])
             if debug_entries:
-                table.add_row("Debug:", f"[dim]{len(debug_entries)} entries[/]")
+                left.add_row("Debug:", f"[dim]{len(debug_entries)} entries[/]")
 
-            console.print(Panel(table, title=f"[bold]CHAPPiE Report[/]  [dim]{proc_time:.0f}ms · {provider}/{model}[/]", border_style="blue"))
-        else:
-            print(f"{Colors.DEBUG}{'─' * 60}")
-            print(f"  [INTENT]  {intent} ({confidence:.2f}) | Tools: {', '.join(tools) or 'none'}")
+            mood, mood_color = self._status_mood(emotion_after if isinstance(emotion_after, dict) else {})
+            right.add_row("[bold]Stimmung:[/]", f"[bold {mood_color}]{mood.upper()}[/]")
             for name in EMOTION_NAMES:
                 b = emotion_before.get(name, 0)
                 a = emotion_after.get(name, 0)
                 d = a - b
-                if d != 0:
-                    print(f"  [EMO]     {name}: {b} → {a} ({'+' if d > 0 else ''}{d})")
+                if d == 0:
+                    right.add_row(name, f"[dim]{b} → {a} (+0)[/]")
+                    continue
+                sign = f"[green]↑+{d}[/]" if d > 0 else f"[red]↓{d}[/]"
+                right.add_row(name, f"{b} → [bold]{a}[/] {sign}")
+
+            steer_str = "VECTOR" if ("vector" in prompt_mode or "layer" in prompt_mode) else "PROMPT"
             dom = steering.get("dominant_vector", "neutral")
-            print(f"  [STEER]   {prompt_mode} | {dom} ({steering.get('dominant_strength', 0):.2f})")
-            print(f"  [TONE]    {tone.get('tone', '?')}")
+            dom_s = steering.get("dominant_strength", 0)
+            right.add_row("Steering:", f"[{_emo_color(int(dom_s * 100))}]{steer_str} | {dom} ({dom_s:.2f})[/]")
+
+            try:
+                width = console.width or shutil.get_terminal_size(fallback=(100, 24)).columns  # type: ignore[union-attr]
+            except Exception:
+                width = shutil.get_terminal_size(fallback=(100, 24)).columns
+            if width >= self.STATUS_TWO_COLUMN_MIN_WIDTH:
+                grid = Table.grid(expand=True, padding=(0, 1))
+                grid.add_column(ratio=1)
+                grid.add_column(width=1)
+                grid.add_column(ratio=1)
+                sep_height = max(left.row_count, right.row_count)
+                grid.add_row(
+                    left,
+                    Text("\n".join([self.STATUS_SEP] * max(1, sep_height)), style="dim", justify="center"),
+                    right,
+                )
+                content = grid
+            else:
+                content = _RichGroup(left, Text(""), right) if _RichGroup else left
+            console.print(Panel(content, title=f"[bold]CHAPPiE Final Report[/]  [dim]{proc_time:.0f}ms · {provider}/{model}[/]", border_style="blue"))
+        else:
+            left_lines = [f"  [INTENT]  {intent} ({confidence:.2f}) | Tools: {', '.join(tools) or 'none'}"]
+            left_lines.append(f"  [TONE]    {tone.get('tone', '?')}")
             fmt_source = result.get("formatting_source", "local_fallback")
             fmt_failed = result.get("formatting_failed", False)
+            fmt_reason = result.get("formatting_reason", result.get("formatting_skip_reason", ""))
             if fmt_failed:
                 fmt_label = "LOCAL (Groq-API fehlgeschlagen)"
-                print(f"  {Colors.ERROR}[FORMAT]  {fmt_label} ({result.get('formatting_model', '?')}){Colors.RESET}")
+                left_lines.append(f"  {Colors.ERROR}[FORMAT]  {fmt_label} ({result.get('formatting_model', '?')}){Colors.RESET}")
             else:
                 fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
-                print(f"  [FORMAT]  {fmt_label} ({result.get('formatting_model', '?')})")
+                reason_txt = f" Grund: {fmt_reason}" if fmt_reason else ""
+                left_lines.append(f"  [FORMAT]  {fmt_label} ({result.get('formatting_model', '?')}){reason_txt}")
             if rep_events:
-                print(f"  [REP]     {', '.join(rep_events.keys())}")
-            print(f"  [TIME]    {proc_time:.0f} ms | {provider}/{model}")
+                left_lines.append(f"  [REP]     {', '.join(rep_events.keys())}")
+            left_lines.append(f"  [TIME]    {proc_time:.0f} ms | {provider}/{model}")
+            right_lines = []
+            try:
+                mood, _ = self._status_mood(emotion_after if isinstance(emotion_after, dict) else {})
+            except Exception:
+                mood = "neutral"
+            right_lines.append(f"  Stimmung: {mood.upper()}")
+            for name in EMOTION_NAMES:
+                b = emotion_before.get(name, 0)
+                a = emotion_after.get(name, 0)
+                d = a - b
+                right_lines.append(f"  [EMO]     {name}: {b} → {a} ({'+' if d > 0 else ''}{d})")
+            dom = steering.get("dominant_vector", "neutral")
+            right_lines.append(f"  [STEER]   {prompt_mode} | {dom} ({steering.get('dominant_strength', 0):.2f})")
+            try:
+                width = shutil.get_terminal_size(fallback=(100, 24)).columns
+            except Exception:
+                width = 100
+            print(f"{Colors.DEBUG}{'─' * 60}")
+            if width >= self.STATUS_TWO_COLUMN_MIN_WIDTH:
+                left_w = max((len(line) for line in left_lines), default=0)
+                sep = f" {self.STATUS_SEP} "
+                for i in range(max(len(left_lines), len(right_lines))):
+                    left_part = left_lines[i] if i < len(left_lines) else " " * left_w
+                    right_part = right_lines[i] if i < len(right_lines) else ""
+                    print(f"{left_part:<{left_w}}{sep}{right_part}")
+            else:
+                for line in left_lines:
+                    print(line)
+                print(f"  {self.STATUS_SEP * 2} Gefuehle {self.STATUS_SEP * 2}")
+                for line in right_lines:
+                    print(line)
             print(f"{'─' * 60}{Colors.RESET}")
 
     # ── full report (/last) ───────────────────────────────────────
@@ -1204,29 +1266,19 @@ class CHAPPiEBrainCLI:
         elif raw_answer:
             console.print(Panel(Text(raw_answer, style="bright_cyan"), title="[bold bright_cyan]CHAPPiE (raw)[/]", border_style="bright_cyan", padding=(0, 1)))
 
-        panels: list = []
-
-        panels.append(self._panel_emotions(result))
-        panels.append(self._panel_intent_json(result))
-        panels.append(self._panel_tools(result))
-        panels.append(self._panel_memory(result))
-        panels.append(self._panel_workspace(result))
-        panels.append(self._panel_steering(result))
-        panels.append(self._panel_tone(result))
-        panels.append(self._panel_budget(result))
-        panels.append(self._panel_timing(result))
-        panels.append(self._panel_causal(result))
-        panels.append(self._panel_consolidation(result))
-        panels.append(self._panel_repetition(result))
-        panels.append(self._panel_debug(result))
-
+        from cli.report import responsive_report, runtime_panel
+        left = [runtime_panel(result), self._panel_intent_json(result), self._panel_tools(result),
+                self._panel_memory(result), self._panel_workspace(result), self._panel_budget(result),
+                self._panel_timing(result), self._panel_causal(result), self._panel_consolidation(result)]
+        right = [self._panel_steering(result), self._panel_emotions(result), self._panel_tone(result),
+                 self._panel_repetition(result)]
+        console.print(responsive_report(left, right, console.width))
+        debug_panel = self._panel_debug(result)
+        if debug_panel:
+            console.print(debug_panel)
         proc_time = result.get("processing_time_ms", 0)
         provider = result.get("provider", "?")
         model = result.get("model", "?")
-
-        for panel in panels:
-            if panel:
-                console.print(panel)
 
         console.print(f"[dim]━━━ CHAPPiE Full Report · {proc_time:.0f}ms · {provider}/{model} ━━━[/]")
 
@@ -1274,12 +1326,14 @@ class CHAPPiEBrainCLI:
             fmt_source = metadata.get("formatting_source", "local_fallback")
             fmt_failed = metadata.get("formatting_failed", False)
             fmt_model = metadata.get("formatting_model", "?")
+            fmt_reason = metadata.get("formatting_reason", metadata.get("formatting_skip_reason", ""))
             if fmt_failed:
                 console.print(f"[red]Format: LOCAL (Groq-API fehlgeschlagen) ({fmt_model})[/]")
             else:
                 fmt_color = "green" if fmt_source == "groq" else "yellow"
                 fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
-                console.print(f"[{fmt_color}]Format: {fmt_label} ({fmt_model})[/]")
+                reason_txt = f" Grund: {fmt_reason}" if fmt_reason else ""
+                console.print(f"[{fmt_color}]Format: {fmt_label} ({fmt_model}){reason_txt}[/]")
             console.print(f"[dim]Intent: {intent} ({conf:.2f}) | Time: {proc_time:.0f}ms[/]")
         else:
             cot = metadata.get("formatted_cot", "")
@@ -1293,32 +1347,20 @@ class CHAPPiEBrainCLI:
                 print(f"{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {answer}\n")
             fmt_source = metadata.get("formatting_source", "local_fallback")
             fmt_failed = metadata.get("formatting_failed", False)
+            fmt_reason = metadata.get("formatting_reason", metadata.get("formatting_skip_reason", ""))
             if fmt_failed:
                 print(f"{Colors.ERROR}  [FORMAT] LOCAL (Groq-API fehlgeschlagen) ({metadata.get('formatting_model', '?')}){Colors.RESET}")
             else:
                 fmt_label = "GROQ" if fmt_source == "groq" else "LOCAL"
-                print(f"  [FORMAT]  {fmt_label} ({metadata.get('formatting_model', '?')})")
+                reason_txt = f" Grund: {fmt_reason}" if fmt_reason else ""
+                print(f"  [FORMAT]  {fmt_label} ({metadata.get('formatting_model', '?')}){reason_txt}")
 
     # ── full report panels ────────────────────────────────────────
 
     @staticmethod
     def _panel_emotions(result: dict) -> Optional[Panel]:
-        before = result.get("emotions_before", {})
-        after = result.get("emotions", {})
-        if not before or not after:
-            return None
-        lines = []
-        for name in EMOTION_NAMES:
-            b = before.get(name, 0)
-            a = after.get(name, 0)
-            d = a - b
-            if d == 0:
-                continue
-            sign = "[green]+[/]" if d > 0 else "[red]-[/]"
-            lines.append(f"  {name:>12}: {b:>3} → [bold]{a:>3}[/]  ({sign}{abs(d)})")
-        if not lines:
-            lines.append("  (keine Aenderungen)")
-        return Panel("\n".join(lines), title="[bold yellow]Emotionen[/]", border_style="yellow")
+        from cli.report import emotion_panel
+        return emotion_panel(result)
 
     @staticmethod
     def _panel_intent_json(result: dict) -> Optional[Panel]:
@@ -1389,22 +1431,8 @@ class CHAPPiEBrainCLI:
 
     @staticmethod
     def _panel_steering(result: dict) -> Optional[Panel]:
-        s = result.get("emotion_steering", {})
-        mode = result.get("prompt_emotion_mode", "?")
-        if not s:
-            return None
-        lines = [
-            f"  Mode:      {mode}",
-            f"  Aktiv:     {'JA' if s.get('steering_active') else 'NEIN'}",
-            f"  Dominant:  {s.get('dominant_vector', 'neutral')} ({s.get('dominant_strength', 0):.2f})",
-        ]
-        for v in s.get("active_vectors", [])[:5]:
-            if isinstance(v, dict):
-                lines.append(f"  Vector:    {v.get('name', '?')} alpha={v.get('alpha', 0):.2f}")
-        for m in s.get("composite_modes", [])[:3]:
-            if isinstance(m, dict):
-                lines.append(f"  Composite: {m.get('name', '?')} ({m.get('strength', 0):.2f})")
-        return Panel("\n".join(lines), title="[bold red]Steering Report[/]", border_style="red")
+        from cli.report import steering_panel
+        return steering_panel(result)
 
     @staticmethod
     def _panel_tone(result: dict) -> Optional[Panel]:
@@ -1438,19 +1466,8 @@ class CHAPPiEBrainCLI:
 
     @staticmethod
     def _panel_timing(result: dict) -> Optional[Panel]:
-        t = result.get("timing", {})
-        proc = result.get("processing_time_ms", 0)
-        if not t:
-            return Panel(f"  Total: {proc:.0f}ms", title="[bold blue]Timing[/]", border_style="blue")
-        lines = [
-            f"  TTFT:             {t.get('ttft_ms', 0)}ms",
-            f"  Reasoning:        {t.get('reasoning_tokens', 0)} tk in {t.get('reasoning_time_ms', 0)}ms",
-            f"  Answer:           {t.get('answer_tokens', 0)} tk in {t.get('answer_time_ms', 0)}ms",
-            f"  Total tokens:     {t.get('total_tokens', 0)}",
-            f"  Generation:       {t.get('total_gen_ms', 0)}ms",
-            f"  Total processing: {proc:.0f}ms",
-        ]
-        return Panel("\n".join(lines), title="[bold blue]Timing[/]", border_style="blue")
+        from cli.report import timing_panel
+        return timing_panel(result)
 
     @staticmethod
     def _panel_causal(result: dict) -> Optional[Panel]:
@@ -1507,6 +1524,357 @@ class CHAPPiEBrainCLI:
 
     # ── status display ────────────────────────────────────────────
 
+    STATUS_TWO_COLUMN_MIN_WIDTH = 100
+    STATUS_THREE_COLUMN_MIN_WIDTH = 150
+    STATUS_SEP = "│"
+
+    @staticmethod
+    def _status_mood(emotions: Dict[str, Any]) -> tuple[str, str]:
+        """Stimmungslabel plus Rich-Farbe, robust gegen leere Dicts."""
+        try:
+            h = int(emotions.get("happiness", 50) or 0)
+            s = int(emotions.get("sadness", 0) or 0)
+            f = int(emotions.get("frustration", 0) or 0)
+        except (TypeError, ValueError):
+            return "neutral", "dim"
+        if h > 60:
+            return "positiv", "green"
+        if s > 40 or f > 50:
+            return "angespannt", "red"
+        return "neutral", "dim"
+
+    @staticmethod
+    def _short_session_id(session_id: Any) -> str:
+        if not session_id:
+            return "?"
+        text = str(session_id)
+        return text[:8] if len(text) > 8 else text
+
+    @staticmethod
+    def _format_goal(goal: Any) -> str:
+        if not isinstance(goal, dict) or not goal:
+            return "?"
+        title = str(goal.get("title", "?") or "?")
+        try:
+            progress = float(goal.get("progress", 0) or 0)
+        except (TypeError, ValueError):
+            return title
+        if progress > 1:
+            progress = progress / 100.0
+        return f"{title} ({progress:.0%})"
+
+    def _status_remote_settings(self) -> Dict[str, Any]:
+        """Best-effort /settings fuer Remote, nie blockierend."""
+        if not self._use_remote or not HAS_REQUESTS:
+            return {}
+        try:
+            base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+            if not base:
+                return {}
+            data = requests.get(f"{base}/settings", timeout=3).json()
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _remote_session_flag(self, name: str) -> Any:
+        """Best-effort Session Flag aus der Remote Session, sonst '?'."""
+        if not self._use_remote or not HAS_REQUESTS:
+            return "?"
+        try:
+            base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+            sid = getattr(self, "session_id", None)
+            if not base or not sid:
+                return "?"
+            data = requests.get(f"{base}/sessions/{sid}/settings", timeout=3).json()
+            if isinstance(data, dict):
+                value = data.get(name, "?")
+                return value if isinstance(value, bool) else "?"
+            return "?"
+        except Exception:
+            return "?"
+
+    def _status_right_rows(self, status: Dict[str, Any], life: Dict[str, Any], remote_settings: Optional[Dict[str, Any]] = None) -> list:
+        """Zehn kompakte (key, rich_value, plain_value) fuer die mittlere Tabelle."""
+        status = status if isinstance(status, dict) else {}
+        life = life if isinstance(life, dict) else {}
+        if remote_settings is None:
+            remote_settings = self._status_remote_settings()
+        remote_settings = remote_settings if isinstance(remote_settings, dict) else {}
+
+        model = str(status.get("model", "?") or "?")
+        provider = str(status.get("provider", "?") or "?")
+        mode = "REMOTE" if self._use_remote else "LOKAL"
+
+        if self._use_remote:
+            steering_on = remote_settings.get("enable_steering", status.get("emotion_steering_active"))
+            two_step = status.get("two_step_enabled", remote_settings.get("enable_two_step_processing", "?"))
+            thinking = remote_settings.get("chain_of_thought", "?")
+            if steering_on is True:
+                steering = "AN"
+            elif steering_on is False:
+                steering = "AUS"
+            else:
+                steering = "?"
+        else:
+            try:
+                s = self._settings()
+            except Exception:
+                s = None
+            if model == "?":
+                model = str(getattr(s, "vllm_model", "?") or "?")
+            if provider == "?":
+                try:
+                    provider = str(s.llm_provider.value)  # type: ignore[union-attr]
+                except Exception:
+                    pass
+            try:
+                local_steering = bool(getattr(s, "enable_steering", True))
+                is_local = bool(self.steering.is_local_provider())  # type: ignore[attr-defined]
+                steering = f"AN ({'VEKTOR' if is_local else 'PROMPT'})" if local_steering else "AUS"
+            except Exception:
+                steering = "AN" if status.get("emotion_steering_active") else "?"
+            two_step = status.get("two_step_enabled", getattr(s, "enable_two_step_processing", "?") if s else "?")
+            thinking = getattr(s, "chain_of_thought", "?") if s else "?"
+
+        def on_off(value: Any) -> tuple[str, str]:
+            if value is True:
+                return "[green]AN[/]", "AN"
+            if value is False:
+                return "[red]AUS[/]", "AUS"
+            if isinstance(value, str) and value.startswith("AN ("):
+                return f"[green]{value}[/]", value
+            text = str(value) if value not in (None, "") else "?"
+            return text, text
+
+        two_rich, two_plain = on_off(two_step)
+        think_rich, think_plain = on_off(thinking)
+        if isinstance(steering, str) and steering.startswith("AN"):
+            steer_rich = f"[green]{steering}[/]"
+        elif steering == "AUS":
+            steer_rich = "[red]AUS[/]"
+        else:
+            steer_rich = str(steering)
+
+        try:
+            history_len = len(self.history) if isinstance(getattr(self, "history", None), list) else 0
+        except Exception:
+            history_len = 0
+        session_plain = f"{self._short_session_id(getattr(self, 'session_id', None))} ({history_len} Nachrichten)"
+        session_rich = session_plain
+
+        daily = status.get("daily_info_count")
+        if daily is None and not self._use_remote:
+            try:
+                daily = self.short_term.get_count()  # type: ignore[attr-defined]
+            except Exception:
+                daily = None
+        short_txt = str(daily) if isinstance(daily, int) else "?"
+        if self._use_remote:
+            long_count: Any = "?"
+            memory_on: Any = self._remote_session_flag("memory_enabled")
+        else:
+            try:
+                raw_long = self.backend.memory.get_memory_count()  # type: ignore[attr-defined]
+                long_count = raw_long if isinstance(raw_long, int) else "?"
+            except Exception:
+                long_count = "?"
+            try:
+                runtime_settings = self.backend.chat_manager.get_runtime_settings(self.session_id)  # type: ignore[attr-defined]
+                memory_on = bool(runtime_settings.memory_enabled)
+            except Exception:
+                memory_on = "?"
+        long_txt = str(long_count) if isinstance(long_count, int) else "?"
+        if memory_on is True:
+            mem_state_rich, mem_state_plain = "[green]AN[/]", "AN"
+        elif memory_on is False:
+            mem_state_rich, mem_state_plain = "[red]AUS[/]", "AUS"
+        else:
+            mem_state_rich, mem_state_plain = "?", "?"
+        memory_plain = f"{mem_state_plain} ({long_txt} Langzeit / {short_txt} Kurzzeit)"
+        memory_rich = f"{mem_state_rich} ({long_txt} Langzeit / {short_txt} Kurzzeit)"
+
+        clock = life.get("clock", {}) if isinstance(life.get("clock"), dict) else {}
+        phase_plain = str(clock.get("phase_label", "?") or "?")
+        goal_plain = self._format_goal(life.get("active_goal"))
+        activity = str(life.get("current_activity", "?") or "?")
+        current_mode = str(life.get("current_mode", "?") or "?")
+        activity_plain = f"{activity} / {current_mode}" if "?" not in (activity, current_mode) else (activity if current_mode == "?" else current_mode)
+
+        return [
+            ("Modell:", model, model),
+            ("Provider:", f"{provider} [{mode}]", f"{provider} [{mode}]"),
+            ("Steering:", steer_rich, steering),
+            ("Two-Step:", two_rich, two_plain),
+            ("Thinking:", think_rich, think_plain),
+            ("Session:", session_rich, session_plain),
+            ("Memory:", memory_rich, memory_plain),
+            ("Phase:", phase_plain, phase_plain),
+            ("Ziel:", goal_plain, goal_plain),
+            ("Aktivitaet:", activity_plain, activity_plain),
+        ]
+
+    def _status_links(self) -> tuple[str, str]:
+        """(Web-UI URL, API URL) fuer klickbare Links, lokal Defaults, remote vom Backend Host."""
+        if self._use_remote:
+            base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "") or ""
+            api_url = base.rstrip("/") or "?"
+            try:
+                parts = urlsplit(base)
+                host = parts.hostname or ""
+                web_url = f"{parts.scheme or 'http'}://{host}:4173" if host else "?"
+            except Exception:
+                web_url = "?"
+            return web_url, api_url
+        return "http://localhost:4173", "http://localhost:8010"
+
+    def _status_model_details(self, remote_settings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Modelldetailwerte fuer die dritte Spalte, lokal aus Settings, remote aus /settings."""
+        if self._use_remote:
+            if remote_settings is None:
+                remote_settings = self._status_remote_settings()
+            remote = remote_settings if isinstance(remote_settings, dict) else {}
+            provider = str(remote.get("intent_provider", "") or "").lower()
+            if provider == "groq":
+                intent_model = remote.get("intent_processor_model_groq", "?")
+            elif provider == "ollama":
+                intent_model = remote.get("intent_processor_model_ollama", "?")
+            else:
+                intent_model = remote.get("intent_processor_model_vllm", remote.get("vllm_model", "?"))
+            return {
+                "embedding_model": remote.get("embedding_model", "?"),
+                "context_token_limit": remote.get("context_token_limit", "?"),
+                "max_tokens": remote.get("max_tokens", "?"),
+                "thinking_limit": remote.get("chappie_thinking_token_limit", "?"),
+                "temperature": remote.get("temperature", "?"),
+                "top_p": remote.get("top_p", "?"),
+                "top_k": remote.get("top_k", "?"),
+            "steering_model": remote.get("steering_model", "?"),
+            "intent_model": intent_model,
+            "web_url": self._status_links()[0],
+            "api_url": self._status_links()[1],
+        }
+        try:
+            s = self._settings()
+        except Exception:
+            return {}
+        try:
+            intent_model = s.get_intent_model()
+        except Exception:
+            intent_model = "?"
+        return {
+            "embedding_model": getattr(s, "embedding_model", "?"),
+            "context_token_limit": getattr(s, "context_token_limit", "?"),
+            "max_tokens": getattr(s, "max_tokens", "?"),
+            "thinking_limit": getattr(s, "chappie_thinking_token_limit", "?"),
+            "temperature": getattr(s, "temperature", "?"),
+            "top_p": getattr(s, "top_p", "?"),
+            "top_k": getattr(s, "top_k", "?"),
+            "steering_model": getattr(s, "steering_model", "?"),
+            "intent_model": intent_model,
+            "web_url": self._status_links()[0],
+            "api_url": self._status_links()[1],
+        }
+
+    def _status_extra_rows(self, details: Dict[str, Any]) -> list:
+        """Zehn kompakte (key, rich_value, plain_value) fuer die dritte Tabelle."""
+        d = details if isinstance(details, dict) else {}
+
+        def known(key: str) -> str:
+            value = d.get(key, "?")
+            return "?" if value in (None, "") else str(value)
+
+        def tokens(key: str) -> str:
+            value = d.get(key, "?")
+            try:
+                return f"{int(value)} Tokens"
+            except (TypeError, ValueError):
+                return "?"
+
+        top_p, top_k = known("top_p"), known("top_k")
+        sampling = f"{top_p} / {top_k}" if "?" not in (top_p, top_k) else "?"
+
+        def link(key: str) -> tuple[str, str]:
+            url = known(key)
+            if url == "?":
+                return "?", "?"
+            return f"[link={url}]{url}[/link]", url
+
+        web_rich, web_plain = link("web_url")
+        api_rich, api_plain = link("api_url")
+
+        return [
+            ("Embedding:", known("embedding_model"), known("embedding_model")),
+            ("Kontext:", tokens("context_token_limit"), tokens("context_token_limit")),
+            ("Max Tokens:", known("max_tokens"), known("max_tokens")),
+            ("Denken-Limit:", known("thinking_limit"), known("thinking_limit")),
+            ("Temperatur:", known("temperature"), known("temperature")),
+            ("Top-P/K:", sampling, sampling),
+            ("Steering-Mod:", known("steering_model"), known("steering_model")),
+            ("Intent-Mod:", known("intent_model"), known("intent_model")),
+            ("Web-UI:", web_rich, web_plain),
+            ("API:", api_rich, api_plain),
+        ]
+
+    @staticmethod
+    def _status_top_emotions(emotions: Dict[str, Any], count: int = 3) -> set:
+        """Namen der hoechsten Emotionswerte, Gleichstand nach Kanalreihenfolge. Leer wenn alle Null sind."""
+        scored = []
+        for index, name in enumerate(EMOTION_NAMES):
+            try:
+                value = int((emotions or {}).get(name, 0) or 0)
+            except (TypeError, ValueError, AttributeError):
+                value = 0
+            scored.append((-value, index, name))
+        scored.sort()
+        return {name for neg, _, name in scored[:count] if -neg > 0}
+
+    def _status_left_table(self, emotions: Dict[str, Any]):
+        left = Table(box=None, show_header=False, padding=(0, 1))
+        left.add_column("k", style="dim")
+        left.add_column("v")
+        mood, color = self._status_mood(emotions if isinstance(emotions, dict) else {})
+        left.add_row("[bold]Stimmung:[/]", f"[bold {color}]{mood.upper()}[/]")
+        top = self._status_top_emotions(emotions)
+        for name in EMOTION_NAMES:
+            try:
+                val = int((emotions or {}).get(name, 0) or 0)
+            except (TypeError, ValueError, AttributeError):
+                val = 0
+            bar_str = _bar(max(0, min(100, val)), width=15)
+            marker = "[bold cyan]◀[/]" if name in top else ""
+            left.add_row(name, f"[{_emo_color(val)}]{bar_str} {val:>3}[/] {marker}".rstrip())
+        return left
+
+    def _status_key_value_table(self, rows: list):
+        """Zwei Spalten Key und Wert ohne eigene Trennlinie, der Teiler steht aussen."""
+        table = Table(box=None, show_header=False, padding=(0, 1))
+        table.add_column("k", style="dim")
+        table.add_column("v", overflow="fold")
+        for key, rich_val, _plain in rows:
+            table.add_row(key, rich_val)
+        return table
+
+    def _status_right_table(self, rows: list):
+        return self._status_key_value_table(rows)
+
+    def _status_extra_table(self, rows: list):
+        return self._status_key_value_table(rows)
+
+    def _status_plain_lines(self, emotions: Dict[str, Any], rows: list, extra_rows: list) -> tuple[list, list, list]:
+        mood, _ = self._status_mood(emotions if isinstance(emotions, dict) else {})
+        left_lines = [f"Stimmung: {mood.upper()}"]
+        top = self._status_top_emotions(emotions)
+        for name in EMOTION_NAMES:
+            try:
+                val = int((emotions or {}).get(name, 0) or 0)
+            except (TypeError, ValueError, AttributeError):
+                val = 0
+            marker = " ◀" if name in top else ""
+            left_lines.append(f"{name:>12} {_bar(max(0, min(100, val)), width=15)} {val:>3}{marker}")
+        middle_lines = [f"{key:<14} {plain}" for key, _rich, plain in rows]
+        extra_lines = [f"{key:<14} {plain}" for key, _rich, plain in extra_rows]
+        return left_lines, middle_lines, extra_lines
+
     def _show_status(self):
         if self._use_remote:
             status = self.remote.get_status()
@@ -1518,58 +1886,289 @@ class CHAPPiEBrainCLI:
 
         emotions = status.get("emotions", {})
         if not emotions and not self._use_remote:
-            state = self.emotions.get_state()
-            emotions = state.to_dict()
+            try:
+                state = self.emotions.get_state()
+                emotions = state.to_dict()
+            except Exception:
+                emotions = {}
         life = status.get("life_state", {}) or status.get("life_snapshot", {}) or status.get("life", {})
+        if not isinstance(life, dict):
+            life = {}
+        remote_settings = self._status_remote_settings()
+        rows = self._status_right_rows(status, life, remote_settings)
+        extra_rows = self._status_extra_rows(self._status_model_details(remote_settings))
+
+        def _sep_cell(height: int):
+            """Trennlinie ueber die volle Blockhoehe, nicht nur ein Zeichen oben."""
+            height = max(1, int(height or 1))
+            return Text("\n".join([self.STATUS_SEP] * height), style="dim", justify="center")
 
         if HAS_RICH:
-            table = Table(box=box.SIMPLE, show_header=False, padding=(0, 1))
-            table.add_column("k", style="dim")
-            table.add_column("v")
-
-            mood = "neutral"
-            h = emotions.get("happiness", 50)
-            s = emotions.get("sadness", 0)
-            f = emotions.get("frustration", 0)
-            if h > 60:
-                mood = "[green]positiv[/]"
-            elif s > 40 or f > 50:
-                mood = "[red]angespannt[/]"
-            table.add_row("Stimmung:", mood)
-
-            for name in EMOTION_NAMES:
-                val = emotions.get(name, 0) if isinstance(emotions, dict) else 0
-                bar_str = _bar(val, width=15)
-                table.add_row(name, f"[{_emo_color(val)}]{bar_str} {val:>3}[/]")
-
-            if life:
-                clock = life.get("clock", {})
-                goal = life.get("active_goal", {})
-                table.add_row("Phase:", clock.get("phase_label", "?"))
-                if goal:
-                    table.add_row("Ziel:", f"{goal.get('title', '?')} ({goal.get('progress', 0):.0%})")
-
-            table.add_row("Modell:", f"{status.get('model', '?')} | {status.get('provider', '?')}")
-            table.add_row("Two-Step:", "AN" if status.get("two_step_enabled") else "AUS")
-            console.print(Panel(table, title="[bold]CHAPPiE Status[/]", border_style="cyan"))
+            left = self._status_left_table(emotions)
+            middle = self._status_right_table(rows)
+            extra = self._status_extra_table(extra_rows)
+            try:
+                width = console.width or shutil.get_terminal_size(fallback=(100, 24)).columns  # type: ignore[union-attr]
+            except Exception:
+                width = shutil.get_terminal_size(fallback=(100, 24)).columns
+            if width >= self.STATUS_THREE_COLUMN_MIN_WIDTH:
+                grid = Table.grid(expand=True, padding=(0, 1))
+                grid.add_column(ratio=3)
+                grid.add_column(width=1)
+                grid.add_column(ratio=4)
+                grid.add_column(width=1)
+                grid.add_column(ratio=4)
+                full_height = max(len(EMOTION_NAMES) + 1, len(rows), len(extra_rows))
+                grid.add_row(left, _sep_cell(full_height), middle, _sep_cell(full_height), extra)
+                content = grid
+            elif width >= self.STATUS_TWO_COLUMN_MIN_WIDTH:
+                grid = Table.grid(expand=True, padding=(0, 1))
+                grid.add_column(ratio=1)
+                grid.add_column(width=1)
+                grid.add_column(ratio=1)
+                grid.add_row(left, _sep_cell(max(len(EMOTION_NAMES) + 1, len(rows))), middle)
+                content = _RichGroup(grid, Text(""), extra) if _RichGroup else grid
+            else:
+                content = _RichGroup(left, Text(""), middle, Text(""), extra) if _RichGroup else left
+            if _RichGroup:
+                content = _RichGroup(Text(""), content, Text(""))
+            console.print(Panel(content, title="[bold]CHAPPiE Status[/]", border_style="cyan"))  # type: ignore[union-attr]
         else:
+            left_lines, middle_lines, extra_lines = self._status_plain_lines(emotions, rows, extra_rows)
+            try:
+                width = shutil.get_terminal_size(fallback=(100, 24)).columns
+            except Exception:
+                width = 100
             print(f"\n{Colors.EMOTION}{'═' * 50}")
             print("  CHAPPiE Status")
-            for name in EMOTION_NAMES:
-                val = emotions.get(name, 0) if isinstance(emotions, dict) else 0
-                print(f"    {name:>12} {_bar(val)} {val:>3}")
-            if life:
-                print(f"  Phase: {life.get('clock', {}).get('phase_label', '?')}")
-            print(f"  Modell: {status.get('model', '?')} | Provider: {status.get('provider', '?')}")
+            print()
+            if width >= self.STATUS_THREE_COLUMN_MIN_WIDTH:
+                left_w = max((len(line) for line in left_lines), default=0)
+                middle_w = max((len(line) for line in middle_lines), default=0)
+                sep = f" {self.STATUS_SEP} "
+                for i in range(max(len(left_lines), len(middle_lines), len(extra_lines))):
+                    left_part = left_lines[i] if i < len(left_lines) else " " * left_w
+                    middle_part = middle_lines[i] if i < len(middle_lines) else " " * middle_w
+                    extra_part = extra_lines[i] if i < len(extra_lines) else ""
+                    print(f"    {left_part:<{left_w}}{sep}{middle_part:<{middle_w}}{sep}{extra_part}")
+            elif width >= self.STATUS_TWO_COLUMN_MIN_WIDTH:
+                left_w = max((len(line) for line in left_lines), default=0)
+                sep = f" {self.STATUS_SEP} "
+                for i in range(max(len(left_lines), len(middle_lines))):
+                    left_part = left_lines[i] if i < len(left_lines) else " " * left_w
+                    middle_part = middle_lines[i] if i < len(middle_lines) else ""
+                    print(f"    {left_part:<{left_w}}{sep}{middle_part}")
+                print(f"  {self.STATUS_SEP * 2} Modelldetails {self.STATUS_SEP * 2}")
+                for line in extra_lines:
+                    print(f"    {line}")
+            else:
+                for line in left_lines:
+                    print(f"    {line}")
+                print(f"  {self.STATUS_SEP * 2} System {self.STATUS_SEP * 2}")
+                for line in middle_lines:
+                    print(f"    {line}")
+                print(f"  {self.STATUS_SEP * 2} Modelldetails {self.STATUS_SEP * 2}")
+                for line in extra_lines:
+                    print(f"    {line}")
+            print()
             print(f"{'═' * 50}{Colors.RESET}\n")
 
     # ── commands ──────────────────────────────────────────────────
+
+    def _session_entries(self) -> list:
+        """Sessionliste lokal oder remote, nie werfend, immer als Liste."""
+        try:
+            if self._use_remote:
+                base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
+                if not base:
+                    return []
+                data = requests.get(f"{base}/sessions", timeout=3).json()
+                sessions = data if isinstance(data, list) else data.get("sessions", [])
+            else:
+                sessions = self.backend.chat_manager.list_sessions()  # type: ignore[union-attr]
+        except Exception:
+            return []
+        return list(sessions) if isinstance(sessions, list) else []
+
+    def _session_completions(self) -> list:
+        """(id, titel) Paare fuer Tab Vervollstaendigung nach /session."""
+        out = []
+        for entry in self._session_entries():
+            if isinstance(entry, dict) and entry.get("id"):
+                out.append((str(entry["id"]), str(entry.get("title", ""))[:60]))
+        return out
+
+    @staticmethod
+    def _session_message_count(entry: Any) -> Any:
+        """Nachrichtenzahl aus message_count oder messages, sonst '?'."""
+        if not isinstance(entry, dict):
+            return "?"
+        count = entry.get("message_count")
+        if isinstance(count, int):
+            return count
+        messages = entry.get("messages")
+        if isinstance(messages, list):
+            return len(messages)
+        return "?"
+
+    def _resolve_session_target(self, target: str) -> Optional[str]:
+        """Exakte ID gewinnt, sonst eindeutiges Praefix. Fehler werden gemeldet, dann None."""
+        ids = [str(e["id"]) for e in self._session_entries() if isinstance(e, dict) and e.get("id")]
+        if target in ids:
+            return target
+        matches = [i for i in ids if i.startswith(target)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            _error(f"Session nicht gefunden: {target}")
+            print("  Tippe /sessions fuer die Liste, /session <Anfang der ID> reicht.")
+            return None
+        short = ", ".join(self._short_session_id(m) for m in matches[:8])
+        _error(f"Mehrdeutig: {target} passt auf {len(matches)} Sessions ({short})")
+        return None
+
+    def _refresh_session_view(self, session_id: Any, title: Any, messages: Any) -> None:
+        try:
+            if HAS_RICH and console is not None:
+                try:
+                    console.clear()
+                except Exception:
+                    pass
+            else:
+                try:
+                    os.system("clear" if os.name != "nt" else "cls")
+                except Exception:
+                    print("\033c", end="")
+        except Exception:
+            pass
+        short = self._short_session_id(session_id)
+        clean_title = str(title or "").strip() or "Ohne Titel"
+        count = len(messages) if isinstance(messages, list) else 0
+        _success(f"Session gewechselt: {short} ({count} Nachrichten)")
+        print(f"{Colors.DIM}{clean_title}{Colors.RESET}\n")
+        if not messages:
+            print(f"{Colors.DIM}Noch keine Nachrichten in dieser Session.{Colors.RESET}\n")
+        else:
+            for msg in messages if isinstance(messages, list) else []:
+                if not isinstance(msg, dict):
+                    continue
+                role = str(msg.get("role", "?"))
+                content = str(msg.get("content", "") or "")
+                if not content.strip():
+                    continue
+                if role == "user":
+                    if HAS_RICH and console is not None:
+                        console.print(_response_panel(content, "[bold green]User[/]", "green"))
+                    else:
+                        print(f"\n{Colors.USER}{Colors.BOLD}User >{Colors.RESET} {content}\n")
+                else:
+                    if HAS_RICH and console is not None:
+                        console.print(_response_panel(content, "[bold bright_cyan]CHAPPiE[/]", "bright_cyan"))
+                    else:
+                        print(f"\n{Colors.AI}{Colors.BOLD}CHAPPiE >{Colors.RESET} {content}\n")
+        try:
+            if not self._use_remote and hasattr(self, "backend") and self.backend is not None:
+                try:
+                    runtime = self.backend.chat_manager.get_runtime_settings(self.session_id)
+                    print(f"{Colors.DIM}Session-Flags: Memory {'AN' if runtime.memory_enabled else 'AUS'} | Steering {'AN' if runtime.steering_enabled else 'AUS'} ({runtime.steering_mode}) | Live {'AN' if runtime.live_enabled else 'AUS'}{Colors.RESET}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            self._show_status()
+        except Exception:
+            pass
+
+    def _handle_emotion_fallback(self, cmd: str) -> None:
+        parts = cmd.split()
+        try:
+            state_fn = getattr(getattr(self.backend, "emotions", None), "get_state", None)
+            state = state_fn().to_dict() if callable(state_fn) else {}
+        except Exception:
+            state = {}
+        if len(parts) == 1:
+            lines = ["**Aktuelle Emotions-Werte:**\n"]
+            for name in EMOTION_NAMES:
+                lines.append(f"- **{name}**: {state.get(name, '?')}/100")
+            lines.append("\n*Syntax: /emotion <name> [+/-]<0-100>*")
+            lines.append("*Beispiel: /emotion happiness +10, /emotion sadness -5*")
+            _print_command_output("\n".join(lines))
+            return
+        if len(parts) != 3:
+            _print_command_output("Nutze: `/emotion <name> [+/-]<0-100>`")
+            return
+        _, emotion, val_str = parts
+        if emotion not in EMOTION_NAMES:
+            _print_command_output(f"Unbekannte Emotion: `{emotion}`.")
+            return
+        try:
+            frozen_fn = getattr(getattr(self.backend, "emotions", None), "is_frozen", None)
+            if callable(frozen_fn) and frozen_fn() is True:
+                _print_command_output("Emotionen sind eingefroren. Nutze `/emofreeze off` zum Freigeben.")
+                return
+        except Exception:
+            pass
+        try:
+            parsed = int(val_str)
+        except ValueError:
+            _print_command_output(f"Ungueltiger Wert: `{val_str}`.")
+            return
+        current = state.get(emotion, 50)
+        try:
+            current = int(current)
+        except (TypeError, ValueError):
+            current = 50
+        is_delta = val_str.startswith("+") or val_str.startswith("-")
+        target = current + parsed if is_delta else parsed
+        clamped = max(0, min(100, target))
+        try:
+            self.backend.emotions.set_emotion(emotion, clamped)
+        except Exception:
+            pass
+        if target != clamped:
+            direction = "Maximum" if target > 100 else "Minimum"
+            overflow = abs(target - clamped)
+            _print_command_output(f"**{emotion}**: {current} {'+' if parsed > 0 else ''}{parsed} -> **{clamped}**/100 ({direction} erreicht, {overflow})")
+        else:
+            _print_command_output(f"**{emotion}**: {current} -> **{clamped}**/100")
 
     def _handle_command(self, cmd: str) -> bool:
         cmd_lower = cmd.lower().strip()
 
         if cmd_lower in ("/exit", "/quit"):
             return False
+
+        if (cmd_lower.split() or [""])[0] in {"/memory", "/steering", "/live", "/emotion", "/preset", "/emofreeze", "/default"}:
+            if self._use_remote:
+                output = self.remote.handle_command(cmd, session_id=self.session_id)
+                self.session_id = self.remote.session_id
+                _print_command_output(output)
+            else:
+                try:
+                    from api.services.command_service import execute_slash_command
+                    session_id, _ = self._ensure_local_session()
+                    result = execute_slash_command(cmd, self.backend, session_id=session_id)
+                    self.last_result = result
+                    replacement = result.get("replacement_session_id")
+                    if replacement:
+                        self.session_id = replacement
+                        try:
+                            self.backend.chat_manager.set_active_session(replacement)
+                        except Exception:
+                            pass
+                    _print_command_output(result["response_text"])
+                except (AttributeError, TypeError):
+                    fallback = None
+                    try:
+                        fallback = self.backend.handle_command(cmd)
+                    except Exception:
+                        fallback = None
+                    if fallback is not None and not str(fallback).startswith("Unbekannter Command:") and (cmd_lower.split() or [""])[0] != "/emotion":
+                        _print_command_output(str(fallback))
+                    else:
+                        self._handle_emotion_fallback(cmd)
+            return True
 
         if cmd_lower == "/status":
             self._show_status()
@@ -1682,7 +2281,7 @@ class CHAPPiEBrainCLI:
             self._handle_model_command(args[1])
             return True
 
-        if cmd_lower == "/thinking":
+        if cmd_lower == "/thinking" or cmd_lower == "/thinking status":
             if self._use_remote:
                 try:
                     base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
@@ -1697,21 +2296,23 @@ class CHAPPiEBrainCLI:
             provider_label = s.llm_provider.value.upper() if not self._use_remote else "REMOTE"
             print(f"\n{Colors.AI}Thinking/Reasoning: {Colors.BOLD}{status_str}{Colors.RESET}")
             print(f"  Provider: {provider_label}")
-            print(f"  vLLM: {'enable_thinking' if s.chain_of_thought else 'kein Reasoning'}")
+            print("  vLLM: natives Thinking auf Qwen3.5-4B deaktiviert (Build ohne Reasoning-Support, Prosa-Leak verifiziert)")
             print(f"  Ollama: {'think aktiv' if s.chain_of_thought else 'think deaktiviert'}")
             print(f"  Groq: {'CoT-Prompt aktiv' if s.chain_of_thought else 'kein CoT-Prompt'}")
-            print(f"\n{Colors.DIM}Syntax: /thinking true | /thinking false{Colors.RESET}\n")
+            print(f"\n{Colors.DIM}Syntax: /thinking on | /thinking off | /thinking status{Colors.RESET}\n")
             return True
 
         if cmd_lower.startswith("/thinking "):
             _, val = cmd.split(maxsplit=1)
             val = val.lower().strip()
+            if val in ("status", "show"):
+                return self._handle_command("/thinking")
             if val in ("true", "on", "an", "1", "ja", "yes"):
                 new_val = True
             elif val in ("false", "off", "aus", "0", "nein", "no"):
                 new_val = False
             else:
-                _error(f"Ungueltiger Wert: {val}. Nutze: /thinking true | /thinking false")
+                _error(f"Ungueltiger Wert: {val}. Nutze: /thinking on | /thinking off")
                 return True
             s = self._settings()
             s.update_from_ui(chain_of_thought=new_val)
@@ -1725,120 +2326,18 @@ class CHAPPiEBrainCLI:
                 self.backend.apply_runtime_settings(force=True)
             status_str = "AN" if new_val else "AUS"
             _success(f"Thinking/Reasoning: {status_str}")
-            return True
-
-        if cmd_lower == "/steering":
-            if self._use_remote:
-                try:
-                    base = getattr(getattr(self, "remote", None), "base_url", self.remote_url or "")
-                    data = requests.get(f"{base}/emotions/state", timeout=10).json()
-                    steering = data.get("steering", {}) if isinstance(data, dict) else {}
-                    print(f"\n{Colors.STEER}Steering (remote): {steering.get('dominant_vector', '?')} ({steering.get('dominant_strength', 0):.2f}){Colors.RESET}\n")
-                except Exception:
-                    _log("STEERING", "Remote-Status nicht abrufbar", Colors.WARN)
-                return True
-            report = self.steering.build_debug_report(self.emotions.get_state().to_dict())
-            if HAS_RICH:
-                table = Table(box=box.SIMPLE, show_header=False)
-                table.add_column("k", style="bold red")
-                table.add_column("v")
-                table.add_row("Modus:", report.get("mode", "?"))
-                table.add_row("Aktiv:", "JA" if report.get("steering_active") else "NEIN")
-                table.add_row("Dominant:", f"{report.get('dominant_vector', 'neutral')} ({report.get('dominant_strength', 0):.2f})")
-                table.add_row("Vektoren:", ", ".join(v.get("name", "?") for v in report.get("base_vectors", [])[:5]))
-                console.print(Panel(table, title="[bold red]Steering Report[/]", border_style="red"))
-            else:
-                print(f"\n{Colors.STEER}Steering: {report.get('dominant_vector', '?')} ({report.get('dominant_strength', 0):.2f}){Colors.RESET}\n")
-            return True
-
-        if cmd_lower.startswith("/emotion"):
-            parts = cmd.split()
-            # /emotion ohne Argumente: Status + Hilfe anzeigen
-            if len(parts) == 1:
-                state = self.emotions.get_state() if not self._use_remote else None
-                if state:
-                    _log("EMOTION", "Aktuelle Emotions-Werte:", Colors.EMOTION)
-                    for name in EMOTION_NAMES:
-                        val = getattr(state, name, 0)
-                        bar_st = _bar(val, width=15)
-                        print(f"  {name:>12} [{Colors.AI}{bar_st}{Colors.RESET}] {val}")
-                else:
-                    try:
-                        r = requests.get(f"{self.remote_url}/emotions/state", timeout=5)
-                        data = r.json().get("emotions", {})
-                        _log("EMOTION", "Aktuelle Emotions-Werte:", Colors.EMOTION)
-                        for name in EMOTION_NAMES:
-                            val = data.get(name, "?")
-                            print(f"  {name:>12}  {val}")
-                    except Exception:
-                        _log("EMOTION", "Remote-Status nicht abrufbar", Colors.WARN)
-                print(f"\n{Colors.EMOTION}Syntax: /emotion <name> [+/-]<0-100>{Colors.RESET}")
-                print("  Beispiel: /emotion happiness +10  (erhoeht um 10)")
-                print("  Beispiel: /emotion sadness -5     (senkt um 5)")
-                print("  Beispiel: /emotion energy 50      (setzt absolut)")
-                return True
-
-            if len(parts) < 2:
-                _log("EMOTION", "Nutze: /emotion <name> [+/-]<0-100>", Colors.EMOTION)
-                return True
-
-            _, emotion, *rest = parts
-            valid = set(EMOTION_NAMES)
-            if emotion not in valid:
-                _error(f"Unbekannte Emotion: {emotion}")
-                return True
-
-            if not rest:
-                _log("EMOTION", f"Nutze: /emotion {emotion} [+/-]<0-100>", Colors.EMOTION)
-                return True
-
-            val_str = rest[0]
-            is_delta = val_str.startswith("+") or val_str.startswith("-")
-            try:
-                parsed = int(val_str)
-            except ValueError:
-                _error(f"Ungueltiger Wert: {val_str}")
-                return True
-
-            # Aktuellen Wert holen
-            if self._use_remote:
-                try:
-                    r = requests.get(f"{self.remote_url}/emotions/state", timeout=5)
-                    current = r.json().get("emotions", {}).get(emotion, 50)
-                except Exception:
-                    _error("Remote-Status nicht abrufbar")
-                    return True
-            else:
-                state = self.emotions.get_state()
-                current = getattr(state, emotion, 50)
-
-            # Zielwert berechnen
-            if is_delta:
-                target = current + parsed
-            else:
-                target = parsed
-
-            # Clamping
-            clamped = max(0, min(100, target))
-            if target != clamped:
-                direction = "Maximum" if target > 100 else "Minimum"
-                overflow = abs(target - clamped)
-                _warn(f"{emotion}: {current} {'+' if parsed > 0 else ''}{parsed} → {clamped} ({direction} erreicht, um {overflow} {'reduziert' if target > 100 else 'erhoeht'})")
-            else:
-                delta_str = f" {'+' if parsed > 0 else ''}{parsed}" if is_delta else ""
-                _success(f"{emotion}: {current}{delta_str} → {clamped}")
-
-            # Anwenden
-            if self._use_remote:
-                try:
-                    requests.post(f"{self.remote_url}/emotions/state", json={emotion: clamped}, timeout=5)
-                except Exception as e:
-                    _error(f"Remote-Fehler: {e}")
-            else:
-                self.emotions.set_emotion(emotion, clamped)
+            if new_val:
+                _log("THINKING", "Hinweis: Qwen3.5-4B hat keinen nativen Reasoning-Support, kein CoT sichtbar. Wirkt auf Ollama/Groq.", Colors.WARN)
             return True
 
         if cmd_lower == "/resetemotions":
+            try:
+                frozen = bool(self.backend.emotions.is_frozen()) if not self._use_remote and hasattr(self.backend, "emotions") and hasattr(self.backend.emotions, "is_frozen") else False
+            except Exception:
+                frozen = False
+            if frozen:
+                _error("Emotionen sind eingefroren. Nutze /emofreeze off zum Freigeben.")
+                return True
             if self._use_remote:
                 try:
                     response = requests.post(f"{self.remote_url}/emotions/reset", timeout=5)
@@ -1858,65 +2357,14 @@ class CHAPPiEBrainCLI:
                 output = self.remote.handle_command("/sleep", session_id=self.session_id)
                 self.session_id = self.remote.session_id
                 if output and not output.startswith("Error"):
-                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                    _print_command_output(output)
                 else:
                     _error(output or "Sleep fehlgeschlagen")
                 return True
             from api.services.command_service import execute_slash_command as _exec_sleep
             result = _exec_sleep("/sleep", self.backend)
             self.last_result = result
-            print(f"\n{Colors.MEMORY}{result.get('response_text', '')}{Colors.RESET}\n")
-            return True
-
-        if cmd_lower == "/memory" or cmd_lower.startswith("/memory "):
-            query = cmd.split(maxsplit=1)[1] if len(cmd.split(maxsplit=1)) > 1 else ""
-            if self._use_remote:
-                try:
-                    if query:
-                        from urllib.parse import quote
-                        data = requests.get(f"{self.remote_url}/memories?q={quote(query)}&limit=10", timeout=10).json()
-                        items = data.get("items", [])
-                        if not items:
-                            _log("LTM", "Keine Erinnerungen gefunden", Colors.MEMORY)
-                        else:
-                            print(f"\n{Colors.MEMORY}Erinnerungen ({len(items)}):")
-                            for it in items[:10]:
-                                print(f"  [{it.get('label', '?')}] {str(it.get('content', ''))[:100]}")
-                            print(Colors.RESET)
-                    else:
-                        data = requests.get(f"{self.remote_url}/memories/short-term", timeout=10).json()
-                        items = data.get("items", [])
-                        if not items:
-                            _log("STM", "Keine Eintraege im Kurzzeitgedaechtnis", Colors.MEMORY)
-                        else:
-                            print(f"\n{Colors.MEMORY}Kurzzeitgedaechtnis ({len(items)} Eintraege):")
-                            for e in items[:15]:
-                                print(f"  [{e.get('category', '?')}] {str(e.get('content', ''))[:80]}")
-                            print(Colors.RESET)
-                except Exception as e:
-                    _error(f"Memory-Abfrage fehlgeschlagen: {e}")
-                return True
-            if query:
-                try:
-                    results = self.memory.search_memory(query, top_k=10)
-                    if not results:
-                        _log("LTM", "Keine Erinnerungen gefunden", Colors.MEMORY)
-                    else:
-                        print(f"\n{Colors.MEMORY}Erinnerungen ({len(results)}):")
-                        for e in results[:10]:
-                            print(f"  [{getattr(e, 'label', '?')}] {str(getattr(e, 'content', ''))[:100]}")
-                        print(Colors.RESET)
-                except Exception as e:
-                    _error(f"LTM-Suche fehlgeschlagen: {e}")
-                return True
-            entries = self.short_term.get_active_entries()
-            if not entries:
-                _log("STM", "Keine Eintraege im Kurzzeitgedaechtnis", Colors.MEMORY)
-            else:
-                print(f"\n{Colors.MEMORY}Kurzzeitgedaechtnis ({len(entries)} Eintraege):")
-                for e in entries[:15]:
-                    print(f"  [{e.category}] {e.content[:80]}{'...' if len(e.content) > 80 else ''}")
-                print(Colors.RESET)
+            _print_command_output(result.get("response_text", ""))
             return True
 
         if cmd_lower == "/history":
@@ -1931,6 +2379,9 @@ class CHAPPiEBrainCLI:
                     print(f"  {color}[{role}] {content}{'...' if len(msg.get('content', '')) > 80 else ''}{Colors.RESET}")
                 print()
             return True
+
+        if cmd_lower == "/copy" or cmd_lower.startswith("/copy "):
+            return self._handle_copy_command(cmd)
 
         if cmd_lower in ("/clear", "/new"):
             if self._use_remote:
@@ -1962,48 +2413,59 @@ class CHAPPiEBrainCLI:
         if cmd_lower == "/sessions":
             if self._use_remote:
                 try:
-                    data = requests.get(f"{self.remote_url}/sessions", timeout=10).json()
-                    sessions = data if isinstance(data, list) else data.get("sessions", data)
-                    print(f"\n{Colors.AI}Sessions ({len(sessions) if isinstance(sessions, list) else '?'}):")
-                    for s in (sessions if isinstance(sessions, list) else [])[:20]:
+                    sessions = self._session_entries()
+                    print(f"\n{Colors.AI}Sessions ({len(sessions)}):")
+                    for s in sessions[:20]:
                         mark = "*" if s.get("id") == self.session_id else " "
-                        print(f" {mark} {s.get('id', '?')}  {s.get('title', '')}  ({len(s.get('messages', []))} Nachrichten)")
+                        print(f" {mark} {self._short_session_id(s.get('id', '?')):<8}  {str(s.get('title', ''))[:60]}  ({self._session_message_count(s)} Nachrichten)")
                     print()
                 except Exception as e:
                     _error(f"Sessions konnten nicht geladen werden: {e}")
                 return True
             try:
-                sessions = self.backend.chat_manager.list_sessions()
+                sessions = self.backend.chat_manager.list_sessions()  # type: ignore[union-attr]
                 print(f"\n{Colors.AI}Sessions ({len(sessions)}):")
                 for s in sessions[:20]:
                     mark = "*" if s.get("id") == self.session_id else " "
-                    print(f" {mark} {s.get('id', '?')}  {s.get('title', '')}")
+                    print(f" {mark} {self._short_session_id(s.get('id', '?')):<8}  {str(s.get('title', ''))[:60]}  ({self._session_message_count(s)} Nachrichten)")
                 print()
             except Exception as e:
                 _error(f"Sessions konnten nicht geladen werden: {e}")
+            return True
+
+        if cmd_lower == "/session":
+            print(f"\n{Colors.DIM}Syntax: /session <ID oder Anfang der ID>  (Tab vervollstaendigt, /sessions listet auf){Colors.RESET}\n")
             return True
 
         if cmd_lower.startswith("/session "):
             target = cmd.split(maxsplit=1)[1].strip()
             if self._use_remote:
                 try:
-                    data = requests.get(f"{self.remote_url}/sessions/{target}", timeout=10).json()
+                    resolved = self._resolve_session_target(target)
+                    if resolved is None:
+                        return True
+                    data = requests.get(f"{self.remote_url}/sessions/{resolved}", timeout=10).json()
                     if isinstance(data, dict) and data.get("id"):
                         self.session_id = data["id"]
                         self.remote.session_id = data["id"]
                         self.history = list(data.get("messages", []))
-                        _success(f"Session gewechselt: {self.session_id}")
+                        self.last_result = None
+                        self._refresh_session_view(data.get("id"), data.get("title", ""), self.history)
                     else:
                         _error("Session nicht gefunden")
                 except Exception as e:
                     _error(f"Session-Wechsel fehlgeschlagen: {e}")
                 return True
             try:
-                session = self.backend.chat_manager.load_session(target)
-                self.backend.chat_manager.set_active_session(target)
-                self.session_id = target
+                resolved = self._resolve_session_target(target)
+                if resolved is None:
+                    return True
+                session = self.backend.chat_manager.load_session(resolved)  # type: ignore[union-attr]
+                self.backend.chat_manager.set_active_session(resolved)  # type: ignore[union-attr]
+                self.session_id = resolved
                 self.history = list(session.get("messages", []))
-                _success(f"Session gewechselt: {target}")
+                self.last_result = None
+                self._refresh_session_view(resolved, session.get("title", ""), self.history)
             except Exception as e:
                 _error(f"Session-Wechsel fehlgeschlagen: {e}")
             return True
@@ -2102,31 +2564,113 @@ class CHAPPiEBrainCLI:
             result = self.remote.handle_command(backend_cmd, session_id=self.session_id)
             self.session_id = self.remote.session_id
             if result and not result.startswith("Error"):
-                print(f"\n{Colors.MEMORY}{result}{Colors.RESET}\n")
+                _print_command_output(result)
                 return True
 
         if self.backend:
             from api.services.command_service import execute_slash_command as _exec_fallback
             try:
-                cmd_result = _exec_fallback(backend_cmd, self.backend)
+                cmd_result = _exec_fallback(backend_cmd, self.backend, session_id=self.session_id)
                 replacement = cmd_result.get("replacement_session_id")
                 if replacement:
                     self.session_id = replacement
                     self.backend.chat_manager.set_active_session(replacement)
                 output = cmd_result.get("response_text", "")
                 if output and output != f"Unbekannter Command: {backend_cmd}":
-                    print(f"\n{Colors.MEMORY}{output}{Colors.RESET}\n")
+                    _print_command_output(output)
                     self.last_result = cmd_result
                     return True
             except Exception:
                 pass
             result = self.backend.handle_command(backend_cmd)
             if not result.startswith("Unbekannter Command:"):
-                print(f"\n{Colors.MEMORY}{result}{Colors.RESET}\n")
+                _print_command_output(result)
                 return True
 
         _warn(f"Unbekannter Befehl: {cmd}")
         print("  Tippe /help fuer alle Befehle")
+        return True
+
+    def _handle_copy_command(self, cmd: str) -> bool:
+        """Exports the active session and sends a safe OSC 52 clipboard request."""
+        parts = cmd.strip().split()
+        mode = parts[1].lower() if len(parts) == 2 else ""
+        if len(parts) == 1:
+            try:
+                choice = input(
+                    "Kopieren: [1] Standard (UI-Daten)  [2] Debug (vollständiger Export) > "
+                ).strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                return True
+            if choice in ("1", "standard", "ui"):
+                mode = "standard"
+            elif choice in ("2", "debug", "vollständig", "vollstaendig"):
+                mode = "debug"
+            else:
+                _warn("Ungueltige Auswahl. Nutze: /copy standard | /copy debug")
+                return True
+        elif len(parts) != 2 or mode not in ("standard", "debug"):
+            _warn("Ungueltiger Modus. Nutze: /copy standard | /copy debug")
+            return True
+
+        fallback_path = ""
+        if self._use_remote:
+            response = self.remote.export_session(mode, session_id=self.session_id)
+            if response.get("error"):
+                _error(f"Session-Export fehlgeschlagen: {response['error']}")
+                return True
+            export = response.get("export")
+            fallback_path = str(response.get("fallback_path") or "")
+        else:
+            try:
+                from web_infrastructure.session_export import (
+                    SessionExportError,
+                    backend_data_directory,
+                    build_session_export,
+                    write_session_export,
+                )
+
+                export = build_session_export(self.backend, self.session_id, mode=mode)
+                fallback_path = str(
+                    write_session_export(export, backend_data_directory(self.backend))
+                )
+            except SessionExportError as exc:
+                _error(f"Session-Export fehlgeschlagen: {exc}")
+                return True
+            except Exception as exc:
+                _error(f"Session-Export fehlgeschlagen: {exc}")
+                return True
+
+        if not isinstance(export, dict):
+            _error("Session-Export lieferte kein gültiges JSON-Objekt.")
+            return True
+
+        from web_infrastructure.session_export import build_clipboard_text, emit_osc52, serialize_session_export
+
+        payload = serialize_session_export(export)
+        clipboard = emit_osc52(payload)
+        label = "Standard" if mode == "standard" else "Debug"
+        if clipboard.get("sent"):
+            _success(f"{label}-Export als JSON an die Terminal-Zwischenablage gesendet.")
+        else:
+            # Volle JSON-Exports (live: 302 KB Standard) passen nie in OSC 52.
+            # Die Zwischenablage bekommt den kompakten Verlauf, die Datei das volle JSON.
+            compact = build_clipboard_text(export)
+            clipboard_compact = emit_osc52(compact)
+            if clipboard_compact.get("sent"):
+                _success(f"Gesprächsverlauf in Zwischenablage kopiert (kompakt lesbar, {len(compact.encode('utf-8')) // 1024} KB).")
+                _log("COPY", "Vollständiges JSON liegt in der Fallback-Datei (siehe unten).", Colors.MEMORY)
+            elif clipboard_compact.get("reason") == "stdout_not_tty" or clipboard.get("reason") == "stdout_not_tty":
+                _warn("Keine interaktive Terminal-Zwischenablage erkannt.")
+            elif clipboard.get("reason") == "payload_too_large":
+                _warn("JSON ist für eine sichere OSC-52-Übertragung zu groß.")
+            else:
+                _warn("OSC-52-Zwischenablage konnte nicht angesprochen werden.")
+        if fallback_path:
+            _log("COPY", f"Vollständige Fallback-Datei: {fallback_path}", Colors.MEMORY)
+        else:
+            _warn("Keine Fallback-Datei vom Server gemeldet.")
         return True
 
     def _handle_model_command(self, args: str) -> None:
@@ -2269,8 +2813,13 @@ class CHAPPiEBrainCLI:
             lines.append(sep.join(cells))
         lines += [
             "",
-            "Weitere: /stats /think /deep think /life /growth /world /habits ... wie in der Web-UI"[:total],
+            "Weitere: /stats /life /world /habits ..."[:total],
             "Tipp: /emotion <name> [+/-]<0-100>, z.B. /emotion happiness +10"[:total],
+            "Tipp: /preset <schlecht|neutral|wohl> setzt eine Gefuehlslage"[:total],
+            "Tipp: /emofreeze on|off friert Emotionen fuer Tests ein"[:total],
+            "Tipp: /default stellt alle Settings auf Standard zurueck"[:total],
+            "Tipp: /thinking on|off zeigt Chain of Thought an oder aus"[:total],
+            "Tipp: /session <ID> wechselt mit Refresh und laedt den Verlauf"[:total],
             "",
             "Ctrl+C         Generierung abbrechen (Streaming)",
         ]
@@ -2290,12 +2839,12 @@ class CHAPPiEBrainCLI:
 
         print(f"""
 {Colors.AI}{Colors.BOLD}
-  ██████╗ ██████╗  █████╗ ██╗███╗   ██╗
-  ██╔══██╗██╔══██╗██╔══██╗██║████╗  ██║
-  ██████╔╝██████╔╝███████║██║██╔██╗ ██║
-  ██╔══██╗██╔══██╗██╔══██║██║██║╚██╗██║
-  ██████╔╝██║  ██║██║  ██║██║██║ ╚████║
-  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
+   ██████╗ ██╗  ██╗  █████╗  ██████╗  ██████╗  ██╗ ███████╗
+  ██╔════╝ ██║  ██║ ██╔══██╗ ██╔══██╗ ██╔══██╗ ██║ ██╔════╝
+  ██║      ███████║ ███████║ ██████╔╝ ██████╔╝ ██║ █████╗  
+  ██║      ██╔══██║ ██╔══██║ ██╔═══╝  ██╔═══╝  ██║ ██╔══╝  
+  ╚██████╗ ██║  ██║ ██║  ██║ ██║      ██║      ██║ ███████╗
+   ╚═════╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═╝      ╚═╝      ╚═╝ ╚══════╝
 {Colors.AI}CHAPPiE Terminal Interface v{self.CLI_VERSION} [{mode_str}]
 {Colors.STEER}Steering: {steering_info} | {len(EMOTION_NAMES)} Emotionale Dimensionen
 {Colors.DEBUG}Live Streaming + Debug-Report | Tippe /help fuer alle Befehle
@@ -2314,15 +2863,37 @@ class CHAPPiEBrainCLI:
             while True:
                 self._drain_background_output()
                 try:
-                    real_stdout.write(self._input_prompt())
-                    real_stdout.flush()
-                    if self._out_capture is not None:
-                        self._out_capture.main_capturing = True
-                    try:
+                    if not sys.stdin.isatty():
+                        # Pipes remain usable for command scripts.
                         user_input = input("")
-                    finally:
-                        if self._out_capture is not None:
-                            self._out_capture.main_capturing = False
+                    else:
+                        try:
+                            from cli.input import create_prompt_session
+                            from config.config import DATA_DIR
+                            from prompt_toolkit.formatted_text import ANSI
+                            from prompt_toolkit.patch_stdout import patch_stdout
+                        except ImportError:
+                            # prompt_toolkit is declared in requirements/runtime.txt
+                            # and installed in venv. Fall back to plain input so
+                            # the CLI still works with a bare system python.
+                            if not getattr(self, "_plain_input_warned", False):
+                                _error("Hinweis: prompt_toolkit fehlt, nutze einfache Eingabe (venv nutzen fuer Verlauf und Vervollstaendigung).")
+                                self._plain_input_warned = True
+                            user_input = input("")
+                        else:
+                            history_session = self.session_id or "new-session"
+                            if getattr(self, "_prompt_session_id", None) != history_session:
+                                self._prompt_session = create_prompt_session(DATA_DIR / "cli_history", history_session, session_provider=self._session_completions)
+                                self._prompt_session_id = history_session
+                            # Bypass the live-render capture during input. patch_stdout
+                            # redraws the prompt safely after background output.
+                            previous_stdout = sys.stdout
+                            sys.stdout = real_stdout
+                            try:
+                                with patch_stdout():
+                                    user_input = self._prompt_session.prompt(ANSI(self._input_prompt()))
+                            finally:
+                                sys.stdout = previous_stdout
                 except (KeyboardInterrupt, EOFError):
                     break
 
@@ -2355,7 +2926,7 @@ class CHAPPiEBrainCLI:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.8.6")
+    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v17.2.0-dev.2")
     parser.add_argument("--remote", action="store_true", help="Connect to remote backend via SSE")
     parser.add_argument("--url", default="http://localhost:8010", help="Backend URL (default: localhost:8010)")
     parser.add_argument("--model", type=str, default=None, help="Lokales vLLM-Modell ueberschreiben (z.B. gemma4-26b)")
