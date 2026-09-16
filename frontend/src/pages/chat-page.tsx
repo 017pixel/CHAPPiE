@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { estimateTextTokens, formatTokenRate } from "../lib/telemetry";
+import { countWords, formatTokenRate, formatWordRate, isEstimatedCount } from "../lib/telemetry";
 import { MarkdownText } from "../lib/markdown";
 import { api } from "../services/api";
 import { isSlashCommand } from "../store/ui";
@@ -60,7 +60,7 @@ const EMOTION_NAMES = [
   "calm",
 ] as const;
 
-const ALL_COMMANDS = ["/sleep", "/stats", "/help", "/clear", "/new", "/emotion", "/deep think 10", "/life", "/plan", "/debug", "/growth"];
+const ALL_COMMANDS = ["/sleep", "/stats", "/help", "/clear", "/new", "/emotion", "/preset", "/emofreeze", "/default", "/thinking", "/life", "/plan", "/debug"];
 
 function isPending(message: ChatMessage): boolean {
   return message.metadata?.pending === true;
@@ -131,7 +131,11 @@ function TerminalEntry({ message, thinkingEnabled, onSelectTrace }: { message: C
       {thinkingEnabled && cot && <details className="terminal-reasoning mb-2"><summary className="cursor-pointer list-none text-[10px] uppercase tracking-widest text-terminal-green">▶ reasoning / CoT</summary><NumberedText content={String(cot).length > 4000 ? `${String(cot).slice(0, 4000)}\n... (truncated)` : String(cot)} className={`mt-2 text-[10px] leading-relaxed ${hasError(message) ? "text-terminal-red/70" : "text-slate/55"}`} /></details>}
       {!isSystem && rawOutput && rawOutput !== visibleOutput && <details className="mb-2 text-[9px] text-slate/45"><summary className="cursor-pointer uppercase tracking-widest hover:text-slate/70">raw model output</summary><NumberedText content={rawOutput} className="mt-1 text-[10px] leading-relaxed text-slate/50" /></details>}
       {isSystem ? <NumberedText content={visibleOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} /> : <MarkdownText content={visibleOutput} className={`terminal-output ${hasError(message) ? "text-terminal-red/80" : "text-mist/85"}`} />}
-      {!isSystem && (isLive || timing.ttft_ms != null || timing.answer_tokens != null || meta.provider) && <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>ttft {formatDuration(timing.ttft_ms)}</span><span>{timing.answer_tokens ?? meta.live_pipeline?.answer_tokens ?? "—"} tk</span><span>{formatTokenRate(timing, meta, message.content)}</span><span>{meta.provider ?? "provider —"}</span></div>}
+      {!isSystem && (isLive || timing.ttft_ms != null || timing.answer_tokens != null || meta.provider) && (isLive ? (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>Live</span><span>{countWords(message.content)} Woerter (Schaetzung)</span><span>{formatWordRate(countWords(message.content), Number(meta.live_pipeline?.elapsed_ms ?? meta.timer_ms ?? 0))}</span><span>{meta.provider ?? "provider —"}</span></div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] uppercase tracking-widest text-slate/35"><span>Final</span><span>{timing.answer_tokens ?? "—"} tk</span><span>{formatTokenRate(timing, meta, message.content)}{isEstimatedCount(timing, meta) ? " (Schaetzung)" : ""}</span><span>{meta.provider ?? "provider —"}</span></div>
+      ))}
     </>}
     {isStreaming && <span className="terminal-cursor ml-7 text-terminal-green">▌</span>}
   </article>;
@@ -379,18 +383,21 @@ export function ChatPage() {
             setLivePipeline((previous) => {
               const startedAt = previous?.started_at ?? useUiStore.getState().genStartTime ?? now;
               const elapsed = Math.max(0, now - startedAt);
-              const answerTokens = estimateTextTokens(streamedContent);
+              const words = countWords(streamedContent);
               return {
                 ...(previous ?? {}),
                 stage: "streaming",
                 stage_key: "streaming",
-                status_text: "Antwort wird gestreamt",
+                status_text: "Live: Antwort wird gestreamt",
                 updated_at: now,
                 elapsed_ms: elapsed,
-                token_count: answerTokens,
-                answer_tokens: answerTokens,
+                token_count: words,
+                word_count: words,
+                answer_tokens: words,
+                count_unit: "words",
                 answer_time_ms: elapsed,
-                tokens_per_second: elapsed > 0 ? answerTokens / (elapsed / 1000) : 0,
+                tokens_per_second: elapsed > 0 ? words / (elapsed / 1000) : 0,
+                words_per_second: elapsed > 0 ? words / (elapsed / 1000) : 0,
                 provider: previous?.provider ?? status.provider,
                 model: previous?.model ?? status.model,
               };
@@ -401,7 +408,7 @@ export function ChatPage() {
               model: livePipeline?.model ?? status.model,
               live_pipeline: livePipeline,
               timing: {
-                answer_tokens: livePipeline?.answer_tokens ?? estimateTextTokens(streamedContent),
+                answer_tokens: livePipeline?.answer_tokens ?? countWords(streamedContent),
                 answer_time_ms: livePipeline?.answer_time_ms ?? 0,
                 tokens_per_second: livePipeline?.tokens_per_second ?? 0,
               },

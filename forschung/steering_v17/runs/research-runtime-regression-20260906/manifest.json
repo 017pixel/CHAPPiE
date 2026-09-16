@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T06:23:40.522407+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "757febd7bfaa968c5e0950882fcc6d194b79c693785d61f18f4b26f2c426d7b8",
+  "source_tree_sha256": "939d0974ef29953f4433cabe5834a9f96303c7b544bfc47174a9478b845383dd",
+  "model": "offline",
+  "dataset_hash": "929c0230b6d5ccb95e317e14aead63363ff7851f38c81c944ef4099871e64d5b",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/runs/research-runtime-regression-20260906/commands.json",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "standalone_regression"
+  ],
+  "seeds": [],
+  "temperature": 0,
+  "max_tokens": 0,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": null,
+  "vector_pack": null
+}

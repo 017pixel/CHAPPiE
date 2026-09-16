@@ -73,6 +73,7 @@ jobs:
             web_infrastructure/persistence.py \
             web_infrastructure/turn_context.py \
             web_infrastructure/turn_pipeline.py \
+            web_infrastructure/session_export.py \
             web_infrastructure/ui_utils.py \
             chappie_brain_cli.py
 
@@ -99,6 +100,8 @@ jobs:
           python tests/test_cli_display.py
           python tests/test_cli_commands.py
           python tests/test_cli_remote.py
+          python tests/test_cli_copy.py
+          python tests/test_session_export.py
           python tests/test_forschung_harness.py
           python tests/test_runtime_architecture.py
           python tests/test_pages_workflow.py
@@ -119,6 +122,18 @@ jobs:
           python tests/test_api_contract.py
           python tests/test_forschung_report.py
           python tests/test_report_v6.py
+          python tests/test_steering_judge.py
+          python tests/test_steering_acceptance.py
+          python tests/test_state_language_transfer.py
+          python tests/test_steering_layer_type_comparison.py
+          python tests/test_steering_composition.py
+          python tests/test_memory_event_store.py
+          python tests/test_memory_off_isolation.py
+          python tests/test_session_runtime_settings.py
+          python tests/test_cli_autocomplete.py
+          python tests/test_cli_history.py
+          python tests/test_two_column_report.py
+          python tests/test_steering_state_transfer_contract.py
           python tests/test_skill_sync.py
 
       - name: Lint active architecture boundaries

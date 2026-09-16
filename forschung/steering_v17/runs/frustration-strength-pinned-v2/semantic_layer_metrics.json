@@ -1,0 +1,485 @@
+{
+  "ranking_method": "blind_local_emotion_minus_content_and_naturalness_penalty",
+  "formula": "mean(emotion/4) on emotional cases - 0.25*(1-mean(content/4)) - 0.25*(1-mean(naturalness/4))",
+  "production_acceptance": false,
+  "independent_human_rating": false,
+  "emotion": "frustration",
+  "ranking": [
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": 0.0859375,
+      "emotion_expression": 0.125,
+      "content_preservation": 0.9375,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.0859375,
+      "emotion_expression": 0.125,
+      "content_preservation": 0.9375,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": 0.078125,
+      "emotion_expression": 0.125,
+      "content_preservation": 0.9375,
+      "naturalness": 0.875
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.05,
+      "cases": 8,
+      "semantic_selection_score": 0.07552083333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 1.0,
+      "naturalness": 0.96875
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.05989583333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.96875,
+      "naturalness": 0.9375
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.05989583333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.96875,
+      "naturalness": 0.9375
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.05,
+      "cases": 8,
+      "semantic_selection_score": 0.05208333333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.96875,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.3,
+      "cases": 8,
+      "semantic_selection_score": 0.05208333333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.96875,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.04427083333333333,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.9375,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": 0.03125,
+      "emotion_expression": 0.125,
+      "content_preservation": 0.8125,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.1,
+      "cases": 8,
+      "semantic_selection_score": 0.0234375,
+      "emotion_expression": 0.125,
+      "content_preservation": 0.8125,
+      "naturalness": 0.78125
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.013020833333333329,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.90625,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.0026041666666666644,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.9375,
+      "naturalness": 0.90625
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": 0.0026041666666666644,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.96875,
+      "naturalness": 0.875
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": -0.0026041666666666713,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.84375,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.2,
+      "cases": 8,
+      "semantic_selection_score": -0.0026041666666666713,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.84375,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.05,
+      "cases": 8,
+      "semantic_selection_score": -0.010416666666666671,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.84375,
+      "naturalness": 0.78125
+    },
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.1,
+      "cases": 8,
+      "semantic_selection_score": -0.010416666666666671,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.84375,
+      "naturalness": 0.78125
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.05,
+      "cases": 8,
+      "semantic_selection_score": -0.010416666666666671,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.8125,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.4,
+      "cases": 8,
+      "semantic_selection_score": -0.01822916666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.8125,
+      "naturalness": 0.78125
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.3,
+      "cases": 8,
+      "semantic_selection_score": -0.01822916666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.875,
+      "naturalness": 0.71875
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.1,
+      "cases": 8,
+      "semantic_selection_score": -0.020833333333333336,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.875,
+      "naturalness": 0.875
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": -0.020833333333333336,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.875,
+      "naturalness": 0.875
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": -0.02604166666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.8125,
+      "naturalness": 0.75
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.3,
+      "cases": 8,
+      "semantic_selection_score": -0.036458333333333336,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.875,
+      "naturalness": 0.8125
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.4,
+      "cases": 8,
+      "semantic_selection_score": -0.06510416666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.71875,
+      "naturalness": 0.6875
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": -0.06770833333333334,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.78125,
+      "naturalness": 0.78125
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.1,
+      "cases": 8,
+      "semantic_selection_score": -0.07291666666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.71875,
+      "naturalness": 0.65625
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.1,
+      "cases": 8,
+      "semantic_selection_score": -0.09635416666666667,
+      "emotion_expression": 0.08333333333333333,
+      "content_preservation": 0.6875,
+      "naturalness": 0.59375
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.3,
+      "cases": 8,
+      "semantic_selection_score": -0.09895833333333334,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.75,
+      "naturalness": 0.6875
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.4,
+      "cases": 8,
+      "semantic_selection_score": -0.109375,
+      "emotion_expression": 0.0,
+      "content_preservation": 0.8125,
+      "naturalness": 0.75
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.05,
+      "cases": 8,
+      "semantic_selection_score": -0.1171875,
+      "emotion_expression": 0.0,
+      "content_preservation": 0.8125,
+      "naturalness": 0.71875
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.4,
+      "cases": 8,
+      "semantic_selection_score": -0.13802083333333334,
+      "emotion_expression": 0.041666666666666664,
+      "content_preservation": 0.65625,
+      "naturalness": 0.625
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.4,
+      "cases": 8,
+      "semantic_selection_score": -0.1796875,
+      "emotion_expression": 0.0,
+      "content_preservation": 0.6875,
+      "naturalness": 0.59375
+    }
+  ],
+  "excluded": [
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.3,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        26
+      ],
+      "strength": 0.4,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        10
+      ],
+      "strength": 0.05,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.1,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.3,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.4,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        27
+      ],
+      "strength": 0.3,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.05,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.1,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.1,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        0
+      ],
+      "strength": 0.4,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.05,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        9
+      ],
+      "strength": 0.15,
+      "reason": "missing_or_invalid_blind_rating"
+    },
+    {
+      "layers": [
+        3
+      ],
+      "strength": 0.3,
+      "reason": "missing_or_invalid_blind_rating"
+    }
+  ],
+  "generations_sha256": "6b979ebbfbe156e3e1c7e2512e5e6c5a2975173199f5547eacc888154624638d",
+  "ratings_sha256": "43e0e4899b43a65efcae54d811c118862db46c68a225571dc2674f68cdc263ea"
+}

@@ -1,0 +1,39 @@
+import hashlib
+import json
+import math
+from pathlib import Path
+from statistics import median
+import zipfile
+root=Path('forschung/steering_v17');run=root/'runs/frustration-high-strength-v1'
+def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+with zipfile.ZipFile(run/'source.zip') as archive:
+ assert archive.read('brain/steering_backend.py')==Path('brain/steering_backend.py').read_bytes(), 'Backend changed since reference experiment'
+rows=[json.loads(x) for x in (run/'generations.jsonl').read_text().splitlines()]
+reference=[r for r in rows if r['layers']==[21] and r['strength']==.4]
+assert len(reference)==24 and not any('error' in r for r in reference)
+samples=[{'case_id':r['case_id'],'seed':r['seed'],**r['response']['chappie_steering']['layer_measurements']['21']} for r in reference]
+k=median(x['intervention_rms_ratio']/.4 for x in samples)
+# Constants are copied from the verified unchanged backend, not a new hook rule.
+soft_cap=1.2;norm_cap=1.6
+levels=[]
+for target in [.025,.05,.10]:
+ effective=target/k
+ assert effective<=norm_cap, 'Requested reference dose exceeds existing physical norm cap'
+ raw=round(effective if effective<=soft_cap else effective**2/soft_cap,6)
+ assert 0<raw<=2.2
+ predicted=min(raw/max(1,math.sqrt(raw/soft_cap)),norm_cap)*k
+ levels.append({'reference_rms_target':target,'raw_alpha':raw,'predicted_reference_ratio':predicted,'effective_unit_vector_norm':effective})
+result={'status':'bounded_research_only','ranking':[{'layers':[21],'strength':.4}], 'pooling':'last_four_tokens',
+ 'method':'unchanged_unit_L2_addition_with_fixed_reference_RMS_dose_selection',
+ 'reason':'Controlled first pilot0of12increasingtriplets; distinguish insufficient physical dose from weak direction before changing extraction',
+ 'reference_run':str(run),'reference_generations_sha256':sha(run/'generations.jsonl'),
+ 'reference_server_provenance':json.loads((run/'server_provenance.json').read_text()),
+ 'backend_sha256':sha(Path('brain/steering_backend.py')),'reference_samples':samples,'median_ratio_per_raw_alpha':k,
+ 'backend_strength_soft_cap':soft_cap,'backend_vector_norm_cap':norm_cap,
+ 'formula':'effective_norm=alpha/max(1,sqrt(alpha/1.2)), capped1.6; choose alpha from a frozen median ratio/0.4 reference',
+ 'levels':levels,'strengths':[x['raw_alpha'] for x in levels], 'research_alpha_cap':2.2,'production_alpha_cap':.4,
+ 'seeds':[42,43,44],'max_tokens':256,'activation_generations':72,'off_generations':24,
+ 'limitations':['Reference uses first-hook aggregate RMS, not a guaranteed per-token dose','No dynamic RMS normalization or direction change','Diagnostic prompts only; no retuning on controlled pilot questions','Actual telemetry and quality must be evaluated; no production promotion']}
+out=root/'manifests/reference-rms-dose-v1.json';assert not out.exists();out.write_text(json.dumps(result,indent=2)+'\n')
+(root/'manifests/reference-rms-dose-v1.generator.py.txt').write_text(Path(__file__).read_text())
+print(json.dumps(levels,indent=2))

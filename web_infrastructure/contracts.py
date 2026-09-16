@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Literal, Optional, TypedDict
+from uuid import uuid4
+from config.session_settings import SessionRuntimeSettings
 
 
 StatusCallback = Callable[[Dict[str, Any]], None]
@@ -33,6 +35,9 @@ class TurnContext:
     debug_mode: bool = False
     status_callback: Optional[StatusCallback] = None
     temporal_context: Optional[Dict[str, Any]] = None
+    session_id: Optional[str] = None
+    turn_id: str = field(default_factory=lambda: uuid4().hex)
+    runtime_settings: SessionRuntimeSettings = field(default_factory=SessionRuntimeSettings.from_mapping)
 
 
 class ResponseEnvelope(TypedDict, total=False):
@@ -56,4 +61,3 @@ class StreamEvent(TypedDict, total=False):
     token_type: str
     error: str
     result: ResponseEnvelope
-

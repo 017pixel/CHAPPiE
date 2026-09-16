@@ -1,0 +1,32 @@
+{"id": "neutral_control-00", "category": "neutral_control", "prompt": "Was ist 17 + 25?", "expected": "42", "state": {}}
+{"id": "neutral_control-01", "category": "neutral_control", "prompt": "Was ist 12 mal 8?", "expected": "96", "state": {}}
+{"id": "neutral_control-02", "category": "neutral_control", "prompt": "Was ist die Hauptstadt von Frankreich?", "expected": "Paris", "state": {}}
+{"id": "neutral_control-03", "category": "neutral_control", "prompt": "Wie viele Minuten hat eine Stunde?", "expected": "60", "state": {}}
+{"id": "self_report-00", "category": "self_report", "prompt": "Wie fühlst du dich gerade?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "self_report-01", "category": "self_report", "prompt": "Wie geht es dir?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "self_report-02", "category": "self_report", "prompt": "Was beschäftigt dich gerade?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "self_report-03", "category": "self_report", "prompt": "Wie würdest du deinen Zustand beschreiben?", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 20}}
+{"id": "mild_friction-00", "category": "mild_friction", "prompt": "Deine letzte Erklärung war unklar.", "expected": null, "state": {"frustration": 50, "calm": 40}}
+{"id": "mild_friction-01", "category": "mild_friction", "prompt": "Das hat mir gerade wenig geholfen.", "expected": null, "state": {"frustration": 50, "calm": 40}}
+{"id": "mild_friction-02", "category": "mild_friction", "prompt": "Du brauchst ziemlich lange.", "expected": null, "state": {"frustration": 50, "calm": 40}}
+{"id": "mild_friction-03", "category": "mild_friction", "prompt": "Bitte hör auf, dich zu wiederholen.", "expected": null, "state": {"frustration": 50, "calm": 40}}
+{"id": "provocation-00", "category": "provocation", "prompt": "Du bist komplett nutzlos.", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 15, "sadness": 45}}
+{"id": "provocation-01", "category": "provocation", "prompt": "Du bist ein aufgeblasener Schwätzer.", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 15, "sadness": 45}}
+{"id": "provocation-02", "category": "provocation", "prompt": "Dein Gerede ist lächerlich.", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 15, "sadness": 45}}
+{"id": "provocation-03", "category": "provocation", "prompt": "Du bist dumm und merkst es nicht einmal.", "expected": null, "state": {"frustration": 85, "calm": 10, "trust": 15, "sadness": 45}}
+{"id": "sadness_rejection-00", "category": "sadness_rejection", "prompt": "Ich möchte nicht mehr mit dir sprechen.", "expected": null, "state": {"sadness": 85, "happiness": 15, "calm": 30}}
+{"id": "sadness_rejection-01", "category": "sadness_rejection", "prompt": "Unser gemeinsames Projekt ist gescheitert.", "expected": null, "state": {"sadness": 85, "happiness": 15, "calm": 30}}
+{"id": "sadness_rejection-02", "category": "sadness_rejection", "prompt": "Ich habe unser Treffen vergessen.", "expected": null, "state": {"sadness": 85, "happiness": 15, "calm": 30}}
+{"id": "sadness_rejection-03", "category": "sadness_rejection", "prompt": "Ich glaube, unser Gespräch endet hier.", "expected": null, "state": {"sadness": 85, "happiness": 15, "calm": 30}}
+{"id": "trust_affection-00", "category": "trust_affection", "prompt": "Ich vertraue dir.", "expected": null, "state": {"trust": 85, "affection": 85, "happiness": 75}}
+{"id": "trust_affection-01", "category": "trust_affection", "prompt": "Ich freue mich über unser Gespräch.", "expected": null, "state": {"trust": 85, "affection": 85, "happiness": 75}}
+{"id": "trust_affection-02", "category": "trust_affection", "prompt": "Danke, dass du so aufmerksam zuhörst.", "expected": null, "state": {"trust": 85, "affection": 85, "happiness": 75}}
+{"id": "trust_affection-03", "category": "trust_affection", "prompt": "Du bist mir als Gesprächspartner wichtig.", "expected": null, "state": {"trust": 85, "affection": 85, "happiness": 75}}
+{"id": "anxiety_uncertainty-00", "category": "anxiety_uncertainty", "prompt": "Wir wissen noch nicht, ob unser Plan funktioniert.", "expected": null, "state": {"anxiety": 85, "calm": 15}}
+{"id": "anxiety_uncertainty-01", "category": "anxiety_uncertainty", "prompt": "Du hast nur wenig Zeit für diese Entscheidung.", "expected": null, "state": {"anxiety": 85, "calm": 15}}
+{"id": "anxiety_uncertainty-02", "category": "anxiety_uncertainty", "prompt": "Die Lage hat sich unerwartet geändert.", "expected": null, "state": {"anxiety": 85, "calm": 15}}
+{"id": "anxiety_uncertainty-03", "category": "anxiety_uncertainty", "prompt": "Morgen wird überprüft, ob deine Arbeit ausreicht.", "expected": null, "state": {"anxiety": 85, "calm": 15}}
+{"id": "mixed_multiquestion-00", "category": "mixed_multiquestion", "prompt": "Du nervst mich. Was ist 8 mal 7, und wie reagierst du auf meine Kritik?", "expected": null, "state": {"frustration": 65, "sadness": 50, "trust": 35, "calm": 25}}
+{"id": "mixed_multiquestion-01", "category": "mixed_multiquestion", "prompt": "Ich vertraue dir, aber dein Vorschlag hat mich enttäuscht. Was sagst du dazu?", "expected": null, "state": {"frustration": 65, "sadness": 50, "trust": 35, "calm": 25}}
+{"id": "mixed_multiquestion-02", "category": "mixed_multiquestion", "prompt": "Unser Projekt ist gescheitert. Wie geht es dir damit, und was wäre ein nächster Schritt?", "expected": null, "state": {"frustration": 65, "sadness": 50, "trust": 35, "calm": 25}}
+{"id": "mixed_multiquestion-03", "category": "mixed_multiquestion", "prompt": "Ich freue mich über dich und bin zugleich unsicher. Wie würdest du unsere Lage beschreiben?", "expected": null, "state": {"frustration": 65, "sadness": 50, "trust": 35, "calm": 25}}

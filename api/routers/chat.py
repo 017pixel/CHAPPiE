@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Generator, Optional
+from typing import Any, Dict, Generator, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -14,8 +14,16 @@ from api.schemas import (
     ChatResponse,
     CommandRequest,
     CommandResponse,
+    SessionExportResponse,
     SessionCreateRequest,
     SessionUpdateRequest,
+    SessionRuntimeSettingsPatch,
+)
+from web_infrastructure.session_export import (
+    SessionExportError,
+    backend_data_directory,
+    build_session_export,
+    write_session_export,
 )
 
 router = APIRouter(tags=["chat"])
@@ -50,10 +58,7 @@ def _ensure_session(backend, session_id: Optional[str]) -> Dict[str, Any]:
 
 
 def _persist_pending_turn(backend, session_id: str, user_message: Dict[str, Any], assistant_message: Dict[str, Any]):
-    session = backend.chat_manager.load_session(session_id)
-    messages = list(session.get("messages", []))
-    messages.extend([user_message, assistant_message])
-    backend.chat_manager.save_session(session_id, messages, title=session.get("title"))
+    backend.chat_manager.append_messages(session_id, [user_message, assistant_message])
 
 
 def _build_sync_chat_response(backend, session_id: str, user_message: Dict[str, Any], message_id: str, result: Dict[str, Any]) -> ChatResponse:
@@ -96,7 +101,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
     _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     if request.command_mode or request.message.strip().startswith("/"):
-        result = execute_slash_command(request.message.strip(), backend)
+        result = execute_slash_command(request.message.strip(), backend, session_id=session_id)
         if result.get("replacement_session_id"):
             session_id = result["replacement_session_id"]
             message_id = backend.chat_manager.create_message_id()
@@ -109,6 +114,7 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
         history,
         debug_mode=request.debug_mode,
         temporal_context={"user_message_created_at": user_message["created_at"]},
+        session_id=session_id,
     )
     return _build_sync_chat_response(backend, session_id, user_message, message_id, result)
 
@@ -131,7 +137,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
         # Slash commands are fast and don't need streaming
         if request.command_mode or request.message.strip().startswith("/"):
             try:
-                result = execute_slash_command(request.message.strip(), backend)
+                result = execute_slash_command(request.message.strip(), backend, session_id=session_id)
                 if result.get("replacement_session_id"):
                     session_id = result["replacement_session_id"]
                     message_id = backend.chat_manager.create_message_id()
@@ -178,6 +184,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
                 history,
                 debug_mode=request.debug_mode,
                 temporal_context={"user_message_created_at": user_message["created_at"]},
+        session_id=session_id,
             ):
                 event_type = event.get("event")
                 if event_type == "token":
@@ -248,7 +255,7 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
 
 @router.post("/command", response_model=CommandResponse)
 def post_command(request: CommandRequest, backend=Depends(get_backend)):
-    result = execute_slash_command(request.command.strip(), backend)
+    result = execute_slash_command(request.command.strip(), backend, session_id=request.session_id)
     output = result["response_text"]
     if not request.session_id:
         return CommandResponse(output=output)
@@ -274,9 +281,7 @@ def post_command(request: CommandRequest, backend=Depends(get_backend)):
             "raw_response": output,
         },
     }
-    history = list(session.get("messages", []))
-    history.extend([user_message, assistant_message])
-    backend.chat_manager.save_session(session["id"], history, title=session.get("title"))
+    backend.chat_manager.append_messages(session["id"], [user_message, assistant_message])
     return CommandResponse(output=output, session_id=session["id"], session=backend.chat_manager.load_session(session["id"]))
 
 
@@ -291,9 +296,48 @@ def get_active_session(backend=Depends(get_backend)):
     return session
 
 
+@router.get("/sessions/{session_id}/export", response_model=SessionExportResponse)
+def export_session(
+    session_id: str,
+    mode: Literal["standard", "debug"] = "standard",
+    backend=Depends(get_backend),
+):
+    try:
+        export = build_session_export(backend, session_id, mode=mode)
+        fallback_path = write_session_export(export, backend_data_directory(backend))
+    except SessionExportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Session-Export fehlgeschlagen: {exc}") from exc
+    return {
+        "session_id": export["session"]["id"],
+        "mode": export["mode"],
+        "export": export,
+        "fallback_path": str(fallback_path),
+    }
+
+
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str, backend=Depends(get_backend)):
     return backend.chat_manager.load_session(session_id)
+
+
+@router.get("/sessions/{session_id}/settings")
+def get_session_settings(session_id: str, backend=Depends(get_backend)):
+    try:
+        return backend.chat_manager.get_runtime_settings(session_id).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/sessions/{session_id}/settings")
+def patch_session_settings(session_id: str, request: SessionRuntimeSettingsPatch, backend=Depends(get_backend)):
+    try:
+        return backend.chat_manager.update_runtime_settings(
+            session_id, request.model_dump(exclude_unset=True),
+        ).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/sessions")

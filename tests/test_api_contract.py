@@ -2,6 +2,8 @@
 
 import os
 import sys
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -86,6 +88,11 @@ class _DummyChatManager:
     def save_session(self, session_id, messages, title=None):
         self.sessions[session_id] = {"id": session_id, "title": title or "Test", "updated_at": "", "messages": messages}
         return session_id
+
+    def append_messages(self, session_id, messages):
+        session = self.load_session(session_id)
+        session["messages"].extend(messages)
+        return session
 
     def update_message(self, session_id, message_id, *, content=None, metadata_updates=None, role=None):
         session = self.sessions[session_id]
@@ -249,7 +256,7 @@ class _DummyBackend:
         return f"command:{command}"
 
     @staticmethod
-    def process(message, history, debug_mode=False, status_callback=None, temporal_context=None):
+    def process(message, history, debug_mode=False, status_callback=None, temporal_context=None, session_id=None):
         if status_callback:
             status_callback({"step": 1, "status_text": "Intent-Analyse"})
         return {
@@ -262,7 +269,7 @@ class _DummyBackend:
         }
 
     @staticmethod
-    def process_stream(message, history, debug_mode=False, status_callback=None, temporal_context=None):
+    def process_stream(message, history, debug_mode=False, status_callback=None, temporal_context=None, session_id=None):
         yield {"event": "status", "step": 1, "status_text": "Intent-Analyse abgeschlossen"}
         yield {"event": "token", "content": f"echo:{message}", "token_type": "answer"}
         yield {
@@ -344,6 +351,40 @@ def test_command_route_persists_execution_trace():
     assert metadata["command_trace"]["status"] == "completed"
     assert metadata["command_trace"]["actions"]
     app.dependency_overrides.clear()
+
+
+def test_session_export_route_returns_payload_and_fallback_file():
+    with tempfile.TemporaryDirectory() as directory:
+        backend = _DummyBackend()
+        backend.runtime_data_dir = Path(directory)
+        backend.chat_manager.sessions["session-1"]["messages"] = [
+            {"id": "u1", "role": "user", "content": "Hallo", "created_at": ""},
+            {
+                "id": "a1",
+                "role": "assistant",
+                "content": "Antwort",
+                "created_at": "",
+                "metadata": {
+                    "emotions_before": {"happiness": 50},
+                    "emotions": {"happiness": 55},
+                    "emotions_delta": {"happiness": 5},
+                    "raw_response": "hidden",
+                },
+            },
+        ]
+        app.dependency_overrides[get_backend] = lambda: backend
+        client = TestClient(app)
+
+        standard = client.get("/sessions/session-1/export", params={"mode": "standard"})
+        debug = client.get("/sessions/session-1/export", params={"mode": "debug"})
+
+        assert standard.status_code == 200
+        assert standard.json()["export"]["mode"] == "standard"
+        assert debug.status_code == 200
+        assert debug.json()["export"]["debug"]["raw_session"]["messages"][1]["metadata"]["raw_response"] == "hidden"
+        assert Path(standard.json()["fallback_path"]).exists()
+        assert Path(debug.json()["fallback_path"]).exists()
+        app.dependency_overrides.clear()
 
 
 def test_memory_context_and_runtime_routes_return_expected_shapes():

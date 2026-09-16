@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "timestamp": "2026-09-06T05:35:56.007814+00:00",
+  "repo_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "source_diff_sha256": "8f1b18d94ee5587f9e6116aa26ff52f6c8490cdef1facd2257a1f8388803c686",
+  "source_tree_sha256": "8509ec56cc57ebaed4b9518b5e215090ca90e8cd0704bfe00b1ccfe7cdfe883f",
+  "model": "Qwen/Qwen3.5-4B",
+  "dataset_hash": "fc1a27f088ebe09ee02838ed9bc972477601071d1c9f3217fb29c9cac8356b1d",
+  "dataset_path": "/home/bbecker/CHAPPiE/forschung/steering_v17/datasets/layer_diagnostics.jsonl",
+  "versions": {
+    "torch": "2.11.0",
+    "transformers": "5.8.1",
+    "httpx": "0.28.1",
+    "numpy": "2.2.6"
+  },
+  "modes": [
+    "activation"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "temperature": 0.7,
+  "max_tokens": 96,
+  "isolation": {
+    "memory": false,
+    "history": false,
+    "sleep": false,
+    "life": false
+  },
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "vector_pack": null,
+  "stage": "pooling",
+  "emotion": "frustration",
+  "pooling": "last_four_tokens",
+  "pack_hash": "4fc01dc86c5aacbcc6b456b3ded7f7aade0060371b02ae05af78ceadd55aba82",
+  "configurations": [
+    [
+      [
+        21
+      ],
+      0.15
+    ],
+    [
+      [
+        24
+      ],
+      0.05
+    ]
+  ],
+  "previous_metrics_sha256": "6650762ed555abb7ac5deff707f134866de6d32497313468024414ddc37e1d32"
+}

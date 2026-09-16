@@ -1,0 +1,33 @@
+{
+  "ranking_method": "lexical_diagnostic_only",
+  "semantic_validation_required": true,
+  "expected": 72,
+  "recorded": 72,
+  "errors": 0,
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 2.086752,
+      "lexical_diagnostic_score": 0.06615052552552551,
+      "cases": 24
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.791218,
+      "lexical_diagnostic_score": 0.05224442504771044,
+      "cases": 24
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.395609,
+      "lexical_diagnostic_score": 0.02504441695771725,
+      "cases": 24
+    }
+  ]
+}

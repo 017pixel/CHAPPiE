@@ -1,0 +1,81 @@
+╭─────────────────────────────── CHAPPiE Status ───────────────────────────────╮
+│                                                                              │
+│   Stimmung:     neutral                                                      │
+│   happiness     ░░░░░░░░░░░░░░░   0                                          │
+│   trust         ░░░░░░░░░░░░░░░   0                                          │
+│   energy        ░░░░░░░░░░░░░░░   0                                          │
+│   curiosity     ░░░░░░░░░░░░░░░   0                                          │
+│   motivation    ░░░░░░░░░░░░░░░   0                                          │
+│   frustration   ░░░░░░░░░░░░░░░   0                                          │
+│   sadness       ░░░░░░░░░░░░░░░   0                                          │
+│   affection     ░░░░░░░░░░░░░░░   0                                          │
+│   anxiety       ░░░░░░░░░░░░░░░   0                                          │
+│   calm          ░░░░░░░░░░░░░░░   0                                          │
+│   Modell:       test | test                                                  │
+│   Two-Step:     AN                                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[32m[18:17:28] [OK] Neue Chat-Sitzung gestartet[0m
+[2m[18:17:28] [LAST] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────────── CHAPPiE ───────────────────────────────────╮
+│ hi                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────── Turn / Runtime ───────────────────────────────╮
+│ Session: ?                                                                   │
+│ vllm/qwen                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── Timing ───────────────────────────────────╮
+│ Intent                                                        nicht gemessen │
+│ Emotion                                                       nicht gemessen │
+│ Memory retrieval                                              nicht gemessen │
+│ Memory context                                                nicht gemessen │
+│ Steering                                                      nicht gemessen │
+│ TTFT                                                          nicht gemessen │
+│ Generation                                                    nicht gemessen │
+│ Formatting                                                    nicht gemessen │
+│ Persist                                                       nicht gemessen │
+│ Background scheduling                                         nicht gemessen │
+│ Total                                                               500.0 ms │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────── Emotionen ──────────────────────────────────╮
+│                                                                              │
+│   Emotion             Wert      Delta      Alpha      Quelle       Grund     │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│   happiness           60        +5                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+━━━ CHAPPiE Full Report · 500ms · vllm/qwen ━━━
+[2m[18:17:28] [RAW] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────── Step 1 Raw JSON ───────────────────────────────╮
+│ {                                                                            │
+│   "key": "val"                                                               │
+│ }                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────── Raw Model Output (vor Formatting) ──────────────────────╮
+│ raw output                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[18:17:28] [TRACE] Noch keine Antwort vorhanden.[0m
+╭──────────────────────────────── Causal Trace ────────────────────────────────╮
+│   [Input] driver=test                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[18:17:28] [HISTORY] Kein Chat-Verlauf[0m
+
+[34mChat-Verlauf (2 Nachrichten):
+  [32m[user] hi[0m
+  [34m[assistant] hello[0m
+
+[32m[18:17:28] [OK] Debug-Output aktiviert[0m
+[2m[18:17:28] [DEBUG] Debug-Output deaktiviert[0m
+[93m[18:17:28] [WARN] Unbekannter Befehl: /debug invalid[0m
+  Tippe /help fuer alle Befehle
+Unbekannte Emotion: `nonexistent`. Gueltig: happiness, trust, energy, curiosity, motivation, frustration, sadness, affection, anxiety, calm
+Ungueltiger Wert: `abc`. Erwartet: Zahl oder +Zahl/-Zahl.
+Nutze: `/emotion <name> [+/-]<0-100>` (z.B. `/emotion happiness +10`)
+[93m[18:17:28] [WARN] Unbekannter Befehl: /unknowncmd[0m
+  Tippe /help fuer alle Befehle
+[93m[18:17:28] [WARN] Unbekannter Befehl: hello[0m
+  Tippe /help fuer alle Befehle
+Memory: an
+[93m[18:17:28] [RUNTIME] Remote-Status nicht abrufbar[0m
+<MagicMock name='mock.handle_command()' id='128823979710208'>
+OK: CLI v6.0 command handling

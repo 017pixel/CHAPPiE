@@ -1,0 +1,15 @@
+{
+  "source_sha256": "aaded4beab556adfe4073a63e45ba972360d5740eef4fe0ca77dfa03ef08d4d3",
+  "model": "Qwen/Qwen3.5-4B",
+  "model_revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "num_layers": 32,
+  "hidden_size": 2560,
+  "site": "decoder_layer_input",
+  "quantized": true,
+  "quantization": "4bit",
+  "adapter_sha256": null,
+  "local_model_sha256": null,
+  "torch_version": "2.11.0+cu130",
+  "cuda_version": "13.0",
+  "context_length": 4096
+}

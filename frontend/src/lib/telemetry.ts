@@ -13,7 +13,20 @@ function positiveNumber(...values: unknown[]): number | null {
 }
 
 export function estimateTextTokens(value: string): number {
+  return countWords(value);
+}
+
+export function countWords(value: string): number {
   return value.trim() ? value.trim().split(/\s+/).length : 0;
+}
+
+export function isEstimatedCount(timing: TelemetryRecord, metadata: TelemetryRecord): boolean {
+  const pipeline = asRecord(metadata.live_pipeline ?? metadata.pipeline);
+  return !(
+    Number.isFinite(Number(timing.answer_tokens)) && Number(timing.answer_tokens) > 0
+    || Number.isFinite(Number(pipeline.answer_tokens)) && Number(pipeline.answer_tokens) > 0
+    || Number.isFinite(Number(metadata.answer_tokens)) && Number(metadata.answer_tokens) > 0
+  );
 }
 
 export function tokenRatePerSecond(
@@ -57,4 +70,9 @@ export function formatTokenRate(
 ): string {
   const rate = tokenRatePerSecond(timing, metadata, content, elapsedMs);
   return rate ? `${rate.toFixed(1)} tok/s` : "— tok/s";
+}
+
+export function formatWordRate(words: number, elapsedMs: number): string {
+  if (!words || !elapsedMs || elapsedMs <= 0) return "— W/s";
+  return `${(words / (elapsedMs / 1000)).toFixed(1)} W/s`;
 }

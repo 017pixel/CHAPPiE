@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
+
+
+class SessionRuntimeSettingsPatch(BaseModel):
+    model_config = {"extra": "forbid"}
+    memory_enabled: Optional[StrictBool] = None
+    steering_enabled: Optional[StrictBool] = None
+    steering_mode: Optional[Literal["off", "activation", "sequence", "combined"]] = None
+    live_enabled: Optional[StrictBool] = None
 
 
 class HealthResponse(BaseModel):
@@ -53,6 +61,13 @@ class CommandResponse(BaseModel):
     session_id: Optional[str] = None
     output: str
     session: Optional[Dict[str, Any]] = None
+
+
+class SessionExportResponse(BaseModel):
+    session_id: str
+    mode: Literal["standard", "debug"]
+    export: Dict[str, Any]
+    fallback_path: str
 
 
 class SessionCreateRequest(BaseModel):
@@ -149,6 +164,7 @@ class SettingsSnapshot(BaseModel):
     enable_steering: bool
     steering_provider: Optional[str]
     steering_model: str
+    steering_vector_pack: str = ""
     steering_quantize: bool
     steering_context_length: int
     use_model_defaults: bool
@@ -215,6 +231,7 @@ class SettingsUpdate(BaseModel):
     enable_steering: Optional[bool] = None
     steering_provider: Optional[str] = None
     steering_model: Optional[str] = None
+    steering_vector_pack: Optional[str] = None
     steering_quantize: Optional[bool] = None
     steering_context_length: Optional[int] = None
     use_model_defaults: Optional[bool] = None
@@ -275,6 +292,7 @@ class ContextFileUpdate(BaseModel):
     enable_steering: Optional[bool] = None
     steering_provider: Optional[str] = None
     steering_model: Optional[str] = None
+    steering_vector_pack: Optional[str] = None
     steering_quantize: Optional[bool] = None
     steering_context_length: Optional[int] = None
     temperature: Optional[float] = None

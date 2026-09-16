@@ -614,6 +614,11 @@ function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRa
   const tokenRate = formatTokenRate(timing, meta, entry.message.content, isLive ? elapsedMs : 0);
   const errorText = streamError || textValue(meta.error_message || meta.error, "");
   const overview = activeView === "overview";
+  const tone = asRecord(meta.tone_decision);
+  const fmtSource = textValue(meta.formatting_source, "");
+  const fmtModel = textValue(meta.formatting_model, "");
+  const fmtReason = textValue(meta.formatting_reason || meta.formatting_skip_reason, "");
+  const finishReason = textValue(timing.finish_reason || meta.finish_reason, "");
 
   return (
     <div className="min-w-0 space-y-3">
@@ -631,21 +636,42 @@ function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRa
       )}
 
       {overview && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <DetailCard title="Overview">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="intent" value={`${textValue(meta.intent_type, "casual_chat")} ${meta.intent_confidence != null ? `${Math.round(Number(meta.intent_confidence) * 100)}%` : ""}`} />
-            <Field label="tone" value={textValue(meta.tone_decision?.tone)} />
-            <Field label="tools" value={textValue(meta.tool_calls_executed, "0")} />
-            <Field label="timestamp" value={formatTimestamp(meta.created_at || meta.timestamp)} />
-          </div>
-        </DetailCard>
-
-        <DetailCard title="Emotionen">
-          {Object.keys(deltas).length === 0 ? <p className="text-[10px] italic text-slate/40">No emotion deltas.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(deltas).map(([name, value]) => { const item = asRecord(value); const change = Number(item.change) || 0; return <div key={name} className="border border-white/8 px-2 py-1.5 text-[10px]"><span className="text-slate/40">{name}</span><div className="mt-1"><span className="text-slate/55">{textValue(item.before ?? before[name])}</span><span className="px-1 text-slate/25">→</span><span className="text-slate/75">{textValue(item.after)}</span><span className={`ml-1 ${change > 0 ? "text-terminal-green" : change < 0 ? "text-terminal-red" : "text-slate/40"}`}>{change > 0 ? "+" : ""}{change}</span></div></div>; })}</div>}
-        </DetailCard>
+        <div className="min-w-0 space-y-3">
+          <DetailCard title="Intent">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Field label="intent" value={`${textValue(meta.intent_type, "casual_chat")} ${meta.intent_confidence != null ? `${Math.round(Number(meta.intent_confidence) * 100)}%` : ""}`} />
+              <Field label="tools" value={textValue(meta.tool_calls_executed, "0")} />
+              <Field label="timestamp" value={formatTimestamp(meta.created_at || meta.timestamp)} />
+            </div>
+          </DetailCard>
+          <DetailCard title="Memory" status={memories.length === 0 ? undefined : "ok"}>
+            {memories.length === 0 ? <p className="text-[10px] italic text-slate/40">&gt; _ no matches (try broader query)</p> : <div className="min-w-0 space-y-2">{memories.slice(0, 12).map((memory, index) => { const item = asRecord(memory); return <div key={`${index}-${textValue(item.content, "memory")}`} className="min-w-0 border-l-2 border-terminal-green/35 pl-2"><div className="flex min-w-0 flex-wrap gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{textValue(item.role, "memory")}</span><span className="text-terminal-green">{item.relevance_score != null ? `${Math.round(Number(item.relevance_score) * 100)}%` : "—"}</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{textValue(item.label)}</span></div><p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/65 [overflow-wrap:anywhere]">{textValue(item.content)}</p></div>; })}</div>}
+            {meta.memory_consolidation && <div className="mt-3 border-t border-white/8 pt-2 text-[10px] text-slate/45">consolidation: {safeJson(meta.memory_consolidation, 0)}</div>}
+          </DetailCard>
+          <DetailCard title="Budget" status={contextWasTrimmed(meta) ? "error" : budget.near_limit ? "warn" : undefined}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Field label="estimated" value={textValue(budget.estimated_tokens, "—")} /><Field label="limit" value={textValue(budget.token_limit, "7000")} /><Field label="status" value={contextWasTrimmed(meta) ? "GETRIMMT" : budget.near_limit ? "NEAR LIMIT" : "OK"} valueClass={contextWasTrimmed(meta) ? "text-terminal-red" : budget.near_limit ? "text-terminal-amber" : "text-terminal-green"} /><Field label="removed" value={textValue(budget.removed_messages, "0")} /></div>
+          </DetailCard>
+          <DetailCard title="Timing (Final)">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="TTFT" value={formatDuration(timing.ttft_ms)} /><Field label="generation" value={formatDuration(timing.total_gen_ms || meta.processing_time_ms)} /><Field label="final tokens" value={`${textValue(timing.answer_tokens, "0")} tk`} /><Field label="reasoning" value={`${formatDuration(timing.reasoning_time_ms)} · ${textValue(timing.reasoning_tokens, "0")} tk`} /><Field label="effective rate" value={tokenRate} valueClass="text-terminal-green" /><Field label="finish" value={finishReason || "—"} /></div>
+          </DetailCard>
+          <DetailCard title="Trace">
+            {causal.length === 0 ? <p className="text-[10px] italic text-slate/40">No causal trace attached.</p> : <div className="space-y-2">{causal.map((step, index) => { const item = asRecord(step); return <div key={index} className="border-l-2 border-white/15 pl-2 text-[10px] text-slate/60"><span className="text-slate/80">{textValue(item.phase, "phase")}:</span> {textValue(item.driver)}{item.effect && <span className="text-slate/40"> — {textValue(item.effect)}</span>}</div>; })}</div>}
+          </DetailCard>
+        </div>
+        <div className="min-w-0 space-y-3">
+          <DetailCard title="Emotionen">
+            {Object.keys(deltas).length === 0 ? <p className="text-[10px] italic text-slate/40">No emotion deltas.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{Object.entries(deltas).map(([name, value]) => { const item = asRecord(value); const change = Number(item.change) || 0; return <div key={name} className="border border-white/8 px-2 py-1.5 text-[10px]"><span className="text-slate/40">{name}</span><div className="mt-1"><span className="text-slate/55">{textValue(item.before ?? before[name])}</span><span className="px-1 text-slate/25">→</span><span className="text-slate/75">{textValue(item.after)}</span><span className={`ml-1 ${change > 0 ? "text-terminal-green" : change < 0 ? "text-terminal-red" : "text-slate/40"}`}>{change > 0 ? "+" : ""}{change}</span></div></div>; })}</div>}
+          </DetailCard>
+          <DetailCard title="Steering" status={steeringVerified ? "ok" : steeringRuntime.error ? "error" : undefined}>
+            {Object.keys(steering).length === 0 && Object.keys(steeringRuntime).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="mode" value={textValue(meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="planned vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="format" value={`${fmtSource} ${fmtModel}`.trim() || "—"} /><Field label="format grund" value={fmtReason || "—"} /><Field label="runtime" value={textValue(steeringRuntime.status, steering.steering_active ? "payload prepared" : "inactive")} /></div>}
+          </DetailCard>
+          <DetailCard title="Ton">
+            <div className="grid grid-cols-2 gap-3"><Field label="tone" value={textValue(tone.tone, "—")} /><Field label="grund" value={textValue(tone.tone_reason, "—")} /></div>
+          </DetailCard>
+        </div>
       </div>}
 
-      {(overview || activeView === "memory") && <>
+      {activeView === "memory" && <>
         <DetailCard title="Memory" status={memories.length === 0 ? undefined : "ok"}>
           {memories.length === 0 ? <p className="text-[10px] italic text-slate/40">&gt; _ no matches (try broader query)</p> : <div className="min-w-0 space-y-2">{memories.slice(0, 12).map((memory, index) => { const item = asRecord(memory); return <div key={`${index}-${textValue(item.content, "memory")}`} className="min-w-0 border-l-2 border-terminal-green/35 pl-2"><div className="flex min-w-0 flex-wrap gap-2 text-[9px] uppercase tracking-widest text-slate/40"><span>{textValue(item.role, "memory")}</span><span className="text-terminal-green">{item.relevance_score != null ? `${Math.round(Number(item.relevance_score) * 100)}%` : "—"}</span><span className="min-w-0 break-words [overflow-wrap:anywhere]">{textValue(item.label)}</span></div><p className="mt-1 min-w-0 whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate/65 [overflow-wrap:anywhere]">{textValue(item.content)}</p></div>; })}</div>}
           {meta.memory_consolidation && <div className="mt-3 border-t border-white/8 pt-2 text-[10px] text-slate/45">consolidation: {safeJson(meta.memory_consolidation, 0)}</div>}
@@ -657,19 +683,19 @@ function TraceDetail({ entry, activeView, isLive, elapsedMs, streamError, showRa
         {Object.keys(focus).length > 0 || meta.memory_trace ? <DetailCard title="Focus + global workspace"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="dominant focus" value={textValue(focus.label)} /><Field label="salience" value={textValue(focus.salience)} /><Field label="broadcast" value={textValue(asRecord(meta.global_workspace).broadcast)} /><Field label="memories found" value={textValue(asRecord(meta.memory_trace).merged?.memories_found)} /><Field label="top relevance" value={textValue(asRecord(meta.memory_trace).merged?.top_relevance)} /><Field label="query" value={textValue(asRecord(meta.memory_trace).merged?.query)} /></div></DetailCard> : null}
       </>}
 
-      {(overview || activeView === "steering" || activeView === "timing") && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-        {(overview || activeView === "steering") &&
+      {(activeView === "steering" || activeView === "timing") && <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {(activeView === "steering") &&
         <DetailCard title="Steering" status={steeringVerified ? "ok" : steeringRuntime.error ? "error" : undefined}>
-          {Object.keys(steering).length === 0 && Object.keys(steeringRuntime).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="mode" value={textValue(meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="planned vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="runtime" value={textValue(steeringRuntime.status, steering.steering_active ? "payload prepared" : "inactive")} valueClass={steeringVerified ? "text-terminal-green" : steeringRuntime.error ? "text-terminal-red" : "text-terminal-amber"} /><Field label="hook calls" value={textValue(steeringRuntime.hook_invocations, "—")} /><Field label="layers" value={`${textValue(asArray(steeringRuntime.applied_layers).length, "—")} / ${textValue(steeringRuntime.actual_model_layers, "—")}`} /><Field label="verified active" value={steeringVerified ? "yes" : "no"} valueClass={steeringVerified ? "text-terminal-green" : "text-slate/45"} /><Field label="overhead" value={steeringRuntime.steering_overhead_ms != null ? formatDuration(steeringRuntime.steering_overhead_ms) : "—"} /><Field label="remapped" value={steeringRuntime.layer_range_remapped ? "yes" : "no"} /></div>}
+          {Object.keys(steering).length === 0 && Object.keys(steeringRuntime).length === 0 ? <p className="text-[10px] italic text-slate/40">Steering inactive.</p> : <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="mode" value={textValue(meta.prompt_emotion_mode, "vector")} /><Field label="dominant" value={`${textValue(steering.dominant_vector, "neutral")} (${textValue(steering.dominant_strength, "0")})`} /><Field label="planned vectors" value={asArray(steering.active_vectors || steering.base_vectors).map((item) => textValue(asRecord(item).name || item)).filter(Boolean).join(", ") || "none"} /><Field label="format" value={`${fmtSource} ${fmtModel}`.trim() || "—"} /><Field label="format grund" value={fmtReason || "—"} /><Field label="runtime" value={textValue(steeringRuntime.status, steering.steering_active ? "payload prepared" : "inactive")} valueClass={steeringVerified ? "text-terminal-green" : steeringRuntime.error ? "text-terminal-red" : "text-terminal-amber"} /><Field label="hook calls" value={textValue(steeringRuntime.hook_invocations, "—")} /><Field label="layers" value={`${textValue(asArray(steeringRuntime.applied_layers).length, "—")} / ${textValue(steeringRuntime.actual_model_layers, "—")}`} /><Field label="verified active" value={steeringVerified ? "yes" : "no"} valueClass={steeringVerified ? "text-terminal-green" : "text-slate/45"} /><Field label="overhead" value={steeringRuntime.steering_overhead_ms != null ? formatDuration(steeringRuntime.steering_overhead_ms) : "—"} /><Field label="remapped" value={steeringRuntime.layer_range_remapped ? "yes" : "no"} /></div>}
         </DetailCard>}
-        {(overview || activeView === "timing") &&
-        <DetailCard title="Timing">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="TTFT" value={formatDuration(timing.ttft_ms)} /><Field label="generation" value={formatDuration(timing.total_gen_ms || meta.processing_time_ms)} /><Field label="output stream" value={`${formatDuration(timing.answer_time_ms)} · ${textValue(timing.answer_tokens, "0")} tk`} /><Field label="reasoning" value={`${formatDuration(timing.reasoning_time_ms)} · ${textValue(timing.reasoning_tokens, "0")} tk`} /><Field label="effective rate" value={tokenRate} valueClass="text-terminal-green" /><Field label="total tokens" value={textValue(timing.total_tokens, "—")} /></div>
-          <p className="mt-3 border-l-2 border-white/15 pl-2 text-[9px] leading-relaxed text-slate/40">Rate basis: answer tokens over complete measured generation time.</p>
+        {(activeView === "timing") &&
+        <DetailCard title="Timing (Final)">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3"><Field label="TTFT" value={formatDuration(timing.ttft_ms)} /><Field label="generation" value={formatDuration(timing.total_gen_ms || meta.processing_time_ms)} /><Field label="final tokens" value={`${textValue(timing.answer_tokens, "0")} tk`} /><Field label="reasoning" value={`${formatDuration(timing.reasoning_time_ms)} · ${textValue(timing.reasoning_tokens, "0")} tk`} /><Field label="effective rate" value={tokenRate} valueClass="text-terminal-green" /><Field label="finish" value={finishReason || "—"} /></div>
+          <p className="mt-3 border-l-2 border-white/15 pl-2 text-[9px] leading-relaxed text-slate/40">Rate basis: answer tokens over complete measured generation time. Final Tokens aus Backend-Metadaten.</p>
         </DetailCard>}
       </div>}
 
-      {(overview || activeView === "causal") && <DetailCard title="Causal trace">
+      {(activeView === "causal") && <DetailCard title="Causal trace">
         {causal.length === 0 ? <p className="text-[10px] italic text-slate/40">No causal trace attached.</p> : <div className="space-y-2">{causal.map((step, index) => { const item = asRecord(step); return <div key={index} className="border-l-2 border-white/15 pl-2 text-[10px] text-slate/60"><span className="text-slate/80">{textValue(item.phase, "phase")}:</span> {textValue(item.driver)}{item.effect && <span className="text-slate/40"> — {textValue(item.effect)}</span>}{item.evidence && <span className="text-slate/35"> [{Array.isArray(item.evidence) ? item.evidence.join(", ") : textValue(item.evidence)}]</span>}</div>; })}</div>}
       </DetailCard>}
 

@@ -125,7 +125,9 @@ def test_sync_and_stream_share_the_same_turn_context_entry() -> None:
     assert events[-1]["event"] == "finished"
     assert sync_runtime.calls[0][0:2] == ("begin", False)
     assert stream_runtime.calls[0][0:2] == ("begin", True)
-    assert sync_runtime.calls[0][2] == stream_runtime.calls[0][2]
+    from dataclasses import replace
+    assert sync_turn.turn_id != stream_turn.turn_id
+    assert replace(sync_runtime.calls[0][2], turn_id="same") == replace(stream_runtime.calls[0][2], turn_id="same")
     assert history is not sync_turn.history
     assert temporal is not sync_turn.temporal_context
 

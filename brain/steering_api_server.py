@@ -149,6 +149,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
             "restart_status": app.state.restart_status,
             "device": str(getattr(engine, "device", "unknown")) if engine is not None else "unknown",
             "steering": report,
+            "runtime_provenance": getattr(engine, "runtime_provenance", {}),
         }
 
     @app.get("/v1/models")
@@ -219,10 +220,11 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                         "created": created,
                         "model": model,
                         "chappie_steering": dict(steering_report),
+                        "runtime_provenance": getattr(engine, "runtime_provenance", {}),
                         "usage": {
                             "chappie_steering": dict(steering_report),
                         },
-                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                        "choices": [{"index": 0, "delta": {}, "finish_reason": steering_report.get("generation", {}).get("finish_reason", "stop")}],
                     }
                     yield f"data: {json.dumps(final_chunk, ensure_ascii=False)}\n\n"
                     yield "data: [DONE]\n\n"
@@ -269,6 +271,8 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
             "created": created,
             "model": model,
             "chappie_steering": result.get("steering_runtime", {}),
+            "runtime_provenance": result.get("runtime_provenance", {}),
+            "generation": {key: result.get(key) for key in ("natural_eos", "effective_max_tokens", "background_preempted")},
             "choices": [{
                 "index": 0,
                 "message": {
@@ -276,7 +280,7 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
                     "content": result["text"],
                     **({"reasoning_content": result["reasoning"]} if result.get("reasoning") else {}),
                 },
-                "finish_reason": "stop",
+                "finish_reason": result.get("finish_reason", "stop"),
             }],
             "usage": {
                 "prompt_tokens": result["prompt_tokens"],

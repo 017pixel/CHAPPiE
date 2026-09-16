@@ -125,7 +125,7 @@ LOCAL_COMMANDS = [
     "/emotion happiness abc", "/resetemotions", "/sleep", "/memory",
     "/memory suche", "/history", "/clear", "/new", "/sessions",
     "/session sess-1", "/debug", "/debug on", "/debug off", "/md",
-    "/stats", "/think", "/deep think 3", "/life", "/unknowncmd",
+    "/stats", "/life", "/unknowncmd",
 ]
 
 
@@ -351,7 +351,7 @@ def test_process_local_slash_uses_command_service():
     with patch("api.services.command_service.execute_slash_command") as exec_cmd:
         exec_cmd.return_value = {"response_text": "ok"}
         _, _ = _run_quiet(cli._process_local, "/stats")
-        exec_cmd.assert_called_once_with("/stats", cli.backend)
+        exec_cmd.assert_called_once_with("/stats", cli.backend, session_id="sess-1")
         assert cli.last_result == {"response_text": "ok"}
 
 

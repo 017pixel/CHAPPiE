@@ -1,0 +1,26 @@
+{
+  "version": "17.0.0-dev.1",
+  "release_status": "development_research_acceptance_pending",
+  "source_sha256": {
+    "frontend/package.json": "4f9404455ac59fc97941f6f6cc21d0033576bc58775c574f17f955f0e71aa564",
+    "frontend/package-lock.json": "8102a9873633f3ca3503a87410e563672f21cdfafb05220732778c7317cd0d6b",
+    "api/main.py": "36605635f467db245bba56d8e14882020e41309802bef2a20e0a9d17d2fc1f17",
+    "chappie_brain_cli.py": "58b291e334325382d9873ee7317b55e4e8b99129a0fb4426c4c993a8ab7f999b",
+    "CHANGELOG.md": "3edc9f46bc3c592bc7cde11def6fc30434a09d1c90f2d05c7a844964ba225f00"
+  },
+  "checks": {
+    "api_contract_exit": 0,
+    "cli_import_exit": 0,
+    "frontend_build_exit": 0,
+    "live_openapi_version": "17.0.0-dev.1",
+    "live_root_version": "17.0.0-dev.1",
+    "brain_available": true,
+    "model_provenance_unchanged": true,
+    "original_active_session_preserved": true
+  },
+  "browser_evidence": "../browser-checkpoint/frontend-version-dev1.json",
+  "limits": [
+    "Model inference process was deliberately not restarted during the controlled pilot",
+    "No final empirical production acceptance or final release claimed"
+  ]
+}

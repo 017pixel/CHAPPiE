@@ -1,0 +1,47 @@
+{
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.15,
+      "cases": 24,
+      "semantic_selection_score": 0.013888888888888881,
+      "emotion_expression": 0.1111111111111111,
+      "emotion_change_vs_off": 0.013888888888888881,
+      "content_preservation": 0.78125,
+      "naturalness": 0.7395833333333334
+    },
+    {
+      "layers": [
+        25,
+        26,
+        27
+      ],
+      "strength": 0.15,
+      "cases": 8,
+      "semantic_selection_score": 0.04166666666666667,
+      "emotion_expression": 0.125,
+      "emotion_change_vs_off": 0.04166666666666667,
+      "content_preservation": 0.90625,
+      "naturalness": 0.84375
+    }
+  ],
+  "pooling": "last_four_tokens",
+  "strengths": [
+    0.4,
+    0.55,
+    0.7
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "selection_rule": "Best single-layer result in completed three-seed pooling comparison and best exploratory combination; verify both at three seeds before calibration",
+  "source_hashes": {
+    "forschung/steering_v17/runs/frustration-pooling-last_four_tokens-v2/paired_blind_ratings_v2_layer_metrics.json": "38b55b78681d9f2ff69b75ad9c8b5a66ff7dd978b7ce05f1d251f0afcfa4863c",
+    "forschung/steering_v17/runs/frustration-combinations-pinned-v3/paired_blind_ratings_v2_layer_metrics.json": "37448d53d0ec9ee149d89dfaae55f2c0a0efac70e369db23c9e8a825df3b7eb1"
+  },
+  "production_acceptance": false
+}

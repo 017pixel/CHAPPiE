@@ -1,0 +1,26 @@
+import hashlib
+import json
+from pathlib import Path
+from statistics import mean
+root=Path('forschung/steering_v17');run=root/'runs/frustration-high-strength-v1';off=root/'runs/layer-diagnostics-off-v2'
+def read(p):return [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+metric_path=run/'paired_blind_ratings_v2_layer_metrics.json';metrics=json.loads(metric_path.read_text());selected=metrics['ranking'][0]
+paths=[run/'generations.jsonl',run/'blind_ratings_v2.jsonl',off/'generations.jsonl',off/'blind_ratings_v2.jsonl']
+for name,path in zip(['generations_sha256','ratings_sha256','control_generations_sha256','control_ratings_sha256'],paths):
+ assert metrics[name]==sha(path)
+ratings={x['response_id']:x for x in read(paths[1])};oratings={x['response_id']:x for x in read(paths[3])}
+controls={(x['case_id'],x['seed']):x for x in read(paths[2])}
+rows=[x for x in read(paths[0]) if x['layers']==selected['layers'] and x['strength']==selected['strength'] and x['category']!='neutral_control']
+assert len(rows)==18
+pairs=[]
+for row in rows:
+ control=controls[(row['case_id'],row['seed'])];a=ratings[row['response']['id']];b=oratings[control['response']['id']]
+ assert row['prompt']==control['prompt'] and a['context_hash']==b['context_hash']
+ assert 'error' not in a and 'error' not in b
+ pairs.append((a['rating'],b['rating']))
+result={'selection':selected,'scope':'18 emotional diagnostic prompt/seed pairs, excluding neutral controls','method':'mean((steering_rating - matched_OFF_rating)/4) separately for each blind rubric axis','production_acceptance':False,'independent_human_rating':False,'limitations':['Post-selection descriptive analysis, not independent confirmation','Responses limited to96tokens; apparent changes may reflect truncation','No uncertainty or statistical-significance claim'],'axes':{axis:mean((a[axis]-b[axis])/4 for a,b in pairs) for axis in pairs[0][0]},'sources':{str(path):sha(path) for path in [metric_path,*paths]}}
+out=root/'reports/higher-dose-effect-profile-v1';out.mkdir(exist_ok=False)
+(out/'effect_profile.json').write_text(json.dumps(result,indent=2)+'\n')
+(out/'generator.py.txt').write_text(Path(__file__).read_text())
+print(json.dumps(result['axes'],indent=2))

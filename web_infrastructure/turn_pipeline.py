@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from contextlib import nullcontext
 from datetime import datetime
 from typing import Any, Callable, Dict, Generator, List, Optional
 
@@ -23,15 +24,10 @@ from brain.response_parser import (
 )
 from brain.steering_manager import (
     STEERING_CONTEXT_GENERAL,
-    STEERING_CONTEXT_EMOTION_SELF_REPORT,
-    STEERING_CONTEXT_CONSCIOUSNESS,
-    STEERING_CONTEXT_IDENTITY,
-    STEERING_CONTEXT_IDENTITY_AND_EMOTION,
     classify_steering_context,
 )
 from web_infrastructure.formatting import (
     normalize_multi_question_answer,
-    should_normalize_multi_question_answer,
 )
 from web_infrastructure.generation import response_memory_top_k_for_intent
 from web_infrastructure.turn_context import (
@@ -44,6 +40,7 @@ from web_infrastructure.turn_context import (
 from typing import TYPE_CHECKING
 
 from web_infrastructure.contracts import ResponseEnvelope, StreamEvent, TurnContext
+from web_infrastructure.timing import timed_call, attach_timings
 
 if TYPE_CHECKING:
     from web_infrastructure.chappie_runtime import CHAPPiERuntime
@@ -71,22 +68,100 @@ class TurnPipeline:
         self._runtime = runtime
 
     def process(self, turn: TurnContext) -> ResponseEnvelope:
-        self._runtime._begin_turn(turn, streaming=False)
-        return self._runtime._process_two_step(
-            turn.user_input,
-            turn.history,
-            status_callback=turn.status_callback,
-            temporal_context=turn.temporal_context,
-        )
+        # Emotional state and the provider are shared. Serialize complete turns
+        # while preserving each session's immutable settings snapshot.
+        started = time.perf_counter()
+        with getattr(self._runtime, "_turn_lock", nullcontext()):
+            try:
+                self._runtime._begin_turn(turn, streaming=False)
+                self._archive_input(turn)
+                try:
+                    result = self._runtime._process_two_step(
+                        turn.user_input, turn.history, status_callback=turn.status_callback,
+                        temporal_context=turn.temporal_context,
+                    )
+                except Exception as exc:
+                    self._archive_result(turn, {"response_text": str(exc), "quality_flags": ["runtime_error"]})
+                    raise
+                self._archive_result(turn, result)
+                return attach_timings(self._runtime, result, started)
+            finally:
+                self._runtime._active_turn = None
+                self._runtime._turn_timings = None
 
     def process_stream(self, turn: TurnContext) -> Generator[StreamEvent, None, None]:
-        self._runtime._begin_turn(turn, streaming=True)
-        yield from self._runtime._process_two_step_stream(
-            turn.user_input,
-            turn.history,
-            turn.status_callback,
-            temporal_context=turn.temporal_context,
-        )
+        started = time.perf_counter()
+        with getattr(self._runtime, "_turn_lock", nullcontext()):
+            archived = False
+            input_archived = False
+            partial = []
+            try:
+                self._runtime._begin_turn(turn, streaming=True)
+                self._archive_input(turn)
+                input_archived = True
+                for event in self._runtime._process_two_step_stream(
+                    turn.user_input, turn.history, turn.status_callback,
+                    temporal_context=turn.temporal_context,
+                ):
+                    if event.get("event") == "token":
+                        partial.append(str(event.get("content", "")))
+                    if event.get("event") == "error":
+                        partial.append(str(event.get("error", "")))
+                    if event.get("event") == "finished":
+                        self._archive_result(turn, event["result"])
+                        archived = True
+                        attach_timings(self._runtime, event["result"], started)
+                    if not turn.runtime_settings.live_enabled and event.get("event") in {"token", "status"}:
+                        continue
+                    yield event
+            finally:
+                try:
+                    if input_archived and not archived:
+                        self._archive_result(turn, {"response_text": "".join(partial), "quality_flags": ["incomplete_stream"]})
+                finally:
+                    self._runtime._active_turn = None
+                    self._runtime._turn_timings = None
+
+    def _event_metadata(self, turn, result=None):
+        result = result or {}
+        provider = self._runtime._chat_provider()
+        return {
+            "model": self._runtime._chat_model(),
+            "provider": getattr(provider, "value", str(provider)),
+            "memory_enabled": turn.runtime_settings.memory_enabled,
+            "steering_mode": turn.runtime_settings.effective_mode,
+            "emotions_before": result.get("emotions_before", self._emotions_before),
+            "emotions_after": result.get("emotions", self._emotions_before),
+            "emotions_delta": result.get("emotions_delta", {}),
+            "steering_vectors": result.get("emotion_steering", {}),
+            "research_isolated": self._runtime.research_mode,
+            "quality_flags": result.get("quality_flags", []),
+        }
+
+    def _archive_input(self, turn):
+        if not hasattr(self._runtime, "persistence"):
+            return
+        self._emotions_before = self._runtime._get_emotions_snapshot()
+        timed_call(self._runtime, "persistence_ms", self._runtime.persistence.archive_input,
+                   turn, self._event_metadata(turn))
+
+    def _archive_result(self, turn, result):
+        if not hasattr(self._runtime, "persistence"):
+            return
+        # V18: Assistant-Skip mit Turn-ID und Grund ins Debug-Log.
+        try:
+            assistant_text = str((result or {}).get("response_text", "") or "")
+            if assistant_text and looks_like_model_error(assistant_text):
+                self._runtime.debug_logger.log_info(
+                    "MEMORY_SKIP",
+                    "Assistant-Memory wegen Backend-Fehlerstring uebersprungen",
+                    {"turn_id": getattr(turn, "turn_id", "?"), "reason": "model_error_string"},
+                )
+        except Exception:
+            pass
+        timed_call(self._runtime, "persistence_ms", self._runtime.persistence.archive_result,
+                   turn, result, self._event_metadata(turn, result))
+        timed_call(self._runtime, "background_jobs_scheduled_ms", self._runtime.persistence.promotion.schedule)
 
 
 
@@ -206,7 +281,7 @@ class RuntimeTurnPipelineMixin:
             intent_result = self._run_with_retries(
                 step_number=1,
                 step_name="Intent-Analyse",
-                action=lambda: self.intent_processor.process(
+                action=lambda: timed_call(self, "intent_ms", self.intent_processor.process,
                     user_input=user_input,
                     history=history,
                     current_emotions=emotions_before,
@@ -262,14 +337,12 @@ class RuntimeTurnPipelineMixin:
         self._add_short_term_entries(intent_result.short_term_entries)
         
         # === AUSFUEHRUNG: Migration ===
-        migrated = self.short_term_memory.migrate_expired_entries()
-        if migrated > 0:
-            self.debug_logger.log_migration(migrated)
+        # Expiration migration runs in the promotion worker.
 
         retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
         context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
         acute_layer_request = _is_acute_layer_reaction(emotion_transitions)
-        if acute_layer_request:
+        if acute_layer_request or not self._feature_enabled("memory"):
             context_requirements = {key: False for key in context_requirements}
         transient_problem = is_transient_problem_statement(user_input) and not is_self_contained_math_query(user_input)
         memory_allowed = (
@@ -392,8 +465,7 @@ class RuntimeTurnPipelineMixin:
             {"steps": causal_trace},
         )
 
-        self.persistence.persist_exchange(user_input, response_data["response_text"])
-        sleep_result = self._schedule_sleep_phase_if_due()
+        sleep_result = timed_call(self, "background_jobs_scheduled_ms", self._schedule_sleep_phase_if_due)
         
         # Auto-periodische Context-Aktualisierung (alle 5 Interaktionen)
         if self.sleep_handler._state.get("interaction_count_since_sleep", 0) % 5 == 4:
@@ -411,6 +483,7 @@ class RuntimeTurnPipelineMixin:
         
         return {
             "response_text": response_data["response_text"],
+            "raw_response": response_data.get("raw_response"),
             "formatted_cot": response_data.get("formatted_cot", ""),
             "formatted_answer": response_data.get("formatted_answer", ""),
             "formatting_failed": response_data.get("formatting_failed", False),
@@ -418,11 +491,15 @@ class RuntimeTurnPipelineMixin:
             "formatting_error": response_data.get("formatting_error", ""),
             "formatting_source": response_data.get("formatting_source", "local_fallback"),
             "formatting_model": response_data.get("formatting_model", "?"),
+            "formatting_reason": response_data.get("formatting_reason", response_data.get("formatting_skip_reason", "")),
+            "formatting_skip_reason": response_data.get("formatting_skip_reason", response_data.get("formatting_reason", "")),
             "sanitization_fallback": response_data.get("sanitization_fallback", False),
             "sanitization_reasons": response_data.get("sanitization_reasons", []),
             "multi_question_paragraph_normalized": response_data.get("multi_question_paragraph_normalized", False),
-            "semantic_retry_count": response_data.get("semantic_retry_count", 0),
+            "technical_retry_count": response_data.get("technical_retry_count", 0),
+            "semantic_retry_count": 0,
             "timing": response_data.get("timing", {}),
+            "finish_reason": (response_data.get("timing", {}) or {}).get("finish_reason", "unknown"),
             "emotions": emotions_after,
             "emotions_before": emotions_before,
             "emotions_delta": emotion_transitions,
@@ -568,11 +645,27 @@ class RuntimeTurnPipelineMixin:
                     f"Fehler bei {tool_call.tool}: {str(e)}"
                 )
 
-    def _apply_emotion_updates(self, emotions_before: Dict[str, int], 
+    def _apply_emotion_updates(self, emotions_before: Dict[str, int],
                                emotion_updates: Dict[str, Any]) -> tuple[Dict[str, int], Dict[str, Any]]:
-        """Wendet Emotions Updates an."""
+        """Wendet Emotions Updates an. Bei Freeze bleibt alles unveraendert."""
         emotions_after = emotions_before.copy()
         transition_meta: Dict[str, Any] = {}
+        try:
+            frozen = self.emotions.is_frozen() is True if hasattr(self.emotions, "is_frozen") else False
+        except Exception:
+            frozen = False
+        if frozen:
+            for emotion_name in emotions_after:
+                transition_meta[emotion_name] = {
+                    "before": emotions_before[emotion_name],
+                    "after": emotions_before[emotion_name],
+                    "raw_delta": 0,
+                    "applied_delta": 0,
+                    "change": 0,
+                    "softened": False,
+                    "reason": "emotion_frozen",
+                }
+            return emotions_after, transition_meta
         
         for emotion_name, update_data in emotion_updates.items():
             if emotion_name in emotions_after:
@@ -655,8 +748,25 @@ class RuntimeTurnPipelineMixin:
         user_input: str,
     ) -> tuple[Dict[str, int], Dict[str, Any]]:
         """Apply appraisal and homeostasis once, with appraisal taking priority."""
+        try:
+            frozen = self.emotions.is_frozen() is True if hasattr(self.emotions, "is_frozen") else False
+        except Exception:
+            frozen = False
+        if frozen:
+            frozen_meta: Dict[str, Any] = {}
+            for emotion_name in EMOTION_ORDER:
+                frozen_meta[emotion_name] = {
+                    "before": emotions_before[emotion_name],
+                    "after": emotions_before[emotion_name],
+                    "raw_delta": 0,
+                    "applied_delta": 0,
+                    "change": 0,
+                    "softened": False,
+                    "reason": "emotion_frozen",
+                }
+            return emotions_before.copy(), frozen_meta
         self.emotions.state = EmotionalState.from_dict(emotions_before)
-        appraisal, analysis = self.emotions.analyze_message(user_input)
+        appraisal, analysis = timed_call(self, "emotion_appraisal_ms", self.emotions.analyze_message, user_input)
         merged_updates: Dict[str, Any] = {}
 
         for emotion_name in EMOTION_ORDER:
@@ -692,6 +802,8 @@ class RuntimeTurnPipelineMixin:
 
     def _add_short_term_entries(self, entries: List[Any]):
         """Fuegt Short-Term Eintraege hinzu."""
+        if not self._feature_enabled("memory"):
+            return
         for entry in entries:
             try:
                 self.short_term_memory.add_entry(
@@ -847,7 +959,7 @@ class RuntimeTurnPipelineMixin:
             intent_result = self._run_with_retries(
                 step_number=1,
                 step_name="Intent-Analyse",
-                action=lambda: self.intent_processor.process(
+                action=lambda: timed_call(self, "intent_ms", self.intent_processor.process,
                     user_input=user_input,
                     history=history,
                     current_emotions=emotions_before,
@@ -906,14 +1018,12 @@ class RuntimeTurnPipelineMixin:
         self._add_short_term_entries(intent_result.short_term_entries)
 
         # === AUSFUEHRUNG: Migration ===
-        migrated = self.short_term_memory.migrate_expired_entries()
-        if migrated > 0:
-            self.debug_logger.log_migration(migrated)
+        # Expiration migration runs in the promotion worker.
 
         retrieval_keywords, exact_entities, fact_lookup_intent = self._intent_retrieval_terms(intent_result, input_classification)
         context_requirements = self._effective_context_requirements(user_input, intent_result.context_requirements)
         acute_layer_request = _is_acute_layer_reaction(emotion_transitions)
-        if acute_layer_request:
+        if acute_layer_request or not self._feature_enabled("memory"):
             context_requirements = {key: False for key in context_requirements}
         transient_problem = is_transient_problem_statement(user_input) and not is_self_contained_math_query(user_input)
         memory_allowed = (
@@ -1004,22 +1114,9 @@ class RuntimeTurnPipelineMixin:
         gen_start = time.perf_counter()
         last_progress_at = 0.0
         steering_context = classify_steering_context(user_input)
-        direct_self_query = steering_context in {
-            STEERING_CONTEXT_EMOTION_SELF_REPORT,
-            STEERING_CONTEXT_CONSCIOUSNESS,
-            STEERING_CONTEXT_IDENTITY,
-            STEERING_CONTEXT_IDENTITY_AND_EMOTION,
-        }
-        suppress_fact_question_tokens = fact_lookup_intent and (
-            "?" in user_input
-            or any(marker in user_input.casefold() for marker in ("erinnerst du", "weißt du noch", "weisst du noch"))
-        )
-        suppress_live_tokens = (
-            suppress_fact_question_tokens
-            or direct_self_query
-            or should_normalize_multi_question_answer(user_input)
-        )
-        semantic_retry_count = 0
+        # V18: immer live streamen. Keine gehaltenen Streams mehr fuer
+        # Faktfragen, Selbstfragen oder Mehrfachfragen.
+        technical_retry_count = 0
         self_report_stabilized = False
         try:
             max_attempts = 3
@@ -1045,7 +1142,7 @@ class RuntimeTurnPipelineMixin:
                         isolated_request=isolated_request,
                         context_components=context_components,
                         emotion_changes=emotion_transitions,
-                        steering_retry_level=semantic_retry_count,
+                        steering_retry_level=0,
                     )
                     for raw_part in token_generator:
                         now = time.perf_counter()
@@ -1054,7 +1151,7 @@ class RuntimeTurnPipelineMixin:
                         attempt_parts.append(str(raw_part or ""))
                         raw_candidate = "".join(attempt_parts)
                         visible_candidate = self._stream_visible_candidate(raw_candidate)
-                        if not suppress_live_tokens and visible_candidate.startswith(attempt_visible):
+                        if visible_candidate.startswith(attempt_visible):
                             fragment = visible_candidate[len(attempt_visible):]
                             if fragment:
                                 attempt_visible = visible_candidate
@@ -1062,17 +1159,20 @@ class RuntimeTurnPipelineMixin:
 
                         if now - last_progress_at >= 0.12:
                             elapsed = max(0, round((now - gen_start) * 1000))
-                            token_count = len(re.findall(r"\S+", attempt_visible))
-                            rate = round(token_count / (elapsed / 1000), 1) if token_count and elapsed else 0.0
+                            word_count = len(re.findall(r"\S+", attempt_visible))
+                            rate = round(word_count / (elapsed / 1000), 1) if word_count and elapsed else 0.0
                             yield _pipeline_status(
                                 "streaming" if attempt_visible else "ttft",
                                 2,
                                 "Antwort wird gestreamt" if attempt_visible else "Warte auf erstes sichtbares Token",
                                 ttft_ms=round((attempt_first_output_at - gen_start) * 1000) if attempt_first_output_at else None,
-                                token_count=token_count,
-                                answer_tokens=token_count,
+                                token_count=word_count,
+                                word_count=word_count,
+                                answer_tokens=word_count,
                                 answer_time_ms=elapsed,
                                 tokens_per_second=rate,
+                                words_per_second=rate,
+                                count_unit="words",
                             )
                             last_progress_at = now
 
@@ -1091,21 +1191,21 @@ class RuntimeTurnPipelineMixin:
                         steering_context,
                     )
                     self_report_stabilized = self_report_stabilized or candidate_stabilized
+                    # V18: Retry nur bei technischem Fehler, fuer alle Kontexte.
                     if (
-                        direct_self_query
-                        and direct_self_report_needs_retry(
+                        direct_self_report_needs_retry(
                             candidate_display,
                             steering_context,
                             str((attempt_meta.get("emotion_steering") or {}).get("dominant_vector", "")),
                         )
-                        and semantic_retry_count < 2
+                        and technical_retry_count < 2
                     ):
-                        semantic_retry_count += 1
+                        technical_retry_count += 1
                         yield _pipeline_status(
                             "steering",
                             2,
-                            "Layer-Selbstbericht wird nachgesteuert",
-                            semantic_retry_count=semantic_retry_count,
+                            "Technisch fehlerhafte Ausgabe wird wiederholt",
+                            technical_retry_count=technical_retry_count,
                         )
                         continue
                     raw_response = candidate_response
@@ -1150,6 +1250,8 @@ class RuntimeTurnPipelineMixin:
                     "formatting_failed": False,
                     "formatting_source": "deterministic_user_memory",
                     "formatting_model": "local_fact_extractor",
+                    "formatting_reason": "exact_user_evidence",
+                    "formatting_skip_reason": "exact_user_evidence",
                     "answer_is_fallback": False,
                 }
             else:
@@ -1212,14 +1314,7 @@ class RuntimeTurnPipelineMixin:
             tone_decision=tone_decision,
         )
 
-        self.persistence.persist_exchange(
-            user_input,
-            display_response,
-            background_short_term=True,
-            deterministic=self.research_mode,
-            suppress_short_term_errors=True,
-        )
-        sleep_result = self._schedule_sleep_phase_if_due()
+        sleep_result = timed_call(self, "background_jobs_scheduled_ms", self._schedule_sleep_phase_if_due)
 
         start_time_dt = datetime.now()
         processing_time_ms = 0
@@ -1287,13 +1382,17 @@ class RuntimeTurnPipelineMixin:
             "formatting_error": formatted_stream.get("formatting_error", ""),
             "formatting_source": formatted_stream.get("formatting_source", "local_fallback"),
             "formatting_model": formatted_stream.get("formatting_model", "?"),
+            "formatting_reason": formatted_stream.get("formatting_reason", formatted_stream.get("formatting_skip_reason", "")),
+            "formatting_skip_reason": formatted_stream.get("formatting_skip_reason", formatted_stream.get("formatting_reason", "")),
             "output_sanitized": formatted_stream.get("output_sanitized", []),
             "sanitization_fallback": formatted_stream.get("sanitization_fallback", False),
             "sanitization_reasons": formatted_stream.get("sanitization_reasons", []),
             "multi_question_paragraph_normalized": formatted_stream.get("multi_question_paragraph_normalized", False),
             "direct_self_report_stabilized": formatted_stream.get("direct_self_report_stabilized", False),
-            "semantic_retry_count": semantic_retry_count,
+            "technical_retry_count": technical_retry_count,
+            "semantic_retry_count": 0,
             "cot_leak": self._detect_cot_leakage(safe_answer),
+            "finish_reason": timing.get("finish_reason", "unknown"),
             "context_budget": meta.get("context_budget", {}),
             "prompt_components": meta.get("prompt_components", {}),
             "emotions": emotions_after,

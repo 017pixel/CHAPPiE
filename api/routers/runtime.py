@@ -61,6 +61,7 @@ def _settings_snapshot() -> SettingsSnapshot:
         enable_steering=settings.enable_steering,
         steering_provider=_enum_value(settings.steering_provider),
         steering_model=settings.steering_model,
+        steering_vector_pack=settings.steering_vector_pack,
         steering_quantize=settings.steering_quantize,
         steering_context_length=settings.steering_context_length,
         use_model_defaults=settings.use_model_defaults,
@@ -182,6 +183,13 @@ def get_emotion_metadata():
 
 @router.post("/emotions/state")
 def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend)):
+    try:
+        if hasattr(backend.emotions, "is_frozen") and backend.emotions.is_frozen():
+            raise HTTPException(status_code=409, detail="Emotionen sind eingefroren. Nutze /emofreeze off zum Freigeben.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
     updates = request.model_dump(exclude_none=True)
     for emotion_name, value in updates.items():
         backend.emotions.set_emotion(emotion_name, value)
@@ -195,6 +203,13 @@ def set_emotion_state(request: EmotionStateUpdate, backend=Depends(get_backend))
 
 @router.post("/emotions/reset")
 def reset_emotion_state(backend=Depends(get_backend)):
+    try:
+        if hasattr(backend.emotions, "is_frozen") and backend.emotions.is_frozen():
+            raise HTTPException(status_code=409, detail="Emotionen sind eingefroren. Nutze /emofreeze off zum Freigeben.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
     backend.emotions.reset()
     emotions = backend.get_emotions_snapshot()
     steering_report = backend.steering_manager.build_debug_report(emotions)

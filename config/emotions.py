@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 
 # VAD: Valenz = angenehm/unangenehm, Erregung = aktiv/ruhig, Dominanz = kontrollierend/ausgeliefert.
@@ -132,6 +132,34 @@ EMOTION_DEFINITIONS: tuple[dict[str, Any], ...] = (
 EMOTION_BY_KEY = {item["key"]: item for item in EMOTION_DEFINITIONS}
 EMOTION_ORDER = tuple(item["key"] for item in EMOTION_DEFINITIONS)
 EMOTION_DEFAULTS = {item["key"]: int(item["default"]) for item in EMOTION_DEFINITIONS}
+EMOTION_PRESETS: dict[str, dict[str, int]] = {
+    "schlecht": {
+        "happiness": 10,
+        "trust": 10,
+        "energy": 25,
+        "curiosity": 25,
+        "motivation": 15,
+        "frustration": 80,
+        "sadness": 75,
+        "affection": 10,
+        "anxiety": 65,
+        "calm": 10,
+    },
+    "neutral": dict({item["key"]: int(item["default"]) for item in EMOTION_DEFINITIONS}),
+    "wohl": {
+        "happiness": 85,
+        "trust": 85,
+        "energy": 85,
+        "curiosity": 70,
+        "motivation": 85,
+        "frustration": 0,
+        "sadness": 0,
+        "affection": 80,
+        "anxiety": 0,
+        "calm": 75,
+    },
+}
+EMOTION_PRESET_ORDER = ("schlecht", "neutral", "wohl")
 EMOTION_LABELS_DE = {item["key"]: str(item["label_de"]) for item in EMOTION_DEFINITIONS}
 EMOTION_LABELS_EN = {item["key"]: str(item["label_en"]) for item in EMOTION_DEFINITIONS}
 EMOTION_COLORS = {item["key"]: str(item["color"]) for item in EMOTION_DEFINITIONS}
@@ -236,6 +264,14 @@ def clamp_emotion_value(value: Any, default: int = 50) -> int:
     except (TypeError, ValueError):
         numeric = default
     return max(0, min(100, numeric))
+
+
+def get_emotion_preset(name: Any) -> dict[str, int] | None:
+    key = str(name or "").strip().lower()
+    preset = EMOTION_PRESETS.get(key)
+    if preset is None:
+        return None
+    return {emotion: clamp_emotion_value(preset.get(emotion, EMOTION_DEFAULTS[emotion]), EMOTION_DEFAULTS[emotion]) for emotion in EMOTION_ORDER}
 
 
 def normalize_emotion_state(source: Mapping[str, Any] | None) -> dict[str, int]:

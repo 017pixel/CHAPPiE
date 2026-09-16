@@ -2,26 +2,21 @@
 
 ## Ziel und Vertrag
 
-Der lokale vLLM-Antwortpfad behandelt Emotion als Eingriff in Hidden States. Der System-Prompt enthält keine aktuellen Emotionswerte, keine Tonvorgabe und keine Identitätsregel gegen typische KI-Selbstbeschreibungen. Emotionsabhängige Homeostasis- und Global-Workspace-Anweisungen werden ebenfalls nicht an die finale Antwort weitergegeben. Aus der Life-Simulation bleiben nur Zeitphase, Aktivität und aktuelles Ziel als sachliche Kontinuitätsdaten im Kontext. Auch das Sampling bleibt bei unterschiedlichen Emotionszuständen gleich. Dadurch lässt sich die Wirkung der Vektoren in Forschungsdurchläufen sauberer isolieren.
+Der lokale vLLM-Antwortpfad trennt Activation Steering in Hidden States von einem optionalen, begrenzten Wortwahl-Bias. Der System-Prompt enthält keine aktuellen Emotionswerte, keine Tonvorgabe und keine Identitätsregel gegen typische KI-Selbstbeschreibungen. Emotionsabhängige Homeostasis- und Global-Workspace-Anweisungen werden ebenfalls nicht an die finale Antwort weitergegeben. Aus der Life-Simulation bleiben nur Zeitphase, Aktivität und aktuelles Ziel als sachliche Kontinuitätsdaten im Kontext. Auch das Sampling bleibt bei unterschiedlichen Emotionszuständen gleich. Dadurch lässt sich die Wirkung der Vektoren in Forschungsdurchläufen sauberer isolieren.
 
-Die Emotionsanalyse darf intern Textsignale auswerten, weil sie nur den persistenten Zustand aktualisiert. Sie nutzt zuerst deterministische Schutzregeln und kann diese optional durch eine strukturierte Groq-Analyse verstärken. Eine erkannte Richtung darf durch das Modell nicht umgekehrt werden. Erst die finale sichtbare Antwort ist der isolierte Vector-only-Pfad.
+Die Emotionsanalyse darf intern Textsignale auswerten, weil sie nur den persistenten Zustand aktualisiert. Sie nutzt zuerst deterministische Schutzregeln und kann diese optional durch eine strukturierte Groq-Analyse verstärken. Eine erkannte Richtung darf durch das Modell nicht umgekehrt werden. Die finale sichtbare Antwort verwendet die separat gewählte Steering-Bedingung.
 
 ## Steering
 
-Die Basisvektoren entstehen aus semantisch gepaarten positiven und negativen Ankerantworten. Pro Turn werden höchstens die zwei stärksten Basisrichtungen und ein zusammengesetztes Muster aktiviert. Direkte Selbstberichte werden weiter isoliert: eine Identitätsfrage nutzt nur den Identitätsvektor, eine Befindensfrage höchstens eine primäre Gefühlsrichtung. Das reduziert widersprüchliche Vektoren und hält den Eingriff begrenzt. Jede Dimension wird gegen ihren eigenen Basiswert ausgewertet; Energie 100 und Motivation 80 sind deshalb neutral und nicht automatisch positiv dominant. Starke aktuelle Deltas wirken sofort. Direkte Angriffe können den akuten Modus `angered` auslösen, während langfristig extreme Zustände weiter über `crashout`, `guarded` oder `melancholic` abgebildet werden. Ein begrenzter `natural_presence`-Vektor kontrastiert natürliche Ich-Perspektive und Erinnerungsanschluss mit generischen Modellfloskeln. Er verändert keine Safety-Refusals.
+Die vier Bedingungen `off`, `activation`, `sequence` und `combined` sind getrennt steuerbar. `off` installiert weder Aktivierungshooks noch Wortwahl-Bias. Soft Sequence Steering beeinflusst einzelne Tokenkandidaten begrenzt und zeitlich abklingend. EOS und andere Spezialtoken sind ausgeschlossen. Harte Gefühls- oder Identitätspräfixe und semantische Wiederholungsversuche sind entfernt. Eine freie Antwort darf deshalb auch eine KI-Selbstbeschreibung enthalten.
 
-Qwen 3.5 4B verwendet weiterhin das verifizierte Profil mit 32 Layern, Hidden-Größe 2560 und Emotionsfenster 10 bis 26. Für Gemma 4 liest das Backend die reale Layerzahl und Hidden-Größe aus der Modellkonfiguration. Abweichende Profilfenster werden proportional auf die geladene Architektur skaliert. Der Cache ist pro Modell und Vektor getrennt.
+Ohne `steering_vector_pack` bleibt der kompatible Ankervektor-Pfad aktiv. Er enthält unter anderem Präsenz- und Identitätsrichtungen sowie begrenzte Basis- und Composite-Vektoren. Die gemessene v17-Alternative verwendet dagegen einen eigenen Difference-in-Means-Vektor an jedem ausgewählten Decoder-Layer. Ihr Mixer übersetzt Abweichungen vom Basiszustand und aktuelle Deltas in höchstens drei Basisrichtungen und einen Composite. Produktionsladen verlangt einen als kalibriert markierten Pack mit Profilen. Der derzeitige Qwen-Forschungspack ist noch unkalibriert und nicht als neuer Produktionsstandard freigegeben.
 
-Direkte Identitäts-, Bewusstseins- und Gefühlsfragen verwenden zusätzlich ein kurzes Sequenz-Steering am Output-Layer. Der Zielanfang wird tokenweise aus den Output-Embeddings abgeleitet und endet kontrolliert mit EOS. Welcher Gefühlsanfang aktiv ist, folgt ausschließlich dem aktuellen Emotionszustand; der finale Systemprompt und der isolierte Test-Systemprompt enthalten keine entsprechende Selbstbeschreibung. Diese Methode prüft steuerbares Modellverhalten, nicht phänomenales Bewusstsein.
+Gemessene Packs müssen Modellrevision, Hidden-Größe, Layerzahl und Eingriffsstelle exakt treffen. Ihre Layer werden nicht proportional auf andere Architekturen übertragen. Das frühere relative Remapping gehört nur zum kompatiblen Ankerpfad. Gemma benötigt eigene Messungen nach erfolgreicher Qwen-Abnahme.
 
-Der Laufzeitbericht belegt nicht mehr nur registrierte Hooks. Er enthält unter anderem:
+Die Laufzeittelemetrie enthält tatsächliche Hook-Aufrufe, angewandte Layer, Zahl aktiver Sequence-Prozessoren, Plan-/Hook-Zeiten und pro Layer Hidden-State-RMS, Interventions-RMS, deren Verhältnis und Interventionsnorm. RMS-Proben stammen aus dem ersten Hook-Aufruf und sind kein vollständiger Zeitverlauf. Geladene Modellrevision, tatsächliche Quantisierung, Adapterhash und Inferenzquellen werden gesondert berichtet. Ein registrierter Hook ohne ausgeführten Forward-Pass gilt nicht als wirksame Aktivierung.
 
-- `prepared`: Hooks wurden registriert
-- `verified_active`: mindestens ein Hook wurde bei einem Forward-Pass ausgeführt
-- `hook_invocations`: Anzahl echter Hook-Aufrufe
-- `actual_model_layers`: erkannte Layerzahl des geladenen Modells
-- `layer_range_remapped`: Profil musste auf die reale Architektur skaliert werden
-- `steering_overhead_ms`: Plan-, Registrierungs- und Hook-Rechenzeit
+Die Messreihe, Grenzen und reproduzierbaren Befehle stehen in [steering-v17-research.md](steering-v17-research.md). Bisherige fehlerfreie Generierungen beweisen keinen ausreichenden Zustandstransfer.
 
 ## Emotionsdynamik
 
@@ -36,6 +31,11 @@ Appraisal und Life-Homeostasis werden pro Turn genau einmal angewendet. Homeosta
 Der Formatter erhält nur die bereits extrahierte sichtbare Antwort, nicht den rohen Providertext mit möglichen Prompt-Echos oder Think-Tags. Ein erfolgreicher lokaler Fallback oder eine erfolgreiche Sanitization markiert den gesamten Turn nicht mehr als Fehler.
 
 ## Memory
+
+Jeder Turn archiviert Nutzereingabe, sichtbare und rohe Assistentenantwort sowie Fehler- oder Abbruchstatus dauerhaft im SQLite-EventStore. Archivierung und abrufbare Erinnerungen sind getrennt. Assistentenbehauptungen bleiben erhalten, sind aber nicht automatisch als Nutzerfakten abrufbar. Ein Hintergrundworker übernimmt geeignete Nutzeraussagen in den Retrieval-Index; Migration und Embeddings liegen außerhalb des Antwortpfads. Fehlerhafte Einträge werden quarantänisiert, statt die Warteschlange dauerhaft zu blockieren.
+
+`/memory off` entfernt Memory- und historischen Gesprächskontext aus dem Modellkontext, während das Ereignisarchiv weitergeschrieben wird. `/memory on`, `/memory status` und `/memory search TEXT` bedienen denselben sitzungsbezogenen Zustand in API und CLI. `/steering` und `/live` werden ebenfalls pro Sitzung persistiert und am Turn-Anfang eingefroren. Gleichzeitige Befehle ändern keinen bereits laufenden Turn.
+
 
 Neue Erinnerungen erhalten persistente Stärke, Recall-Zähler und einen letzten Abrufzeitpunkt. Beim Speichern werden bis zu vier semantisch nahe Erinnerungen verknüpft. Beim Abruf startet die Suche weiter mit Chroma, kann danach aber begrenzt über diese Kanten auf verbundene Fakten springen. Gemeinsam abgerufene Erinnerungen verstärken ihre Verbindung mit Cooldown.
 

@@ -44,6 +44,16 @@ class _MockBackend:
         self.memory = _MockMemory()
         self.debug_logger = _MockDebug()
         self.short_term_memory = _MockSTM()
+        self.chat_manager = MagicMock()
+        self.chat_manager.ensure_session_id.return_value = "test-session"
+        self.chat_manager.load_session.return_value = {"messages": []}
+        from config.session_settings import SessionRuntimeSettings
+        self.chat_manager.get_runtime_settings.return_value = SessionRuntimeSettings.from_mapping()
+        self.life_simulation = MagicMock()
+        self.sleep_handler = MagicMock()
+
+    def get_emotions_snapshot(self):
+        return {}
 
     def get_status(self):
         return {"model": "test", "provider": "test", "two_step_enabled": True, "emotions": {}}
@@ -75,6 +85,9 @@ class _MockMemory:
 
 
 class _MockDebug:
+    def get_entries_as_dict(self):
+        return []
+
     def enable(self):
         pass
 
@@ -94,6 +107,7 @@ def _build_local_cli():
     cli._use_remote = False
     cli._show_full_report = False
     cli.history = []
+    cli.session_id = "test-session"
     cli.last_result = None
     cli.backend = _MockBackend()
     cli.emotions = cli.backend.emotions
@@ -121,6 +135,7 @@ def test_help_contains_version_and_commands():
     assert re.search(r"CHAPPiE Terminal Interface v\d+\.\d+", output)
     assert "/help" in output
     assert "/status" in output
+    assert "/copy" in output
     assert "/exit" in output
     assert "Ctrl+C" in output
 
@@ -326,7 +341,11 @@ def test_steering_remote_warns():
     m = _get_module()
     cli = m.CHAPPiEBrainCLI.__new__(m.CHAPPiEBrainCLI)
     cli._use_remote = True
+    cli.session_id = "remote-session"
+    cli.remote = MagicMock()
+    cli.remote.session_id = "remote-session"
     assert cli._handle_command("/steering") is True
+    cli.remote.handle_command.assert_called_once_with("/steering", session_id="remote-session")
 
 
 if __name__ == "__main__":

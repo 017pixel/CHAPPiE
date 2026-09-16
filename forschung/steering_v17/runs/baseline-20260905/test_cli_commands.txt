@@ -1,0 +1,63 @@
+╭─────────────────────────────── CHAPPiE Status ───────────────────────────────╮
+│                                                                              │
+│   Stimmung:     neutral                                                      │
+│   happiness     ░░░░░░░░░░░░░░░   0                                          │
+│   trust         ░░░░░░░░░░░░░░░   0                                          │
+│   energy        ░░░░░░░░░░░░░░░   0                                          │
+│   curiosity     ░░░░░░░░░░░░░░░   0                                          │
+│   motivation    ░░░░░░░░░░░░░░░   0                                          │
+│   frustration   ░░░░░░░░░░░░░░░   0                                          │
+│   sadness       ░░░░░░░░░░░░░░░   0                                          │
+│   affection     ░░░░░░░░░░░░░░░   0                                          │
+│   anxiety       ░░░░░░░░░░░░░░░   0                                          │
+│   calm          ░░░░░░░░░░░░░░░   0                                          │
+│   Modell:       test | test                                                  │
+│   Two-Step:     AN                                                           │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[32m[15:59:20] [OK] Neue Chat-Sitzung gestartet[0m
+[2m[15:59:20] [LAST] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────────── CHAPPiE ───────────────────────────────────╮
+│ hi                                                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────────────────── Emotionen ──────────────────────────────────╮
+│      happiness:  55 →  60  (+5)                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─────────────────────────────────── Timing ───────────────────────────────────╮
+│   Total: 500ms                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+━━━ CHAPPiE Full Report · 500ms · vllm/qwen ━━━
+[2m[15:59:20] [RAW] Noch keine Antwort vorhanden.[0m
+╭────────────────────────────── Step 1 Raw JSON ───────────────────────────────╮
+│ {                                                                            │
+│   "key": "val"                                                               │
+│ }                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭───────────────────── Raw Model Output (vor Formatting) ──────────────────────╮
+│ raw output                                                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[15:59:20] [TRACE] Noch keine Antwort vorhanden.[0m
+╭──────────────────────────────── Causal Trace ────────────────────────────────╮
+│   [Input] driver=test                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+[2m[15:59:20] [HISTORY] Kein Chat-Verlauf[0m
+
+[34mChat-Verlauf (2 Nachrichten):
+  [32m[user] hi[0m
+  [34m[assistant] hello[0m
+
+[32m[15:59:20] [OK] Debug-Output aktiviert[0m
+[2m[15:59:20] [DEBUG] Debug-Output deaktiviert[0m
+[93m[15:59:20] [WARN] Unbekannter Befehl: /debug invalid[0m
+  Tippe /help fuer alle Befehle
+[91m[15:59:20] [ERROR] Unbekannte Emotion: nonexistent[0m
+[91m[15:59:20] [ERROR] Ungueltiger Wert: abc[0m
+[33m[15:59:20] [EMOTION] Nutze: /emotion happiness [+/-]<0-100>[0m
+[93m[15:59:20] [WARN] Unbekannter Befehl: /unknowncmd[0m
+  Tippe /help fuer alle Befehle
+[93m[15:59:20] [WARN] Unbekannter Befehl: hello[0m
+  Tippe /help fuer alle Befehle
+[35m[15:59:20] [STM] Keine Eintraege im Kurzzeitgedaechtnis[0m
+[93m[15:59:20] [RUNTIME] Remote-Status nicht abrufbar[0m
+[93m[15:59:20] [STEERING] Remote-Status nicht abrufbar[0m
+OK: CLI v6.0 command handling

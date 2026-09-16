@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import threading
+from web_infrastructure.timing import measured
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List
+from typing import Any, Dict, List
 
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER
 from brain.response_parser import (
     is_safe_retrieval_text,
-    looks_like_model_error,
 )
 
 
@@ -17,58 +17,26 @@ from brain.response_parser import (
 
 
 class TurnPersistence:
-    def __init__(
-        self,
-        *,
-        memory_getter: Callable[[], Any],
-        short_term_memory_getter: Callable[[], Any],
-        timestamp_callback: Callable[[], None],
-    ) -> None:
-        self._memory_getter = memory_getter
-        self._short_term_memory_getter = short_term_memory_getter
+    """Archive first; embedding and migration run in the durable worker."""
+
+    def __init__(self, *, event_store, promotion, timestamp_callback):
+        self.store = event_store
+        self.promotion = promotion
         self._timestamp_callback = timestamp_callback
 
-    def persist_exchange(
-        self,
-        user_input: str,
-        response_text: str,
-        *,
-        background_short_term: bool = False,
-        deterministic: bool = False,
-        suppress_short_term_errors: bool = False,
-    ) -> None:
-        memory = self._memory_getter()
-        memory.add_memory(user_input, role="user")
-        if response_text.strip() and not looks_like_model_error(response_text):
-            memory.add_memory(response_text, role="assistant")
+    def archive_input(self, turn, metadata):
+        self.store.append(
+            session_id=turn.session_id or "local", turn_id=turn.turn_id,
+            role="user", content=turn.user_input, metadata=metadata,
+        )
+
+    def archive_result(self, turn, result, metadata):
+        self.store.append(
+            session_id=turn.session_id or "local", turn_id=turn.turn_id,
+            role="assistant", content=result.get("response_text", ""),
+            raw_content=result.get("raw_response"), metadata=metadata,
+        )
         self._timestamp_callback()
-
-        def persist_short_term() -> None:
-            short_term_memory = self._short_term_memory_getter()
-            short_term_memory.add_entry(
-                content=f"User: {user_input}",
-                category="chat",
-                importance="normal",
-            )
-            short_term_memory.add_entry(
-                content=f"CHAPPiE: {response_text[:200]}",
-                category="chat",
-                importance="normal",
-            )
-
-        def run_short_term() -> None:
-            if not suppress_short_term_errors:
-                persist_short_term()
-                return
-            try:
-                persist_short_term()
-            except Exception:
-                pass
-
-        if background_short_term and not deterministic:
-            threading.Thread(target=run_short_term, daemon=True).start()
-        else:
-            run_short_term()
 
 
 class RuntimePersistenceMixin:
@@ -91,12 +59,14 @@ class RuntimePersistenceMixin:
             except Exception:
                 pass
 
+    @measured("memory_retrieval_ms")
     def _search_memory(self, *args, **kwargs) -> List[Any]:
         if not self._feature_enabled("memory"):
             return []
         memories = self.memory.search_memory(*args, **kwargs)
         return [memory for memory in memories if is_safe_retrieval_text(getattr(memory, "content", ""))]
 
+    @measured("memory_retrieval_ms")
     def _search_memory_keywords(self, *args, **kwargs) -> List[Any]:
         if not self._feature_enabled("memory"):
             return []

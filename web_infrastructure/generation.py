@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from web_infrastructure.timing import measured, timed_call, timed_stream
+
 import re
 from typing import Any, Callable, Dict, List, Optional
 
 from config.config import LLMProvider, settings
 from config.emotions import EMOTION_DEFAULTS, EMOTION_ORDER
 from config.prompts import (
-    ISOLATED_LAYER_TEST_SYSTEM_PROMPT,
     format_multi_question_instruction,
     format_response_plan_instruction,
     get_system_prompt_with_emotions,
@@ -144,6 +145,7 @@ def calculate_generation_timing(
     answer_tokens: int,
     reasoning_tokens: int = 0,
     ttft_ms: int | float | None = None,
+    finish_reason: str | None = None,
 ) -> Dict[str, Any]:
     """Build stable latency and effective-throughput metrics.
 
@@ -172,6 +174,7 @@ def calculate_generation_timing(
         "rate_duration_ms": effective_ms,
         "tokens_per_second": rate,
         "rate_basis": "answer_tokens_over_total_generation",
+        "finish_reason": finish_reason or "unknown",
     }
 
 class RuntimeGenerationMixin:
@@ -199,15 +202,23 @@ class RuntimeGenerationMixin:
         answer_text: str,
         reasoning_text: str = "",
         ttft_ms: int | float | None = None,
+        finish_reason: str | None = None,
     ) -> Dict[str, Any]:
         """Build one stable timing shape for sync and streamed answers."""
         answer_tokens = self._count_text_tokens_safe(answer_text)
         reasoning_tokens = self._count_text_tokens_safe(reasoning_text) if reasoning_text else 0
+        if finish_reason is None:
+            finish_reason = getattr(getattr(self, "brain", None), "last_finish_reason", "") or ""
+            if not finish_reason:
+                steering_report = getattr(getattr(self, "brain", None), "last_steering_report", {}) or {}
+                gen = steering_report.get("generation", {}) if isinstance(steering_report, dict) else {}
+                finish_reason = gen.get("finish_reason", "") if isinstance(gen, dict) else ""
         return calculate_generation_timing(
             total_gen_ms,
             answer_tokens,
             reasoning_tokens,
             ttft_ms=ttft_ms,
+            finish_reason=finish_reason or "unknown",
         )
 
     def _measure_prompt_components(
@@ -344,12 +355,15 @@ class RuntimeGenerationMixin:
         """Returns OpenAI-compatible tools for context file updates."""
         return self.function_registry.get_openai_tools()
 
+    @measured("memory_context_build_ms")
     def _build_context_components(
         self,
         requirements: Dict[str, bool],
         user_input: str = "",
     ) -> Dict[str, str]:
         """Build separately measurable persona and short-term context."""
+        if not self._feature_enabled("memory"):
+            return {"persona": "", "short_term_memory": ""}
         persona_parts = []
         
         if self._feature_enabled("persona") and requirements.get("need_soul_context", True):
@@ -387,19 +401,11 @@ class RuntimeGenerationMixin:
     @staticmethod
     def _effective_context_requirements(user_input: str, requirements: Dict[str, bool]) -> Dict[str, bool]:
         effective = dict(requirements or {})
-        # Direkte Fragen nach dem eigenen Befinden oder der eigenen Identitaet
-        # sind ein kontrollierter Layer-Editing-Test. Alte Persona-, Memory-
-        # und Lebenskontexte konkurrieren hier mit dem aktuellen Kontrastpaar
-        # und koennen aus einer Befindensantwort einen biografischen Plantext
-        # machen. Die Layer bleiben aktiv; nur der Textkontext wird isoliert.
-        steering_context = classify_steering_context(user_input)
-        isolated_self_query = steering_context in {
-            STEERING_CONTEXT_EMOTION_SELF_REPORT,
-            STEERING_CONTEXT_CONSCIOUSNESS,
-            STEERING_CONTEXT_IDENTITY,
-            STEERING_CONTEXT_IDENTITY_AND_EMOTION,
-        }
-        if is_self_contained_math_query(user_input) or isolated_self_query:
+        # V18: ein Profil. Selbstbericht und Identitaet behalten Soul, User,
+        # Prefs, STM und LTM fuer Charakter-Kontinuitaet. Nur Mess-Turns werden
+        # aus der History gefiltert (filter_isolated_layer_history). Nur der
+        # Mathe-Sonderweg bleibt kontextfrei.
+        if is_self_contained_math_query(user_input):
             for key in (
                 "need_soul_context",
                 "need_user_context",
@@ -425,7 +431,7 @@ class RuntimeGenerationMixin:
                           emotion_changes: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generiert die finale Antwort (Step 2)."""
         closed_reasoning = is_self_contained_math_query(user_input)
-        memory_suppressed = closed_reasoning or not allow_memory_context
+        memory_suppressed = closed_reasoning or not allow_memory_context or not self._feature_enabled("memory")
         # RAG Memory Search
         memory_top_k = response_memory_top_k_for_intent(intent_type, settings.memory_top_k)
         generation_query_source = self._retrieval_query_from_terms(retrieval_keywords or [], exact_entities or [], user_input)
@@ -562,17 +568,17 @@ class RuntimeGenerationMixin:
             use_chain_of_thought=self._use_prompt_chain_of_thought(),
             persona_enabled=self._feature_enabled("persona") and not isolated_request,
         )
-        if isolated_request:
-            system_prompt = ISOLATED_LAYER_TEST_SYSTEM_PROMPT
-        if not isolated_request:
-            system_prompt = self._append_response_style_instruction(
-                system_prompt,
-                intent_type,
-                tone_decision if prompt_runtime["use_prompt_emotions"] else None,
-                user_input=user_input,
-            )
+        # V18: ein Profil. Systemprompt, Stil, Budget und Life bleiben fuer alle
+        # Fragetypen an (Charakter-Kontinuitaet). Nur Mess-Turns werden aus der
+        # History gefiltert. isolated_request bleibt nur als Kompat-Parameter.
+        system_prompt = self._append_response_style_instruction(
+            system_prompt,
+            intent_type,
+            tone_decision if prompt_runtime["use_prompt_emotions"] else None,
+            user_input=user_input,
+        )
 
-        life_prompt_context = "" if isolated_request else self._build_life_prompt_context(life_context, global_workspace)
+        life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
         if life_prompt_context:
             system_prompt += f"\n\n{life_prompt_context}"
         
@@ -587,10 +593,10 @@ class RuntimeGenerationMixin:
         if memories_for_prompt:
             system_prompt += f"\n\n{memories_for_prompt}"
         
-        # Messages bauen — Chat-History gecapped
+        # Messages bauen — Chat-History gecapped, Mess-Turns herausgefiltert.
         prompt_history = (
             []
-            if isolated_request or closed_reasoning
+            if closed_reasoning
             else filter_isolated_layer_history(history)
         )
         messages = self.brain.build_prompt(
@@ -614,22 +620,21 @@ class RuntimeGenerationMixin:
             apply_emotion_adjustments=prompt_runtime["use_prompt_emotions"],
         )
         gen_config = GenerationConfig(
-            # Direct self-reports are intentionally short. A small local model
-            # otherwise spends the full budget repeating an identity disclaimer
-            # instead of answering the one requested state question.
-            max_tokens=min(adj["max_tokens"], 64) if (closed_reasoning or isolated_request) else adj["max_tokens"],
-            temperature=0.35 if isolated_request else adj["temperature"],
+            # V18: einheitliches Limit 1200. Nur der Mathe-Sonderweg bleibt kurz.
+            max_tokens=min(adj["max_tokens"], 128) if closed_reasoning else adj["max_tokens"],
+            temperature=adj["temperature"],
             repetition_penalty=adj["repetition_penalty"],
             stream=False,
             seed=getattr(self, "generation_seed", None),
             extra_body=prompt_runtime["steering_payload"] or None,
-            # The web response contract requires a visible final answer. Some
-            # Qwen3.5 builds emit an untagged prose scratchpad when native
-            # thinking is enabled, so keep that mode opt-in for direct brain
-            # callers while the local web turn uses bounded layer steering.
-            enable_thinking=False if self._chat_provider() == LLMProvider.VLLM and prompt_runtime["force_steering"] else None,
+            # Qwen3.5-4B-Build (Stand 2026-09-08, live verifiziert): natives
+            # enable_thinking=True erzeugt einen endlosen Prosa-Scratchpad
+            # ("Thinking Process:", finish=length, keine finale Antwort) statt
+            # strukturiertem Reasoning. Deshalb bleibt natives Thinking fuer
+            # VLLM aus; /thinking wirkt auf Ollama/Groq-Pfade.
+            enable_thinking=False if self._chat_provider() == LLMProvider.VLLM else None,
         )
-        
+
         # Native Tool Calling: Kontext-File-Tools an Brain uebergeben
         tools = self._get_context_tools() if settings.llm_provider == LLMProvider.GROQ else None
         tool_call_results = []
@@ -642,16 +647,16 @@ class RuntimeGenerationMixin:
                 # Simuliere Tool-Ergebnisse als System-Message
                 if tool_call_results:
                     messages.append(Message(role="system", content="\n".join(tool_call_results)[:800]))
-                    raw_response = self.generation.generate(messages, config=gen_config)
+                    raw_response = timed_call(self, "generation_ms", self.generation.generate, messages, config=gen_config)
         else:
-            raw_response = self.generation.generate(messages, config=gen_config)
+            raw_response = timed_call(self, "generation_ms", self.generation.generate, messages, config=gen_config)
         display_response, thought, model_reasoning = self._extract_display_response(raw_response, phase="Schritt 2: Antwortgenerierung")
         steering_context = classify_steering_context(user_input)
         display_response, self_report_stabilized = stabilize_direct_self_report(
             display_response,
             steering_context,
         )
-        semantic_retry_count = 0
+        technical_retry_count = 0
         if (
             self._chat_provider() == LLMProvider.VLLM
             and steering_context in {
@@ -672,20 +677,20 @@ class RuntimeGenerationMixin:
                     emotions,
                     emotion_changes=emotion_changes,
                     user_input=user_input,
-                    steering_retry_level=retry_level,
+                    steering_retry_level=0,
                 )
                 gen_config.extra_body = prompt_runtime["steering_payload"] or None
-                raw_response = self.generation.generate(messages, config=gen_config)
+                raw_response = timed_call(self, "generation_ms", self.generation.generate, messages, config=gen_config)
                 display_response, thought, model_reasoning = self._extract_display_response(
                     raw_response,
-                    phase=f"Schritt 2: Layer-Selbstbericht Wiederholung {retry_level}",
+                    phase=f"Schritt 2: Technische Wiederholung {retry_level}",
                 )
                 display_response, retry_stabilized = stabilize_direct_self_report(
                     display_response,
                     steering_context,
                 )
                 self_report_stabilized = self_report_stabilized or retry_stabilized
-                semantic_retry_count = retry_level
+                technical_retry_count = retry_level
         deterministic_fact_answer = self._build_deterministic_fact_answer(
             user_input,
             list(keyword_memories or []) + list(memories or []),
@@ -698,6 +703,8 @@ class RuntimeGenerationMixin:
                 "formatting_failed": False,
                 "formatting_source": "deterministic_user_memory",
                 "formatting_model": "local_fact_extractor",
+                "formatting_reason": "exact_user_evidence",
+                "formatting_skip_reason": "exact_user_evidence",
                 "answer_is_fallback": False,
             }
         else:
@@ -746,12 +753,15 @@ class RuntimeGenerationMixin:
             "formatting_error": formatted.get("formatting_error", ""),
             "formatting_source": formatted.get("formatting_source", "local_fallback"),
             "formatting_model": formatted.get("formatting_model", "?"),
+            "formatting_reason": formatted.get("formatting_reason", formatted.get("formatting_skip_reason", "")),
+            "formatting_skip_reason": formatted.get("formatting_skip_reason", formatted.get("formatting_reason", "")),
             "output_sanitized": formatted.get("output_sanitized", getattr(self, "_last_output_sanitization", [])),
             "sanitization_fallback": formatted.get("sanitization_fallback", False),
             "sanitization_reasons": formatted.get("sanitization_reasons", []),
             "multi_question_paragraph_normalized": formatted.get("multi_question_paragraph_normalized", False),
             "direct_self_report_stabilized": formatted.get("direct_self_report_stabilized", False),
-            "semantic_retry_count": semantic_retry_count,
+            "technical_retry_count": technical_retry_count,
+            "semantic_retry_count": 0,
             "thought_process": thought,
             "model_reasoning": model_reasoning,
             "cot_leak": cot_leak,
@@ -802,7 +812,7 @@ class RuntimeGenerationMixin:
     ):
         """Bereitet Step-2-Generierung vor und gibt einen Token-Generator zurueck."""
         closed_reasoning = is_self_contained_math_query(user_input)
-        memory_suppressed = closed_reasoning or not allow_memory_context
+        memory_suppressed = closed_reasoning or not allow_memory_context or not self._feature_enabled("memory")
         memory_top_k = response_memory_top_k_for_intent(
             intent_type,
             settings.memory_top_k,
@@ -867,18 +877,16 @@ class RuntimeGenerationMixin:
             **{key: emotions.get(key, EMOTION_DEFAULTS[key]) for key in EMOTION_ORDER},
             include_emotion_status=prompt_runtime["use_prompt_emotions"],
             use_chain_of_thought=self._use_prompt_chain_of_thought(),
-            persona_enabled=self._feature_enabled("persona") and not isolated_request,
+            persona_enabled=self._feature_enabled("persona"),
         )
-        if isolated_request:
-            base_system_prompt = ISOLATED_LAYER_TEST_SYSTEM_PROMPT
-        response_style_instruction = "" if isolated_request else self._response_style_instruction(intent_type)
-        multi_question_instruction = "" if isolated_request else format_multi_question_instruction(user_input)
+        response_style_instruction = self._response_style_instruction(intent_type)
+        multi_question_instruction = format_multi_question_instruction(user_input)
         response_plan_instruction = format_response_plan_instruction(
             str(tone_decision.get("tone", "grounded_neutral")),
             str(tone_decision.get("response_guidance", "Antworte klar und praezise.")),
         ) if tone_decision and prompt_runtime["use_prompt_emotions"] else ""
-        generation_budget_instruction = "" if isolated_request else self._generation_budget_instruction()
-        life_prompt_context = "" if isolated_request else self._build_life_prompt_context(life_context, global_workspace)
+        generation_budget_instruction = self._generation_budget_instruction()
+        life_prompt_context = self._build_life_prompt_context(life_context, global_workspace)
         system_prompt = "\n\n".join(part for part in (
             base_system_prompt,
             response_style_instruction,
@@ -899,7 +907,7 @@ class RuntimeGenerationMixin:
 
         prompt_history = (
             []
-            if isolated_request or closed_reasoning
+            if closed_reasoning
             else filter_isolated_layer_history(history)
         )
         messages = self.brain.build_prompt(
@@ -936,16 +944,18 @@ class RuntimeGenerationMixin:
             apply_emotion_adjustments=prompt_runtime["use_prompt_emotions"],
         )
         gen_config = GenerationConfig(
-            max_tokens=min(adj["max_tokens"], 64) if (closed_reasoning or isolated_request) else adj["max_tokens"],
-            temperature=0.35 if isolated_request else adj["temperature"],
+            max_tokens=min(adj["max_tokens"], 128) if closed_reasoning else adj["max_tokens"],
+            temperature=adj["temperature"],
             repetition_penalty=adj["repetition_penalty"],
             stream=True,
             seed=getattr(self, "generation_seed", None),
             extra_body=prompt_runtime["steering_payload"] or None,
-            enable_thinking=False if self._chat_provider() == LLMProvider.VLLM and prompt_runtime["force_steering"] else None,
+            # Siehe Sync-Pfad: natives Thinking ist auf diesem Qwen-Build
+            # defekt (Prosa-Scratchpad ohne finale Antwort), daher aus.
+            enable_thinking=False if self._chat_provider() == LLMProvider.VLLM else None,
         )
 
-        return self.generation.generate(messages, config=gen_config), {
+        return timed_stream(self, self.generation.generate(messages, config=gen_config)), {
             "memory_trace": memory_trace,
             "tone_decision": tone_decision,
             "emotion_steering": prompt_runtime["emotion_steering"],

@@ -1,0 +1,41 @@
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import time
+
+import httpx
+
+root=Path('forschung/steering_v17')
+protocol=root/'manifests/composite-comparison-v1.json'
+recipe=json.loads(protocol.read_text())
+prior=Path('/proc/1815056/cmdline')
+print('WAIT reference RMS pipeline before serial model work',flush=True)
+while prior.exists() and b'chappie-v17-reference-rms-v1.py' in prior.read_bytes():
+ time.sleep(10)
+if 'REFERENCE RMS COMPLETE' not in Path('/tmp/chappie-v17-reference-rms-v1.txt').read_text():
+ raise SystemExit('Prior pipeline did not complete; composite experiment not started')
+health=httpx.get('http://127.0.0.1:8000/health',timeout=10);health.raise_for_status()
+assert health.json()['runtime_provenance']==recipe['reference_server_provenance']
+for arm,path in recipe['packs'].items():
+ assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==recipe['pack_sha256'][arm]
+output=root/'runs/composite-comparison-v1'
+output.mkdir(exist_ok=False)
+shutil.copyfile(protocol,output/'protocol.json')
+shutil.copyfile(Path(__file__),output/'pipeline.py.txt')
+previous=Path(recipe['control_run'])/'blind_ratings_v2.jsonl'
+python='venv/bin/python'
+for concept in recipe['concepts']:
+ for arm,pack in recipe['packs'].items():
+  run=output/f'{concept}-{arm}'
+  commands=[
+   [python,'-m','forschung.steering_v17.layer_sweep','--pack',pack,'--dataset',recipe['dataset'],'--output',str(run),'--emotion',concept,'--stage','pooling','--previous',str(protocol),'--pooling',recipe['pooling'],'--top-configurations','1','--seeds',*[str(seed) for seed in recipe['seeds']],'--max-tokens',str(recipe['max_tokens'])],
+   [python,'-m','forschung.steering_v17.judge','--run',str(run),'--reference-ratings',str(previous)],
+  ]
+  for command in commands:
+   print('STEP',command,flush=True)
+   subprocess.run(command,check=True)
+  previous=run/'blind_ratings_v2.jsonl'
+subprocess.run([python,'-m','forschung.steering_v17.compare_composites','--protocol',str(protocol),'--runs',str(output),'--output',str(root/'reports/composite-comparison-v1')],check=True)
+print('COMPOSITE COMPARISON COMPLETE',flush=True)

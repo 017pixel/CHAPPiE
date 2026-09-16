@@ -20,10 +20,15 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    LogitsProcessorList,
     StoppingCriteria,
     StoppingCriteriaList,
 )
 
+from brain.steering.telemetry import generation_end_metadata, runtime_source_fingerprint, cached_model_revision, model_artifact_hash, loaded_quantization
+from brain.steering.modes import SteeringMode
+from brain.steering.sequence_processor import SoftSequenceLogitsProcessor
+from config.config import get_steering_runtime_config
 from config.emotions import EMOTION_LABELS_DE, EMOTION_ORDER
 from config.prompts import (
     STEERING_NEGATIVE_ANCHORS,
@@ -33,6 +38,7 @@ from config.prompts import (
 
 
 LOGGER = logging.getLogger(__name__)
+LOADED_SOURCE_FINGERPRINT = runtime_source_fingerprint()
 
 
 NEUTRAL_DESCRIPTION = "ruhig, ausgeglichen, neutral, kontrolliert"
@@ -148,6 +154,10 @@ def normalize_request_priority(value: object) -> str:
         if str(value or "").strip().casefold() == REQUEST_PRIORITY_BACKGROUND
         else REQUEST_PRIORITY_INTERACTIVE
     )
+
+
+# Fallback, falls eine Engine ohne __init__ existiert (Tests, alte Pickles).
+_TOKENIZER_FALLBACK_LOCK = threading.RLock()
 
 
 class PriorityGenerationGate:
@@ -365,6 +375,8 @@ def build_activation_plan(
 ) -> Dict[int, torch.Tensor]:
     payload = extract_steering_payload(steering_payload)
     steering = payload.get("steering") if isinstance(payload, dict) else None
+    if isinstance(steering, dict) and steering.get("enabled") is False:
+        return {}
     vectors = steering.get("vectors", []) if isinstance(steering, dict) else []
     combined: Dict[int, torch.Tensor] = {}
     abs_strengths: Dict[int, float] = {}
@@ -388,7 +400,11 @@ def build_activation_plan(
             continue
         if end < start:
             start, end = end, start
-        if actual_layer_count is not None:
+        measured_vector = isinstance(item.get("vector"), dict) and item["vector"].get("type") == "layer_vectors"
+        if measured_vector and actual_layer_count is not None:
+            if declared_layer_count not in (0, actual_layer_count) or not 0 <= start <= end < actual_layer_count:
+                raise ValueError("Measured layer vectors cannot be remapped to another architecture")
+        if actual_layer_count is not None and not measured_vector:
             start, end = remap_layer_range(
                 start,
                 end,
@@ -497,6 +513,28 @@ class ActivationVectorResolver:
 
     def resolve(self, item: Dict[str, Any], start: int, end: int) -> Dict[int, torch.Tensor]:
         raw_vector = item.get("vector")
+        if isinstance(raw_vector, dict) and raw_vector.get("type") == "layer_vectors":
+            if (raw_vector.get("model") != self.model_name
+                    or raw_vector.get("site") != "decoder_layer_input"
+                    or raw_vector.get("num_layers") != self.num_layers
+                    or raw_vector.get("hidden_size") != self.hidden_size):
+                raise ValueError("Measured layer vector model/shape/site mismatch")
+            expected_revision = raw_vector.get("model_revision")
+            actual_revision = getattr(getattr(self.model, "config", None), "_commit_hash", None)
+            if expected_revision and actual_revision and expected_revision != actual_revision:
+                raise ValueError("Measured vector model revision mismatch")
+            result = {}
+            for key, values in raw_vector.get("layers", {}).items():
+                layer = int(key)
+                vector = torch.tensor(values, dtype=torch.float32)
+                if (not 0 <= layer < self.num_layers or not start <= layer <= end
+                        or vector.shape != (self.hidden_size,) or not torch.isfinite(vector).all()
+                        or not torch.isclose(vector.norm(), torch.tensor(1.0), atol=1e-4)):
+                    raise ValueError("Invalid measured layer vector")
+                result[layer] = vector
+            if not result:
+                raise ValueError("Empty measured layer vectors")
+            return result
         if isinstance(raw_vector, list) and len(raw_vector) == self.hidden_size:
             base = torch.tensor(raw_vector, dtype=torch.float32)
             return {layer: base for layer in range(start, end + 1)}
@@ -574,35 +612,8 @@ class ActivationVectorResolver:
         return (direction / norm * scale).cpu()
 
     def token_sequence_vectors(self, vector_data: Dict[str, Any]) -> list[torch.Tensor]:
-        """Erzeugt je Praefix-Token eine Richtung direkt fuer den Output-Layer."""
-        prefix = str(vector_data.get("target_prefix") or "")
-        token_ids = self.tokenizer(prefix, add_special_tokens=False).get("input_ids", [])
-        if token_ids and isinstance(token_ids[0], list):
-            token_ids = token_ids[0]
-        if not token_ids:
-            raise ValueError("token_sequence_steering benoetigt target_prefix")
-        if bool(vector_data.get("append_eos", False)):
-            eos_token_id = self.tokenizer.eos_token_id
-            if isinstance(eos_token_id, int) and eos_token_id >= 0:
-                token_ids = [*token_ids, eos_token_id]
-        try:
-            scale = max(1.0, min(48.0, float(vector_data.get("activation_scale", 24.0))))
-            max_norm = max(1.0, min(48.0, float(vector_data.get("max_norm", scale))))
-        except (TypeError, ValueError):
-            scale = max_norm = 24.0
-        output_embeddings = self.model.get_output_embeddings()
-        weight = getattr(output_embeddings, "weight", None)
-        if weight is None:
-            raise ValueError("Modell stellt keine Output-Embeddings fuer Sequenz-Steering bereit")
-        vectors: list[torch.Tensor] = []
-        for token_id in token_ids:
-            direction = weight[int(token_id)].detach().float()
-            norm = float(direction.norm().item())
-            if norm <= 1e-8:
-                raise ValueError("Sequenz-Steering ergab einen leeren Tokenvektor")
-            vector = direction / norm * min(scale, max_norm)
-            vectors.append(vector.cpu())
-        return vectors
+        """Legacy API retained solely to report retirement explicitly."""
+        raise ValueError("Hard sequence steering is retired; use soft_sequence_steering")
 
     def _basis_cache_path(self, item: Dict[str, Any]) -> Path:
         payload = {
@@ -758,6 +769,8 @@ class LocalSteeringEngine:
         background_input_token_limit: int = 256,
     ):
         self.model_name = model_name
+        self.model_revision = cached_model_revision(model_name)
+        local_model_hash = model_artifact_hash(model_name) if Path(model_name).is_dir() else None
         self.context_length = context_length
         self.background_input_token_limit = max(128, int(background_input_token_limit))
         self.quantize = self._resolve_quantize(quantize)
@@ -766,6 +779,11 @@ class LocalSteeringEngine:
         self.cache_dir = cache_dir or (Path(__file__).resolve().parent.parent / "data" / "steering_cache")
         self._generation_lock = threading.Lock()
         self._generation_gate = PriorityGenerationGate()
+        # Der Rust-Tokenizer ist nicht threadsicher ("Already borrowed" bei
+        # gleichzeitigem Encode waehrend ein Stream dekodiert, live 2026-09-08:
+        # Hintergrund-Job des Trainings-Daemons vs. interaktiver Turn).
+        # Reihenfolge ist immer Gate -> Tokenizer-Lock, nie umgekehrt.
+        self._tokenizer_lock = threading.RLock()
         self.last_steering_report: Dict[str, Any] = {
             "active": False,
             "hook_count": 0,
@@ -774,13 +792,16 @@ class LocalSteeringEngine:
             "mode": "activation_addition",
             "model": model_name,
         }
+        model_config = AutoConfig.from_pretrained(model_name, **self._build_loader_kwargs())
+        self.model_revision = self.model_revision or getattr(model_config, "_commit_hash", None) or cached_model_revision(model_name)
+        if self.model_revision is None and local_model_hash is None:
+            raise ValueError("Cannot establish the loaded model revision")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, **self._build_loader_kwargs())
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         # Bei gekuerzten Chatverlaeufen muessen die aktuelle Nutzerfrage und
         # die letzten Turns erhalten bleiben, nicht der aelteste Kontext.
         self.tokenizer.truncation_side = "left"
-        model_config = AutoConfig.from_pretrained(model_name, **self._build_loader_kwargs())
         max_pos = getattr(model_config, "max_position_embeddings", None)
         if max_pos is None:
             max_pos = context_length
@@ -813,16 +834,30 @@ class LocalSteeringEngine:
         if not self.quantize:
             self.model.to(self.device)
         self.model.eval()
+        self.model_revision = self.model_revision or getattr(self.model.config, "_commit_hash", None) or cached_model_revision(model_name)
+        self.model.config._commit_hash = self.model_revision
 
         # Load LoRA adapter if specified
+        adapter_hash = None
         if adapter_path and Path(adapter_path).exists():
             from peft import PeftModel
+            adapter_hash = model_artifact_hash(adapter_path)
             LOGGER.info("Steering: Lade LoRA-Adapter von %s", adapter_path)
             self.model = PeftModel.from_pretrained(self.model, adapter_path)
             LOGGER.info("Steering: LoRA-Adapter erfolgreich geladen.")
 
         self.layers = self._find_transformer_layers()
         self.resolver = ActivationVectorResolver(model_name, self.cache_dir, self.tokenizer, self.model, self.device)
+        self.runtime_provenance = {
+            "source_sha256": LOADED_SOURCE_FINGERPRINT,
+            "model": model_name, "model_revision": self.model_revision,
+            "num_layers": len(self.layers), "hidden_size": model_config_int(self.model, "hidden_size"),
+            "site": "decoder_layer_input", "quantized": loaded_quantization(self.model) != "none",
+            "quantization": loaded_quantization(self.model),
+            "adapter_sha256": adapter_hash, "local_model_sha256": local_model_hash,
+            "torch_version": torch.__version__, "cuda_version": torch.version.cuda,
+            "context_length": self.context_length,
+        }
 
     @staticmethod
     def _nested_attr(root: Any, path: str) -> Any:
@@ -991,6 +1026,8 @@ class LocalSteeringEngine:
         """Erlaubt Remote-Code fuer Modellfamilien, die lokal noch nicht nativ im Transformers-Pin stecken."""
         model_lower = (self.model_name or "").lower()
         kwargs: Dict[str, Any] = {}
+        if getattr(self, "model_revision", None):
+            kwargs["revision"] = self.model_revision
         if "qwen/qwen3.5" in model_lower or is_gemma4_name(model_lower):
             kwargs["trust_remote_code"] = True
         if for_model and ("qwen" in model_lower or is_gemma4_name(model_lower)):
@@ -1007,12 +1044,14 @@ class LocalSteeringEngine:
     ) -> tuple[str, Dict[str, torch.Tensor]]:
         kwargs = dict(chat_template_kwargs or {})
         prompt_messages = [dict(message) for message in messages]
-        prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
+        with self._tokenizer_guarded():
+            prompt = self.tokenizer.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True, **kwargs)
         reserved = max(0, min(int(reserve_new_tokens or 0), max(0, self.context_length - 128)))
         max_input_length = max(128, self.context_length - reserved)
         if input_token_limit is not None:
             max_input_length = min(max_input_length, max(128, int(input_token_limit)))
-        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
+        with self._tokenizer_guarded():
+            inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_input_length)
         actual_len = int(inputs["input_ids"].shape[1])
         if actual_len > max_input_length:
             LOGGER.warning("Prompt nach Truncation immer noch %d Token (Limit %d). Das sollte nicht passieren.", actual_len, max_input_length)
@@ -1028,6 +1067,12 @@ class LocalSteeringEngine:
             LOGGER.debug("GPU-Memory [%s]: alloc=%.2f GiB, reserved=%.2f GiB, peak=%.2f GiB", label, allocated, reserved, max_alloc)
         except Exception:
             pass
+
+    @contextmanager
+    def _tokenizer_guarded(self) -> Iterator[None]:
+        """Serialisiert alle Tokenizer-Zugriffe (Rust-Tokenizer ist nicht threadsicher)."""
+        with getattr(self, "_tokenizer_lock", _TOKENIZER_FALLBACK_LOCK):
+            yield
 
     @contextmanager
     def _generation_slot(self, request_priority: object) -> Iterator[None]:
@@ -1072,16 +1117,19 @@ class LocalSteeringEngine:
         self._log_gpu_stats("pre-generate")
         steering_runtime: Dict[str, Any] = {}
         with self._generation_slot(request_priority):
-            if seed is not None:
-                torch.manual_seed(int(seed))
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed_all(int(seed))
-            with self._apply_activation_plan(steering_payload):
-                with torch.inference_mode():
-                    generated = self.model.generate(**generation_kwargs)
-            # Capture the request report before another queued request can
-            # replace the shared health snapshot.
-            steering_runtime = dict(self.last_steering_report)
+            with self._tokenizer_guarded():
+                if seed is not None:
+                    torch.manual_seed(int(seed))
+                    if torch.cuda.is_available():
+                        torch.cuda.manual_seed_all(int(seed))
+                with self._apply_activation_plan(steering_payload, int(inputs["input_ids"].shape[1])) as processors:
+                    if processors:
+                        generation_kwargs["logits_processor"] = LogitsProcessorList(processors)
+                    with torch.inference_mode():
+                        generated = self.model.generate(**generation_kwargs)
+                # Capture the request report before another queued request can
+                # replace the shared health snapshot.
+                steering_runtime = dict(self.last_steering_report)
         self._log_gpu_stats("post-generate")
         input_len = int(inputs["input_ids"].shape[1])
         new_ids = generated[0][input_len:]
@@ -1090,8 +1138,14 @@ class LocalSteeringEngine:
         prompt_tokens = int(inputs["input_ids"].shape[1])
         visible_text = answer
         if not visible_text and not reasoning:
-            visible_text = self.tokenizer.decode(new_ids, skip_special_tokens=True).strip()
+            with self._tokenizer_guarded():
+                visible_text = self.tokenizer.decode(new_ids, skip_special_tokens=True).strip()
+        end_metadata = generation_end_metadata(new_ids.tolist(), generation_kwargs["max_new_tokens"],
+                                               generation_kwargs.get("eos_token_id"),
+                                               bool(background_yield and background_yield.triggered))
         result: Dict[str, Any] = {
+            **end_metadata,
+            "runtime_provenance": getattr(self, "runtime_provenance", {}),
             "text": visible_text,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
@@ -1112,6 +1166,10 @@ class LocalSteeringEngine:
 
     def _split_thinking_output(self, token_ids: torch.Tensor) -> tuple[str, str]:
         """Trennt Reasoning und Antwort fuer Qwen- und Gemma-4-Chat-Templates."""
+        with self._tokenizer_guarded():
+            return self._split_thinking_output_locked(token_ids)
+
+    def _split_thinking_output_locked(self, token_ids: torch.Tensor) -> tuple[str, str]:
         if token_ids.numel() == 0:
             return "", ""
         ids_list = token_ids.tolist()
@@ -1225,14 +1283,23 @@ class LocalSteeringEngine:
         def _run_generation() -> None:
             try:
                 with self._generation_slot(request_priority):
-                    if seed is not None:
-                        torch.manual_seed(int(seed))
-                        if torch.cuda.is_available():
-                            torch.cuda.manual_seed_all(int(seed))
-                    with self._apply_activation_plan(steering_payload):
-                        with torch.inference_mode():
-                            self.model.generate(**generation_kwargs)
-                    steering_report.update(self.last_steering_report)
+                    with self._tokenizer_guarded():
+                        if seed is not None:
+                            torch.manual_seed(int(seed))
+                            if torch.cuda.is_available():
+                                torch.cuda.manual_seed_all(int(seed))
+                        with self._apply_activation_plan(steering_payload, int(inputs["input_ids"].shape[1])) as processors:
+                            if processors:
+                                generation_kwargs["logits_processor"] = LogitsProcessorList(processors)
+                            with torch.inference_mode():
+                                generated = self.model.generate(**generation_kwargs)
+                        steering_report.update(self.last_steering_report)
+                    end_metadata = generation_end_metadata(
+                        generated[0][int(inputs["input_ids"].shape[1]):].tolist(), generation_kwargs["max_new_tokens"],
+                        generation_kwargs.get("eos_token_id"),
+                        bool(background_yield and background_yield.triggered))
+                    steering_report["generation"] = end_metadata
+                    del generated
             except BaseException as exc:  # pragma: no cover - Modelllaufzeit
                 generation_error.append(exc)
                 # TextIteratorStreamer only receives its sentinel when
@@ -1390,28 +1457,39 @@ class LocalSteeringEngine:
         # hidden reasoning. Prevent only that reopening token; normal answer
         # tokens and the template-provided closed block remain untouched.
         if enable_thinking is False and is_qwen_name(self.model_name):
-            think_start_id = self.tokenizer.convert_tokens_to_ids("<think>")
+            with self._tokenizer_guarded():
+                think_start_id = self.tokenizer.convert_tokens_to_ids("<think>")
             if isinstance(think_start_id, int) and think_start_id >= 0:
                 kwargs["bad_words_ids"] = [[think_start_id]]
         return kwargs
 
     @contextmanager
-    def _apply_activation_plan(self, steering_payload: Optional[Dict[str, Any]]) -> Iterable[None]:
+    def _apply_activation_plan(self, steering_payload: Optional[Dict[str, Any]], prompt_length: int = 0) -> Iterable[list]:
         plan_started = time.perf_counter()
         normalized_payload = extract_steering_payload(steering_payload)
         steering = normalized_payload.get("steering", {}) if isinstance(normalized_payload, dict) else {}
         vectors = steering.get("vectors", []) if isinstance(steering.get("vectors", []), list) else []
+        if steering.get("enabled") is False:
+            vectors = []
+        selected_mode = SteeringMode(steering.get("mode", "combined"))
+        enabled = steering.get("enabled") is not False and selected_mode != SteeringMode.OFF
+        vectors = vectors if enabled and selected_mode.activation else []
+        if any(isinstance(item.get("vector"), dict) and item["vector"].get("type") == "token_sequence_steering" for item in vectors if isinstance(item, dict)):
+            raise ValueError("Hard sequence steering is retired; use soft_sequence_steering")
+        vectors = vectors if enabled and selected_mode.activation else []
         vector_names = [str(item.get("name") or "") for item in vectors if isinstance(item, dict)]
-        sequence_items = [
-            item for item in vectors
-            if isinstance(item, dict)
-            and isinstance(item.get("vector"), dict)
-            and item["vector"].get("type") == "token_sequence_steering"
-        ]
-        static_payload = dict(normalized_payload) if isinstance(normalized_payload, dict) else {}
-        static_steering = dict(steering) if isinstance(steering, dict) else {}
-        static_steering["vectors"] = [item for item in vectors if item not in sequence_items]
+        static_payload = dict(normalized_payload)
+        static_steering = dict(steering)
+        static_steering["vectors"] = vectors
         static_payload["steering"] = static_steering
+        processors = []
+        sequence_specs = steering.get("sequences", []) if enabled and selected_mode.sequence else []
+        if sequence_specs:
+            eos = getattr(getattr(self.model, "generation_config", None), "eos_token_id", None)
+            eos_ids = eos if isinstance(eos, list) else [eos]
+            eos_ids = [token for token in [*eos_ids, self.tokenizer.eos_token_id] if isinstance(token, int)]
+            processors = [SoftSequenceLogitsProcessor(sequence_specs, self.tokenizer, prompt_length, eos_ids,
+                                                     get_steering_runtime_config()["sequence_max_bias"])]
         try:
             declared_layers = int(steering.get("model_layers", 0) or 0)
         except (TypeError, ValueError):
@@ -1422,17 +1500,6 @@ class LocalSteeringEngine:
                 self.resolver.resolve,
                 actual_layer_count=len(self.layers),
             )
-            sequence_vectors: list[torch.Tensor] = []
-            if sequence_items:
-                sequence_item = sequence_items[0]
-                try:
-                    sequence_strength = max(0.0, float(sequence_item.get("strength", 1.0)))
-                except (TypeError, ValueError):
-                    sequence_strength = 1.0
-                sequence_vectors = [
-                    vector * sequence_strength
-                    for vector in self.resolver.token_sequence_vectors(sequence_item["vector"])
-                ]
         except Exception as exc:
             self.last_steering_report = {
                 "active": False,
@@ -1452,8 +1519,6 @@ class LocalSteeringEngine:
 
         plan_build_ms = (time.perf_counter() - plan_started) * 1000.0
         requested_layers = sorted(int(layer) for layer in plan)
-        if sequence_vectors and self.layers:
-            requested_layers = sorted(set(requested_layers + [len(self.layers) - 1]))
         handles = []
         stats: Dict[str, Any] = {
             "hook_invocations": 0,
@@ -1476,33 +1541,25 @@ class LocalSteeringEngine:
                         prompt_only=prompt_only,
                     )
                 ))
-            if sequence_vectors:
-                output_layer = self.model.get_output_embeddings()
-                handles.append(output_layer.register_forward_pre_hook(
-                    self._output_sequence_hook_factory(
-                        [vector.to(self.device, dtype=self.dtype) for vector in sequence_vectors],
-                        stats=stats,
-                        layer_idx=len(self.layers) - 1,
-                    )
-                ))
             hook_attach_ms = (time.perf_counter() - attach_started) * 1000.0
             self.last_steering_report = {
                 "active": False,
-                "prepared": bool(handles),
+                "prepared": bool(handles or processors),
                 "verified_active": False,
                 "hook_count": len(handles),
                 "hook_invocations": 0,
                 "requested_layers": requested_layers,
                 "applied_layers": sorted(set(
                     [int(layer) for layer in plan if 0 <= int(layer) < len(self.layers)]
-                    + ([len(self.layers) - 1] if sequence_vectors and self.layers else [])
                 )),
                 "mode": "activation_addition",
                 "model": self.model_name,
-                "status": "prepared" if handles else "no_applicable_layers",
+                "status": "prepared" if handles or processors else "no_applicable_layers",
                 "active_vectors": vector_names,
                 "active_vector_count": len(vector_names),
-                "sequence_prefix_tokens": len(sequence_vectors),
+                "sequence_prefix_tokens": 0,
+                "sequence_processor_count": len(processors),
+                "ablation_mode": selected_mode.value,
                 "declared_model_layers": declared_layers,
                 "actual_model_layers": len(self.layers),
                 "layer_range_remapped": bool(declared_layers and declared_layers != len(self.layers)),
@@ -1510,13 +1567,15 @@ class LocalSteeringEngine:
                 "hook_attach_ms": round(hook_attach_ms, 3),
             }
             stats["report"] = self.last_steering_report
-            yield
+            yield processors
         finally:
             for handle in handles:
                 handle.remove()
             handles.clear()
             hook_compute_ms = float(stats["hook_compute_ms"])
-            verified = int(stats["hook_invocations"]) > 0
+            sequence_report = processors[0].telemetry if processors else {"processor_count": 0, "biased_steps": 0}
+            verified = int(stats["hook_invocations"]) > 0 or sequence_report["biased_steps"] > 0
+            self.last_steering_report["sequence"] = dict(sequence_report)
             total_overhead_ms = (
                 plan_build_ms
                 + float(self.last_steering_report.get("hook_attach_ms", 0.0))
@@ -1529,6 +1588,7 @@ class LocalSteeringEngine:
                 "hook_invocations": int(stats["hook_invocations"]),
                 "steered_hidden_positions": int(stats["steered_hidden_positions"]),
                 "layer_invocations": dict(stats["layer_invocations"]),
+                "layer_measurements": dict(stats.get("layer_measurements", {})),
                 "hook_compute_ms": round(max(0.001, hook_compute_ms), 3) if hook_compute_ms > 0 else 0.0,
                 # Millisecond telemetry has three decimals. A verified run is
                 # therefore represented by the smallest measurable bucket
@@ -1564,6 +1624,21 @@ class LocalSteeringEngine:
                     positions = int(hidden.shape[0]) * int(hidden.shape[1])
                     stats["steered_hidden_positions"] = int(stats.get("steered_hidden_positions", 0)) + positions
                 layer_key = str(layer_idx) if layer_idx is not None else "unknown"
+                measurements = stats.setdefault("layer_measurements", {})
+                if layer_key not in measurements and torch.is_tensor(hidden):
+                    # Sample the first actual intervention, not an anchor pass.
+                    # Reductions stay on device; only three scalars reach CPU.
+                    sample = hidden.detach().float()
+                    delta = updated[0].detach().float() - sample
+                    hidden_rms = float(sample.square().mean().sqrt().item())
+                    intervention_rms = float(delta.square().mean().sqrt().item())
+                    measurements[layer_key] = {
+                        "hidden_state_rms": hidden_rms,
+                        "intervention_rms": intervention_rms,
+                        "intervention_rms_ratio": intervention_rms / max(hidden_rms, 1e-12),
+                        "intervention_norm": float(delta.norm().item()),
+                        "sample": "first_hook_invocation",
+                    }
                 layer_counts = stats.setdefault("layer_invocations", {})
                 layer_counts[layer_key] = int(layer_counts.get(layer_key, 0)) + 1
                 stats["hook_compute_ms"] = float(stats.get("hook_compute_ms", 0.0)) + (
@@ -1577,51 +1652,6 @@ class LocalSteeringEngine:
                     report["verified_active"] = True
                     report["status"] = "verified"
                     report["hook_invocations"] = int(stats["hook_invocations"])
-            return updated
-
-        return _hook
-
-    @staticmethod
-    def _output_sequence_hook_factory(
-        vectors: list[torch.Tensor],
-        stats: Optional[Dict[str, Any]] = None,
-        layer_idx: Optional[int] = None,
-    ) -> Callable[..., Any]:
-        """Lenkt nur die letzten Output-Aktivierungen auf einen kurzen Praefix."""
-        state = {"index": 0}
-
-        def _hook(_module: Any, inputs: Any) -> Any:
-            hidden = inputs[0] if isinstance(inputs, tuple) and inputs else None
-            index = state["index"]
-            if (
-                index >= len(vectors)
-                or not torch.is_tensor(hidden)
-                or hidden.dim() != 3
-                or hidden.size(-1) != vectors[index].numel()
-            ):
-                return inputs
-            started = time.perf_counter()
-            updated_hidden = hidden.clone()
-            updated_hidden[:, -1, :] = updated_hidden[:, -1, :] + vectors[index]
-            state["index"] = index + 1
-            updated = (updated_hidden, *inputs[1:])
-            if stats is not None:
-                stats["hook_invocations"] = int(stats.get("hook_invocations", 0)) + 1
-                stats["output_hook_invocations"] = int(stats.get("output_hook_invocations", 0)) + 1
-                stats["steered_hidden_positions"] = int(stats.get("steered_hidden_positions", 0)) + int(hidden.shape[0])
-                layer_key = str(layer_idx) if layer_idx is not None else "output"
-                layer_counts = stats.setdefault("layer_invocations", {})
-                layer_counts[layer_key] = int(layer_counts.get(layer_key, 0)) + 1
-                stats["hook_compute_ms"] = float(stats.get("hook_compute_ms", 0.0)) + (
-                    time.perf_counter() - started
-                ) * 1000.0
-                report = stats.get("report")
-                if isinstance(report, dict):
-                    report["active"] = True
-                    report["verified_active"] = True
-                    report["status"] = "verified"
-                    report["hook_invocations"] = int(stats["hook_invocations"])
-                    report["output_hook_invocations"] = int(stats["output_hook_invocations"])
             return updated
 
         return _hook

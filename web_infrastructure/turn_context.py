@@ -7,6 +7,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from web_infrastructure.contracts import StatusCallback, TurnContext
+from config.session_settings import SessionRuntimeSettings
 
 
 # Degenerierte Assistenten-Turns (Fallbacks, Fragmente, Prompt-Leaks) duerfen
@@ -94,14 +95,18 @@ def build_turn_context(
     debug_mode: bool = False,
     status_callback: Optional[StatusCallback] = None,
     temporal_context: Optional[Dict[str, Any]] = None,
+    session_id: Optional[str] = None,
+    runtime_settings: Optional[SessionRuntimeSettings] = None,
 ) -> TurnContext:
     """Create an isolated request object without changing user text semantics."""
 
+    snapshot = runtime_settings or SessionRuntimeSettings.from_mapping()
     return TurnContext(
         user_input=str(user_input),
-        history=sanitize_history(history),
+        history=sanitize_history(history) if snapshot.memory_enabled else [],
         debug_mode=bool(debug_mode),
         status_callback=status_callback,
         temporal_context=dict(temporal_context) if temporal_context is not None else None,
+        session_id=session_id,
+        runtime_settings=snapshot,
     )
-

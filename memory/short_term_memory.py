@@ -22,7 +22,7 @@ from dataclasses import dataclass, asdict
 
 import fcntl
 
-from config.config import DATA_DIR
+from config.config import DATA_DIR, MEMORY_PROMOTION_CONFIG
 from config.prompts import scrub_internal_identifiers
 from memory.memory_engine import MemoryEngine
 from brain.response_parser import looks_like_model_error, strip_role_prefixes
@@ -40,6 +40,8 @@ class ShortTermEntry:
     migrated: bool = False
     summarized: bool = False
     summary_source_ids: Optional[List[str]] = None
+    retrieval_eligible: Optional[bool] = None
+    quality_flag: str = ""
 
 
 class ShortTermMemory:
@@ -122,6 +124,10 @@ class ShortTermMemory:
                     if previous is not None:
                         entry.migrated = entry.migrated or previous.migrated
                         entry.summarized = entry.summarized or previous.summarized
+                        if previous.retrieval_eligible is False or entry.retrieval_eligible is None:
+                            entry.retrieval_eligible = previous.retrieval_eligible
+                        if not entry.quality_flag:
+                            entry.quality_flag = previous.quality_flag
                     merged[entry.id] = entry
                 for entry_id in removed_ids:
                     merged.pop(entry_id, None)
@@ -323,66 +329,58 @@ class ShortTermMemory:
         )
     
     def migrate_expired_entries(self) -> int:
-        """
-        Migriert abgelaufene Eintraege ins Langzeitgedaechtnis.
-        
-        Zusaetzlich: High-Importance-Eintraege werden bereits nach halber TTL
-        migriert, nicht erst nach voller TTL.
-        
-        Returns:
-            Anzahl migrierter Eintraege
-        """
+        """Batch eligible user records; retain quarantined history in STM."""
         if not self.memory_engine:
             return 0
-        
+        from memory.retrieval_quality import is_memory_contaminated
         now = datetime.now(timezone.utc)
-        migrated_count = 0
-        
-        for entry in self.entries:
+        eligible = []
+        changed = False
+        # Keep references stable while other instances append to disk.
+        for entry in list(self.entries):
             if entry.migrated:
                 continue
-            
             try:
                 expires = datetime.fromisoformat(entry.expires_at)
+                created = datetime.fromisoformat(entry.created_at)
                 if expires.tzinfo is None:
                     expires = expires.replace(tzinfo=timezone.utc)
-                
-                created = datetime.fromisoformat(entry.created_at)
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
-                
-                half_ttl = created + (expires - created) / 2
-                is_high_priority = entry.importance in ("high", "critical")
-                is_expired = now > expires
-                is_early_migration = is_high_priority and now > half_ttl
-                
-                if (is_expired or is_early_migration) and entry.category in ("summary", "chat", "user", "system", "context"):
-                    try:
-                        role = self._detect_role(entry.content, entry.category)
-                        self.memory_engine.add_memory(
-                            content=entry.content,
-                            role=role,
-                            mem_type="short_term_migration",
-                            label=f"{entry.category}_{entry.importance}",
-                            # Explicit USER facts become ordinary episodic
-                            # memories after migration. Generated assistant
-                            # transcripts retain the STM source and remain
-                            # quarantinable by the long-term retrieval policy.
-                            source="conversation" if role == "user" else "short_term_memory"
-                        )
-                        entry.migrated = True
-                        migrated_count += 1
-                    except Exception as e:
-                        print(f"[ShortTerm] Migration fehlgeschlagen fuer {entry.id}: {e}")
-            except (ValueError, TypeError) as e:
-                print(f"[ShortTerm] Fehler beim Parsen von expires_at: {e}")
-        
-        if migrated_count > 0:
+                due = now > expires or (entry.importance in {"high", "critical"} and now > created + (expires-created)/2)
+                if not due or entry.category not in {"summary", "chat", "user", "system", "context"}:
+                    continue
+                role = self._detect_role(entry.content, entry.category)
+                # Generated summaries/context carry no verified user provenance.
+                entry.retrieval_eligible = role == "user" and entry.category in {"user", "chat"} and not is_memory_contaminated(entry.content, role="user", source="conversation")
+                if not entry.retrieval_eligible:
+                    entry.quality_flag = "unverified_source"
+                    entry.migrated = True
+                    changed = True
+                    continue
+                eligible.append(entry)
+            except (ValueError, TypeError):
+                continue
+        migrated = 0
+        batch_size = MEMORY_PROMOTION_CONFIG["batch_size"]
+        for offset in range(0, len(eligible), batch_size):
+            batch = eligible[offset:offset + batch_size]
+            records = [{"id": "stm-" + entry.id, "content": entry.content,
+                        "role": "user", "source": "conversation",
+                        "type": "short_term_migration", "timestamp": entry.created_at,
+                        "label": f"{entry.category}_{entry.importance}"} for entry in batch]
+            ids = self.memory_engine.add_memory_batch(records)
+            if set(ids) != {record["id"] for record in records}:
+                raise RuntimeError("Incomplete STM migration batch")
+            for entry in batch:
+                entry.migrated = True
+            migrated += len(batch)
+            changed = True
             self._save_entries()
-            print(f"[ShortTerm] {migrated_count} Eintraege migriert")
-        
-        return migrated_count
-    
+        if changed:
+            self._save_entries()
+        return migrated
+
     def _detect_role(self, content: str, category: str) -> str:
         content_lower = content.lower()
         if content_lower.startswith("chappie:") or content_lower.startswith("assistant:"):
@@ -480,6 +478,21 @@ class ShortTermMemory:
     def get_count(self) -> int:
         """Gibt die Anzahl aktiver Einträge zurück."""
         return len(self.get_active_entries())
+
+    def get_stats(self) -> dict:
+        """V18: aktiv, quarantäniert und migriert getrennt ausweisen."""
+        active = 0
+        quarantined = 0
+        migrated = 0
+        for entry in self.entries:
+            if getattr(entry, "migrated", False):
+                migrated += 1
+                continue
+            if getattr(entry, "quality_flag", "") == "unverified_source" or getattr(entry, "retrieval_eligible", None) is False:
+                quarantined += 1
+                continue
+            active += 1
+        return {"active": active, "quarantined": quarantined, "migrated": migrated, "total": len(self.entries)}
     
     def delete_entry(self, entry_id: str) -> bool:
         """Löscht einen Eintrag."""

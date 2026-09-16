@@ -144,6 +144,9 @@ data/chroma_db/
 data/chroma_db_repaired*/
 data/research_runs/
 data/chat_sessions/
+data/session_exports/
+data/events.sqlite3
+data/events.sqlite3-*
 data/short_term_memory.json
 data/short_term_memory.json.lock
 data/short_term_memory.repair-backup-*.json
@@ -199,3 +202,6 @@ forschung/last_config.json
 # Temporäre lokale Dateien (Update-Checkliste, Forschungs-Rohpatch)
 todo.md
 forschung/runs/*/raw/source-worktree.patch
+
+# Reproducible v17 activation captures, large local research intermediates
+forschung/steering_v17/activations/

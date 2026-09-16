@@ -1,0 +1,67 @@
+[
+  {
+    "test": "test_steering_acceptance",
+    "exit_code": 0,
+    "seconds": 0.31
+  },
+  {
+    "test": "test_steering_research_capture",
+    "exit_code": 0,
+    "seconds": 6.29
+  },
+  {
+    "test": "test_steering_research_integrity",
+    "exit_code": 0,
+    "seconds": 6.43
+  },
+  {
+    "test": "test_steering_backend",
+    "exit_code": 0,
+    "seconds": 6.33
+  },
+  {
+    "test": "test_memory_event_store",
+    "exit_code": 0,
+    "seconds": 0.72
+  },
+  {
+    "test": "test_memory_off_isolation",
+    "exit_code": 0,
+    "seconds": 0.22
+  },
+  {
+    "test": "test_short_term_memory",
+    "exit_code": 0,
+    "seconds": 0.22
+  },
+  {
+    "test": "test_session_runtime_settings",
+    "exit_code": 0,
+    "seconds": 8.64
+  },
+  {
+    "test": "test_cli_commands",
+    "exit_code": 0,
+    "seconds": 0.27
+  },
+  {
+    "test": "test_cli_autocomplete",
+    "exit_code": 0,
+    "seconds": 0.52
+  },
+  {
+    "test": "test_cli_history",
+    "exit_code": 0,
+    "seconds": 0.32
+  },
+  {
+    "test": "test_two_column_report",
+    "exit_code": 0,
+    "seconds": 0.16
+  },
+  {
+    "test": "test_chat_manager_persistence",
+    "exit_code": 0,
+    "seconds": 0.72
+  }
+]
