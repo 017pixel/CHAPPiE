@@ -232,7 +232,17 @@ def test_report_links_stay_reachable_on_github_pages() -> None:
     github = re.compile(
         r"^https://github\.com/017pixel/CHAPPiE/(?:blob|raw)/main/(.+)$"
     )
-    reports = sorted((ROOT / "forschung" / "report").glob("*.html"))
+    freeze = json.loads(
+        (ROOT / "forschung" / "report" / "report-v5-freeze.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    frozen_reports = {Path(freeze["path"]).name}
+    reports = sorted(
+        report
+        for report in (ROOT / "forschung" / "report").glob("*.html")
+        if report.name not in frozen_reports
+    )
     assert reports
     for report in reports:
         for raw in attribute.findall(report.read_text(encoding="utf-8")):
