@@ -4,8 +4,12 @@ import os
 import re
 import threading
 import uuid
+import tempfile
+import fcntl
+from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+from config.session_settings import SessionRuntimeSettings
 
 
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
@@ -150,13 +154,62 @@ class ChatManager:
         }
 
         file_path = self._get_file_path(normalized_session_id)
-        with self._lock:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+        with self._session_storage_lock():
+            previous = self._read_session_raw(normalized_session_id)
+            data["runtime_settings"] = previous.get("runtime_settings") or SessionRuntimeSettings.from_mapping().to_dict()
+            self._write_session_atomic(file_path, data)
         
-        self._prune_old_sessions()
         self.set_active_session(normalized_session_id)
         return normalized_session_id
+
+    @contextmanager
+    def _session_storage_lock(self):
+        with self._lock:
+            with open(os.path.join(self.sessions_dir, ".settings.lock"), "a") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def _read_session_raw(self, session_id: str) -> Dict[str, Any]:
+        path = self._get_file_path(session_id)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as handle:
+                return json.load(handle)
+        return {"id": session_id, "messages": [], "title": "New Chat", "updated_at": ""}
+
+    @staticmethod
+    def _write_session_atomic(file_path: str, data: Dict[str, Any]) -> None:
+        fd, temporary = tempfile.mkstemp(prefix=".session-", dir=os.path.dirname(file_path))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(data, handle, ensure_ascii=False, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, file_path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+
+    def get_runtime_settings(self, session_id: str) -> SessionRuntimeSettings:
+        if not self._is_valid_session_id(session_id):
+            raise ValueError("Ungueltige Chat-Session-ID")
+        with self._lock:
+            return SessionRuntimeSettings.from_mapping(self._read_session_raw(session_id).get("runtime_settings"))
+
+    def update_runtime_settings(self, session_id: str, changes: Dict[str, Any]) -> SessionRuntimeSettings:
+        if not self._is_valid_session_id(session_id):
+            raise ValueError("Ungueltige Chat-Session-ID")
+        SessionRuntimeSettings.validate_patch(changes)
+        with self._session_storage_lock():
+            data = self._read_session_raw(session_id)
+            current = SessionRuntimeSettings.from_mapping(data.get("runtime_settings")).to_dict()
+            updated = SessionRuntimeSettings.from_mapping({**current, **changes})
+            data["runtime_settings"] = updated.to_dict()
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._write_session_atomic(self._get_file_path(session_id), data)
+            return updated
 
     def load_session(self, session_id: Optional[str]) -> Dict[str, Any]:
         """Loads a chat session from disk."""
@@ -183,25 +236,51 @@ class ChatManager:
         role: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Updates a single message in an existing session by id."""
-        data = self.load_session(session_id)
-        messages = self.ensure_message_ids(data.get("messages", []))
+        normalized = self.ensure_session_id(session_id)
+        with self._session_storage_lock():
+            data = self._read_session_raw(normalized)
+            messages = self.ensure_message_ids(data.get("messages", []))
+            for msg in messages:
+                if msg.get("id") != message_id:
+                    continue
+                if content is not None:
+                    msg["content"] = content
+                if role is not None:
+                    msg["role"] = role
+                if metadata_updates is not None:
+                    metadata = dict(msg.get("metadata") or {})
+                    metadata.update(metadata_updates)
+                    msg["metadata"] = metadata
+                break
 
-        for msg in messages:
-            if msg.get("id") != message_id:
-                continue
-            if content is not None:
-                msg["content"] = content
-            if role is not None:
-                msg["role"] = role
-            if metadata_updates is not None:
-                metadata = dict(msg.get("metadata") or {})
-                metadata.update(metadata_updates)
-                msg["metadata"] = metadata
-            break
+            data["messages"] = messages
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._write_session_atomic(self._get_file_path(normalized), data)
+            return data
 
-        normalized_session_id = self.save_session(data.get("id"), messages, title=data.get("title"))
-        updated = self.load_session(normalized_session_id)
-        return updated
+    def append_messages(self, session_id: str, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Atomic read/append/write across threads and processes."""
+        normalized = self.ensure_session_id(session_id)
+        additions = self.ensure_message_ids(messages)
+        with self._session_storage_lock():
+            data = self._read_session_raw(normalized)
+            current = self.ensure_message_ids(data.get("messages", []))
+            existing = {message["id"]: message for message in current}
+            for message in additions:
+                if message["id"] in existing:
+                    if existing[message["id"]] != message:
+                        raise ValueError("Conflicting append for existing message ID")
+                    continue
+                current.append(message)
+                existing[message["id"]] = message
+            data["messages"] = current
+            data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            data.setdefault("runtime_settings", SessionRuntimeSettings.from_mapping().to_dict())
+            if data.get("title", "New Chat") == "New Chat":
+                first = next((m["content"] for m in current if m.get("role") == "user"), "New Chat")
+                data["title"] = first[:30] + ("..." if len(first) > 30 else "")
+            self._write_session_atomic(self._get_file_path(normalized), data)
+            return data
 
     def list_sessions(self) -> List[Dict[str, Any]]:
         """Lists all available sessions sorted by updated_at (newest first)."""
@@ -212,10 +291,12 @@ class ChatManager:
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                    messages = data.get("messages", [])
                     sessions.append({
                         "id": data.get("id"),
                         "title": data.get("title", "Untitled"),
-                        "updated_at": data.get("updated_at", "")
+                        "updated_at": data.get("updated_at", ""),
+                        "message_count": len(messages) if isinstance(messages, list) else 0,
                     })
             except Exception:
                 continue # Skip broken files
@@ -235,10 +316,5 @@ class ChatManager:
         return False
 
     def _prune_old_sessions(self):
-        """Keeps only the most recent N sessions."""
-        sessions = self.list_sessions()
-        if len(sessions) > self.max_sessions:
-            # Sessions are already sorted newest first, so we remove from the end
-            to_remove = sessions[self.max_sessions:]
-            for session in to_remove:
-                self.delete_session(session["id"])
+        """Compatibility no-op: sessions are no longer automatically deleted."""
+        return None

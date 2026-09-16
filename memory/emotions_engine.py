@@ -212,6 +212,7 @@ class EmotionsEngine:
         self.status_file = Path(status_file) if status_file else STATUS_FILE
         self.force_simple = bool(force_simple)
         self._last_state_mtime_ns: int | None = None
+        self._frozen = False
         self.state = self._load_state()
         
         # Brain einmal beim ersten Init laden (lazy loading)
@@ -601,29 +602,40 @@ class EmotionsEngine:
         """Gibt den aktuellen Zustand zurueck."""
         self._sync_state_from_disk_if_newer()
         return self.state
-    
+
+    def is_frozen(self) -> bool:
+        return bool(getattr(self, "_frozen", False))
+
+    def set_frozen(self, frozen: bool) -> bool:
+        self._frozen = bool(frozen)
+        return self._frozen
+
     def set_emotion(self, emotion: str, value: int):
         """
         Setzt eine einzelne Emotion auf einen bestimmten Wert.
-        
-        Args:
-            emotion: Name der Emotion (siehe config.emotions.EMOTION_ORDER)
-            value: Neuer Wert (0-100)
+
+        Gibt False zurueck, wenn Freeze aktiv ist und nichts geaendert wurde.
         """
+        if bool(getattr(self, "_frozen", False)):
+            return False
         self._sync_state_from_disk_if_newer(force=True)
         value = clamp_emotion_value(value)
 
         if emotion in EMOTION_DEFAULTS:
             setattr(self.state, emotion, value)
-        
+
         self._save_state()
-    
-    def reset(self):
+        return True
+
+    def reset(self, force: bool = False):
         """Setzt den emotionalen Zustand zurueck."""
+        if bool(getattr(self, "_frozen", False)) and not force:
+            return False
         self._sync_state_from_disk_if_newer(force=True)
         self.state = EmotionalState()
         self._save_state()
         print("Emotionaler Zustand zurueckgesetzt")
+        return True
 
 
 def analyze_sentiment_simple(text: str) -> str:

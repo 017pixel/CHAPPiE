@@ -155,8 +155,9 @@ class ShortTermMemoryTests(unittest.TestCase):
             def __init__(self):
                 self.items = []
 
-            def add_memory(self, **kwargs):
-                self.items.append(kwargs)
+            def add_memory_batch(self, records):
+                self.items.extend(records)
+                return [record["id"] for record in records]
 
         with TemporaryDirectory() as tmp_dir:
             original_data_dir = stm_module.DATA_DIR
@@ -167,7 +168,7 @@ class ShortTermMemoryTests(unittest.TestCase):
                 memory.entries = [
                     stm_module.ShortTermEntry(
                         id="raw-expired",
-                        content="raw",
+                        content="User: Mein Name ist Ada.",
                         category="chat",
                         importance="normal",
                         created_at="2020-03-30T10:00:00+00:00",
@@ -187,8 +188,29 @@ class ShortTermMemoryTests(unittest.TestCase):
             finally:
                 stm_module.DATA_DIR = original_data_dir
 
-        self.assertEqual(migrated, 2)
-        self.assertEqual([item["content"] for item in sink.items], ["raw", "summary"])
+        self.assertEqual(migrated, 1)
+        self.assertEqual([item["content"] for item in sink.items], ["User: Mein Name ist Ada."])
+        self.assertEqual(len(memory.entries), 2)
+        self.assertFalse(memory.entries[1].retrieval_eligible)
+        self.assertEqual(memory.entries[1].quality_flag, "unverified_source")
+        self.assertEqual(memory.migrate_expired_entries(), 0)
+
+    def test_stale_writer_preserves_background_quarantine(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "stm.json"
+            first = stm_module.ShortTermMemory(memory_engine=None, storage_path=path)
+            entry_id = first.add_entry("Generated summary", category="summary")
+            second = stm_module.ShortTermMemory(memory_engine=None, storage_path=path)
+            second.entries[0].retrieval_eligible = False
+            second.entries[0].quality_flag = "unverified_source"
+            second.entries[0].migrated = True
+            second._save_entries()
+            first.add_entry("Another entry", category="user")
+            restored = stm_module.ShortTermMemory(memory_engine=None, storage_path=path)
+            entry = next(e for e in restored.entries if e.id == entry_id)
+            self.assertIs(entry.retrieval_eligible, False)
+            self.assertEqual(entry.quality_flag, "unverified_source")
+            self.assertTrue(entry.migrated)
 
     def test_parallel_instances_merge_entries_without_losing_updates(self):
         with TemporaryDirectory() as tmp_dir:

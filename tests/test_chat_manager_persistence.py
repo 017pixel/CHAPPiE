@@ -83,6 +83,27 @@ def test_invalid_session_id_cannot_delete_outside_session_directory(tmp_path):
     assert outside_path.exists()
 
 
+def test_atomic_concurrent_append_and_finish(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    manager = ChatManager(str(tmp_path))
+    sid = manager.create_session()
+    def exchange(index):
+        other = ChatManager(str(tmp_path))
+        other.append_messages(sid, [{"id": f"u{index}", "role": "user", "content": f"question{index}"},
+                                    {"id": f"a{index}", "role": "assistant", "content": "pending"}])
+        other.update_message(sid, f"a{index}", content=f"answer{index}", metadata_updates={"pending": False})
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(exchange, range(64)))
+    messages = manager.load_session(sid)["messages"]
+    assert len(messages) == 128
+    assert len({m["id"] for m in messages}) == 128
+    assert all(m["content"] == f"answer{m['id'][1:]}" for m in messages if m["role"] == "assistant")
+    # Former max_sessions limit must not delete historical conversations.
+    manager.max_sessions = 1
+    manager.save_session(manager.create_session(), [{"role": "user", "content": "new"}])
+    assert len(manager.load_session(sid)["messages"]) == 128
+
+
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir)
@@ -91,4 +112,5 @@ if __name__ == "__main__":
         test_update_message_replaces_pending_placeholder(path)
         test_invalid_session_id_cannot_read_outside_session_directory(path)
         test_invalid_session_id_cannot_delete_outside_session_directory(path)
+        test_atomic_concurrent_append_and_finish(path)
     print("OK: chat manager persistence")

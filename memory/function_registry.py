@@ -9,11 +9,9 @@ Features:
 - Einfache Registrierung eigener Funktionen
 """
 
-from typing import Dict, Any, Callable, List, Optional
-from dataclasses import dataclass, asdict
-import json
+from typing import Dict, Any, Callable, List
+from dataclasses import dataclass
 
-from config.config import settings
 
 
 @dataclass
@@ -31,7 +29,11 @@ class FunctionRegistry:
     Registriert und managet Custom Functions für CHAPI.
     """
 
-    def __init__(self):
+    def __init__(self, *, short_term_memory=None, personality_manager=None, context_files=None, maintenance_schedule=None):
+        self._bound_stm = short_term_memory
+        self._bound_personality = personality_manager
+        self._bound_context = context_files
+        self._maintenance_schedule = maintenance_schedule
         self.functions: Dict[str, Function] = {}
         self._register_core_functions()
 
@@ -350,15 +352,15 @@ class FunctionRegistry:
         """Fügt Info zum Kurzzeitgedächtnis hinzu."""
         from memory.short_term_memory import get_short_term_memory
 
-        stm = get_short_term_memory()
-        entry_id = stm.add_entry(content, importance=importance, category=category)
+        stm = self._bound_stm if self._bound_stm is not None else get_short_term_memory()
+        stm.add_entry(content, importance=importance, category=category)
         return f"✓ Info im Kurzzeitgedächtnis gespeichert ({importance}, {category}): \"{content[:80]}{'...' if len(content) > 80 else ''}\""
 
     def _handle_update_personality(self, category: str, value: str, reasoning: str = "") -> str:
         """Aktualisiert die Persönlichkeit."""
         from memory.personality_manager import get_personality_manager
 
-        pm = get_personality_manager()
+        pm = self._bound_personality if self._bound_personality is not None else get_personality_manager()
         pm.add_core_value(category, value, reasoning)
         return f"✓ Persönlichkeit aktualisiert: {category} = \"{value}\" (Grund: {reasoning})"
 
@@ -366,7 +368,7 @@ class FunctionRegistry:
         """Fügt eine Selbst-Reflexion hinzu."""
         from memory.personality_manager import get_personality_manager
 
-        pm = get_personality_manager()
+        pm = self._bound_personality if self._bound_personality is not None else get_personality_manager()
         pm.add_insight(reflection, category)
         return f"✓ Selbst-Reflexion dokumentiert ({category}): \"{reflection[:80]}{'...' if len(reflection) > 80 else ''}\""
 
@@ -374,7 +376,7 @@ class FunctionRegistry:
         """Gibt Persönlichkeits-Zusammenfassung zurück."""
         from memory.personality_manager import get_personality_manager
 
-        pm = get_personality_manager()
+        pm = self._bound_personality if self._bound_personality is not None else get_personality_manager()
         summary = pm.get_current_personality_summary()
         if summary:
             return f"Deine Persönlichkeit:\n{summary}"
@@ -384,7 +386,7 @@ class FunctionRegistry:
         """Gibt Daily Infos zurück."""
         from memory.short_term_memory import get_short_term_memory
 
-        stm = get_short_term_memory()
+        stm = self._bound_stm if self._bound_stm is not None else get_short_term_memory()
         entries = stm.get_active_entries(query=query)
 
         if not entries:
@@ -399,7 +401,7 @@ class FunctionRegistry:
     def _handle_update_soul(self, **kwargs) -> str:
         """Aktualisiert soul.md."""
         from memory.context_files import get_context_files_manager
-        cfs = get_context_files_manager()
+        cfs = self._bound_context if self._bound_context is not None else get_context_files_manager()
         data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
         if data:
             cfs.update_soul(data)
@@ -410,7 +412,7 @@ class FunctionRegistry:
     def _handle_update_user(self, **kwargs) -> str:
         """Aktualisiert user.md."""
         from memory.context_files import get_context_files_manager
-        cfs = get_context_files_manager()
+        cfs = self._bound_context if self._bound_context is not None else get_context_files_manager()
         data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
         if data:
             cfs.update_user(data)
@@ -421,7 +423,7 @@ class FunctionRegistry:
     def _handle_update_preferences(self, **kwargs) -> str:
         """Aktualisiert CHAPPiEsPreferences.md."""
         from memory.context_files import get_context_files_manager
-        cfs = get_context_files_manager()
+        cfs = self._bound_context if self._bound_context is not None else get_context_files_manager()
         data = {k: v for k, v in kwargs.items() if v is not None and v != ""}
         if data:
             cfs.update_preferences(data)
@@ -431,9 +433,12 @@ class FunctionRegistry:
 
     def _handle_cleanup_daily_info(self) -> str:
         """Bereinigt abgelaufene Eintraege."""
+        if self._maintenance_schedule is not None:
+            self._maintenance_schedule()
+            return "Memory-Migration im Hintergrund vorgemerkt."
         from memory.short_term_memory import get_short_term_memory
 
-        stm = get_short_term_memory()
+        stm = self._bound_stm if self._bound_stm is not None else get_short_term_memory()
         count = stm.migrate_expired_entries()
         return f"✓ Bereinigung abgeschlossen: {count} abgelaufene Eintraege migriert."
 
@@ -456,7 +461,6 @@ def get_functions_for_llm() -> str:
     Gibt die Functions als formatierte String für den System-Prompt zurück.
     """
     registry = get_function_registry()
-    schema = registry.get_function_schema()
 
     # Als formatierten String für den Prompt
     lines = [
