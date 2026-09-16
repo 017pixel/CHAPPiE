@@ -6,8 +6,10 @@ import re
 import subprocess
 import sys
 import tempfile
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -216,12 +218,39 @@ def test_committed_reports_keep_collage_outside_html() -> None:
         ROOT / "forschung" / "report" / "CHAPPiE-Forschungsbericht.html",
         ROOT / "forschung" / "report" / "CHAPPiE-Forschungsbericht-Run-2.html",
     )
+    collage = "https://github.com/017pixel/CHAPPiE/raw/main/CHAPPiE-Kollage.jpg"
     for report in reports:
         rendered = report.read_text(encoding="utf-8")
         assert "data:image/" not in rendered
-        assert re.search(r'<img src="\.\./\.\./CHAPPiE-Kollage\.jpg"', rendered)
+        assert f'<img src="{collage}"' in rendered
         assert report.stat().st_size < 1_000_000
     print("  PASS test_committed_reports_keep_collage_outside_html")
+
+
+def test_report_links_stay_reachable_on_github_pages() -> None:
+    attribute = re.compile(r'(?:href|src)="([^"]+)"')
+    github = re.compile(
+        r"^https://github\.com/017pixel/CHAPPiE/(?:blob|raw)/main/(.+)$"
+    )
+    reports = sorted((ROOT / "forschung" / "report").glob("*.html"))
+    assert reports
+    for report in reports:
+        for raw in attribute.findall(report.read_text(encoding="utf-8")):
+            value = unescape(raw).strip().split("#", 1)[0].split("?", 1)[0]
+            if not value or value.startswith(("http://", "mailto:", "data:")):
+                continue
+            if value.startswith("https://"):
+                match = github.match(value)
+                if match:
+                    target = ROOT / unquote(match.group(1))
+                    assert target.exists(), f"{report.name}: GitHub-Ziel fehlt: {value}"
+                continue
+            assert not value.startswith(".."), (
+                f"{report.name}: Link verlaesst die Pages-Seite: {value}"
+            )
+            target = report.parent / unquote(value)
+            assert target.exists(), f"{report.name}: lokales Ziel fehlt: {value}"
+    print("  PASS test_report_links_stay_reachable_on_github_pages")
 
 
 def test_benchmark_helpers_handle_missing_data() -> None:
@@ -399,6 +428,7 @@ if __name__ == "__main__":
         test_run2_result_svgs_use_current_status_and_contrast,
         test_report_builds_offline_html,
         test_committed_reports_keep_collage_outside_html,
+        test_report_links_stay_reachable_on_github_pages,
         test_benchmark_helpers_handle_missing_data,
         test_report_validator_detects_missing_local_link,
         test_prompt_tool_contract_tracks_measured_streaming_path,

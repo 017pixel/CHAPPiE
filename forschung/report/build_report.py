@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,6 +18,11 @@ TEMPLATE = REPORT_DIR / "report_template.html"
 DEFAULT_DATA = REPORT_DIR / "workspace" / "benchmark-data.json"
 DEFAULT_OUTPUT = REPORT_DIR / "CHAPPiE-Forschungsbericht.html"
 MANUAL_REVIEW = REPORT_DIR / "workspace" / "manuelle-bewertung.json"
+GITHUB_BASE = "https://github.com/017pixel/CHAPPiE"
+GITHUB_BRANCH = "main"
+GITHUB_BLOB = f"{GITHUB_BASE}/blob/{GITHUB_BRANCH}/"
+GITHUB_RAW = f"{GITHUB_BASE}/raw/{GITHUB_BRANCH}/"
+UNPUBLISHED_PREFIXES = ("data/",)
 
 EXPECTED = [
     ("qwen", "Qwen 3.5 4B", "Qwen/Qwen3.5-4B", "lokaler Steering-Service (Providerlabel vllm)", "Layer Editing"),
@@ -28,6 +33,18 @@ EXPECTED = [
 
 def e(value: Any) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
+
+
+def published_url(path: Path, raw: bool = False) -> str | None:
+    """Return a GitHub URL for a repository file, or None when it is not published."""
+    try:
+        relative = path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return None
+    if relative.startswith(UNPUBLISHED_PREFIXES):
+        return None
+    prefix = GITHUB_RAW if raw else GITHUB_BLOB
+    return prefix + quote(relative, safe="/")
 
 
 def strip_emoji(text: str) -> str:
@@ -332,10 +349,12 @@ def dialog_evidence(data: dict[str, Any]) -> tuple[str, str, str]:
             if row.get(field):
                 flags.append(label)
         metadata = f"Session {row.get('session_id')} · Kat. {row.get('category_id')}/{row.get('question_number')} · {row.get('duration_ms', 0)/1000:.1f} s · Steering {row.get('steering_mode')} · {', '.join(flags) or 'keine Zusatzflags'}"
-        source_href = "../../" + str(row.get("source_file") or "")
+        source_file = str(row.get("source_file") or "")
+        source_href = published_url(ROOT / source_file) if source_file else None
+        source_link = f'<a href="{e(source_href)}">Rohlog</a>' if source_href else "Rohlog lokal"
         dialogs.append(
             f'<article class="dialog" data-model="{e(key)}" data-category="{e(cat_key)}"><div class="question">{e(row.get("question_text"))}</div>'
-            f'<blockquote>{e(quote)}</blockquote><footer>{e(row.get("model"))} · {e(metadata)} · <a href="{e(source_href)}">Rohlog</a></footer></article>'
+            f'<blockquote>{e(quote)}</blockquote><footer>{e(row.get("model"))} · {e(metadata)} · {source_link}</footer></article>'
         )
     model_options = "".join(f'<option value="{e(key)}">{e(value)}</option>' for key, value in sorted(models.items()))
     category_options = "".join(f'<option value="{e(key)}">{e(key)}. {e(value)}</option>' for key, value in sorted(categories.items(), key=lambda item: int(item[0])))
@@ -476,10 +495,13 @@ def repro_content(data: dict[str, Any], sessions: dict[str, dict[str, Any]]) -> 
             validation = REPORT_DIR / "workspace" / f"session-{session_id}-validation.json"
             validation_link = (f' · <a href="workspace/session-{e(session_id)}-validation.json">Vollständigkeitsprüfung</a>' if validation.exists() else "")
             session_dir = str(session.get("session_dir") or "")
-            session_href = "../../" + session_dir
-            summary_link = (f' · <a href="{e(session_href + "/summary.json")}">Summary</a>' if session.get("has_summary") else " · Summary fehlt")
-            quality_link = f' · <a href="{e(session_href + "/quality_analysis.json")}">Post-hoc-Quality</a>'
-            session_lines.append(f'<li>{e(label)}: <a href="{e(session_href)}"><code>{e(session_dir)}</code></a>{summary_link}{quality_link}{validation_link}.</li>')
+            session_href = published_url(ROOT / session_dir) if session_dir else None
+            if session_href:
+                summary_link = (f' · <a href="{e(session_href + "/summary.json")}">Summary</a>' if session.get("has_summary") else " · Summary fehlt")
+                quality_link = f' · <a href="{e(session_href + "/quality_analysis.json")}">Post-hoc-Quality</a>'
+                session_lines.append(f'<li>{e(label)}: <a href="{e(session_href)}"><code>{e(session_dir)}</code></a>{summary_link}{quality_link}{validation_link}.</li>')
+            else:
+                session_lines.append(f'<li>{e(label)}: <code>{e(session_dir)}</code>{validation_link}.</li>')
         else:
             session_lines.append(f"<li>{e(label)}: keine aktuelle explizit ausgewählte Session.</li>")
     return (
@@ -495,22 +517,16 @@ def repro_content(data: dict[str, Any], sessions: dict[str, dict[str, Any]]) -> 
     )
 
 
-def collage_uri(path: Path, output: Path) -> str:
-    """Return a portable repository-relative URL for the historical collage."""
-    return Path(os.path.relpath(path.resolve(), output.resolve().parent)).as_posix()
-
-
-def collage_block(path: Path, output: Path) -> str:
+def collage_block(path: Path) -> str:
     """Render the collage only when its separate repository asset exists."""
     if not path.exists():
         return ""
+    collage_src = published_url(path, raw=True)
     return (
-        f'<figure class="asset"><img src="{e(collage_uri(path, output))}" '
+        f'<figure class="asset"><img src="{e(collage_src)}" '
         'alt="Historische CHAPPiE-Kollage mit Terminal-, Web- und Architekturansichten" '
-        'loading="lazy"><figcaption>Vorhandene Datei <code>CHAPPiE-Kollage.jpg</code>. '
-        'Historische qualitative Illustration; ältere CHAPPiE-Version, nicht vollständig '
-        'reproduzierbar, teilweise ohne aktuelle Debugdaten und nicht direkt mit den '
-        'aktuellen Modellmessungen vergleichbar.</figcaption></figure>'
+        'loading="lazy"><figcaption>Historische Kollage aus einer früheren Version; '
+        'sie illustriert den Projektverlauf, nicht die aktuellen Messwerte.</figcaption></figure>'
     )
 
 
@@ -639,7 +655,7 @@ CHAPPiE-Identität und Antwortstil
         "{{MODEL_OPTIONS}}": model_options,
         "{{CATEGORY_OPTIONS}}": category_options,
         "{{DIALOGS}}": dialogs,
-        "{{COLLAGE_BLOCK}}": collage_block(collage, args.output),
+        "{{COLLAGE_BLOCK}}": collage_block(collage),
         "{{MISSING_ASSETS}}": missing_assets(collage.exists()),
         "{{MODEL_FINDINGS}}": model_findings(sessions),
         "{{RUN_LIMITATIONS}}": run_limits,

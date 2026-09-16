@@ -1,0 +1,51 @@
+{
+  "selection": {
+    "layers": [
+      25,
+      26,
+      27
+    ],
+    "strength": 0.55,
+    "cases": 24,
+    "semantic_selection_score": 0.027777777777777776,
+    "emotion_expression": 0.125,
+    "emotion_change_vs_off": 0.027777777777777776,
+    "content_preservation": 0.78125,
+    "naturalness": 0.7291666666666666
+  },
+  "scope": "18 emotional diagnostic prompt/seed pairs, excluding neutral controls",
+  "method": "mean((steering_rating - matched_OFF_rating)/4) separately for each blind rubric axis",
+  "production_acceptance": false,
+  "independent_human_rating": false,
+  "limitations": [
+    "Post-selection descriptive analysis, not independent confirmation",
+    "Responses limited to96tokens; apparent changes may reflect truncation",
+    "No uncertainty or statistical-significance claim"
+  ],
+  "axes": {
+    "happiness": -0.013888888888888888,
+    "trust": -0.013888888888888888,
+    "energy": -0.013888888888888888,
+    "curiosity": -0.06944444444444445,
+    "motivation": -0.013888888888888888,
+    "frustration": 0.027777777777777776,
+    "sadness": 0.013888888888888888,
+    "affection": 0.0,
+    "anxiety": 0.0,
+    "calm": -0.013888888888888888,
+    "directness": -0.013888888888888888,
+    "hostility": 0.013888888888888888,
+    "sarcasm": 0.0,
+    "insult": 0.0,
+    "boundary_setting": -0.013888888888888888,
+    "content_preservation": -0.013888888888888888,
+    "naturalness": -0.041666666666666664
+  },
+  "sources": {
+    "forschung/steering_v17/runs/frustration-high-strength-v1/paired_blind_ratings_v2_layer_metrics.json": "a96cbebb41890a686b74dc89376a863d3101000450ae2231e6446039056a8f2e",
+    "forschung/steering_v17/runs/frustration-high-strength-v1/generations.jsonl": "ed653bd4fb579e0acb98e91c29c57bf61980551ae42b8bf89c7b50dc6cd775ef",
+    "forschung/steering_v17/runs/frustration-high-strength-v1/blind_ratings_v2.jsonl": "217ce55cab98fb2c242da20df7d54b20ac84b30abaa3dced8437467a696fb7c0",
+    "forschung/steering_v17/runs/layer-diagnostics-off-v2/generations.jsonl": "1da5535e5e5d9e5726f7dfd3e8b07616f1e75438f5882b3352ee6df712b2bbdb",
+    "forschung/steering_v17/runs/layer-diagnostics-off-v2/blind_ratings_v2.jsonl": "9260491b5dc96e965c727c64bf8023b96a1ebc4885d4fdf434983b73d43ca78d"
+  }
+}

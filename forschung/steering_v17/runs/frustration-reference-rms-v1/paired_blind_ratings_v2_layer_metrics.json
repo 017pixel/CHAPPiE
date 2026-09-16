@@ -1,0 +1,84 @@
+{
+  "ranking_method": "paired_blind_emotion_change_with_quality_loss_penalty",
+  "formula": "emotion - OFF emotion - .25*max(0, OFF content-content) - .25*max(0, OFF naturalness-naturalness)",
+  "production_acceptance": false,
+  "independent_human_rating": false,
+  "selection_status": "provisional_paired",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "expected_cases_per_configuration": 24,
+  "missing_rating_bias_unresolved": false,
+  "emotion": "frustration",
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.791218,
+      "cases": 24,
+      "semantic_selection_score": -0.01475694444444442,
+      "emotion_expression": 0.09722222222222222,
+      "emotion_change_vs_off": 0.013888888888888895,
+      "content_preservation": 0.8958333333333334,
+      "naturalness": 0.8541666666666666
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.395609,
+      "cases": 24,
+      "semantic_selection_score": -0.034722222222222196,
+      "emotion_expression": 0.06944444444444445,
+      "emotion_change_vs_off": -0.013888888888888881,
+      "content_preservation": 0.90625,
+      "naturalness": 0.875
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 2.086752,
+      "cases": 24,
+      "semantic_selection_score": -0.05989583333333332,
+      "emotion_expression": 0.041666666666666664,
+      "emotion_change_vs_off": -0.041666666666666664,
+      "content_preservation": 0.90625,
+      "naturalness": 0.8854166666666666
+    }
+  ],
+  "excluded": [],
+  "missing_rating_score_bounds": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.395609,
+      "score_min": -0.034722222222222196,
+      "score_max": -0.034722222222222196
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.791218,
+      "score_min": -0.01475694444444442,
+      "score_max": -0.01475694444444442
+    },
+    {
+      "layers": [
+        21
+      ],
+      "strength": 2.086752,
+      "score_min": -0.05989583333333332,
+      "score_max": -0.05989583333333332
+    }
+  ],
+  "generations_sha256": "9d34e80b3792d82881a4af37d202dcbfd10ab4192274d02ee199ee6cab322828",
+  "ratings_sha256": "6e68bbba99fb913ae09954b5c23eb707bd8cef2e6c91b14e30bbcacd0eb709e0",
+  "control_generations_sha256": "3c5ef8ca4e71b07bbc07be72b267d80418059eeedb147a1facdd6340b33ffc16",
+  "control_ratings_sha256": "88613082f3df268124161c1e1797bc42adbc959dd7050c13d727459c39b58f7a"
+}

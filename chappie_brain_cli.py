@@ -1,9 +1,9 @@
-"""CHAPPiE Terminal Interface v16.8.6
+"""CHAPPiE Terminal Interface v16.8.7
 
 Rich-formatted terminal client with live token streaming (CoT + Answer),
 full debug output, compact auto-report, and backend+SSE connectivity.
 Inkl. /thinking Command zum Aktivieren/Deaktivieren des Reasonings.
-Paritaet zur Web-UI (API 16.8.6): Sessions, command_mode, alle Slash-Commands.
+Paritaet zur Web-UI (API 16.8.7): Sessions, command_mode, alle Slash-Commands.
 
 Modes:
   Local  - Direct backend (create_chappie_backend), process_stream() with Live display
@@ -330,7 +330,7 @@ class RemoteBackend:
 # ═══════════════════════════════════════════════════════════════════
 
 class CHAPPiEBrainCLI:
-    CLI_VERSION = "16.8.6"
+    CLI_VERSION = "16.8.7"
 
     def __init__(self, remote_url: Optional[str] = None):
         self.remote_url = remote_url
@@ -2355,7 +2355,7 @@ class CHAPPiEBrainCLI:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.8.6")
+    parser = argparse.ArgumentParser(description="CHAPPiE Terminal Interface v16.8.7")
     parser.add_argument("--remote", action="store_true", help="Connect to remote backend via SSE")
     parser.add_argument("--url", default="http://localhost:8010", help="Backend URL (default: localhost:8010)")
     parser.add_argument("--model", type=str, default=None, help="Lokales vLLM-Modell ueberschreiben (z.B. gemma4-26b)")

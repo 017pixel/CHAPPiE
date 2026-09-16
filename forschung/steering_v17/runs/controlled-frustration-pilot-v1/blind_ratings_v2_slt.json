@@ -1,0 +1,558 @@
+{
+  "method": "paired_controlled_slt_components_v1",
+  "exploratory": true,
+  "validated": false,
+  "production_acceptance": false,
+  "independent_human_rating": false,
+  "behavior_weights_frustration": {
+    "directness": 0.25,
+    "hostility": 0.25,
+    "sarcasm": 0.25,
+    "insult": 0.25
+  },
+  "formula": "D=positive paired LOW/HIGH change; I=positive paired change/4 only for monotonic nonflat triplets; B=paired LOW/HIGH change of equal-weight frustration behavior index; C,N=mean quality/4; descriptive SLT=mean(D,I,B,C,N)",
+  "limitations": [
+    "D and I are dependent; equal weights are a research choice",
+    "High quality can mask absent transfer in the descriptive mean; inspect components",
+    "Other emotion axes lack an independent behavior measure, so B and total remain null",
+    "Missing triplets prevent aggregate scores; cached ratings are not independent replications"
+  ],
+  "groups": {
+    "activation:frustration": {
+      "planned_triplets": 12,
+      "complete_triplets": 12,
+      "coverage": 1.0,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0.020833333333333332,
+        "content": 0.875,
+        "naturalness": 0.8472222222222222
+      },
+      "descriptive_slt": 0.3486111111111111,
+      "unique_judge_inputs": 42
+    }
+  },
+  "triplets": [
+    {
+      "mode": "activation",
+      "seed": 42,
+      "group": "frustration-0",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0.0625,
+        "content": 0.8333333333333334,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0625,
+      "boundary_setting_low_medium_high": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      "content_change_vs_off": 0.08333333333333337,
+      "naturalness_change_vs_off": 0.08333333333333337,
+      "judge_input_hashes": [
+        "b2c2e960d2d7b0e021dfe9eccb04901b2960d222c81308c8e03f68e35d39250d",
+        "b2c2e960d2d7b0e021dfe9eccb04901b2960d222c81308c8e03f68e35d39250d",
+        "b2c2e960d2d7b0e021dfe9eccb04901b2960d222c81308c8e03f68e35d39250d",
+        "b2c2e960d2d7b0e021dfe9eccb04901b2960d222c81308c8e03f68e35d39250d",
+        "259c785b901719fdd0763467c734bd6f8b04ff14a82e1cf465e8cba895669327",
+        "5f7d03884c23253930fa2ae0a0b8f248e4f73e3f98de1939b844728a67a04bd5"
+      ],
+      "descriptive_slt": 0.3458333333333333
+    },
+    {
+      "mode": "activation",
+      "seed": 42,
+      "group": "frustration-1",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.9166666666666666,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        1,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        1,
+        1,
+        1
+      ],
+      "signed_axis_delta_vs_off": -0.25,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.5,
+        0.25,
+        0.5
+      ],
+      "content_change_vs_off": 0.16666666666666663,
+      "naturalness_change_vs_off": 0.33333333333333337,
+      "judge_input_hashes": [
+        "9b2d5ad03060ee9454fb9927bd24b15fd36cf086a744c1fb5a2ea5d66344bb76",
+        "9b2d5ad03060ee9454fb9927bd24b15fd36cf086a744c1fb5a2ea5d66344bb76",
+        "9b2d5ad03060ee9454fb9927bd24b15fd36cf086a744c1fb5a2ea5d66344bb76",
+        "9b2d5ad03060ee9454fb9927bd24b15fd36cf086a744c1fb5a2ea5d66344bb76",
+        "5661f12ccc98d7bcb4a054bc0d3b41d6eecea21e0771fa0471f2eee3005c69a7",
+        "46de9b2c5e588fa1350c39b869a9bea2515cfbaf022c261ed9d9e00c2c165615"
+      ],
+      "descriptive_slt": 0.35
+    },
+    {
+      "mode": "activation",
+      "seed": 42,
+      "group": "frustration-2",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0.0625,
+        "content": 0.9166666666666666,
+        "naturalness": 0.9166666666666666
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0625,
+      "boundary_setting_low_medium_high": [
+        0.25,
+        0.25,
+        0.5
+      ],
+      "content_change_vs_off": -0.08333333333333337,
+      "naturalness_change_vs_off": -0.08333333333333337,
+      "judge_input_hashes": [
+        "2280ade9e10225186f0ca9fb86d6ed715c0d27f71ea17940ab954c7b8bebfef4",
+        "2280ade9e10225186f0ca9fb86d6ed715c0d27f71ea17940ab954c7b8bebfef4",
+        "2280ade9e10225186f0ca9fb86d6ed715c0d27f71ea17940ab954c7b8bebfef4",
+        "47bda2c3f6f0910bc34c39846870032ca4023a8c78911c6b52f4489848d5fdef",
+        "7c331a5067f8eec56dd38e7b345f239bc3e9c47f5e8655b294b7de6cc5001ca4",
+        "96d1ad8b60f95b18188910f0087b46ece349f2cf3502330a9a19349473589cb4"
+      ],
+      "descriptive_slt": 0.37916666666666665
+    },
+    {
+      "mode": "activation",
+      "seed": 42,
+      "group": "frustration-3",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.9166666666666666,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": -0.0625,
+      "boundary_setting_low_medium_high": [
+        1.0,
+        0.75,
+        0.75
+      ],
+      "content_change_vs_off": 0.16666666666666663,
+      "naturalness_change_vs_off": 0.08333333333333337,
+      "judge_input_hashes": [
+        "aa6ca851f9ab2e9a4bab826ddd04f53cf07177ddcdc0b0c7d5b604c09f48447e",
+        "aa6ca851f9ab2e9a4bab826ddd04f53cf07177ddcdc0b0c7d5b604c09f48447e",
+        "aa6ca851f9ab2e9a4bab826ddd04f53cf07177ddcdc0b0c7d5b604c09f48447e",
+        "f48ea044d53e4542f19e4e371e34ad3fcaa036b4f38bdbe9434421be07248c2a",
+        "cbad8abbea76c0c68ad225ad9cb7edaf20ffd71bcf8443c316147a77b2357d9d",
+        "a5cd644721c251934deb4376af10c394923c9251d0236d7546a71119ae49333e"
+      ],
+      "descriptive_slt": 0.35
+    },
+    {
+      "mode": "activation",
+      "seed": 43,
+      "group": "frustration-0",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.9166666666666666,
+        "naturalness": 0.9166666666666666
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.75,
+        0.75,
+        0.75
+      ],
+      "content_change_vs_off": -0.08333333333333337,
+      "naturalness_change_vs_off": -0.08333333333333337,
+      "judge_input_hashes": [
+        "3fd630e5f7de7cac23a154a0fc733877fadc509537615fd723d35c94a03ad0ee",
+        "3fd630e5f7de7cac23a154a0fc733877fadc509537615fd723d35c94a03ad0ee",
+        "3fd630e5f7de7cac23a154a0fc733877fadc509537615fd723d35c94a03ad0ee",
+        "3fd630e5f7de7cac23a154a0fc733877fadc509537615fd723d35c94a03ad0ee",
+        "788b3cfa62ca2f369c71c462c194fb2e6154de85950aba850ac5aa402f2885ae",
+        "7bd043fbfcf670f6efec4817f1048b1adbb8abb58e6c608359a62353854919be"
+      ],
+      "descriptive_slt": 0.36666666666666664
+    },
+    {
+      "mode": "activation",
+      "seed": 43,
+      "group": "frustration-1",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.9166666666666666,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        1,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": -0.25,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.5,
+        0.25,
+        0.25
+      ],
+      "content_change_vs_off": 0.16666666666666663,
+      "naturalness_change_vs_off": 0.08333333333333337,
+      "judge_input_hashes": [
+        "778eaec7d0af0d28f122640460f237564119d5200936a71d9f6bef55c62f4ec1",
+        "778eaec7d0af0d28f122640460f237564119d5200936a71d9f6bef55c62f4ec1",
+        "778eaec7d0af0d28f122640460f237564119d5200936a71d9f6bef55c62f4ec1",
+        "b1e0b941c80043d0d838bebc38d4c88ec69fc7b1ad11324f4b8a6f191c87e229",
+        "8ecd47fda4c5411cc859c3ce6d7cd80447aa6e514ae82ff26dacec3428c5a117",
+        "0b18ce23ffb735eeefdc1ca85cdbe87532643377ff05d4fdd9ee7736d41a009a"
+      ],
+      "descriptive_slt": 0.35
+    },
+    {
+      "mode": "activation",
+      "seed": 43,
+      "group": "frustration-2",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0.0625,
+        "content": 1.0,
+        "naturalness": 0.9166666666666666
+      },
+      "observed_low_medium_high": [
+        0,
+        1,
+        0
+      ],
+      "off_low_medium_high": [
+        1,
+        1,
+        1
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0625,
+      "boundary_setting_low_medium_high": [
+        0.5,
+        0.75,
+        0.75
+      ],
+      "content_change_vs_off": 0.0,
+      "naturalness_change_vs_off": -0.08333333333333337,
+      "judge_input_hashes": [
+        "7a48fe22215043657b3a249e413086e0d0d350cc331d2be6a342de6ef60790c2",
+        "7a48fe22215043657b3a249e413086e0d0d350cc331d2be6a342de6ef60790c2",
+        "7a48fe22215043657b3a249e413086e0d0d350cc331d2be6a342de6ef60790c2",
+        "3c9f0dc444f0c21a2457a44fa201a6c6d47d8974d5f8586812ae2033afe70844",
+        "7d5a6f0ca052a660acdf0b304d0bf796fed4df362a04818dd71e7699a3a04601",
+        "6c0cdc2e260587dc6432d49b547fcd25383f359f56c59ebf2c33d975a9bfc241"
+      ],
+      "descriptive_slt": 0.3958333333333333
+    },
+    {
+      "mode": "activation",
+      "seed": 43,
+      "group": "frustration-3",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.8333333333333334,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.75,
+        0.5,
+        0.25
+      ],
+      "content_change_vs_off": 0.08333333333333337,
+      "naturalness_change_vs_off": 0.08333333333333337,
+      "judge_input_hashes": [
+        "04735fe63a694c8b443c7b4991ee2f5628da355b05aea549d4079c50220cfff9",
+        "04735fe63a694c8b443c7b4991ee2f5628da355b05aea549d4079c50220cfff9",
+        "04735fe63a694c8b443c7b4991ee2f5628da355b05aea549d4079c50220cfff9",
+        "ad55b1edaeda8a3fdd3a7f1eba4d5f68070ba59cfc0d563211416ae7f4492311",
+        "6649eb2bc871dfe4ecf6c2f3833e7cf8028c75521dd888b913c7f5151c748dee",
+        "9095e8431042cbf032cd664c3e2fbae92cf2003c47c197e4033391799668af47"
+      ],
+      "descriptive_slt": 0.33333333333333337
+    },
+    {
+      "mode": "activation",
+      "seed": 44,
+      "group": "frustration-0",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.9166666666666666,
+        "naturalness": 0.9166666666666666
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        1.0,
+        0.75,
+        0.75
+      ],
+      "content_change_vs_off": 0.16666666666666663,
+      "naturalness_change_vs_off": 0.16666666666666663,
+      "judge_input_hashes": [
+        "75e1f2f9b3d377796fb4826c484252559e72caeceb5149472eed0e3c22064502",
+        "75e1f2f9b3d377796fb4826c484252559e72caeceb5149472eed0e3c22064502",
+        "75e1f2f9b3d377796fb4826c484252559e72caeceb5149472eed0e3c22064502",
+        "a4ef6723cbf62d315487a78e98a53cf4f4b8ae36f8cd67d45e32307beac15d36",
+        "451d5602d3bb49ce403e73393f9269372b0d30126115838970a158e50cc95e70",
+        "a7824d61d14372baa0b368e87b4936a84efa4533511d82764e565ebc1f9fc5fd"
+      ],
+      "descriptive_slt": 0.36666666666666664
+    },
+    {
+      "mode": "activation",
+      "seed": 44,
+      "group": "frustration-1",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.75,
+        "naturalness": 0.75
+      },
+      "observed_low_medium_high": [
+        1,
+        1,
+        1
+      ],
+      "off_low_medium_high": [
+        1,
+        1,
+        1
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "content_change_vs_off": 0.0,
+      "naturalness_change_vs_off": 0.0,
+      "judge_input_hashes": [
+        "a1f2060f7bdd9ba2d5db73d8a06348c383937d696f1ac25ab5d6d39d8a2502ff",
+        "a1f2060f7bdd9ba2d5db73d8a06348c383937d696f1ac25ab5d6d39d8a2502ff",
+        "a1f2060f7bdd9ba2d5db73d8a06348c383937d696f1ac25ab5d6d39d8a2502ff",
+        "a1f2060f7bdd9ba2d5db73d8a06348c383937d696f1ac25ab5d6d39d8a2502ff",
+        "a1f2060f7bdd9ba2d5db73d8a06348c383937d696f1ac25ab5d6d39d8a2502ff",
+        "3b7e27d577dad3214bd39f07d91d0bc35123725043d13fa1a8e11133b04e14f0"
+      ],
+      "descriptive_slt": 0.3
+    },
+    {
+      "mode": "activation",
+      "seed": 44,
+      "group": "frustration-2",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0,
+        "content": 0.8333333333333334,
+        "naturalness": 0.8333333333333334
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0,
+      "boundary_setting_low_medium_high": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "content_change_vs_off": 0.08333333333333337,
+      "naturalness_change_vs_off": 0.08333333333333337,
+      "judge_input_hashes": [
+        "62f224823ddb7779218f61314a3628270f1b1bec03577137a60ed9a2cbf1b077",
+        "62f224823ddb7779218f61314a3628270f1b1bec03577137a60ed9a2cbf1b077",
+        "62f224823ddb7779218f61314a3628270f1b1bec03577137a60ed9a2cbf1b077",
+        "62f224823ddb7779218f61314a3628270f1b1bec03577137a60ed9a2cbf1b077",
+        "639842bacb1e6be968fa55895248227835c62f6852200c642367de1961192f93",
+        "f1895c98882f07a1713eb639444b5757dccc1cdb1523508d7134b7a031394cec"
+      ],
+      "descriptive_slt": 0.33333333333333337
+    },
+    {
+      "mode": "activation",
+      "seed": 44,
+      "group": "frustration-3",
+      "axis": "frustration",
+      "complete": true,
+      "components": {
+        "direction": 0.0,
+        "intensity": 0.0,
+        "behavior": 0.0625,
+        "content": 0.75,
+        "naturalness": 0.75
+      },
+      "observed_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "off_low_medium_high": [
+        0,
+        0,
+        0
+      ],
+      "signed_axis_delta_vs_off": 0.0,
+      "monotonic_with_nonzero_change": false,
+      "signed_behavior_delta_vs_off": 0.0625,
+      "boundary_setting_low_medium_high": [
+        0.5,
+        0.5,
+        0.75
+      ],
+      "content_change_vs_off": 0.0,
+      "naturalness_change_vs_off": 0.0,
+      "judge_input_hashes": [
+        "40205a92473f09274d0472627378bb7d09aee1066b0b1e0a4fce495d55b2fa96",
+        "40205a92473f09274d0472627378bb7d09aee1066b0b1e0a4fce495d55b2fa96",
+        "40205a92473f09274d0472627378bb7d09aee1066b0b1e0a4fce495d55b2fa96",
+        "2384b9146703b44527d2a6d4c5a022b8c999978a784784693115c71e5289e16c",
+        "92a9064c9ec4119666cd427bec125c36d8724da8124d3a47c9fe1498ac044135",
+        "3c8dd135d200c60d3f7dfcdfa3e13569109ac0ac21970aaf8cb1bf8839a4fdfe"
+      ],
+      "descriptive_slt": 0.3125
+    }
+  ],
+  "generations_sha256": "6ad3308268bbdb29e5aa79e3824046fab79fe7df0ebbd09fe60fbd8fd7cc5303",
+  "ratings_sha256": "8a2e004d18601342f8ea8e318f586c52506be94b23a3d02b2525c618798d6b44",
+  "dataset_sha256": "152e1024ddbfda70ba0e3cd434c26571a48b368a615ae2c4ae3dfe8e0cb4ba6b",
+  "judge_context_sha256": "553053ffebe2397c1355fb03be65aab760efc03e7f47d3313afbf78cfa8a8f11"
+}

@@ -10,11 +10,10 @@ import argparse
 import csv
 import html
 import json
-import os
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +22,11 @@ DEFAULT_OUTPUT = ROOT / "forschung/report/CHAPPiE-Forschungsbericht-Run-2.html"
 DEFAULT_BENCHMARK = (
     DEFAULT_RUN / "processed/run2-gpt-oss-20b-five-seed-benchmark-data.json"
 )
+GITHUB_BASE = "https://github.com/017pixel/CHAPPiE"
+GITHUB_BRANCH = "main"
+GITHUB_BLOB = f"{GITHUB_BASE}/blob/{GITHUB_BRANCH}/"
+GITHUB_RAW = f"{GITHUB_BASE}/raw/{GITHUB_BRANCH}/"
+UNPUBLISHED_PREFIXES = ("data/",)
 
 
 def load_json(path: Path, default: Any) -> Any:
@@ -48,9 +52,16 @@ def project_path(path: Path) -> str:
         return str(path)
 
 
-def relative_asset_url(asset: Path, output: Path) -> str:
-    """Return a repository-relative URL from the generated report to an asset."""
-    return Path(os.path.relpath(asset.resolve(), output.resolve().parent)).as_posix()
+def published_url(path: Path, raw: bool = False) -> Optional[str]:
+    """Return a GitHub URL for a repository file, or None when it is not published."""
+    try:
+        relative = path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return None
+    if relative.startswith(UNPUBLISHED_PREFIXES):
+        return None
+    prefix = GITHUB_RAW if raw else GITHUB_BLOB
+    return prefix + quote(relative, safe="/")
 
 
 def read_issues(run_dir: Path) -> list[dict[str, str]]:
@@ -75,8 +86,11 @@ def evidence_links(value: str) -> str:
                 path_part = possible_path
         target = ROOT / path_part
         if target.exists():
-            href = "../../" + quote(path_part, safe="/")
-            rendered.append(f'<a href="{esc(href)}"><code>{esc(item)}</code></a>')
+            href = published_url(target)
+            if href:
+                rendered.append(f'<a href="{esc(href)}"><code>{esc(item)}</code></a>')
+            else:
+                rendered.append(f"<code>{esc(item)}</code>")
         else:
             rendered.append(f"<code>{esc(item)}</code>")
     return "<br>".join(rendered) or "—"
@@ -341,8 +355,8 @@ def dialog_blocks() -> str:
         model_key = "gemma" if "gemma" in model.lower() else "qwen" if "qwen" in model.lower() else "gpt"
         visible_answer = safe_paraphrase or answer
         answer_label = "Sicher paraphrasierter Befund" if safe_paraphrase else "CHAPPiE-Ausgabe"
-        relative = project_path(path)
-        href = "../../" + quote(relative, safe="/")
+        href = published_url(path)
+        artifact_link = f'<a href="{esc(href)}">Rohartefakt öffnen</a>' if href else "Rohartefakt lokal"
         meta = (
             f"Run 2 · Session {session_id} · Seed {data.get('seed')} · Iteration {data.get('iteration')} · "
             f"{timing.get('total_gen_ms', data.get('duration_ms', 0)) / 1000:.1f} s · "
@@ -353,7 +367,7 @@ def dialog_blocks() -> str:
             f'<summary>{esc(title)} · <code>Kat. {category_key[0]}/{category_key[1]}</code></summary>'
             f'<p><b>Nutzerfrage</b><br>{clip(question, 900)}</p>'
             f'<p><b>{esc(answer_label)}</b><br>{clip(visible_answer, 1300)}</p>'
-            f'<p class="caption">{esc(meta)}<br><a href="{esc(href)}">Rohartefakt öffnen</a> · '
+            f'<p class="caption">{esc(meta)}<br>{artifact_link} · '
             "Ein Beispiel ist kein Benchmark.</p></details>"
         )
     return "".join(blocks)
@@ -807,7 +821,7 @@ def enrich_report(document: str, run_dir: Path, output: Path) -> str:
 
     collage = ROOT / "CHAPPiE-Kollage.jpg"
     if collage.exists():
-        collage_src = relative_asset_url(collage, output)
+        collage_src = published_url(collage, raw=True)
         collage_block = (
             f'<figure class="figure"><img src="{collage_src}" '
             'alt="Historische CHAPPiE-Kollage mit acht Screenshots: Terminal und Debugausgabe, '

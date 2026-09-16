@@ -2,6 +2,15 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [16.8.7] - 2026-09-16
+
+### Verändert
+- Rohartefakt-, Rohlog- und Quellenlinks im Forschungsbericht öffnen jetzt direkt die Dateien auf GitHub
+- Alle relativen Pfade, die auf der veröffentlichten Berichtsseite ins Leere führten, sind ersetzt
+- Bericht v6 enthält den neuen Abschnitt zur v17-Weiterarbeit samt nachvollziehbaren Nachweisen
+- Historische Quellkopien und v17-Nachweisdaten sind im Repository veröffentlicht
+- Berichtstests prüfen, dass keine Links die veröffentlichte Seite mehr verlassen
+
 ## [16.8.6] - 2026-09-05
 
 ### Erstellt

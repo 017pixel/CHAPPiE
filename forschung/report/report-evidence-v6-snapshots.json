@@ -1,0 +1,16 @@
+{
+  "source_commit": "bcc37202fad8b1324d471d73c47cbb489ec7e028",
+  "reason": "Preserve exact v6 evidence while active source evolves for v17. Original evidence hashes and manifest remain unchanged.",
+  "snapshots": {
+    "web_infrastructure/chappie_runtime.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/chappie_runtime.py.txt",
+    "web_infrastructure/turn_pipeline.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/turn_pipeline.py.txt",
+    "web_infrastructure/contracts.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/contracts.py.txt",
+    "web_infrastructure/generation.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/generation.py.txt",
+    "web_infrastructure/persistence.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/persistence.py.txt",
+    "web_infrastructure/formatting.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/formatting.py.txt",
+    "web_infrastructure/backend_wrapper.py": "forschung/report/assets/v6-source-freeze/web_infrastructure/backend_wrapper.py.txt",
+    "brain/steering_manager.py": "forschung/report/assets/v6-source-freeze/brain/steering_manager.py.txt",
+    "Legacy-Code/brain-pipeline-v1/brain_pipeline.py": "forschung/report/assets/v6-source-freeze/Legacy-Code/brain-pipeline-v1/brain_pipeline.py.txt",
+    "Legacy-Code/backend-wrapper-v1/source/backend_wrapper.py": "forschung/report/assets/v6-source-freeze/Legacy-Code/backend-wrapper-v1/source/backend_wrapper.py.txt"
+  }
+}

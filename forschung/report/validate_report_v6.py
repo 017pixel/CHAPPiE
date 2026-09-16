@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[2]
 REPORT = Path(__file__).with_name("CHAPPiE-Forschungsbericht-v6.html")
 MANIFEST = Path(__file__).with_name("report-evidence-v6.json")
+SNAPSHOTS = Path(__file__).with_name("report-evidence-v6-snapshots.json")
 
 
 def _sha256(path: Path) -> str:
@@ -63,9 +64,15 @@ def validate() -> list[str]:
     if manifest.get("validator_version") != "1":
         errors.append("Unbekannte Validatorversion im Evidence-Manifest")
 
+    snapshots = json.loads(SNAPSHOTS.read_text()).get("snapshots", {}) if SNAPSHOTS.exists() else {}
     for item in manifest.get("evidence", []):
         relative_path = item.get("path", "")
-        source = ROOT / relative_path
+        # Original hashes remain authoritative. Validate exact archived source
+        # for historical v6 claims; v17 evidence has its own run manifests.
+        source = (ROOT / snapshots.get(relative_path, relative_path)).resolve()
+        if not source.is_relative_to(ROOT):
+            errors.append(f"Evidence-Pfad verlaesst Projekt: {relative_path}")
+            continue
         if not source.is_file():
             errors.append(f"Evidence-Quelle fehlt: {relative_path}")
             continue

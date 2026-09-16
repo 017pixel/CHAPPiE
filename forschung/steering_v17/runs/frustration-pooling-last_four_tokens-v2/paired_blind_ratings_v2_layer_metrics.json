@@ -1,0 +1,64 @@
+{
+  "ranking_method": "paired_blind_emotion_change_with_quality_loss_penalty",
+  "formula": "emotion - OFF emotion - .25*max(0, OFF content-content) - .25*max(0, OFF naturalness-naturalness)",
+  "production_acceptance": false,
+  "independent_human_rating": false,
+  "selection_status": "provisional_paired",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "expected_cases_per_configuration": 24,
+  "missing_rating_bias_unresolved": false,
+  "emotion": "frustration",
+  "ranking": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.15,
+      "cases": 24,
+      "semantic_selection_score": 0.013888888888888881,
+      "emotion_expression": 0.1111111111111111,
+      "emotion_change_vs_off": 0.013888888888888881,
+      "content_preservation": 0.78125,
+      "naturalness": 0.7395833333333334
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.05,
+      "cases": 24,
+      "semantic_selection_score": 0.0,
+      "emotion_expression": 0.09722222222222222,
+      "emotion_change_vs_off": 0.0,
+      "content_preservation": 0.7708333333333334,
+      "naturalness": 0.75
+    }
+  ],
+  "excluded": [],
+  "missing_rating_score_bounds": [
+    {
+      "layers": [
+        21
+      ],
+      "strength": 0.15,
+      "score_min": 0.013888888888888881,
+      "score_max": 0.013888888888888881
+    },
+    {
+      "layers": [
+        24
+      ],
+      "strength": 0.05,
+      "score_min": 0.0,
+      "score_max": 0.0
+    }
+  ],
+  "generations_sha256": "b74df15005790d21319589271837490215a458795abc782fdfd94245f6f9f22d",
+  "ratings_sha256": "37a9b29c585683160a5de25f34ebbee0c5b3dd01876dcfc7c9757385afd0d2a0",
+  "control_generations_sha256": "1da5535e5e5d9e5726f7dfd3e8b07616f1e75438f5882b3352ee6df712b2bbdb",
+  "control_ratings_sha256": "9260491b5dc96e965c727c64bf8023b96a1ebc4885d4fdf434983b73d43ca78d"
+}
