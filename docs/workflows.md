@@ -36,6 +36,26 @@ Die feste fachliche Reihenfolge lautet:
 
 Sync und Stream teilen Vorbereitung und Abschluss. Streaming wandelt Chunks in die bestehende Eventfolge um und persistiert auch bei erfolgreichem Streamabschluss.
 
+## Session-Export
+
+```mermaid
+sequenceDiagram
+    participant Terminal as lokale oder Remote-CLI
+    participant API as FastAPI
+    participant Export as Session-Exporter
+    participant Store as Chat-Datei und Event-Store
+    participant Mac as Termius-Zwischenablage
+
+    Terminal->>API: GET /sessions/{id}/export?mode=standard|debug
+    API->>Export: Nachrichten, Runtime und Archiv lesen
+    Export->>Store: Session und Ereignisse laden
+    Export-->>API: versioniertes JSON plus Fallbackpfad
+    API-->>Terminal: Exportantwort
+    Terminal->>Mac: OSC 52 über SSH-Terminal
+```
+
+Jeder Export wird zusätzlich als Datei mit restriktiven Rechten unter `data/session_exports/` gespeichert. Das schützt vor Datenverlust, wenn Termius, `tmux` oder eine zwischengeschaltete Terminalumgebung OSC 52 nicht weitergibt.
+
 ## Provider
 
 Der Web-Chat löst `CHAT_PROVIDER` bewusst als vLLM auf und verwendet bei Runtime-Reload immer das aktuelle konfigurierte vLLM-Modell. Der gespeicherte Schalter `enable_two_step_processing` bleibt abwärtskompatibel, erzeugt aber keine zweite alte Pipeline.

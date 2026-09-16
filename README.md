@@ -36,8 +36,9 @@ Die frühere Multi-Agent-`BrainPipeline` ist nicht der aktive Requestpfad. Ihre 
 
 - Episodisches Gedächtnis mit ChromaDB, Hybrid-RAG, Recall-Stärke, Verknüpfungen und Vergessenskurve
 - Life-Simulation mit Needs, Goals, Habit Dynamics, Attachment und Timeline
-- zehn gekoppelte Emotionen mit VAD-Mapping und reinem Layer-Steering im lokalen Antwortpfad
-- gemeinsamer synchroner und gestreamter Turn-Kern
+- zehn gekoppelte Emotionen mit VAD-Mapping und getrennt testbarem Activation- und Soft-Sequence-Steering
+- gemeinsamer synchroner und gestreamter Turn-Kern mit dauerhaftem Ereignisarchiv und Hintergrund-Retrieval-Promotion
+- pro Sitzung persistierte Memory-, Steering- und Live-Einstellungen für API und CLI
 - Causal Trace für Intent, Memory, Emotion, Life, Steering und Tonentscheidung
 - Sleep-Phase mit Replay und Konsolidierung
 - autonomer Trainings-Daemon in einer isolierten Laufzeitumgebung
@@ -82,28 +83,44 @@ Secrets gehören ausschließlich in `CHAPPIE_CONFIG.json`, `config/secrets.py` o
 
 ### Starten
 
+Alle Python-Befehle laufen im Projekt venv. Nach `source venv/bin/activate` genügt `python3`, ohne Aktivierung `venv/bin/python` voranstellen:
+
 ```bash
 # API auf Port 8010
-python3 app.py
+venv/bin/python app.py
 
 # Frontend-Entwicklung auf Port 5173
 cd frontend && npm run dev
 
 # lokale CLI
-python3 chappie_brain_cli.py
+venv/bin/python chappie_brain_cli.py
 
 # Remote-CLI
-python3 chappie_brain_cli.py --remote
+venv/bin/python chappie_brain_cli.py --remote
 
 # autonomes Training
-python3 -m Chappies_Trainingspartner.training_daemon
+venv/bin/python -m Chappies_Trainingspartner.training_daemon
 ```
 
 Der Steering-Service läuft separat auf Port 8000:
 
 ```bash
-python3 -m brain.steering_api_server
+venv/bin/python -m brain.steering_api_server
 ```
+
+Ohne venv startet die CLI mit einfacher Eingabe und Hinweis statt Verlauf und Vervollständigung. Für den vollen Funktionsumfang immer das venv verwenden.
+
+### Session als JSON kopieren
+
+In der Terminal-CLI stehen zwei Exportstufen bereit:
+
+```text
+/copy standard   sichtbare Session-Daten und UI-Reportfelder
+/copy debug      Standarddaten plus Roh-Metadaten, Debug-Log und Event-Archiv
+/copy            fragt die Exportstufe interaktiv ab
+```
+
+Der Export wird über OSC 52 an die Zwischenablage des verbundenen Termius-Terminals gesendet. Der vollständige Export landet immer zusätzlich als private Datei unter `data/session_exports/`. Bei einer Remote-CLI liegt diese Datei auf dem CHAPPiE-Server und kann dort per SFTP abgerufen werden.
 
 ## Provider
 
@@ -115,7 +132,7 @@ python3 -m brain.steering_api_server
 
 Aktive Provider sind ausschließlich `vllm`, `ollama` und `groq`. Cerebras-Bezüge sind nur in ausdrücklich historischen Forschungs- oder Legacy-Dateien zulässig.
 
-Im vLLM-Antwortpfad stehen keine Emotionswerte, Tonpläne oder emotional veränderten Samplingwerte im Prompt. Der sichtbare Einfluss entsteht ausschließlich durch kontrastiv berechnete Aktivierungsvektoren. Details und Live-Prüfung stehen in [`docs/emotion-memory-steering.md`](docs/emotion-memory-steering.md).
+Im vLLM-Antwortpfad stehen keine Emotionswerte, Tonpläne oder emotional veränderten Samplingwerte im Prompt. Activation Steering und begrenzter Soft Sequence Bias sind einzeln, kombiniert oder vollständig abgeschaltet testbar; harte Antwortpräfixe und Sequence-EOS sind entfernt. Details und Live-Prüfung stehen in [`docs/emotion-memory-steering.md`](docs/emotion-memory-steering.md).
 
 ## Tests
 
@@ -139,6 +156,7 @@ Alle Testgruppen und die minimale CI-Installation stehen in [docs/testing.md](do
 - [Forschungsbericht v5, unveränderte historische Momentaufnahme](forschung/report/CHAPPiE-Forschungsbericht-v5.html)
 - [Forschungsbericht v6, aktuelle Architektur und Provenienz](forschung/report/CHAPPiE-Forschungsbericht-v6.html)
 - [Forschungsmethodik](docs/research-methodology.md)
+- [Steering-v17-Messreihe und offene Abnahme](docs/steering-v17-research.md)
 
 Run-2-Messdaten entstanden vor der Runtime-Modularisierung. Bericht v6 trennt diese Daten ausdrücklich von der späteren Architekturverifikation und erfindet keine Post-Migrations-Benchmarks.
 

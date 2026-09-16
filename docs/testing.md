@@ -24,6 +24,8 @@ python3 tests/test_root_config.py
 python3 tests/test_chat_ui_formatting.py
 python3 tests/test_reasoning_layering.py
 python3 tests/test_api_contract.py
+python3 tests/test_session_export.py
+python3 tests/test_cli_copy.py
 python3 tests/test_forschung_harness.py
 python3 tests/test_forschung_report.py
 python3 forschung/report/validate_report_v5_freeze.py
@@ -39,7 +41,14 @@ python3 scripts/validate_skill_sync.py
 - `tests/test_short_term_memory.py`
 - `tests/test_training_config_ui.py`
 - `tests/test_training_daemon_lifecycle.py`
+- `tests/test_session_export.py`: JSON-Schema, Emotionshistorie, Secret-Filter, Datei-Fallback und OSC 52
+- `tests/test_cli_copy.py`: lokale Auswahl, Prompt und Remote-Endpunkt
 - `tests/test_provider_factory.py`
+- `tests/test_steering_judge.py`: versionierter Judge, Cache, gepaarte Rangfolge und fehlende Bewertungen
+- `tests/test_steering_acceptance.py`: geplante Versuchsmatrix, Zustandsmonotonie, Qualitätsabdeckung
+- `tests/test_state_language_transfer.py`: explorative gepaarte SLT-Komponenten, keine Produktionsfreigabe
+- `tests/test_steering_composition.py`: Einheitsnorm, Auslöschung, Quellbindung und getrennte Kompositvalidierung
+- `tests/test_steering_layer_type_comparison.py`: vollständige Layerauswahl bei gleichen Dosen, keine Vermischung von Kombinationen
 - relevante Memory-, Life-, CLI- und Research-Validatoren
 
 Diese Tests sollen in CI fehlschlagen dürfen, wenn eine Regression vorliegt. `continue-on-error` oder pauschales `|| true` ist für deterministische Tests nicht erlaubt.
@@ -73,3 +82,9 @@ Bei sichtbaren UI-Änderungen ist zusätzlich die im Projekt vorgeschriebene Pla
 - Keine lokalen Secrets oder Nutzerdaten als Fixture committen.
 - Zufällige Modelltexte nicht als einzigen Regressionstest verwenden.
 - Forschungsdaten und Post-Migrations-Strukturtests klar trennen.
+
+## v17-Forschungsnachweise
+
+Die reproduzierbaren Befehle und Grenzen stehen in [steering-v17-research.md](steering-v17-research.md). HTTP-Erfolg, lexikalische Diagnostik und automatisierte Blindratings sind unterschiedliche Nachweise. Die vollständige Abnahme benötigt zusätzlich die geplanten Mehrseed- und Zustandsversuche sowie echte Runtime-, Browser- und Stresstests mit dem endgültigen Vektorpack.
+
+Die erweiterte CI-Gruppe prüft außerdem `test_memory_event_store.py`, `test_memory_off_isolation.py`, `test_session_runtime_settings.py`, `test_cli_autocomplete.py`, `test_cli_history.py`, `test_two_column_report.py` und `test_steering_state_transfer_contract.py`. Diese Tests benötigen nur `requirements/ci.txt`, keine Modellgewichte oder GPU-Pakete.

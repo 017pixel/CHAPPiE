@@ -6,6 +6,7 @@
 |---|---|---|
 | FastAPI Chat | `api/routers/chat.py` | Request-Schema, Statuscodes und Antwortfelder |
 | FastAPI Streaming | `POST /chat/stream` | SSE-Eventnamen, Datenfelder und Abschlussereignis |
+| Session-Export | `GET /sessions/{session_id}/export?mode=standard` oder `debug` | versioniertes JSON, Emotionstimeline und optionales Debug-Archiv |
 | lokale CLI | `chappie_brain_cli.py` | Argumente, Commands, Ausgabe und Exitcode |
 | Remote-CLI | `chappie_brain_cli.py --remote` | API-URL und Fehlerdarstellung |
 | Research | `forschung/session_runner.py` | isolierte Runtime-Optionen, Session- und Evidence-Dateien |
@@ -54,3 +55,9 @@ Die Web-Runtime meldet und verwendet vLLM. Ollama und Groq bleiben in der allgem
 ## Persistenz
 
 Memory-, Life-, Chat- und Sessionformate wurden nicht geändert. `training_config.json` ist die einzige Pfadmigration: Der zentrale Zielpfad ist `config/training_config.json`; die alte Root-Datei bleibt lesbar.
+
+## Session-Export
+
+Der Export liest die vorhandenen Chat-Nachrichten und das dauerhafte Ereignisarchiv. `standard` enthält die sichtbaren Nachrichten, UI-Metadaten, den aktuellen Runtime-Zustand und die Emotionsänderungen. `debug` ergänzt die vollständigen gespeicherten Nachrichten-Metadaten, den aktuellen Debug-Logger und dekodierte Event-Store-Zeilen.
+
+Der API-Endpunkt schreibt parallel eine private Fallback-Datei unter `data/session_exports/` und liefert deren Serverpfad zurück. Der API-Endpunkt sendet selbst keine Clipboard-Steuersequenz. Die Remote-CLI serialisiert die Exportantwort und sendet sie über OSC 52 an das Terminal. Zugangsdaten und Secret-Felder werden in beiden Exportstufen entfernt.

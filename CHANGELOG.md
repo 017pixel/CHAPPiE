@@ -2,6 +2,102 @@
 
 Alle Änderungen werden in 5 Stichpunkten dokumentiert. Keine Code-Anzeigen!
 
+## [17.2.0-dev.2] - 2026-09-16
+
+### Erstellt
+- Sicherheitsrisiko-Filter für Dialogbelege ergänzt
+- Risikostufen-Badges an sicherheitskritischen Belegen ergänzt
+- Zähler für sichtbare Belege im Forschungsbericht ergänzt
+- Wörtliche 1:1-Zitat-Belege aus den Rohartefakten ergänzt
+- Testvertrag für erreichbare Berichtslinks ergänzt
+
+### Verändert
+- Dialogbelege zeigen Originalantworten statt sicherer Paraphrasen
+- Beleg-Links öffnen die korrekten GitHub-Rohartefakte
+- Nutzerfragen in Belegen exakt aus den Rohdaten übernommen
+- Zweispaltiger Terminal-Bericht erscheint ab 120 Spalten
+- Ungenutzte Importe und Variablen in CLI und Konfiguration entfernt
+
+### Gelöscht
+- Sichere Paraphrasen als Ersatz für Originalzitate entfernt
+- Ungültige doppelte Klassenattribute an Belegkarten entfernt
+- Relative Beleg-Links, die auf der Live-Seite ins Leere führten, entfernt
+- Keine bestehenden Berichtsinhalte gelöscht
+- Keine Forschungsdaten gelöscht
+
+## [17.2.0-dev.1] - 2026-09-07
+
+### Erstellt
+- Session-Export mit Standard- und Debug-Stufe ergänzt
+- Strukturierte Emotionshistorie in den Export aufgenommen
+- OSC-52-Übertragung für Termius-Terminals ergänzt
+- Private Server-Datei als zuverlässiger Export-Fallback ergänzt
+- Remote-API-Endpunkt für Sitzungs-Exporte ergänzt
+
+### Verändert
+- Terminal-CLI fragt bei `/copy` die gewünschte Exportstufe ab
+- Standard-Export bildet sichtbare Session- und UI-Daten ab
+- Debug-Export bewahrt Roh-Metadaten und dekodierte Ereignisse
+- Session-Export entfernt Zugangsdaten und Secret-Felder
+- Exportverträge und Testläufe in CI und Dokumentation aufgenommen
+
+### Gelöscht
+- Keine bestehenden Chat-Nachrichten gelöscht
+- Keine bestehenden Session-Dateien gelöscht
+- Keine bestehenden Event-Store-Einträge gelöscht
+- Keine bisherigen Clipboard-Funktionen der Weboberfläche gelöscht
+- Keine Modell-, Memory- oder Life-Daten gelöscht
+
+## [17.1.0-dev.1] - 2026-09-07
+
+Ein Antwortprofil und ein Steering-Budget für alle Fragetypen, stabile Selbstauskünfte und ehrliche Anzeigen für Live-Fortschritt, Tokens und Report.
+
+### Erstellt
+- Einheitliches Steering-Budget mit Top-3-Basis, Top-1-Composite und gedeckelter Summenstärke eingeführt
+- Stil-Kennzeichnung für Präsenz und Identität mit eigenem Dominanz-Label bei reiner Stil-Steuerung ergänzt
+- Provider-Finish-Reason in Timing, Metadaten, Terminal-Report und Web-Inspektor sichtbar gemacht
+- Format-Herkunft mit Grund in Terminal, API-Metadaten und Web-Inspektor durchgängig ausgewiesen
+- Offline-Vertragstest für Profil, Budget, Dominanz-Label, Timing-Grund und Speicherstatistik ergänzt
+
+### Verändert
+- Antwortbudget auf 1200 Tokens für alle Fragetypen vereinheitlicht, Mathe-Kurzantwort bleibt als einziger Sonderweg
+- Selbstbericht und Identität behalten Soul-, Memory- und Life-Kontext statt leerem Isolationskontext
+- Live-Anzeige zählt Wörter mit einstelliger Rate, finale Tokens kommen aus dem Tokenizer
+- Kompakt-Report zeigt immer alle zehn Emotionen mit Wert und Delta, unveränderte gedimmt
+- Web-Inspektor teilt den Report in links Intent, Memory, Budget, Timing, Trace und rechts Emotionen, Steering, Ton
+
+### Gelöscht
+- 128-Token-Deckel für Selbstfragen aus der Generierung entfernt
+- Frustrationskürzung des Antwortbudgets bei der Sampling-Anpassung entfernt
+- Gehaltene Live-Streams für Fakt-, Selbst- und Mehrfachfragen entfernt
+- Sonderfilter auf fünf Report-Emotionen im Steering-Pfad entfernt
+- Basis-Budget-Sonderwege 0 und 1 für Identitäts- und Selbstbericht-Kontexte entfernt
+
+## [17.0.0-dev.1] - 2026-09-06
+
+Entwicklungsstand des v17-Umbaus. Die technische Umsetzung ist testbar; die vollständige Forschungsabnahme und die Freigabe gemessener Produktionsprofile stehen noch aus.
+
+### Erstellt
+- Getrennte Schalter für Aktivierungssteuerung, weiche Wortsteuerung und ihren gemeinsamen Betrieb ergänzt
+- Dauerhaftes Gesprächsarchiv mit getrennt geprüfter Nutzung als Erinnerung eingeführt
+- Reproduzierbare Qwen-Vektorerfassung, Layervergleiche und blinde Antwortbewertung ergänzt
+- Sitzungseigene Memory-, Steering- und Streaming-Einstellungen hinzugefügt
+- Terminal-Verlauf, Tab-Vervollständigung und zweispaltige Forschungsanzeige ergänzt
+
+### Verändert
+- Emotionale Antworten entstehen aus freier Modellgeneration und begrenzten internen Eingriffen
+- Erinnerungsverarbeitung und Migration laufen außerhalb der direkten Antwortvorbereitung
+- Innere Zustände und jüngste Änderungen bestimmen getrennt begrenzte Aktivierungs- und Wortimpulse
+- Forschungsbericht um reale Vergleichsläufe, Grenzen und weitere Arbeit erweitert
+- Frontend, API und Terminal verwenden synchron den Entwicklungsstand 17.0.0-dev.1
+
+### Gelöscht
+- Vollständige vorgegebene Gefühlsantworten aus dem Steering-Pfad entfernt
+- Erzwungene Antwortenden nach emotionalen Zielsequenzen entfernt
+- Wiederholungsversuche allein wegen fehlender erwarteter Emotionswörter entfernt
+- Automatische Nutzung ungeprüfter Assistant-Behauptungen als verlässliche Erinnerung entfernt
+- Blockierende Memory-Migration aus dem interaktiven Turn entfernt
+
 ## [16.8.6] - 2026-09-05
 
 ### Erstellt
