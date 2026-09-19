@@ -41,6 +41,8 @@ if "transformers" not in sys.modules:
     fake_transformers.AutoModelForCausalLM = object
     fake_transformers.AutoTokenizer = object
     fake_transformers.BitsAndBytesConfig = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
+    fake_transformers.LogitsProcessor = object
+    fake_transformers.LogitsProcessorList = list
     fake_transformers.StoppingCriteria = object
     fake_transformers.StoppingCriteriaList = list
     fake_transformers.TextIteratorStreamer = object
