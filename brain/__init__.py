@@ -5,6 +5,7 @@ Nutze get_brain() für automatische Backend-Auswahl basierend auf settings
 oder für eine gezielte Provider-/Modellauswahl pro Agent.
 """
 from importlib import import_module
+from hashlib import sha256
 from typing import Optional, Dict, Tuple, Any
 
 from .base_brain import BaseBrain, Message, GenerationConfig
@@ -12,6 +13,7 @@ from .base_brain import BaseBrain, Message, GenerationConfig
 from config.config import settings, LLMProvider, _parse_provider
 
 _brain_cache: Dict[Tuple[str, str], BaseBrain] = {}
+_brain_cache_signatures: Dict[Tuple[str, str], Tuple[str, ...]] = {}
 _brain_request_audit: list[Dict[str, Any]] = []
 
 _EXPORTS = {
@@ -68,6 +70,20 @@ def _resolved_model(provider: LLMProvider, model: Optional[str]) -> str:
     return str(settings.ollama_model)
 
 
+def _provider_runtime_signature(provider: LLMProvider) -> Tuple[str, ...]:
+    """Return the connection settings that are captured by a brain client."""
+    if provider == LLMProvider.VLLM:
+        return (str(getattr(settings, "vllm_url", "")),)
+    if provider == LLMProvider.OLLAMA:
+        return (str(getattr(settings, "ollama_host", "")),)
+    if provider == LLMProvider.GROQ:
+        # Keep the credential out of cache-key/debug representations while
+        # still invalidating a client as soon as the configured key changes.
+        credential = str(getattr(settings, "groq_api_key", "") or "").encode()
+        return (sha256(credential).hexdigest(),)
+    return ()
+
+
 def reset_brain_request_audit() -> None:
     """Begin a fresh provider-call audit without touching reusable clients."""
     _brain_request_audit.clear()
@@ -87,24 +103,39 @@ def get_brain(provider: Optional[LLMProvider | str] = None, model: Optional[str]
     - "groq" → GroqBrain (cloud, high-speed)
     - "vllm" → VLLMBrain (lokale GPU-Beschleunigung)
 
-    Instanzen werden pro (provider, model)-Kombination gecached,
-    um mehrfache Initialisierungen zu vermeiden.
+    Instanzen werden pro (provider, model)-Kombination gecached. Aendert sich
+    die Provider-Verbindung in den Runtime-Settings, wird der alte Client
+    verworfen und beim naechsten Aufruf neu erstellt.
 
     Returns:
         Initialisiertes Brain-Objekt
     """
     effective_provider = _normalize_provider(provider or settings.llm_provider)
     effective_model = model or None
+    resolved_model = _resolved_model(effective_provider, effective_model)
+    # Keep the historical key shape. The resolved model and connection details
+    # live in the signature so settings reloads invalidate model=None calls too.
     cache_key = (effective_provider.value, effective_model or "")
+    runtime_signature = (resolved_model, *_provider_runtime_signature(effective_provider))
+    cache_hit = (
+        cache_key in _brain_cache
+        and _brain_cache_signatures.get(cache_key) == runtime_signature
+    )
 
     _brain_request_audit.append({
         "provider": effective_provider.value,
-        "model": _resolved_model(effective_provider, effective_model),
-        "cache_hit": cache_key in _brain_cache,
+        "model": resolved_model,
+        "cache_hit": cache_hit,
     })
 
-    if cache_key in _brain_cache:
+    if cache_hit:
         return _brain_cache[cache_key]
+
+    # A stale client may contain an old URL, host or credential. Remove it
+    # before constructing the replacement so Settings reloads do not retain
+    # obsolete provider clients in the reusable cache.
+    _brain_cache.pop(cache_key, None)
+    _brain_cache_signatures.pop(cache_key, None)
 
     if effective_provider == LLMProvider.GROQ:
         brain_cls = _load_export("GroqBrain")
@@ -117,4 +148,5 @@ def get_brain(provider: Optional[LLMProvider | str] = None, model: Optional[str]
         brain = brain_cls(model=model)
 
     _brain_cache[cache_key] = brain
+    _brain_cache_signatures[cache_key] = runtime_signature
     return brain

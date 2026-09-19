@@ -41,13 +41,15 @@ if "transformers" not in sys.modules:
     fake_transformers.AutoModelForCausalLM = object
     fake_transformers.AutoTokenizer = object
     fake_transformers.BitsAndBytesConfig = lambda *args, **kwargs: {"args": args, "kwargs": kwargs}
+    fake_transformers.StoppingCriteria = object
+    fake_transformers.StoppingCriteriaList = list
     fake_transformers.TextIteratorStreamer = object
     sys.modules["transformers"] = fake_transformers
 
 import torch  # noqa: E402
 
 from brain.steering_manager import MODEL_LAYER_PROFILES, SteeringManager  # noqa: E402
-from brain.steering_backend import LocalSteeringEngine, anchor_scale_for_model  # noqa: E402
+from brain.steering_backend import ANCHOR_SCALE_FACTORS, LocalSteeringEngine, anchor_scale_for_model  # noqa: E402
 from brain.vllm_brain import VLLMBrain  # noqa: E402
 from config.config import get_model_generation_defaults, is_gemma4_model, is_qwen_model  # noqa: E402
 
@@ -83,8 +85,9 @@ def test_gemma4_steering_profile_detection_uses_specific_profiles():
     assert manager._detect_model_profile_for_name("google/gemma-4-E4B-it") is MODEL_LAYER_PROFILES["gemma-4-e4b"]
 
 
-def test_gemma4_anchor_scale_is_separate_from_qwen():
-    assert anchor_scale_for_model("google/gemma-4-26B-A4B-it") > anchor_scale_for_model("Qwen/Qwen3.5-4B")
+def test_gemma4_anchor_scale_uses_model_profile():
+    assert anchor_scale_for_model("google/gemma-4-26B-A4B-it") == ANCHOR_SCALE_FACTORS["gemma4"]
+    assert anchor_scale_for_model("Qwen/Qwen3.5-4B") == ANCHOR_SCALE_FACTORS["qwen"]
 
 
 def test_gemma4_thinking_output_split_uses_channel_tokens():
@@ -104,7 +107,7 @@ def test_vllm_reasoning_extraction_accepts_gemma_thinking_keys():
 if __name__ == "__main__":
     test_gemma4_config_detection_and_generation_defaults()
     test_gemma4_steering_profile_detection_uses_specific_profiles()
-    test_gemma4_anchor_scale_is_separate_from_qwen()
+    test_gemma4_anchor_scale_uses_model_profile()
     test_gemma4_thinking_output_split_uses_channel_tokens()
     test_vllm_reasoning_extraction_accepts_gemma_thinking_keys()
     print("OK: Gemma 4 integration")
