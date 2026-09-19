@@ -1,129 +1,49 @@
-# Gemma 4 Installation
+# Gemma 4 E4B installieren
 
-## Übersicht
+CHAPPiE unterstützt `google/gemma-4-E4B-it` als Alternative zu Qwen 3.5 4B. Qwen bleibt der besser getestete Standard. Gemma benötigt vor dem Download einen Hugging-Face-Zugang zum freigeschalteten Modell.
 
-Zwei Varianten:
+## Installation
 
-| Modell | VRAM | Geschwindigkeit | Kontext |
-|---|---|---|---|
-| `google/gemma-4-E4B-it` | ~9 GB (FP16) | ~7-10 tk/s | 32K+ |
-| `google/gemma-4-26B-A4B-it` | ~15 GB (NF4) | ~3-5 tk/s | max 8K |
-
----
-
-## 1. Voraussetzungen
+1. Öffne [`google/gemma-4-E4B-it`](https://huggingface.co/google/gemma-4-E4B-it), melde dich an und akzeptiere den Modellzugang.
+2. Erzeuge bei Bedarf einen Read-Token in den Hugging-Face-Einstellungen.
+3. Starte im geklonten Repository den Wizard:
 
 ```bash
-pip install --upgrade transformers>=5.0.0 huggingface-hub
+python3 scripts/setup_wizard.py --model gemma
 ```
 
-HuggingFace-Lizenz akzeptieren:
+Der Wizard erstellt `venv`, installiert `requirements.txt`, baut das Frontend, lädt das Modell und schreibt eine private `CHAPPIE_CONFIG.json`. Für die breitere Hardwareunterstützung verwendet dieses Profil NF4 mit 4096 Tokens Kontext. Der Hugging-Face-Token wird verdeckt abgefragt und nicht in der CHAPPiE-Konfiguration gespeichert.
 
-1. https://huggingface.co/google/gemma-4-E4B-it besuchen
-2. "Agree and access repository" klicken (einmalig pro Account)
-3. Bei 26B: https://huggingface.co/google/gemma-4-26B-A4B-it
-
-Dann lokal einloggen:
+Der zweite unterstützte Installationsweg ist der [vollständige Auftrag für einen Coding-Agenten](../AGENT_SETUP_PROMPT.md). Dabei kann der Token über die Umgebung bereitgestellt werden:
 
 ```bash
-huggingface-cli login
-# Token eingeben (Settings → Access Tokens)
+export HF_TOKEN="<read-token>"
+python3 scripts/setup_wizard.py --non-interactive --model gemma
 ```
 
----
-
-## 2. Modell herunterladen (einmalig)
-
-```bash
-# Gemma 4 E4B (4B, FP16, ~9 GB)
-huggingface-cli download google/gemma-4-E4B-it
-
-# Gemma 4 26B-A4B (MoE, NF4-faehig, ~13 GB)
-huggingface-cli download google/gemma-4-26B-A4B-it
-```
-
-Die Modelle landen im HF-Cache (`~/.cache/huggingface/hub/`).
-
----
-
-## 3. Steering-Server starten
-
-### 3a. Gemma 4 E4B (4B dense, FP16, T4-tauglich)
-
-```bash
-python -m brain.steering_api_server \
-  --model google/gemma-4-E4B-it \
-  --context-length 8192
-```
-
-### 3b. Gemma 4 26B-A4B (MoE, NF4, 16 GB VRAM)
-
-```bash
-python -m brain.steering_api_server \
-  --model google/gemma-4-26B-A4B-it \
-  --context-length 4096 \
-  --quantize
-```
-
-- `--quantize` aktiviert NF4 (4-Bit). Automatisch erzwungen bei 26B auf GPUs unter 48 GB.
-- `--context-length 4096` schuetzt vor OOM auf T4 (16 GB). Auf GPUs mit mehr VRAM kann `8192` oder hoeher gesetzt werden.
-
-### 3c. Server-Status pruefen
-
-```bash
-curl http://127.0.0.1:8000/health
-# {"status":"ok","model":"google/gemma-4-26B-A4B-it","restart_status":"ready"}
-```
-
----
-
-## 4. CHAPPiE konfigurieren
-
-In `CHAPPIE_CONFIG.json`:
-
-### Gemma 4 E4B (empfohlen fuer T4)
+Die vom Wizard erzeugten Gemma-Werte liegen wie alle Steering-Einstellungen im Abschnitt `local_models`:
 
 ```json
 {
   "local_models": {
     "llm_provider": "vllm",
-    "vllm_model": "google/gemma-4-E4B-it",
     "vllm_url": "http://127.0.0.1:8000/v1",
-    "vllm_force_single_model": true
-  },
-  "steering": {
+    "vllm_model": "google/gemma-4-E4B-it",
+    "gemma4_model": "google/gemma-4-E4B-it",
+    "gemma4_steering_model": "google/gemma-4-E4B-it",
+    "vllm_force_single_model": true,
     "enable_steering": true,
     "steering_provider": "vllm",
     "steering_model": "google/gemma-4-E4B-it",
-    "steering_quantize": false,
-    "steering_context_length": 8192
-  },
-  "generation": {
-    "temperature": 1.0,
-    "top_p": 0.95,
-    "top_k": 64,
-    "use_model_defaults": true
-  }
-}
-```
-
-### Gemma 4 26B-A4B (NF4, nur mit Quantisierung)
-
-```json
-{
-  "local_models": {
-    "llm_provider": "vllm",
-    "vllm_model": "google/gemma-4-26B-A4B-it",
-    "vllm_url": "http://127.0.0.1:8000/v1",
-    "vllm_force_single_model": true
-  },
-  "steering": {
-    "enable_steering": true,
-    "steering_provider": "vllm",
-    "steering_model": "google/gemma-4-26B-A4B-it",
     "steering_quantize": true,
     "steering_context_length": 4096
   },
+  "small_tasks": {
+    "intent_provider": "vllm",
+    "intent_processor_model_vllm": "google/gemma-4-E4B-it",
+    "query_extraction_provider": "vllm",
+    "query_extraction_vllm_model": "google/gemma-4-E4B-it"
+  },
   "generation": {
     "temperature": 1.0,
     "top_p": 0.95,
@@ -133,81 +53,37 @@ In `CHAPPIE_CONFIG.json`:
 }
 ```
 
-**Wichtig:** `steering_quantize: true` bei 26B-A4B, sonst OOM.
+Eine ältere Anleitung verwendete fälschlich einen separaten Abschnitt `steering`. Dieser Abschnitt wird von der aktiven Config nicht gelesen.
 
----
+## Start und Prüfung
 
-## 5. Alternative: Modellwechsel ueber CLI
-
-Ohne Config-Edit, nur lokaler Modus:
+Starte die Prozesse aus dem aktivierten `venv` in getrennten Terminals:
 
 ```bash
-python chappie_brain_cli.py --model gemma4-e4b
-
-# Oder waehrend der Session:
-# /model gemma4-e4b
-# /model gemma4-26b
-# /model qwen
+python3 -m brain.steering_api_server
+python3 app.py
+cd frontend && npm run dev
 ```
 
----
-
-## 6. Schnelltest
+Prüfe danach beide Health-Endpunkte:
 
 ```bash
-# Steering-Server antwortet?
-curl http://127.0.0.1:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "google/gemma-4-E4B-it",
-    "messages": [{"role":"user","content":"Hallo"}],
-    "max_tokens": 50
-  }'
-
-# CHAPPiE-eigener Gemma-Test (kein Modell noetig)
-python tests/test_gemma4_integration.py
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8010/health
 ```
 
----
+Der Steering-Endpunkt muss `google/gemma-4-E4B-it` und `restart_status: ready` melden. Ein echter Chatlauf gilt erst als gesteuert, wenn der Debug-Bericht ausgeführte Hooks und `verified_active=true` meldet.
 
-## 7. Systemd-Service (Produktiv)
-
-`/etc/systemd/system/chappie-vllm.service` anpassen:
-
-### Gemma 4 E4B
-
-```ini
-Environment="CHAPPIE_STEERING_MODEL=google/gemma-4-E4B-it"
-ExecStart=/usr/bin/python3 -m brain.steering_api_server \
-  --model google/gemma-4-E4B-it \
-  --context-length 8192
-```
-
-### Gemma 4 26B-A4B
-
-```ini
-Environment="CHAPPIE_STEERING_MODEL=google/gemma-4-26B-A4B-it"
-ExecStart=/usr/bin/python3 -m brain.steering_api_server \
-  --model google/gemma-4-26B-A4B-it \
-  --context-length 4096 \
-  --quantize
-```
-
-Danach:
+Die modellfreien Regressionstests laufen ohne Gewichte:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl restart chappie-vllm.service
+python3 tests/test_gemma4_integration.py
+python3 tests/test_steering_backend.py
+python3 tests/test_vector_only_emotion_path.py
 ```
 
----
+## Grenzen
 
-## 8. Zurueck zu Qwen
+Gemma 4 E4B wurde im Forschungs-Harness geprüft, Qwen 3.5 4B wurde im laufenden CHAPPiE-System häufiger verwendet. Geschwindigkeit und Speicherbedarf hängen von GPU, Torch-Version, Quantisierung und Kontextlänge ab. Bei Speicherfehlern zuerst die `steering_context_length` senken.
 
-```bash
-# Steering-Server
-python -m brain.steering_api_server --model Qwen/Qwen3.5-4B
-
-# Config: vllm_model zurueck auf "Qwen/Qwen3.5-4B" setzen
-# Oder CLI: /model qwen
-```
+Der größere Checkpoint `google/gemma-4-26B-A4B-it` bleibt im Code als experimentelles Profil erhalten. Der Setup-Wizard installiert bewusst E4B, weil dieser Checkpoint für mehr Rechner geeignet ist.

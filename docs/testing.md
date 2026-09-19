@@ -21,6 +21,8 @@ python3 tests/test_local_first_runtime.py
 python3 tests/test_web_ui_consistency.py
 python3 tests/test_settings_integrity.py
 python3 tests/test_root_config.py
+python3 tests/test_setup_wizard.py
+python3 tests/test_gemma4_integration.py
 python3 tests/test_chat_ui_formatting.py
 python3 tests/test_reasoning_layering.py
 python3 tests/test_api_contract.py
@@ -55,7 +57,7 @@ Diese Tests sollen in CI fehlschlagen dürfen, wenn eine Regression vorliegt. `c
 
 ## Live-Tests
 
-`tests/test_brain_agents.py`, `tests/test_integration.py`, `tests/test_query_extraction.py` und Dateien unter `tests/manual/` können lokale Modelle, Chroma-Daten oder externe Dienste benötigen. Sie laufen nur bewusst in einer geeigneten Umgebung.
+`tests/test_brain_agents.py`, `tests/test_integration.py`, `tests/test_query_extraction.py`, `tests/test_chappie_end_to_end.py`, `tests/test_token_budget.py` und Dateien unter `tests/manual/` benötigen je nach Test lokale Tokenizer, Chroma-Laufzeitdaten, Modellgewichte oder externe Dienste. Sie laufen nur bewusst in einer geeigneten Umgebung.
 
 ## Ruff und Mypy
 

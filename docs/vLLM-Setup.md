@@ -2,7 +2,7 @@
 
 ## Architektur
 
-Der Prozess `python3 -m brain.steering_api_server` stellt auf Port 8000 eine OpenAI-kompatible API bereit. `brain/vllm_brain.py` verbindet sich mit diesem Endpoint und übergibt Generationseinstellungen sowie Steering-Metadaten. Der Web-Chat selbst läuft über die App-API auf Port 8010.
+Der Prozess `python3 -m brain.steering_api_server` stellt auf Port 8000 eine OpenAI-kompatible API bereit. Der Providername `vllm` bleibt aus Kompatibilitätsgründen bestehen; der aktive Steering-Service lädt das Modell mit Transformers, damit Forward-Hooks die Hidden States verändern können. `brain/vllm_brain.py` verbindet sich mit diesem Endpoint und übergibt Generationseinstellungen sowie Steering-Metadaten. Der Web-Chat selbst läuft über die App-API auf Port 8010.
 
 ```text
 CHAPPiERuntime -> VLLMBrain -> :8000/v1 -> SteeringBackend -> Modell
@@ -10,14 +10,15 @@ CHAPPiERuntime -> VLLMBrain -> :8000/v1 -> SteeringBackend -> Modell
 
 ## Installation
 
+CHAPPiE bietet zwei Installationswege. Der geführte Wizard ist der direkte Weg:
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements/runtime.txt
-pip install -r requirements/providers-local.txt
+python3 scripts/setup_wizard.py
 ```
 
-Die konkrete Torch-, CUDA-, Transformers- und vLLM-Kombination muss zur Ziel-GPU passen. Die CI installiert diesen GPU-Stack nicht.
+Er installiert die vollständige `requirements.txt`, baut das Frontend, lädt Qwen 3.5 4B oder Gemma 4 E4B und erzeugt die lokale Config. Der zweite Weg ist der vollständige [Installationsauftrag für einen Coding-Agenten](../AGENT_SETUP_PROMPT.md). Beide Wege verwenden denselben Wizard und dieselben Prüfungen.
+
+Die konkrete Torch-, CUDA-, Transformers- und BitsAndBytes-Kombination muss zur Ziel-GPU passen. Die CI installiert diesen GPU-Stack nicht.
 
 ## Konfiguration
 
@@ -55,7 +56,7 @@ curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8010/health
 ```
 
-Die genaue Health-Route des Steering-Service wird zusätzlich durch dessen API-Tests abgesichert. Für reine Logiktests sind keine laufenden Dienste erforderlich.
+Während Modellstart oder Neustart antwortet der Steering-Service mit HTTP 503. Erst `restart_status: ready` und HTTP 200 bedeuten, dass Anfragen angenommen werden. Die Route wird zusätzlich durch API-Tests abgesichert. Für reine Logiktests sind keine laufenden Dienste erforderlich.
 
 ## Modelle und Steering
 

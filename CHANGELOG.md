@@ -97,6 +97,30 @@ Entwicklungsstand des v17-Umbaus. Die technische Umsetzung ist testbar; die voll
 - Wiederholungsversuche allein wegen fehlender erwarteter Emotionswörter entfernt
 - Automatische Nutzung ungeprüfter Assistant-Behauptungen als verlässliche Erinnerung entfernt
 - Blockierende Memory-Migration aus dem interaktiven Turn entfernt
+
+## [16.9.0] - 2026-09-19
+
+### Erstellt
+- Geführten Linux-Setup-Wizard für Qwen 3.5 4B und Gemma 4 E4B ergänzt
+- Vollständigen Installationsprompt für frei wählbare Coding-Agenten ergänzt
+- Sieben README-Abbildungen für CLI, Emotionen und Forschungsergebnisse ergänzt
+- Bereitschafts- und Cache-Regressionstests für lokale Provider ergänzt
+- Leichtgewichtigen API-Importcheck und Systemvalidierungstest in CI ergänzt
+
+### Verändert
+- README auf lokale Antwortgenerierung, Hidden-State-Steering und Forschungsgrenzen ausgerichtet
+- Qwen als Standard und Gemma E4B mit NF4 und 4096 Tokens als Alternative vereinheitlicht
+- Provider-Cache berücksichtigt Modell, Endpoint, Host und Groq-Zugangsdaten
+- Health-Endpunkte melden erst nach vollständig geladenem Steering-Modell Bereitschaft
+- Terminal, API und Frontend verwenden synchron Version 16.9.0
+
+### Gelöscht
+- Veralteten Ollama- und Qwen-2.5-Ablauf aus dem Setup-Skript entfernt
+- Feste externe IP als Frontend-Standard entfernt
+- Groq-Platzhalter als wirksamen Standardzugang entfernt
+- Falsche Bereitschaftsmeldungen während Modellstart und Neustart entfernt
+- Verwaiste Pending-Nachrichten nach neuen oder geleerten Sitzungen entfernt
+
 ## [16.8.7] - 2026-09-16
 
 ### Verändert

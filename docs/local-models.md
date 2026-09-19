@@ -2,9 +2,9 @@
 
 ## Produktiver Standard
 
-Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. `vllm_force_single_model=true` hält Antwort, Intent, Query-Extraktion und optionale Format-/Konsolidierungshilfen auf dem lokalen Ein-Modell-Pfad. Groq-Hilfsaufrufe werden erst verwendet, wenn dieser Schutz ausdrücklich deaktiviert und `groq_auxiliary_enabled=true` gesetzt ist.
+Der Web-Chat verwendet lokal `Qwen/Qwen3.5-4B` über den OpenAI-kompatiblen Steering-Service auf `http://127.0.0.1:8000/v1`. Der kompatible Providername ist `vllm`, während `brain/steering_backend.py` das Modell für die Hidden-State-Hooks direkt mit Transformers lädt. `vllm_force_single_model=true` hält Antwort, Intent, Query-Extraktion und optionale Format-/Konsolidierungshilfen auf dem lokalen Ein-Modell-Pfad. Groq-Hilfsaufrufe werden erst verwendet, wenn dieser Schutz ausdrücklich deaktiviert und `groq_auxiliary_enabled=true` gesetzt ist.
 
-Alternative lokale Modelle benötigen eine eigene Prüfung von VRAM, Quantisierung und Vektorwirkung. Der kompatible Ankerpfad kann relative Layerfenster anpassen; gemessene v17-Packs verlangen hingegen eine exakt passende Modellrevision und Architektur. Gemma bekommt nach erfolgreicher Qwen-Abnahme eigene Captures und eigene Profile.
+`google/gemma-4-E4B-it` ist als Alternative eingebaut. Der Steering-Service liest Hidden-Größe und Layerzahl aus dem geladenen Modell und skaliert das konfigurierte relative Layerfenster auf die tatsächliche Architektur. VRAM, Quantisierung und die sichtbare Vektorwirkung müssen auf dem Modellserver separat geprüft werden. Gemessene v17-Packs verlangen eine exakt passende Modellrevision und Architektur; Gemma bekommt nach erfolgreicher Qwen-Abnahme eigene Captures und eigene Profile.
 
 Interaktive Chat-Anfragen haben am Steering-Service Vorrang vor autonomen Trainingsläufen. Hintergrundläufe werden bei einem wartenden Chat nach dem nächsten erzeugten Token beendet. Zusätzlich begrenzt `background_input_token_limit` den Trainings-Prefill standardmäßig auf die jüngsten 256 Tokens; der normale Chat behält das volle konfigurierte Kontextfenster.
 
@@ -64,12 +64,13 @@ Wichtige Werte:
 
 ## Installation
 
+Direkt mit Modell-Download und Config:
+
 ```bash
-pip install -r requirements/runtime.txt
-pip install -r requirements/providers-local.txt
+python3 scripts/setup_wizard.py
 ```
 
-GPU- und Modellgewichte sind bewusst nicht Teil der minimalen CI-Installation. Die vollständige lokale Installation bleibt `pip install -r requirements.txt`.
+Alternativ übernimmt ein Coding-Agent den gleichen Ablauf mit dem [Agent-Installationsprompt](../AGENT_SETUP_PROMPT.md). GPU- und Modellgewichte sind bewusst nicht Teil der minimalen CI-Installation; der Wizard installiert für die lokale Nutzung die vollständige `requirements.txt`.
 
 ## Prüfung
 

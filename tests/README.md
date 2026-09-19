@@ -15,6 +15,8 @@ python3 tests/test_runtime_architecture.py
 - `test_web_ui_consistency.py`
 - `test_settings_integrity.py`
 - `test_root_config.py`
+- `test_setup_wizard.py`
+- `test_gemma4_integration.py`
 - `test_chat_ui_formatting.py`
 - `test_reasoning_layering.py`
 - `test_vector_only_emotion_path.py`
@@ -51,7 +53,7 @@ python3 tests/test_runtime_architecture.py
 
 ## Live und manuell
 
-Integrationsnahe Tests und `tests/manual/` können einen laufenden vLLM-/Ollama-Service, lokale Modellgewichte oder echte Daten benötigen. Sie sind nicht Teil der Offline-Pflichtgruppe.
+Integrationsnahe Tests wie `test_chappie_end_to_end.py` und `test_token_budget.py` sowie `tests/manual/` können ChromaDB, lokale Tokenizer, einen laufenden Modellservice, Modellgewichte oder echte Daten benötigen. Sie sind nicht Teil der Offline-Pflichtgruppe.
 
 ## Umgebung
 
