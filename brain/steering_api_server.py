@@ -139,23 +139,29 @@ def create_app(model_name: str, context_length: int = 8192, quantize: Optional[b
     app.state.restart_estimated_remaining = 90
     app.state.restart_error = ""
 
+    def _is_ready() -> bool:
+        return app.state.engine is not None and app.state.restart_status == "ready"
+
+    def _readiness_response(payload: Dict[str, Any]) -> JSONResponse:
+        return JSONResponse(status_code=200 if _is_ready() else 503, content=payload)
+
     @app.get("/health")
-    def health() -> Dict[str, Any]:
+    def health() -> JSONResponse:
         engine = app.state.engine
         report = getattr(engine, "last_steering_report", {}) if engine is not None else {}
-        return {
-            "status": "ok",
+        return _readiness_response({
+            "status": "ok" if _is_ready() else "unavailable",
             "model": app.state.model_name,
             "restart_status": app.state.restart_status,
             "device": str(getattr(engine, "device", "unknown")) if engine is not None else "unknown",
             "steering": report,
             "runtime_provenance": getattr(engine, "runtime_provenance", {}),
-        }
+        })
 
     @app.get("/v1/models")
-    def models() -> Dict[str, Any]:
+    def models() -> JSONResponse:
         now = int(time.time())
-        return {"object": "list", "data": [{"id": app.state.model_name, "object": "model", "created": now, "owned_by": "chappie-local"}]}
+        return _readiness_response({"object": "list", "data": [{"id": app.state.model_name, "object": "model", "created": now, "owned_by": "chappie-local"}]})
 
     @app.post("/v1/chat/completions")
     async def chat_completions(request: Request) -> Any:

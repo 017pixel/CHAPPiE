@@ -85,14 +85,14 @@ DEFAULT_CONFIG: Dict[str, Dict[str, Any]] = {
         "live_enabled": True,
     },
     "api": {
-        "groq_api_key": "DEIN_GROQ_API_KEY_HIER",
+        "groq_api_key": "",
     },
     "local_models": {
         "llm_provider": "vllm",
         "vllm_url": "http://127.0.0.1:8000/v1",
         "vllm_model": "Qwen/Qwen3.5-4B",
-        "gemma4_model": "google/gemma-4-26B-A4B-it",
-        "gemma4_steering_model": "google/gemma-4-26B-A4B-it",
+        "gemma4_model": "google/gemma-4-E4B-it",
+        "gemma4_steering_model": "google/gemma-4-E4B-it",
         "vllm_force_single_model": True,
         "ollama_host": "http://localhost:11434",
         "ollama_model": "qwen3.5:9b",
@@ -447,8 +447,8 @@ class Settings:
         self.ollama_model = self._get_val("OLLAMA_MODEL", "qwen3.5:9b")
         self.vllm_url = self._get_val("VLLM_URL", "http://127.0.0.1:8000/v1")
         self.vllm_model = self._get_val("VLLM_MODEL", "Qwen/Qwen3.5-4B")
-        self.gemma4_model = self._get_val("GEMMA4_MODEL", "google/gemma-4-26B-A4B-it")
-        self.gemma4_steering_model = self._get_val("GEMMA4_STEERING_MODEL", "google/gemma-4-26B-A4B-it")
+        self.gemma4_model = self._get_val("GEMMA4_MODEL", "google/gemma-4-E4B-it")
+        self.gemma4_steering_model = self._get_val("GEMMA4_STEERING_MODEL", "google/gemma-4-E4B-it")
         self.vllm_force_single_model = bool(self._get_val("VLLM_FORCE_SINGLE_MODEL", True))
 
         self.groq_api_key = self._get_val("GROQ_API_KEY", "")

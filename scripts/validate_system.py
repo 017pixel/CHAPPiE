@@ -2,13 +2,10 @@
 """Validiert Konfiguration, Brain-, Memory- und Training-Kompatibilität."""
 
 import inspect
-import sys
 from pathlib import Path
 
 from config.config import settings, LLMProvider
-from brain import get_brain
-from brain.steering_manager import get_steering_manager
-from memory.memory_engine import MemoryEngine
+from config.emotions import EMOTION_ORDER
 
 
 def _provider_summary() -> list[str]:
@@ -40,7 +37,7 @@ def _active_provider_has_credentials() -> bool:
 
 
 def _training_service_is_valid() -> tuple[bool, str]:
-    service_file = Path(__file__).parent / "chappie-training.service"
+    service_file = Path(__file__).resolve().parent.parent / "deploy" / "chappie-training.service"
     if not service_file.exists():
         return False, "Service-Datei fehlt"
     content = service_file.read_text(encoding="utf-8")
@@ -48,6 +45,10 @@ def _training_service_is_valid() -> tuple[bool, str]:
     return valid_target, "ExecStart zeigt auf training_daemon" if valid_target else "ExecStart zeigt nicht auf training_daemon"
 
 def main():
+    from brain import get_brain
+    from brain.steering_manager import get_steering_manager
+    from memory.memory_engine import MemoryEngine
+
     print("CHAPiE SYSTEM VALIDIERUNG")
     print("=" * 50)
 
@@ -114,7 +115,7 @@ def main():
     print("\nTRAINING vs WEB UI KOMPATIBILITAET:")
 
     training_brain = get_brain()
-    web_ui_memory = MemoryEngine()
+    MemoryEngine()
 
     print("  Beide verwenden gleiche Brain-Type:", type(training_brain).__name__)
     print("  Beide verwenden gleiche ChromaDB: JA (selbe Collection)")
@@ -131,19 +132,22 @@ def main():
         steering = get_steering_manager()
         sample_emotions = {
             "happiness": 76,
-            "sadness": 28,
-            "frustration": 22,
             "trust": 74,
+            "energy": 72,
             "curiosity": 67,
             "motivation": 69,
-            "energy": 72,
+            "frustration": 22,
+            "sadness": 28,
+            "affection": 64,
+            "anxiety": 18,
+            "calm": 71,
         }
         payload = steering.get_steering_payload(sample_emotions, force=(settings.llm_provider == LLMProvider.VLLM))
         steering_meta = payload.get("steering", {}) if isinstance(payload, dict) else {}
         emotion_state = steering_meta.get("emotion_state", {}) if isinstance(steering_meta.get("emotion_state", {}), dict) else {}
         base_vectors = steering_meta.get("base_vectors", []) if isinstance(steering_meta.get("base_vectors", []), list) else []
         print("  Steering aktiv:", bool(steering_meta.get("enabled")))
-        print("  Vitalzeichen im Payload:", len(emotion_state), "/ 7")
+        print("  Emotionsdimensionen im Payload:", len(emotion_state), "/", len(EMOTION_ORDER))
         print("  Basisvektoren aktiv:", len(base_vectors))
         print("  Dominante Emotion:", steering_meta.get("dominant_emotion", "neutral"))
         print("  Aktivierungs-Steering unterstuetzt:", steering.supports_activation_steering())
@@ -162,7 +166,7 @@ def main():
         brain = get_brain()
         if not brain.is_available():
             issues.append("Brain nicht verfuegbar")
-    except:
+    except Exception:
         issues.append("Brain Initialisierung fehlerhaft")
 
     try:
@@ -172,7 +176,7 @@ def main():
             issues.append("Embedding Model nicht geladen")
         if not health['chromadb_connected']:
             issues.append("ChromaDB nicht verbunden")
-    except:
+    except Exception:
         issues.append("Memory System fehlerhaft")
 
     if not service_ok:
@@ -183,18 +187,23 @@ def main():
         payload = steering.get_steering_payload(
             {
                 "happiness": 76,
-                "sadness": 28,
-                "frustration": 22,
                 "trust": 74,
+                "energy": 72,
                 "curiosity": 67,
                 "motivation": 69,
-                "energy": 72,
+                "frustration": 22,
+                "sadness": 28,
+                "affection": 64,
+                "anxiety": 18,
+                "calm": 71,
             },
             force=(settings.llm_provider == LLMProvider.VLLM),
         )
         emotion_state = payload.get("steering", {}).get("emotion_state", {}) if isinstance(payload, dict) else {}
-        if settings.llm_provider == LLMProvider.VLLM and len(emotion_state) != 7:
-            issues.append("Steering-Payload enthaelt nicht alle 7 Vitalzeichen")
+        if settings.llm_provider == LLMProvider.VLLM and len(emotion_state) != len(EMOTION_ORDER):
+            issues.append(
+                f"Steering-Payload enthaelt nicht alle {len(EMOTION_ORDER)} Emotionsdimensionen"
+            )
     except Exception:
         issues.append("Steering-Validierung fehlgeschlagen")
 

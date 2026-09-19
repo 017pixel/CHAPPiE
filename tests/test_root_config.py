@@ -37,6 +37,9 @@ def test_build_root_config_contains_generation_budgets():
     assert config["generation"]["chappie_answer_token_limit"] == 1200
     assert config["small_tasks"]["intent_processor_model_groq"] == "openai/gpt-oss-20b"
     assert config["local_models"]["background_input_token_limit"] == 256
+    assert config["api"]["groq_api_key"] == ""
+    assert config["local_models"]["gemma4_model"] == "google/gemma-4-E4B-it"
+    assert config["local_models"]["gemma4_steering_model"] == "google/gemma-4-E4B-it"
 
 
 if __name__ == "__main__":
