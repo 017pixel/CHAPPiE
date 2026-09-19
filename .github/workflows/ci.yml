@@ -14,7 +14,7 @@ jobs:
   python-tests:
     name: Python Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -31,6 +31,23 @@ jobs:
           set -euo pipefail
           python -m pip install --no-cache-dir --upgrade pip
           python -m pip install --no-cache-dir -r requirements/ci.txt
+
+      - name: Import active API (no model weights)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+
+          from api.main import app
+
+          paths = set(app.openapi()["paths"])
+          assert "/health" in paths
+          assert "/chat" in paths
+          assert "memory.memory_engine" not in sys.modules
+          assert "web_infrastructure.chappie_runtime" not in sys.modules
+          print("Active API import and OpenAPI startup smoke passed")
+          PY
 
       - name: Syntax check core modules
         shell: bash
@@ -57,6 +74,7 @@ jobs:
             brain/agents/steering_manager.py \
             config/config.py \
             config/prompts.py \
+            Chappies_Trainingspartner/training_history.py \
             forschung/report/build_report.py \
             memory/chat_manager.py \
             memory/emotions_engine.py \
@@ -93,8 +111,10 @@ jobs:
           python tests/test_config_package_import.py
           python tests/test_chat_ui_formatting.py
           python tests/test_reasoning_layering.py
+          python tests/test_response_policy.py
           python tests/test_web_ui_consistency.py
           python tests/test_root_config.py
+          python tests/test_validate_system.py
           python tests/test_settings_integrity.py
           python tests/test_cli_import.py
           python tests/test_cli_display.py
@@ -115,10 +135,15 @@ jobs:
           set -euo pipefail
           python tests/test_vllm_response_handling.py
           python tests/test_ollama_response_handling.py
+          python tests/test_provider_factory.py
+          python tests/test_steering_api_server.py
+          python tests/test_setup_wizard.py
+          python tests/test_gemma4_integration.py
           python tests/test_chat_manager_persistence.py
           python tests/test_short_term_memory.py
           python tests/test_training_config_ui.py
           python tests/test_training_daemon_lifecycle.py
+          python tests/test_training_prompt_history.py
           python tests/test_api_contract.py
           python tests/test_forschung_report.py
           python tests/test_report_v6.py
