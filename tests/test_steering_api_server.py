@@ -3,6 +3,26 @@
 import os
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
+
+# The steering server imports the GPU stack (torch, transformers) via
+# brain.steering_backend. CI installs neither, so stub them like the other
+# offline tests do. create_app never instantiates the engine here.
+if "torch" not in sys.modules:
+    try:
+        __import__("torch")
+    except ImportError:
+        sys.modules["torch"] = MagicMock()
+
+if "transformers" not in sys.modules:
+    try:
+        __import__("transformers")
+    except ImportError:
+        fake_transformers = MagicMock()
+        fake_transformers.LogitsProcessor = object
+        fake_transformers.StoppingCriteria = object
+        fake_transformers.StoppingCriteriaList = list
+        sys.modules["transformers"] = fake_transformers
 
 from fastapi.testclient import TestClient
 
