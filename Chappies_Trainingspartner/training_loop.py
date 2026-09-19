@@ -40,6 +40,7 @@ from memory.sleep_phase import SleepPhaseHandler
 
 from .trainer_agent import TrainerAgent
 from .repetition_tracker import RepetitionTracker
+from .training_history import normalize_training_prompt_history
 
 console = Console()
 
@@ -884,36 +885,6 @@ class TrainingLoop:
         
         log.info("Conversation Reset abgeschlossen - starte frisch")
         console.print("[green]✅ Reset abgeschlossen. Starte mit frischer Konversation.[/green]")
-def normalize_training_prompt_history(
-    history: list[dict],
-    current_input: str,
-    max_history: int,
-) -> tuple[str, list[dict]]:
-    """Return one summary context plus valid user/assistant chat history.
-
-    Qwen and Gemma require system context at the start of the chat template.
-    Persisted dream summaries therefore belong in the leading system prompt,
-    never as interleaved history messages.
-    """
-    system_summaries = [
-        str(item.get("content", "")).strip()
-        for item in history
-        if item.get("role") == "system" and str(item.get("content", "")).strip()
-    ]
-    dialogue = [
-        {"role": item.get("role"), "content": str(item.get("content", ""))}
-        for item in history
-        if item.get("role") in {"user", "assistant"} and str(item.get("content", "")).strip()
-    ]
-    if dialogue and dialogue[-1]["role"] == "user" and dialogue[-1]["content"] == str(current_input):
-        dialogue.pop()
-    history_limit = max(0, int(max_history))
-    if history_limit:
-        dialogue = dialogue[-history_limit:]
-    latest_summary = system_summaries[-1] if system_summaries else ""
-    return latest_summary, dialogue
-
-
 def sanitize_training_response(response: Any, role: str = "assistant") -> str:
     """Remove leaked prompts/transcripts before training state or memory writes."""
     visible, reasons = sanitize_visible_response(str(response or ""))

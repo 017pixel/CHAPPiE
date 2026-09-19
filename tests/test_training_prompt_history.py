@@ -6,7 +6,7 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from Chappies_Trainingspartner.training_loop import normalize_training_prompt_history
+from Chappies_Trainingspartner.training_history import normalize_training_prompt_history  # noqa: E402
 
 
 def test_system_summaries_are_folded_into_one_leading_context():
