@@ -60,6 +60,7 @@ class _DummyLife:
 
 class _DummyChatManager:
     def __init__(self):
+        self._message_counter = 0
         self.sessions = {
             "session-1": {
                 "id": "session-1",
@@ -69,9 +70,9 @@ class _DummyChatManager:
             }
         }
 
-    @staticmethod
-    def create_message_id():
-        return "message-1"
+    def create_message_id(self):
+        self._message_counter += 1
+        return f"message-{self._message_counter}"
 
     def ensure_session_id(self, session_id):
         return session_id or "session-1"
@@ -326,6 +327,50 @@ def test_chat_route_returns_serialized_turn_payload():
     app.dependency_overrides.clear()
 
 
+def test_chat_reset_commands_persist_only_in_replacement_session():
+    for command in ("/new", "/clear"):
+        backend = _DummyBackend()
+        app.dependency_overrides[get_backend] = lambda: backend
+        client = TestClient(app)
+
+        response = client.post(
+            "/chat",
+            json={"session_id": "session-1", "message": command, "command_mode": True},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["session_id"] == "new-session"
+        assert backend.chat_manager.sessions["session-1"]["messages"] == []
+        replacement_messages = backend.chat_manager.sessions["new-session"]["messages"]
+        assert [message["role"] for message in replacement_messages] == ["user", "assistant"]
+        assert replacement_messages[0]["content"] == command
+        assert replacement_messages[1]["metadata"]["pending"] is False
+
+    app.dependency_overrides.clear()
+
+
+def test_stream_reset_commands_persist_only_in_replacement_session():
+    for command in ("/new", "/clear"):
+        backend = _DummyBackend()
+        app.dependency_overrides[get_backend] = lambda: backend
+        client = TestClient(app)
+
+        response = client.post(
+            "/chat/stream",
+            json={"session_id": "session-1", "message": command, "command_mode": True},
+        )
+
+        assert response.status_code == 200
+        assert '"session_id": "new-session"' in response.text
+        assert backend.chat_manager.sessions["session-1"]["messages"] == []
+        replacement_messages = backend.chat_manager.sessions["new-session"]["messages"]
+        assert [message["role"] for message in replacement_messages] == ["user", "assistant"]
+        assert replacement_messages[0]["content"] == command
+        assert replacement_messages[1]["metadata"]["pending"] is False
+
+    app.dependency_overrides.clear()
+
+
 def test_chat_stream_route_emits_final_turn_event():
     app.dependency_overrides[get_backend] = lambda: _DummyBackend()
     client = TestClient(app)
@@ -416,6 +461,8 @@ def test_memory_context_and_runtime_routes_return_expected_shapes():
 if __name__ == "__main__":
     test_health_and_status_routes()
     test_chat_route_returns_serialized_turn_payload()
+    test_chat_reset_commands_persist_only_in_replacement_session()
+    test_stream_reset_commands_persist_only_in_replacement_session()
     test_chat_stream_route_emits_final_turn_event()
     test_command_route_persists_execution_trace()
     test_memory_context_and_runtime_routes_return_expected_shapes()

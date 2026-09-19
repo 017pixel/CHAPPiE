@@ -61,6 +61,10 @@ def _persist_pending_turn(backend, session_id: str, user_message: Dict[str, Any]
     backend.chat_manager.append_messages(session_id, [user_message, assistant_message])
 
 
+def _is_session_reset_command(message: str) -> bool:
+    return message.strip().lower() in {"/clear", "/new"}
+
+
 def _build_sync_chat_response(backend, session_id: str, user_message: Dict[str, Any], message_id: str, result: Dict[str, Any]) -> ChatResponse:
     session_id = result.get("replacement_session_id", session_id)
     assistant_message = backend.build_assistant_message(user_message["content"], result, message_id=message_id)
@@ -96,18 +100,18 @@ def post_chat(request: ChatRequest, backend=Depends(get_backend)):
     history = list(session.get("messages", []))
 
     user_message = _build_user_message(backend, request.message)
-    message_id = backend.chat_manager.create_message_id()
-    pending_message = backend.build_pending_message(message_id)
-    _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     if request.command_mode or request.message.strip().startswith("/"):
         result = execute_slash_command(request.message.strip(), backend, session_id=session_id)
-        if result.get("replacement_session_id"):
-            session_id = result["replacement_session_id"]
-            message_id = backend.chat_manager.create_message_id()
-            pending_message = backend.build_pending_message(message_id)
-            _persist_pending_turn(backend, session_id, user_message, pending_message)
+        session_id = result.get("replacement_session_id", session_id)
+        message_id = backend.chat_manager.create_message_id()
+        pending_message = backend.build_pending_message(message_id)
+        _persist_pending_turn(backend, session_id, user_message, pending_message)
         return _build_sync_chat_response(backend, session_id, user_message, message_id, result)
+
+    message_id = backend.chat_manager.create_message_id()
+    pending_message = backend.build_pending_message(message_id)
+    _persist_pending_turn(backend, session_id, user_message, pending_message)
 
     result = backend.process(
         request.message,
@@ -126,6 +130,16 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
     history = list(session.get("messages", []))
 
     user_message = _build_user_message(backend, request.message)
+    is_command = request.command_mode or request.message.strip().startswith("/")
+    reset_command_result = None
+    reset_command_error = None
+    if is_command and _is_session_reset_command(request.message):
+        try:
+            reset_command_result = execute_slash_command(request.message.strip(), backend, session_id=session_id)
+            session_id = reset_command_result.get("replacement_session_id", session_id)
+        except Exception as exc:
+            reset_command_error = exc
+
     message_id = backend.chat_manager.create_message_id()
     pending_message = backend.build_pending_message(message_id)
     _persist_pending_turn(backend, session_id, user_message, pending_message)
@@ -135,14 +149,18 @@ def post_chat_stream(request: ChatRequest, backend=Depends(get_backend)):
         yield _format_sse("turn_started", {"session_id": session_id, "message_id": message_id})
 
         # Slash commands are fast and don't need streaming
-        if request.command_mode or request.message.strip().startswith("/"):
+        if is_command:
             try:
-                result = execute_slash_command(request.message.strip(), backend, session_id=session_id)
+                if reset_command_error is not None:
+                    raise reset_command_error
+                result = reset_command_result or execute_slash_command(request.message.strip(), backend, session_id=session_id)
                 if result.get("replacement_session_id"):
-                    session_id = result["replacement_session_id"]
-                    message_id = backend.chat_manager.create_message_id()
-                    pending_message = backend.build_pending_message(message_id)
-                    _persist_pending_turn(backend, session_id, user_message, pending_message)
+                    replacement_session_id = result["replacement_session_id"]
+                    if replacement_session_id != session_id:
+                        session_id = replacement_session_id
+                        message_id = backend.chat_manager.create_message_id()
+                        pending_message = backend.build_pending_message(message_id)
+                        _persist_pending_turn(backend, session_id, user_message, pending_message)
 
                 assistant_message = backend.build_assistant_message(request.message, result, message_id=message_id)
                 backend.chat_manager.update_message(

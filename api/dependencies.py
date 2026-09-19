@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import threading
+from typing import TYPE_CHECKING
 
-from web_infrastructure.chappie_runtime import CHAPPiERuntime, create_chappie_backend
+if TYPE_CHECKING:
+    from web_infrastructure.chappie_runtime import CHAPPiERuntime
 
 _backend: CHAPPiERuntime | None = None
 _backend_lock = threading.Lock()
@@ -12,6 +14,8 @@ def get_backend() -> CHAPPiERuntime:
     global _backend
     with _backend_lock:
         if _backend is None:
+            from web_infrastructure.chappie_runtime import create_chappie_backend
+
             _backend = create_chappie_backend()
     return _backend
 

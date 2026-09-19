@@ -9,7 +9,7 @@ function deriveApiBaseUrl(): string {
   }
 
   if (typeof window === "undefined") {
-    return "http://100.105.94.71:8010";
+    return "http://127.0.0.1:8010";
   }
 
   const { protocol, hostname, port, origin } = window.location;
@@ -17,7 +17,7 @@ function deriveApiBaseUrl(): string {
     return trimTrailingSlash(origin);
   }
   if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "http://100.105.94.71:8010";
+    return `${protocol}//${hostname}:8010`;
   }
 
   return `${protocol}//${hostname}:8010`;
